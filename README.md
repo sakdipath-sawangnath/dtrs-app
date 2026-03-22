@@ -2,7 +2,17 @@
 
 ระบบแจ้งปัญหาและระบบจัดการการซ่อมบำรุงกล้องวงจรปิด (CCTV) ซึ่งพัฒนาต่อเนื่องมาจากการใช้งานผ่าน AppSheet
 
-## บันทึกการอัปเดตล่าสุด (2026-03-22)
+## บันทึกการอัปเดตล่าสุด (2026-03-23)
+
+- **GitLab CI/CD** — `.gitlab-ci.yml`: stages `build` → `deploy` → `deploy_docker` → `cleanup`; build แยก `frontend` / `backend`; build image **สองตัว** บน Docker daemon PRD (`cctv-app-ticket-frontend`, `cctv-app-ticket-backend`); SSH รัน **สอง container** + network `cctv-app-ticket-net` — map **8309→3000** (Next.js), **8310→4000** (NestJS)
+- **Docker** — `backend/Dockerfile` + `frontend/Dockerfile` + `docker-compose.yml` (รันทดสอบแยกคอนเทนเนอร์); build frontend ใช้ `--build-arg NEXT_PUBLIC_API_BASE_URL=...`
+- **ตัวแปร CI (GitLab)** — ใช้ **`FRONTEND_BASE_URL`** เดียวสำหรับลิงก์ Environment, ส่งเข้า container และ `JobsPdfService` (ไม่แยก `FRONTEND_URL_PRD`); รายการตัวแปรอื่นดูคอมเมนต์ใน `.gitlab-ci.yml`
+- **Production โดเมนเดียว (ตัวอย่าง)** — เว็บ `https://cctv-app.forth.co.th` + API ที่ **`/api`**: ตั้ง `NEXT_PUBLIC_API_BASE_URL=https://cctv-app.forth.co.th/api`, `NEXTAUTH_URL`, `ALLOWED_ORIGINS`, `FRONTEND_BASE_URL` ให้สอดคล้อง origin จริง; reverse proxy ต้องส่งต่อ **`/socket.io`** ไป backend (Socket.IO ไม่อยู่ใต้ `/api`)
+- **MINIO_PUBLIC_URL (ตัวอย่าง)** — เช่น `https://minio-it.forth.co.th` สำหรับ URL รูปที่ browser โหลดได้ (ค่าจริงใส่เฉพาะ `.env` / GitLab Variables)
+- **Git** — `.gitignore` ที่ root กำหนดขอบเขตขึ้น repo: `backend/`, `frontend/`, `README.md`, `PLAN.md`, `TASK.md`, `STATUS.md`, `AGENTS.md`, `AGENT_INSTRUCTIONS.md`, `.gitlab-ci.yml`, `docker-compose.yml`, `.dockerignore`, `docker/`
+- **Frontend `npm run build`** — เพิ่ม `src/lib/apiResponse.ts` (ดึงรายชื่อ assignable + แปลง error จาก axios แบบ type-safe); หน้า **`/public/report`**: ห่อ `useSearchParams` ด้วย `<Suspense>` ตาม Next.js 15
+
+### ย้อนหลัง (2026-03-22)
 
 - **ตั้งค่าอีเมล (SMTP) — ใช้งานจริง**
   - Backend: โมดูล `SettingsModule` + **nodemailer**; เก็บค่าในตาราง `Setting` คีย์ `email_smtp` (รหัสผ่านไม่ส่งคืนใน GET)

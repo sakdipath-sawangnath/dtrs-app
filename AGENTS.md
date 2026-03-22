@@ -31,8 +31,9 @@
 
 ## ไฟล์/เอกสารที่ควรรู้
 - ภาพรวมระบบ: `README.md`
-- สถานะ/แผน/งาน: `STATUS.md`, `PLAN.md`, `TASK.md` (รวมฟีเจอร์ล่าสุด เช่น SMTP ในตั้งค่าระบบ, Reopen/แก้ไขเฉพาะ assignee, แท็บสัญญา + badge, ลบ IN_PROGRESS โดย ADMIN, lightbox รูปผู้ใช้)
+- สถานะ/แผน/งาน: `STATUS.md`, `PLAN.md`, `TASK.md` (รวม Phase 6.5: GitLab CI, Docker, พอร์ต 8309/8310, `FRONTEND_BASE_URL`, production `/api` + `/socket.io`, build fixes)
 - Mapping ข้อมูล CSV: `docs/CSV-vs-System-Mapping.md`
 - RBAC: `backend/docs/RBAC-Setup.md`
 - Postman / สรุป endpoint: `backend/postman/README.md`, `backend/docs/api-endpoints.json`
+- Deploy: `.gitlab-ci.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml` — อ่านคู่กับ `README.md`
 

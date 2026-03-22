@@ -24,7 +24,7 @@
 ## โฟลเดอร์ใน Collection
 
 - **Auth** – Login (สาธารณะ)
-- **Users** – ผู้ใช้ (reporters สาธารณะ, me, assignable สำหรับ ADMIN/SUPERVISOR, CRUD ต้อง JWT/ADMIN)
+- **Users** – ผู้ใช้ (reporters สาธารณะ, me, **assignable** สำหรับ ADMIN/SUPERVISOR/**STAFF**, CRUD ต้อง JWT/ADMIN)
 - **Jobs** – งานแจ้งซ่อม (สร้าง/สถานะสาธารณะ, อื่นๆ ต้อง JWT; assign: ADMIN/SUPERVISOR มอบหมายได้, STAFF รับงานตัวเอง; **PATCH :id/fix**: บันทึกการแก้ไข — **เฉพาะผู้รับงาน**; **PATCH :id/reopen**: เปิดงานใหม่หลังปิด — **เฉพาะผู้รับงาน**; อัปโหลดรูปการแก้ไข; **DELETE :id**: ADMIN ลบงาน **IN_PROGRESS** ได้; ADMIN/SUPERVISOR ลบงาน **PENDING** ที่ยังไม่มอบหมายได้) — ดูรายละเอียดใน `../docs/api-endpoints.json`
 - **Settings** – ตั้งค่าระบบ (ADMIN): **GET/PUT** `settings/email-smtp`, **POST** `settings/email-smtp/test` (ทดสอบส่งอีเมล)
 - **Sites** – พื้นที่โครงการ (GET สาธารณะ, POST ต้อง JWT)
@@ -32,3 +32,7 @@
 - **Health** – Hello (health check)
 
 รายละเอียดแต่ละเส้นดูได้ที่ **`../docs/api-endpoints.json`**
+
+## GitLab CI / Deploy
+
+Pipeline อ้างอิงที่ root โปรเจกต์: **`.gitlab-ci.yml`** + **`backend/Dockerfile`** / **`frontend/Dockerfile`** — สรุปการตั้งค่าและตัวแปรดูที่ root **`README.md`**

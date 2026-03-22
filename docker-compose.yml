@@ -1,0 +1,38 @@
+# รันแยก Frontend + Backend สำหรับทดสอบ / ตรวจสอบ (พอร์ต: 8309 = Next, 8310 = Nest)
+# ตัวอย่าง: set NEXT_PUBLIC_API_BASE_URL แล้ว build
+#   set NEXT_PUBLIC_API_BASE_URL=http://localhost:8310/api
+#   docker compose build --build-arg NEXT_PUBLIC_API_BASE_URL=%NEXT_PUBLIC_API_BASE_URL%
+# หรือใช้ไฟล์ .env ข้าง compose (ดู README)
+#   docker compose --env-file .env.docker up -d --build
+#
+# หมายเหตุ: ค่า DATABASE_URL / JWT / MinIO ฯลฯ ต้องส่งเข้า backend ผ่าน environment
+# (เช่น export ก่อนรัน หรือสร้าง docker-compose.override.yml ในเครื่อง — ไม่ขึ้น git)
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cctv-app-ticket-backend
+    restart: unless-stopped
+    ports:
+      - "8310:4000"
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8310/api}
+    container_name: cctv-app-ticket-frontend
+    restart: unless-stopped
+    ports:
+      - "8309:3000"
+    environment:
+      NODE_ENV: production
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:8309}
+    depends_on:
+      - backend

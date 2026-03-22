@@ -11,7 +11,7 @@
 !/STATUS.md
 !.gitignore
 !.gitlab-ci.yml
-!Dockerfile
+!docker-compose.yml
 !.dockerignore
 !/docker/
 !/docker/**

@@ -13,9 +13,10 @@ stages:
 variables:
   NODE_VERSION: "20"
 
-  # Docker / Server PRD
+  # Docker / Server PRD — image แยก frontend / backend
   DOCKER_HOST_PRD: "tcp://192.168.0.128:2375"
-  APP_IMAGE: "cctv-app-ticket"
+  APP_IMAGE_BACKEND: "cctv-app-ticket-backend"
+  APP_IMAGE_FRONTEND: "cctv-app-ticket-frontend"
   IMAGE_TAG: "$CI_COMMIT_SHORT_SHA"
 
   # SSH / Deploy target
@@ -28,7 +29,7 @@ cache:
     - frontend/node_modules/
     - backend/node_modules/
 
-# 1) BUILD — ตรวจว่า frontend/backend build ผ่าน (artifact ไม่ส่งต่อให้ Docker; image build ภายใน Dockerfile)
+# 1) BUILD — ตรวจว่า frontend/backend build ผ่าน (artifact ไม่ส่งต่อให้ Docker; image build จาก backend/Dockerfile + frontend/Dockerfile)
 build:frontend:
   stage: build
   image: node:${NODE_VERSION}
@@ -90,15 +91,18 @@ docker_build:prd:
     - job: deploy:summary
   script:
     - export DOCKER_HOST="$DOCKER_HOST_PRD"
-    - IMAGE_NAME="$APP_IMAGE:$IMAGE_TAG-prd"
+    - IMAGE_BACKEND="${APP_IMAGE_BACKEND}:${IMAGE_TAG}-prd"
+    - IMAGE_FRONTEND="${APP_IMAGE_FRONTEND}:${IMAGE_TAG}-prd"
+    - docker build -t "$IMAGE_BACKEND" -f backend/Dockerfile ./backend
+    - docker tag "$IMAGE_BACKEND" "$APP_IMAGE_BACKEND:prd"
+    - docker tag "$IMAGE_BACKEND" "$APP_IMAGE_BACKEND:latest-prd"
     - |
-      docker build -t "$IMAGE_NAME" -f Dockerfile \
-        --build-arg NODE_ENV=production \
-        --build-arg NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL}" \
-        .
-    - docker tag "$IMAGE_NAME" "$APP_IMAGE:prd"
-    - docker tag "$IMAGE_NAME" "$APP_IMAGE:latest-prd"
-    - docker images "$APP_IMAGE"
+      docker build -t "$IMAGE_FRONTEND" -f frontend/Dockerfile ./frontend \
+        --build-arg NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL}"
+    - docker tag "$IMAGE_FRONTEND" "$APP_IMAGE_FRONTEND:prd"
+    - docker tag "$IMAGE_FRONTEND" "$APP_IMAGE_FRONTEND:latest-prd"
+    - docker images "$APP_IMAGE_BACKEND"
+    - docker images "$APP_IMAGE_FRONTEND"
   only:
     - main
     - master
@@ -119,21 +123,21 @@ deploy:prd:docker:
       ssh $DEPLOY_SERVER_PRD "bash -s" << EOF
       set -e
       export DEPLOY_PATH='${DEPLOY_PATH_PRD}'
-      export APP_IMAGE='${APP_IMAGE}'
+      export APP_IMAGE_BACKEND='${APP_IMAGE_BACKEND}'
+      export APP_IMAGE_FRONTEND='${APP_IMAGE_FRONTEND}'
       export DOCKER_HOST='${DOCKER_HOST_PRD}'
       mkdir -p "\$DEPLOY_PATH"
       cd "\$DEPLOY_PATH"
-      docker ps -a --filter "name=cctv-app-ticket" --format "{{.ID}}" | xargs -r docker rm -f || true
+      docker network inspect cctv-app-ticket-net >/dev/null 2>&1 || docker network create cctv-app-ticket-net
+      docker rm -f cctv-app-ticket cctv-app-ticket-backend cctv-app-ticket-frontend 2>/dev/null || true
       docker run -d --restart unless-stopped \
-        --name cctv-app-ticket \
-        -p 8309:3000 \
+        --name cctv-app-ticket-backend \
+        --network cctv-app-ticket-net \
         -p 8310:4000 \
         -e NODE_ENV=production \
         -e PORT=4000 \
         -e DATABASE_URL='${DATABASE_URL}' \
         -e JWT_SECRET='${JWT_SECRET}' \
-        -e NEXTAUTH_SECRET='${NEXTAUTH_SECRET}' \
-        -e NEXTAUTH_URL='${NEXTAUTH_URL}' \
         -e FRONTEND_BASE_URL='${FRONTEND_BASE_URL}' \
         -e MINIO_ENDPOINT='${MINIO_ENDPOINT}' \
         -e MINIO_PORT='${MINIO_PORT}' \
@@ -143,7 +147,15 @@ deploy:prd:docker:
         -e MINIO_PUBLIC_URL='${MINIO_PUBLIC_URL}' \
         -e SMTP_TLS_REJECT_UNAUTHORIZED='${SMTP_TLS_REJECT_UNAUTHORIZED}' \
         -e CRON_SECRET='${CRON_SECRET}' \
-        "\${APP_IMAGE}:latest-prd"
+        "\${APP_IMAGE_BACKEND}:latest-prd"
+      docker run -d --restart unless-stopped \
+        --name cctv-app-ticket-frontend \
+        --network cctv-app-ticket-net \
+        -p 8309:3000 \
+        -e NODE_ENV=production \
+        -e NEXTAUTH_SECRET='${NEXTAUTH_SECRET}' \
+        -e NEXTAUTH_URL='${NEXTAUTH_URL}' \
+        "\${APP_IMAGE_FRONTEND}:latest-prd"
       EOF
   only:
     - main
@@ -166,22 +178,24 @@ cleanup:docker:prd:
     - ssh-keyscan -H ${DEPLOY_SERVER_PRD#*@} >> ~/.ssh/known_hosts
   script:
     - |
-      ssh $DEPLOY_SERVER_PRD "DOCKER_HOST='$DOCKER_HOST_PRD' APP_IMAGE='$APP_IMAGE' bash -c '
+      ssh $DEPLOY_SERVER_PRD "DOCKER_HOST='$DOCKER_HOST_PRD' bash -c '
         set -e
         export DOCKER_HOST=\$DOCKER_HOST
         echo \"Before cleanup:\"
         docker system df || true
         echo \"Cleaning dangling images...\"
         docker image prune -f || true
-        echo \"Cleaning old images for \$APP_IMAGE (keep latest 2)...\"
+        echo \"Cleaning old images for backend/frontend (keep latest 2 each)...\"
         KEEP=2
-        OLD=\$(docker images \"\$APP_IMAGE\" --format \"{{.ID}} {{.CreatedAt}}\" | sort -k2 -r | tail -n +\$((KEEP+1)) | cut -d\" \" -f1)
-        if [ -n \"\$OLD\" ]; then
-          echo \"Removing:\"
-          echo \"\$OLD\" | xargs -r docker rmi -f || true
-        else
-          echo \"No old images to remove\"
-        fi
+        for APP_IMAGE in cctv-app-ticket-backend cctv-app-ticket-frontend; do
+          OLD=\$(docker images \"\$APP_IMAGE\" --format \"{{.ID}} {{.CreatedAt}}\" | sort -k2 -r | tail -n +\$((KEEP+1)) | cut -d\" \" -f1)
+          if [ -n \"\$OLD\" ]; then
+            echo \"Removing for \$APP_IMAGE:\"
+            echo \"\$OLD\" | xargs -r docker rmi -f || true
+          else
+            echo \"No old images to remove for \$APP_IMAGE\"
+          fi
+        done
         echo \"After cleanup:\"
         docker system df || true
       '"
