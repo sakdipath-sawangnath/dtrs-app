@@ -10,6 +10,11 @@
 !/TASK.md
 !/STATUS.md
 !.gitignore
+!.gitlab-ci.yml
+!Dockerfile
+!.dockerignore
+!/docker/
+!/docker/**
 
 # ให้ติดตามเนื้อหาในโฟลเดอร์ที่อนุญาต (ชัดเจนกรณี Git เวอร์ชันเก่า)
 !/backend/**

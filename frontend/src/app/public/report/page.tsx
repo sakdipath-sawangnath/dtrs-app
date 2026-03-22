@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
@@ -46,7 +46,7 @@ function extractApiErrorMessage(err: unknown): string {
   return '';
 }
 
-export default function ReportPage() {
+function ReportPageContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -679,5 +679,20 @@ export default function ReportPage() {
     <PublicLayoutShell subtitle="แจ้งปัญหาการใช้งาน">
       {formInner}
     </PublicLayoutShell>
+  );
+}
+
+export default function ReportPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950">
+          <div className="animate-spin w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full mb-3" />
+          <div className="text-sm text-slate-400">กำลังโหลด...</div>
+        </div>
+      }
+    >
+      <ReportPageContent />
+    </Suspense>
   );
 }

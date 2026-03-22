@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- react-select StylesConfig ต้องใช้ generic หลวมเพื่อให้ onChange ของแต่ละหน้าเข้ากันได้ */
 import type { GroupBase, StylesConfig } from "react-select";
 
 /**

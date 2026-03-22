@@ -73,9 +73,8 @@ export default function ProfilePage() {
       .then((res) => {
         const p = unwrapApiData<Profile>(res.data);
         if (!p) {
-          const apiRoot = res.data as any;
+          const apiRoot = res.data as unknown as Record<string, unknown> | null | undefined;
           const inner = apiRoot?.data;
-          // eslint-disable-next-line no-console
           console.error("[profile][fetchProfile] invalid payload", apiRoot);
           const notFoundMsg =
             inner === null

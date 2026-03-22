@@ -25,6 +25,7 @@ import DashboardPageShell from "@/components/DashboardPageShell";
 import { confirmDialog, toastError, toastSuccess } from "@/lib/toast";
 import Select from "react-select";
 import { reactSelectGlassStyles } from "@/lib/reactSelectGlassStyles";
+import { extractAssignableArray } from "@/lib/apiResponse";
 
 interface JobDetail {
   id: number;
@@ -358,14 +359,7 @@ export default function JobDetailPage() {
       const res = await axios.get(`${API}/users/assignable`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const root = res?.data as unknown;
-      const anyRoot = root as any;
-      const extracted =
-        Array.isArray(anyRoot) ? anyRoot
-          : Array.isArray(anyRoot?.data) ? anyRoot.data
-            : Array.isArray(anyRoot?.data?.data) ? anyRoot.data.data
-              : Array.isArray(anyRoot?.data?.items) ? anyRoot.data.items
-                : [];
+      const extracted = extractAssignableArray(res?.data as unknown);
       setAssignableStaff(
         Array.isArray(extracted)
           ? (extracted as { id: number; name?: string | null; username?: string; email?: string }[])

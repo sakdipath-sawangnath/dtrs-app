@@ -66,7 +66,7 @@ export const authOptions: NextAuthOptions = {
                                 },
                             });
                             const meRaw: unknown = await meRes.json().catch(() => null);
-                            const mePayload = unwrapApiData<any>(meRaw) as any;
+                            const mePayload = unwrapApiData<{ image?: string }>(meRaw);
                             image = mePayload?.image ?? undefined;
                         } catch {
                             // ignore

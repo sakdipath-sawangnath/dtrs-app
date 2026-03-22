@@ -35,6 +35,12 @@ import { io, Socket } from "socket.io-client";
 import DataTablePagination, { DataTablePageSize } from "./DataTablePagination";
 import { createPortal } from "react-dom";
 import SegmentedTabs from "./SegmentedTabs";
+import {
+  extractAssignableArray,
+  axiosErrorData,
+  formatApiErrorDetail,
+  asRecord,
+} from "@/lib/apiResponse";
 
 function ActionIconButton({
   label,
@@ -864,15 +870,7 @@ export default function JobsList({
       // รองรับหลายรูปแบบ response:
       // - { success, data: [...] } (ResponseInterceptor)
       // - { data: { data: [...] } } (บางกรณี response ซ้อน)
-      const root = res?.data as unknown;
-      const anyRoot = root as any;
-
-      const extracted =
-        Array.isArray(anyRoot) ? anyRoot
-          : Array.isArray(anyRoot?.data) ? anyRoot.data
-          : Array.isArray(anyRoot?.data?.data) ? anyRoot.data.data
-          : Array.isArray(anyRoot?.data?.items) ? anyRoot.data.items
-          : [];
+      const extracted = extractAssignableArray(res?.data as unknown);
 
       setAssignableStaff(
         Array.isArray(extracted)
@@ -933,30 +931,17 @@ export default function JobsList({
       toastSuccess("ย้ายนอกสัญญาแล้ว", 1200);
       await fetchJobs();
     } catch (err: unknown) {
-      const payload = (err as { response?: { data?: any } })?.response?.data;
-      // eslint-disable-next-line no-console
+      const payload = axiosErrorData(err);
       console.error("[out-of-contract] payload:", payload);
-      const details = payload?.error?.details as
-        | Array<{ field?: string; message?: string }>
-        | undefined;
       const detailText =
-        Array.isArray(details) && details.length > 0
-          ? details
-              .map((d) => `${d.field ? `${d.field}: ` : ""}${d.message ?? ""}`.trim())
-              .filter(Boolean)
-              .join("\n")
-          : payload?.error?.message ??
-            payload?.message ??
-            (payload ? JSON.stringify(payload) : undefined);
+        formatApiErrorDetail(payload) ??
+        (payload ? JSON.stringify(payload) : undefined);
 
       toastError("ไม่สามารถย้ายนอกสัญญาได้", detailText ?? "เกิดข้อผิดพลาด");
-      // eslint-disable-next-line no-console
       console.error(err);
-      // รีเฟรชรายการเพื่อกันกรณีสถานะงานเปลี่ยนไปแล้ว
       try {
         await fetchJobs();
       } catch (refreshErr) {
-        // eslint-disable-next-line no-console
         console.error("[out-of-contract] refresh failed:", refreshErr);
       }
     } finally {
@@ -985,11 +970,14 @@ export default function JobsList({
       if (assignJob?.id === jobId) setAssignJob(null);
       await fetchJobs();
     } catch (err: unknown) {
-      const payload = (err as { response?: { data?: any } })?.response?.data;
+      const payload = axiosErrorData(err);
+      const errInner = asRecord(payload?.error);
+      const detailsArr = errInner?.details;
+      const firstDetail = Array.isArray(detailsArr) ? asRecord(detailsArr[0]) : undefined;
       const msg =
-        payload?.error?.message ??
-        payload?.error?.details?.[0]?.message ??
-        payload?.message ??
+        (typeof errInner?.message === "string" ? errInner.message : undefined) ??
+        (typeof firstDetail?.message === "string" ? firstDetail.message : undefined) ??
+        (typeof payload?.message === "string" ? payload.message : undefined) ??
         "ไม่สามารถลบได้";
       toastError("ลบไม่สำเร็จ", String(msg));
     }
@@ -1017,11 +1005,14 @@ export default function JobsList({
       if (updateFixJob?.id === jobId) setUpdateFixJob(null);
       await fetchJobs();
     } catch (err: unknown) {
-      const payload = (err as { response?: { data?: any } })?.response?.data;
+      const payload = axiosErrorData(err);
+      const errInner = asRecord(payload?.error);
+      const detailsArr = errInner?.details;
+      const firstDetail = Array.isArray(detailsArr) ? asRecord(detailsArr[0]) : undefined;
       const msg =
-        payload?.error?.message ??
-        payload?.error?.details?.[0]?.message ??
-        payload?.message ??
+        (typeof errInner?.message === "string" ? errInner.message : undefined) ??
+        (typeof firstDetail?.message === "string" ? firstDetail.message : undefined) ??
+        (typeof payload?.message === "string" ? payload.message : undefined) ??
         "ไม่สามารถลบได้";
       toastError("ลบไม่สำเร็จ", String(msg));
     }

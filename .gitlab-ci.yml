@@ -1,0 +1,194 @@
+# GitLab CI/CD — CCTV Maintenance (อ้างอิงโครงสร้าง usb-request-management)
+# ตั้งค่าใน GitLab: SSH_PRIVATE_KEY, DATABASE_URL, JWT_SECRET, NEXTAUTH_SECRET, NEXTAUTH_URL,
+#   NEXT_PUBLIC_API_BASE_URL (URL ที่ client เรียก API — ควรตรงพอร์ตที่ map ไป backend เช่น :8310/api),
+#   FRONTEND_BASE_URL (URL หน้าเว็บ PRD — ใช้ทั้ง GitLab Environment, คอนเทนเนอร์, และ backend PDF/Puppeteer)
+#   ตัวแปร MinIO/SMTP ตาม backend
+
+stages:
+  - build
+  - deploy
+  - deploy_docker
+  - cleanup
+
+variables:
+  NODE_VERSION: "20"
+
+  # Docker / Server PRD
+  DOCKER_HOST_PRD: "tcp://192.168.0.128:2375"
+  APP_IMAGE: "cctv-app-ticket"
+  IMAGE_TAG: "$CI_COMMIT_SHORT_SHA"
+
+  # SSH / Deploy target
+  DEPLOY_SERVER_PRD: "newbie@192.168.0.128"
+  DEPLOY_PATH_PRD: "/home/newbie/cctv-app-ticket"
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - frontend/node_modules/
+    - backend/node_modules/
+
+# 1) BUILD — ตรวจว่า frontend/backend build ผ่าน (artifact ไม่ส่งต่อให้ Docker; image build ภายใน Dockerfile)
+build:frontend:
+  stage: build
+  image: node:${NODE_VERSION}
+  script:
+    - cd frontend
+    - npm ci --prefer-offline --no-audit
+    - npm run build
+  artifacts:
+    paths:
+      - frontend/.next
+      - frontend/package.json
+      - frontend/package-lock.json
+    expire_in: 1 hour
+  only:
+    - main
+    - master
+
+build:backend:
+  stage: build
+  image: node:${NODE_VERSION}
+  script:
+    - cd backend
+    - npm ci --prefer-offline --no-audit
+    - npx prisma generate
+    - npm run build
+  artifacts:
+    paths:
+      - backend/dist
+      - backend/package.json
+      - backend/package-lock.json
+      - backend/prisma
+    expire_in: 1 hour
+  only:
+    - main
+    - master
+
+# 2) DEPLOY — จุดเชื่อมระหว่าง build กับ Docker (รายงานสั้น ๆ; deploy จริงอยู่ที่ deploy_docker)
+deploy:summary:
+  stage: deploy
+  image: alpine:latest
+  script:
+    - echo "Deploy production ผ่าน stage deploy_docker (build image + SSH run container)"
+  needs:
+    - job: build:frontend
+    - job: build:backend
+  only:
+    - main
+    - master
+
+# 3) DEPLOY_DOCKER
+docker_build:prd:
+  stage: deploy_docker
+  tags:
+    - docker
+  image: docker:latest
+  needs:
+    - job: build:frontend
+    - job: build:backend
+    - job: deploy:summary
+  script:
+    - export DOCKER_HOST="$DOCKER_HOST_PRD"
+    - IMAGE_NAME="$APP_IMAGE:$IMAGE_TAG-prd"
+    - |
+      docker build -t "$IMAGE_NAME" -f Dockerfile \
+        --build-arg NODE_ENV=production \
+        --build-arg NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL}" \
+        .
+    - docker tag "$IMAGE_NAME" "$APP_IMAGE:prd"
+    - docker tag "$IMAGE_NAME" "$APP_IMAGE:latest-prd"
+    - docker images "$APP_IMAGE"
+  only:
+    - main
+    - master
+
+deploy:prd:docker:
+  stage: deploy_docker
+  image: alpine:latest
+  needs:
+    - job: docker_build:prd
+  before_script:
+    - apk add --no-cache openssh-client bash
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan -H ${DEPLOY_SERVER_PRD#*@} >> ~/.ssh/known_hosts
+  script:
+    - |
+      ssh $DEPLOY_SERVER_PRD "bash -s" << EOF
+      set -e
+      export DEPLOY_PATH='${DEPLOY_PATH_PRD}'
+      export APP_IMAGE='${APP_IMAGE}'
+      export DOCKER_HOST='${DOCKER_HOST_PRD}'
+      mkdir -p "\$DEPLOY_PATH"
+      cd "\$DEPLOY_PATH"
+      docker ps -a --filter "name=cctv-app-ticket" --format "{{.ID}}" | xargs -r docker rm -f || true
+      docker run -d --restart unless-stopped \
+        --name cctv-app-ticket \
+        -p 8309:3000 \
+        -p 8310:4000 \
+        -e NODE_ENV=production \
+        -e PORT=4000 \
+        -e DATABASE_URL='${DATABASE_URL}' \
+        -e JWT_SECRET='${JWT_SECRET}' \
+        -e NEXTAUTH_SECRET='${NEXTAUTH_SECRET}' \
+        -e NEXTAUTH_URL='${NEXTAUTH_URL}' \
+        -e FRONTEND_BASE_URL='${FRONTEND_BASE_URL}' \
+        -e MINIO_ENDPOINT='${MINIO_ENDPOINT}' \
+        -e MINIO_PORT='${MINIO_PORT}' \
+        -e MINIO_ACCESS_KEY='${MINIO_ACCESS_KEY}' \
+        -e MINIO_SECRET_KEY='${MINIO_SECRET_KEY}' \
+        -e MINIO_BUCKET_NAME='${MINIO_BUCKET_NAME}' \
+        -e MINIO_PUBLIC_URL='${MINIO_PUBLIC_URL}' \
+        -e SMTP_TLS_REJECT_UNAUTHORIZED='${SMTP_TLS_REJECT_UNAUTHORIZED}' \
+        -e CRON_SECRET='${CRON_SECRET}' \
+        "\${APP_IMAGE}:latest-prd"
+      EOF
+  only:
+    - main
+    - master
+  environment:
+    name: production
+    url: $FRONTEND_BASE_URL
+
+# 4) CLEANUP — ลบ image เก่าใน PRD (manual)
+cleanup:docker:prd:
+  stage: cleanup
+  tags:
+    - docker
+  image: docker:latest
+  before_script:
+    - apk add --no-cache openssh-client bash
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan -H ${DEPLOY_SERVER_PRD#*@} >> ~/.ssh/known_hosts
+  script:
+    - |
+      ssh $DEPLOY_SERVER_PRD "DOCKER_HOST='$DOCKER_HOST_PRD' APP_IMAGE='$APP_IMAGE' bash -c '
+        set -e
+        export DOCKER_HOST=\$DOCKER_HOST
+        echo \"Before cleanup:\"
+        docker system df || true
+        echo \"Cleaning dangling images...\"
+        docker image prune -f || true
+        echo \"Cleaning old images for \$APP_IMAGE (keep latest 2)...\"
+        KEEP=2
+        OLD=\$(docker images \"\$APP_IMAGE\" --format \"{{.ID}} {{.CreatedAt}}\" | sort -k2 -r | tail -n +\$((KEEP+1)) | cut -d\" \" -f1)
+        if [ -n \"\$OLD\" ]; then
+          echo \"Removing:\"
+          echo \"\$OLD\" | xargs -r docker rmi -f || true
+        else
+          echo \"No old images to remove\"
+        fi
+        echo \"After cleanup:\"
+        docker system df || true
+      '"
+  only:
+    - main
+    - master
+  when: manual
+  allow_failure: true
+  environment:
+    name: production
