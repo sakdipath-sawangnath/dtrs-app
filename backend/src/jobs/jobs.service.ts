@@ -13,6 +13,7 @@ import {
 import { JobStatus, Prisma } from '@prisma/client';
 import { SitesService } from '../sites/sites.service';
 import { UsersService } from '../users/users.service';
+import { MinioService } from '../minio/minio.service';
 import axios from 'axios';
 
 @Injectable()
@@ -21,7 +22,30 @@ export class JobsService {
         private prisma: PrismaService,
         private sitesService: SitesService,
         private usersService: UsersService,
+        private minioService: MinioService,
     ) { }
+
+    /** ปรับ URL รูปผู้ใช้ (avatar) ให้เบราว์เซอร์เข้าถึง MinIO ภายนอกได้ */
+    private mapUserImage<T extends { image?: string | null } | null | undefined>(u: T): T {
+        if (!u || typeof u !== 'object') {
+            return u;
+        }
+        const image = this.minioService.rewriteStorageUrlForClient(u.image ?? undefined);
+        return { ...u, image } as T;
+    }
+
+    private mapJobForClient<
+        T extends {
+            assignedTo?: { image?: string | null } | null;
+            reporter?: { image?: string | null } | null;
+        },
+    >(job: T): T {
+        return {
+            ...job,
+            assignedTo: job.assignedTo ? this.mapUserImage(job.assignedTo) : job.assignedTo,
+            reporter: job.reporter ? this.mapUserImage(job.reporter) : job.reporter,
+        };
+    }
 
     async create(data: Prisma.JobCreateInput) {
         const province = (data.province as string)?.trim();
@@ -62,7 +86,7 @@ export class JobsService {
     }
 
     async findAll() {
-        return this.prisma.job.findMany({
+        const rows = await this.prisma.job.findMany({
             include: {
                 assignedTo: {
                     select: { id: true, name: true, image: true },
@@ -73,6 +97,7 @@ export class JobsService {
             },
             orderBy: { createdAt: 'desc' },
         });
+        return rows.map((j) => this.mapJobForClient(j));
     }
 
     /** รายการแจ้งใหม่สำหรับ notifications bell (PENDING ล่าสุด) */
@@ -94,7 +119,7 @@ export class JobsService {
     }
 
     async findOne(id: number) {
-        return this.prisma.job.findUnique({
+        const job = await this.prisma.job.findUnique({
             where: { id },
             include: {
                 assignedTo: {
@@ -105,6 +130,7 @@ export class JobsService {
                 },
             },
         });
+        return job ? this.mapJobForClient(job) : null;
     }
 
     /**
@@ -173,7 +199,8 @@ export class JobsService {
             if (!job) {
                 return null;
             }
-            return { ...job, detailLevel: 'full' as const };
+            const mapped = this.mapJobForClient(job);
+            return { ...mapped, detailLevel: 'full' as const };
         }
 
         const job = await this.prisma.job.findUnique({

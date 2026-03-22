@@ -97,6 +97,35 @@ export class MinioService implements OnModuleInit {
         return `${protocol}://${endpoint}:${port}`;
     }
 
+    /**
+     * แปลง URL ที่บันทึกใน DB (อาจเป็น host ภายใน/docker) ให้ใช้ MINIO_PUBLIC_URL
+     * เพื่อให้แท็ก <img> ในเบราว์เซอร์โหลดรูปได้
+     */
+    rewriteStorageUrlForClient(url: string | null | undefined): string | null {
+        if (url == null || typeof url !== 'string') {
+            return null;
+        }
+        const trimmed = url.trim();
+        if (!trimmed) {
+            return null;
+        }
+        const publicBaseRaw = process.env.MINIO_PUBLIC_URL?.trim();
+        if (!publicBaseRaw) {
+            return trimmed;
+        }
+        const publicBase = publicBaseRaw.replace(/\/+$/, '');
+        try {
+            const parsed = new URL(trimmed);
+            const bucketPrefix = `/${this.bucketName}/`;
+            if (!parsed.pathname.startsWith(bucketPrefix) && parsed.pathname !== `/${this.bucketName}`) {
+                return trimmed;
+            }
+            return `${publicBase}${parsed.pathname}${parsed.search}`;
+        } catch {
+            return trimmed;
+        }
+    }
+
     private async putObjectAndGetUrl(objectName: string, file: Express.Multer.File): Promise<string> {
         const metaData = {
             'Content-Type': file.mimetype,

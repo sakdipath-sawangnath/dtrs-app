@@ -11,6 +11,8 @@ import {
   Wrench,
   CheckCircle2,
   TrendingUp,
+  TrendingDown,
+  Minus,
   MapPin,
   BarChart3,
   PieChart as PieChartIcon,
@@ -21,6 +23,10 @@ import {
   FileEdit,
   Search,
   User,
+  UserX,
+  FileWarning,
+  Timer,
+  Lightbulb,
 } from "lucide-react";
 import {
   PieChart,
@@ -45,6 +51,9 @@ interface Job {
   createdAt: string;
   fixDate?: string | null;
   province?: string | null;
+  district?: string | null;
+  isOutOfContract?: boolean;
+  assignedTo?: { id: number; name: string } | null;
 }
 
 interface Stats {
@@ -168,6 +177,75 @@ export default function DashboardPage() {
     return days;
   }, [jobs]);
 
+  /** สรุปตัวเลขจากชุด 14 วันเดียวกับกราฟ */
+  const trendSummary14 = useMemo(() => {
+    const reported = trendData.reduce((a, d) => a + d.แจ้งในวันนั้น, 0);
+    const resolved = trendData.reduce((a, d) => a + d.เสร็จในวันนั้น, 0);
+    const net = reported - resolved;
+    const peakReported = trendData.reduce(
+      (best, d) => (d.แจ้งในวันนั้น > best.v ? { date: d.date, v: d.แจ้งในวันนั้น } : best),
+      { date: "–", v: 0 },
+    );
+    const peakResolved = trendData.reduce(
+      (best, d) => (d.เสร็จในวันนั้น > best.v ? { date: d.date, v: d.เสร็จในวันนั้น } : best),
+      { date: "–", v: 0 },
+    );
+    return {
+      reported,
+      resolved,
+      net,
+      avgReported: reported / trendDays,
+      avgResolved: resolved / trendDays,
+      peakReported,
+      peakResolved,
+    };
+  }, [trendData, trendDays]);
+
+  /** งาน PENDING ที่ยังไม่มีผู้รับผิดชอบ */
+  const pendingUnassigned = useMemo(
+    () => jobs.filter((j) => j.status === "PENDING" && !j.assignedTo).length,
+    [jobs],
+  );
+
+  /** งานนอกสัญญาที่ยังไม่ปิด */
+  const openOutOfContract = useMemo(
+    () =>
+      jobs.filter(
+        (j) => j.isOutOfContract === true && (j.status === "PENDING" || j.status === "IN_PROGRESS"),
+      ).length,
+    [jobs],
+  );
+
+  /** เวลาแก้เฉลี่ย (วัน) สำหรับงานที่ปิดแล้วและมี fixDate */
+  const avgResolutionDays = useMemo(() => {
+    const resolved = jobs.filter(
+      (j) => j.status === "RESOLVED" && j.fixDate && (j.reportDate || j.createdAt),
+    );
+    if (resolved.length === 0) return null;
+    let sum = 0;
+    for (const j of resolved) {
+      const start = new Date(j.reportDate || j.createdAt).getTime();
+      const end = new Date(j.fixDate!).getTime();
+      sum += Math.max(0, (end - start) / 86_400_000);
+    }
+    return sum / resolved.length;
+  }, [jobs]);
+
+  /** Top อำเภอ (จากข้อมูลงานทั้งหมด) */
+  const districtTop5 = useMemo(() => {
+    const count: Record<string, number> = {};
+    jobs.forEach((j) => {
+      const prov = j.province?.trim() || "ไม่ระบุ";
+      const dist = j.district?.trim() || "ไม่ระบุ";
+      const key = `${prov} · ${dist}`;
+      count[key] = (count[key] || 0) + 1;
+    });
+    return Object.entries(count)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+  }, [jobs]);
+
   const cards = [
     { label: "ทั้งหมด", value: stats.total, icon: TrendingUp, color: "#94a3b8", bg: "rgba(71,85,105,0.15)", border: "rgba(255,255,255,0.1)", href: "/dashboard/all" },
     { label: "รอดำเนินการ", value: stats.pending, icon: AlertCircle, color: "#fb923c", bg: "rgba(230,81,0,0.12)", border: "rgba(251,146,60,0.25)", href: "/dashboard/pending" },
@@ -226,7 +304,8 @@ export default function DashboardPage() {
               สัดส่วนตามสถานะ
             </h3>
           </div>
-          <div className="flex-1 min-h-[220px]">
+          {/* ความสูงคงที่: Recharts ResponsiveContainer ต้องการ parent ที่มี height ชัดเจน ไม่ใช่แค่ min-height + flex-1 */}
+          <div className="w-full min-w-0 h-[260px]">
             {loading ? (
               <div className="h-full flex items-center justify-center text-sm text-slate-500">
                 กำลังโหลด...
@@ -270,7 +349,7 @@ export default function DashboardPage() {
               จำนวนแจ้งซ่อมแยกตามจังหวัด (Top 8)
             </h3>
           </div>
-          <div className="flex-1 min-h-[220px]">
+          <div className="w-full min-w-0 h-[260px]">
             {loading ? (
               <div className="h-full flex items-center justify-center text-sm text-slate-500">
                 กำลังโหลด...
@@ -301,48 +380,168 @@ export default function DashboardPage() {
       <div
         className="rounded-xl border border-white/10 p-4 sm:p-5 min-h-[280px] flex flex-col bg-slate-900/50 backdrop-blur-sm"
       >
-        <div className="flex flex-col gap-1 mb-4 shrink-0">
+          <div className="flex flex-col gap-1 mb-4 shrink-0">
           <div className="flex items-center gap-2">
             <BarChart3 size={18} className="text-slate-400" />
             <h3 className="font-bold text-sm text-slate-200">
               แนวโน้มรายวัน (14 วันล่าสุด)
             </h3>
           </div>
-          <p className="text-xs text-slate-500">
-            <strong>วัตถุประสงค์:</strong> เปรียบเทียบปริมาณงานที่เข้ามา (แจ้งซ่อม) กับงานที่ปิดได้ในแต่ละวัน · สีเทา = จำนวนที่<strong>แจ้งในวันนั้น</strong> (reportDate) · สีเขียว = จำนวนที่<strong>แก้ไขเสร็จในวันนั้น</strong> (fixDate) · ใช้ดูว่า backlog ลดหรือเพิ่ม
+          <p className="text-xs text-slate-500 leading-relaxed">
+            <strong>ใช้ทำอะไร:</strong> ดูว่าแต่ละวันมีงาน<strong>เข้าใหม่</strong>กี่ใบ (เส้น/พื้นเทา — นับตามวันที่แจ้ง) เทียบกับงานที่<strong>ปิดเสร็จ</strong>กี่ใบ (เขียว — นับตามวันที่บันทึกแก้ไขเสร็จ) ถ้าเข้ามามากกว่าปิดต่อเนื่อง
+            แปลว่าคิวงานสะสม (backlog) มีแนวโน้มเพิ่ม — ใช้ประกอบการวางคนและลำดับความสำคัญ ไม่ใช่ SLA ตามสัญญาโดยตรง
           </p>
         </div>
-        <div className="flex-1 min-h-[220px]">
+        <div className="w-full min-w-0 h-[280px] sm:h-[300px]">
           {loading ? (
             <div className="h-full flex items-center justify-center text-sm text-slate-500">
               กำลังโหลด...
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <AreaChart data={trendData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
                 <defs>
-                  <linearGradient id="colorReport" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#475569" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#475569" stopOpacity={0} />
+                  <linearGradient id="dashTrendReport" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#64748b" stopOpacity={0.45} />
+                    <stop offset="95%" stopColor="#64748b" stopOpacity={0.05} />
                   </linearGradient>
-                  <linearGradient id="colorResolved" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2e7d32" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#2e7d32" stopOpacity={0} />
+                  <linearGradient id="dashTrendResolved" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0.05} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                 <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} stroke="rgba(255,255,255,0.1)" />
-                <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} stroke="rgba(255,255,255,0.1)" allowDecimals={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} stroke="rgba(255,255,255,0.1)" allowDecimals={false} domain={[0, "auto"]} />
                 <Tooltip
                   contentStyle={{ borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "#1e293b", color: "#e2e8f0" }}
                   formatter={(value: number, name: string) => [value, name === "แจ้งในวันนั้น" ? "แจ้งในวันนั้น (รายการ)" : "เสร็จในวันนั้น (รายการ)"]}
                 />
                 <Legend />
-                <Area type="monotone" dataKey="แจ้งในวันนั้น" stroke="#475569" fillOpacity={1} fill="url(#colorReport)" strokeWidth={2} />
-                <Area type="monotone" dataKey="เสร็จในวันนั้น" stroke="#2e7d32" fillOpacity={1} fill="url(#colorResolved)" strokeWidth={2} />
+                <Area type="monotone" dataKey="แจ้งในวันนั้น" stroke="#94a3b8" fillOpacity={1} fill="url(#dashTrendReport)" strokeWidth={2} />
+                <Area type="monotone" dataKey="เสร็จในวันนั้น" stroke="#4ade80" fillOpacity={1} fill="url(#dashTrendResolved)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           )}
+        </div>
+        {!loading && (
+          <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 shrink-0">
+            <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5">
+              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">แจ้งรวม 14 วัน</p>
+              <p className="text-lg font-bold text-slate-200 tabular-nums">{trendSummary14.reported}</p>
+              <p className="text-[11px] text-slate-500">เฉลี่ย {trendSummary14.avgReported.toFixed(1)} ใบ/วัน</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5">
+              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">ปิดรวม 14 วัน</p>
+              <p className="text-lg font-bold text-emerald-300 tabular-nums">{trendSummary14.resolved}</p>
+              <p className="text-[11px] text-slate-500">เฉลี่ย {trendSummary14.avgResolved.toFixed(1)} ใบ/วัน</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5 col-span-2 sm:col-span-1 lg:col-span-1">
+              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">สุทธิใน 14 วัน (เข้า − ปิด)</p>
+              <p className={`text-lg font-bold tabular-nums flex items-center gap-1.5 ${trendSummary14.net > 0 ? "text-amber-300" : trendSummary14.net < 0 ? "text-sky-300" : "text-slate-200"}`}>
+                {trendSummary14.net > 0 ? <TrendingUp size={18} className="shrink-0 opacity-90" aria-hidden /> : null}
+                {trendSummary14.net < 0 ? <TrendingDown size={18} className="shrink-0 opacity-90" aria-hidden /> : null}
+                {trendSummary14.net === 0 ? <Minus size={18} className="shrink-0 text-slate-500" aria-hidden /> : null}
+                {trendSummary14.net > 0 ? "+" : ""}
+                {trendSummary14.net}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                {trendSummary14.net > 0
+                  ? "งานเข้ามากกว่าปิดในช่วงนี้"
+                  : trendSummary14.net < 0
+                    ? "ปิดได้มากกว่างานเข้าใหม่"
+                    : "เข้าและปิดเท่ากัน"}
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5 col-span-2 lg:col-span-2">
+              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">จุดสูงสุดในกราฟ 14 วัน</p>
+              <p className="text-xs text-slate-300 mt-1 leading-snug">
+                แจ้งสูงสุด <span className="font-semibold text-slate-100">{trendSummary14.peakReported.v}</span> ใบ วันที่{" "}
+                {trendSummary14.peakReported.date}
+                <span className="text-slate-500"> · </span>
+                ปิดสูงสุด <span className="font-semibold text-emerald-200/90">{trendSummary14.peakResolved.v}</span> ใบ วันที่{" "}
+                {trendSummary14.peakResolved.date}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* สรุปวิเคราะห์จากข้อมูลชุดเดียวกับรายการงาน */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-bold text-slate-200 tracking-tight">สรุปสำหรับวิเคราะห์เพิ่มเติม</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="rounded-xl border border-white/10 p-4 bg-slate-900/50 backdrop-blur-sm flex gap-3 min-w-0">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 border border-amber-500/25 text-amber-300">
+              <UserX size={20} aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-slate-400">รอดำเนินการ · ยังไม่มีผู้รับ</p>
+              <p className="text-2xl font-bold text-slate-100 tabular-nums">{loading ? "–" : pendingUnassigned}</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">ควรมอบหมายหรือรับงานเพื่อไม่ให้ค้างที่สถานะรอ</p>
+            </div>
+          </div>
+          <div className="rounded-xl border border-white/10 p-4 bg-slate-900/50 backdrop-blur-sm flex gap-3 min-w-0">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500/15 border border-orange-500/25 text-orange-300">
+              <FileWarning size={20} aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-slate-400">นอกสัญญา · ยังไม่ปิด</p>
+              <p className="text-2xl font-bold text-slate-100 tabular-nums">{loading ? "–" : openOutOfContract}</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">PENDING / IN_PROGRESS ที่ทำเครื่องหมายนอกสัญญา</p>
+            </div>
+          </div>
+          <div className="rounded-xl border border-white/10 p-4 bg-slate-900/50 backdrop-blur-sm flex gap-3 min-w-0">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 border border-sky-500/25 text-sky-300">
+              <Timer size={20} aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-slate-400">เวลาแก้เฉลี่ย (งานปิดแล้ว)</p>
+              <p className="text-2xl font-bold text-slate-100 tabular-nums">
+                {loading ? "–" : avgResolutionDays != null ? avgResolutionDays.toFixed(1) : "–"}
+              </p>
+              <p className="text-[11px] text-slate-500 mt-0.5">วัน จากวันแจ้งถึงวันบันทึกแก้ไขเสร็จ (ทุกใบที่ RESOLVED)</p>
+            </div>
+          </div>
+          <div className="rounded-xl border border-white/10 p-4 bg-slate-900/50 backdrop-blur-sm min-w-0 sm:col-span-2 lg:col-span-1">
+            <div className="flex items-center gap-2 mb-2">
+              <MapPin size={16} className="text-slate-400 shrink-0" aria-hidden />
+              <p className="text-xs font-semibold text-slate-400">พื้นที่แจ้งถี่ (จังหวัด · อำเภอ Top 5)</p>
+            </div>
+            {loading ? (
+              <p className="text-sm text-slate-500">กำลังโหลด...</p>
+            ) : districtTop5.length === 0 ? (
+              <p className="text-sm text-slate-500">ยังไม่มีข้อมูล</p>
+            ) : (
+              <ul className="space-y-1.5 text-xs">
+                {districtTop5.map((row, i) => (
+                  <li key={row.name} className="flex justify-between gap-2 text-slate-300">
+                    <span className="truncate" title={row.name}>
+                      {i + 1}. {row.name}
+                    </span>
+                    <span className="shrink-0 font-semibold text-slate-100 tabular-nums">{row.value}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-white/10 p-4 sm:p-5 bg-slate-900/40 backdrop-blur-sm">
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-300 border border-violet-500/20">
+              <Lightbulb size={18} aria-hidden />
+            </span>
+            <div className="min-w-0 text-xs text-slate-400 leading-relaxed space-y-2">
+              <p className="font-semibold text-slate-300 text-sm">แนวทางขยายวิเคราะห์ในอนาคต (จากข้อมูลเดิมในระบบ)</p>
+              <ul className="list-disc pl-4 space-y-1 marker:text-slate-600">
+                <li>ภาระงานต่อเจ้าหน้าที่ (นับจากผู้รับผิดชอบ + งานค้าง)</li>
+                <li>สัดส่วนใน / นอกสัญญา และแนวโน้มรายเดือน</li>
+                <li>กราฟเวลาแก้ตามจังหวัดหรือตามประเภทสถานที่ (Site)</li>
+                <li>เป้า SLA ถ้ามีกำหนดวันปิดในนโยบาย — เปรียบเทียบกับวันจริงที่ปิด</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
 

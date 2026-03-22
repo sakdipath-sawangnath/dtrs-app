@@ -13,7 +13,7 @@ Next.js 15 (App Router) สำหรับระบบแจ้งปัญห�
 
 - `src/app/` — หน้าและ layout (report, status, login, dashboard)
 - `src/components/` — SiteHeader, SiteFooter, PublicLayoutShell, DashboardPageShell, DashboardFilterBar, CrudModal, UserMenuDropdown, SegmentedTabs, JobsList (ตารางงาน + แท็บสัญญา/นอกสัญญา **ไม่ห่อ glass ชั้นนอก** + badge งานค้าง + modal อัปเดตการแก้ไขแบบ Dark Glass + ดูรายละเอียด full page `/dashboard/jobs/:id` + มอบหมายงาน react-select / รับงาน; รองรับ `assignedToMe` สำหรับงานที่รับผิดชอบ; ADMIN ลบ IN_PROGRESS ได้ที่หน้า `/dashboard/in-progress`)
-- `src/lib/` — auth.ts (NextAuth), toast.ts (toastSuccess, toastError, confirmDialog)
+- `src/lib/` — auth.ts (NextAuth), toast.ts (toastSuccess, toastError, confirmDialog), **apiResponse.ts** (`extractAssignableArray`, `axiosErrorData`, `formatApiErrorDetail` — ใช้ใน JobsList / หน้ารายละเอียดงาน)
 
 ### Flow สำคัญ
 
@@ -36,6 +36,17 @@ Next.js 15 (App Router) สำหรับระบบแจ้งปัญห�
 
 - **/dashboard/users** (ADMIN)
   - จัดการผู้ใช้ — คลิกรูปโปรไฟล์ในตารางเพื่อดูรูปขนาดใหญ่ (lightbox)
+
+- **`/public/report`**
+  - แจ้งปัญหา (เส้นทาง public); ใช้ **`useSearchParams`** ภายใน **`ReportPageContent`** ที่ห่อด้วย **`<Suspense>`** เพื่อให้ `next build` ผ่าน (Next.js 15)
+
+## Production build
+
+```bash
+npm run build
+```
+
+ควรรันก่อน merge/deploy; โปรเจกต์หลักใช้ GitLab CI แยก build `frontend` / `backend` ตาม `.gitlab-ci.yml` ที่ root (ดู `README.md` ด้านบน)
 
 ## รันพัฒนา
 

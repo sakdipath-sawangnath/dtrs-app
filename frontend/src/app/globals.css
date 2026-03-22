@@ -160,6 +160,12 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+
+  /* สถานะกำลังโหลด: ให้หมุนต่อเนื่องได้ (สเปซิฟิกสิทธิ์สูงกว่า * ด้านบน) */
+  .login-loading-spin {
+    animation-duration: 1s !important;
+    animation-iteration-count: infinite !important;
+  }
 }
 
 /* ─── Focus States (Accessibility) ─── */

@@ -45,6 +45,8 @@
 | job.assign | มอบหมายงาน (ปุ่มมอบหมายงานในหน้ารอดำเนินการ) |
 | job.deleteUnassigned | ลบงานที่ยังไม่มีผู้รับผิดชอบ |
 
+> **หมายเหตุ (Deploy):** บน GitLab CI ใช้ตัวแปร **`FRONTEND_BASE_URL`** เป็น URL หน้าเว็บ PRD (รวมลิงก์ Environment และส่งเข้า container) — สอดคล้อง `JobsPdfService` ฝั่ง backend
+
 ## บทบาทเริ่มต้น
 
 | Code | ชื่อ | คำอธิบาย |

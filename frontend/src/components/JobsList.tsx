@@ -41,6 +41,7 @@ import {
   formatApiErrorDetail,
   asRecord,
 } from "@/lib/apiResponse";
+import PersonAvatar from "@/components/PersonAvatar";
 
 function ActionIconButton({
   label,
@@ -200,45 +201,6 @@ function limitText(s: string, maxLen: number): { short: string; full: string; cl
   if (!full) return { short: "–", full: "", clipped: false };
   const clipped = full.length > maxLen;
   return { short: clipped ? full.slice(0, maxLen) + "…" : full, full, clipped };
-}
-
-function ListPersonAvatar({
-  imageUrl,
-  nameLabel,
-  size = "sm",
-  variant = "dark",
-}: {
-  imageUrl?: string | null;
-  nameLabel?: string;
-  size?: "sm" | "md";
-  variant?: "dark" | "light";
-}) {
-  const [imgErr, setImgErr] = useState(false);
-  const url = imageUrl?.trim();
-  const showImg = Boolean(url) && !imgErr;
-  const dim = size === "md" ? "h-10 w-10" : "h-8 w-8";
-  const iconSz = size === "md" ? 18 : 16;
-  const shell =
-    variant === "light"
-      ? "border border-slate-200 bg-slate-100 ring-1 ring-slate-200/60"
-      : "border border-white/10 bg-slate-800/80 ring-1 ring-white/5";
-  const iconCls = variant === "light" ? "text-slate-400" : "text-slate-500";
-  return (
-    <div
-      className={`${dim} shrink-0 rounded-full overflow-hidden flex items-center justify-center ${shell}`}
-    >
-      {showImg ? (
-        <img
-          src={url}
-          alt={nameLabel ? `รูป ${nameLabel}` : "รูปโปรไฟล์"}
-          className="h-full w-full object-cover"
-          onError={() => setImgErr(true)}
-        />
-      ) : (
-        <User size={iconSz} className={iconCls} aria-hidden />
-      )}
-    </div>
-  );
 }
 
 interface Job {
@@ -1209,7 +1171,7 @@ export default function JobsList({
                   </td>
                   <td className="px-2.5 py-2.5 text-sm text-slate-300">
                     <div className="flex items-start gap-2 min-w-0">
-                      <ListPersonAvatar
+                      <PersonAvatar
                         imageUrl={job.reporter?.image}
                         nameLabel={job.reporterName ?? undefined}
                       />
@@ -1239,7 +1201,7 @@ export default function JobsList({
                   {showAssignedToColumn && (
                     <td className="px-2.5 py-2.5 text-sm text-slate-300">
                       <div className="flex items-center gap-2 min-w-0">
-                        <ListPersonAvatar
+                        <PersonAvatar
                           imageUrl={job.assignedTo?.image}
                           nameLabel={job.assignedTo?.name}
                         />
@@ -1456,7 +1418,7 @@ export default function JobsList({
                         <User size={12} /> ผู้แจ้ง
                       </p>
                       <div className="flex items-start gap-3">
-                        <ListPersonAvatar
+                        <PersonAvatar
                           imageUrl={detailJob.reporter?.image}
                           nameLabel={detailJob.reporterName ?? undefined}
                           size="md"
@@ -1521,7 +1483,7 @@ export default function JobsList({
                           ผู้รับผิดชอบ
                         </p>
                         <div className="flex items-center gap-3">
-                          <ListPersonAvatar
+                          <PersonAvatar
                             imageUrl={detailJob.assignedTo.image}
                             nameLabel={detailJob.assignedTo.name}
                             size="md"

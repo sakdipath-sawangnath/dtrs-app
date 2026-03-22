@@ -1,6 +1,6 @@
 # แผนปรับปรุงระบบแจ้งซ่อม CCTV
 
-**อัปเดต:** 2026-03-22
+**อัปเดต:** 2026-03-23
 
 ---
 
@@ -126,6 +126,14 @@
 - [x] **Reopen** — `PATCH /jobs/:id/reopen` (เฉพาะ assignee); `fix` ต้องไม่ใช่กรณี `RESOLVED` จนกว่าจะ reopen
 - [x] **Frontend** — `/dashboard/settings` (SMTP + ทดสอบส่ง); Reopen ยืนยันก่อนเรียก API; `JobsList` เอา glass ห่อชั้นนอกรอบแท็บสัญญา/นอกสัญญาออก
 - [x] **@nestjs/cli v11** — แก้ปัญหา watch mode กับ TypeScript/Nest 11
+
+## 4.5 GitLab CI, Docker, production URL & build (2026-03-23)
+
+- [x] **`.gitlab-ci.yml`** — stages: build (frontend+backend), deploy (สรุป), deploy_docker (build image + SSH `docker run`), cleanup (manual); map พอร์ต **8309:3000**, **8310:4000**; container **`cctv-app-ticket`**
+- [x] **`Dockerfile` + `docker/entrypoint.sh`** — multi-stage build; runtime `dumb-init` + Nest + Next
+- [x] **ตัวแปร CI** — `FRONTEND_BASE_URL` รวมบทบาทเดิมของ `FRONTEND_URL_PRD` + ใช้กับ backend PDF
+- [x] **เอกสาร production** — โดเมนเดียว + `/api` + proxy **`/socket.io`**; ตัวอย่าง `MINIO_PUBLIC_URL` (เช่น minio-it.forth.co.th) ใน `README.md`
+- [x] **`npm run build`** — แก้ ESLint/TS + Suspense หน้า `/public/report`; เพิ่ม `frontend/src/lib/apiResponse.ts`
 
 ---
 

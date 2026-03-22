@@ -142,4 +142,19 @@
 ### เอกสาร
 - [x] อัปเดต `README.md`, `STATUS.md`, `PLAN.md`, `TASK.md`, `AGENTS.md`, `AGENT_INSTRUCTIONS.md`, `frontend/README.md`, `backend/postman/README.md`
 
+## 15. Phase 6.5 — GitLab CI, Docker, พอร์ต PRD, production URL, build (2026-03-23)
+
+### CI / Deploy
+- [x] **`.gitlab-ci.yml`** — build แยก `frontend` / `backend`, deploy Docker บน PRD, SSH run; พอร์ต **8309→3000**, **8310→4000**; cleanup image แบบ manual
+- [x] **`Dockerfile`**, **`.dockerignore`**, **`docker/entrypoint.sh`**
+- [x] **GitLab Variables** — ใช้ **`FRONTEND_BASE_URL`** เดียว (เลิกใช้ `FRONTEND_URL_PRD` ใน pipeline)
+
+### Frontend
+- [x] **`apiResponse.ts`** — `extractAssignableArray`, `axiosErrorData`, `formatApiErrorDetail`, `asRecord`
+- [x] **`/public/report`** — `<Suspense>` + `ReportPageContent` สำหรับ `useSearchParams` (Next 15)
+- [x] **`reactSelectGlassStyles.ts`** — `eslint-disable` เฉพาะไฟล์สำหรับ `StylesConfig<any>`
+
+### เอกสาร
+- [x] อัปเดต `README.md`, `STATUS.md`, `PLAN.md`, `TASK.md`, `AGENTS.md`, `AGENT_INSTRUCTIONS.md`, `frontend/README.md`, `backend/postman/README.md`, `backend/docs/RBAC-Setup.md` (ถ้ามีบรรทัดที่เกี่ยวข้อง)
+
 

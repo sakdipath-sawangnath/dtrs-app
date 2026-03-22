@@ -1,6 +1,6 @@
 # Project Status - ระบบแจ้งซ่อม CCTV
 
-**วันที่อัปเดตสถานะ:** 2026-03-22
+**วันที่อัปเดตสถานะ:** 2026-03-23
 
 ---
 
@@ -142,6 +142,8 @@ npx ts-node scripts/seed-roles-permissions.ts
 - **รายงาน PDF / พิมพ์ (งาน Resolved)**: ใช้หน้า `/print/jobs/[id]` + `JobMaintenancePdfTemplate` + `print.css` (พิมพ์จากเบราว์เซอร์); ลบ dependency **html2canvas / jsPDF** ออกจากหน้ารายละเอียดงานแล้ว
 - **แจ้งซ่อม + รายการงาน**: Validation/API ชัดเจนขึ้น; รายการใน Dashboard ใช้ **`GET /jobs/list`**; flow เจ้าหน้าที่บน `/report` แยกจากผู้ใช้ทั่วไป
 - **ตั้งค่าอีเมล (SMTP) + Reopen (2026-03-22)**: API ตั้งค่า SMTP (ADMIN); **`PATCH /jobs/:id/fix`** และ **`PATCH /jobs/:id/reopen`** — เฉพาะผู้รับงาน; Frontend หน้า settings + Reopen ยืนยันก่อนเรียก API; `@nestjs/cli` v11; `JobsList` แท็บสัญญา/นอกสัญญาไม่ห่อ glass ชั้นนอก
+- **Deploy / CI (2026-03-23)**: **GitLab CI** (`.gitlab-ci.yml`) + **`Dockerfile`** — build แยก frontend/backend ใน pipeline, image production รัน Nest + Next; พอร์ต host ตัวอย่าง **8309→3000**, **8310→4000**; ตัวแปร **`FRONTEND_BASE_URL`** แทน `FRONTEND_URL_PRD`; คู่มือ production โดเมนเดียว + `/api` + `/socket.io` และ `MINIO_PUBLIC_URL` สรุปใน `README.md`
+- **Frontend build (2026-03-23)**: `apiResponse.ts`; **`/public/report`** ใช้ `<Suspense>` รอบ `useSearchParams` เพื่อให้ `next build` ผ่าน
 
 ---
 

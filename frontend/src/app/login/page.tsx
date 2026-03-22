@@ -3,7 +3,7 @@
 import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react";
+import { Eye, EyeOff, AlertCircle, LoaderCircle } from "lucide-react";
 import PublicLayoutShell from "@/components/PublicLayoutShell";
 
 /** Dark Glass — สอดคล้อง AGENTS.md */
@@ -66,10 +66,16 @@ export default function LoginPage() {
                 aria-live="polite"
                 aria-label="กำลังเข้าสู่ระบบ"
               >
-                <Loader2
-                  className="h-10 w-10 shrink-0 text-blue-400 animate-spin"
+                <span
+                  className="login-loading-spin inline-flex animate-spin text-blue-400"
                   aria-hidden
-                />
+                >
+                  <LoaderCircle
+                    className="h-10 w-10 shrink-0 origin-center"
+                    strokeWidth={2}
+                    aria-hidden
+                  />
+                </span>
                 <p className="text-sm font-medium text-slate-200">
                   กำลังเข้าสู่ระบบ...
                 </p>
@@ -171,10 +177,16 @@ export default function LoginPage() {
                 >
                   {loading ? (
                     <>
-                      <Loader2
-                        className="h-4 w-4 shrink-0 animate-spin"
+                      <span
+                        className="login-loading-spin inline-flex shrink-0 animate-spin"
                         aria-hidden
-                      />
+                      >
+                        <LoaderCircle
+                          className="h-4 w-4 origin-center"
+                          strokeWidth={2}
+                          aria-hidden
+                        />
+                      </span>
                       <span>กำลังเข้าสู่ระบบ...</span>
                     </>
                   ) : (

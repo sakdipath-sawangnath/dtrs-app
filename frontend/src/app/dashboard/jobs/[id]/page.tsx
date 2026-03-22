@@ -22,6 +22,7 @@ import {
   Loader2,
 } from "lucide-react";
 import DashboardPageShell from "@/components/DashboardPageShell";
+import PersonAvatar from "@/components/PersonAvatar";
 import { confirmDialog, toastError, toastSuccess } from "@/lib/toast";
 import Select from "react-select";
 import { reactSelectGlassStyles } from "@/lib/reactSelectGlassStyles";
@@ -42,7 +43,8 @@ interface JobDetail {
   description?: string;
   title?: string;
   images?: string[] | null;
-  assignedTo?: { id: number; name: string } | null;
+  reporter?: { id?: number; image?: string | null } | null;
+  assignedTo?: { id: number; name: string; image?: string | null } | null;
   fixDate?: string | null;
   brokenPart?: string | null;
   cause?: string | null;
@@ -510,22 +512,31 @@ export default function JobDetailPage() {
                       </div>
 
                       <div>
-                        <p className="text-xs font-semibold mb-1 flex items-center gap-1 text-slate-400">
+                        <p className="text-xs font-semibold mb-2 flex items-center gap-1 text-slate-400">
                           <User size={12} aria-hidden /> ผู้แจ้ง
                         </p>
-                        <p className="text-sm text-slate-100">
-                          {job.reporterName ?? "–"}
-                        </p>
-                        {job.reporterPhone && (
-                          <p className="text-xs flex items-center gap-1 mt-0.5 text-slate-400">
-                            <Phone size={12} aria-hidden /> {job.reporterPhone}
-                          </p>
-                        )}
-                        {job.reporterEmail && (
-                          <p className="text-xs flex items-center gap-1 mt-0.5 text-slate-400">
-                            <Mail size={12} aria-hidden /> {job.reporterEmail}
-                          </p>
-                        )}
+                        <div className="flex items-start gap-3 min-w-0">
+                          <PersonAvatar
+                            imageUrl={job.reporter?.image}
+                            nameLabel={job.reporterName ?? undefined}
+                            size="md"
+                          />
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <p className="text-sm text-slate-100 font-medium">
+                              {job.reporterName ?? "–"}
+                            </p>
+                            {job.reporterPhone && (
+                              <p className="text-xs flex items-center gap-1 text-slate-400">
+                                <Phone size={12} aria-hidden /> {job.reporterPhone}
+                              </p>
+                            )}
+                            {job.reporterEmail && (
+                              <p className="text-xs flex items-center gap-1 text-slate-400">
+                                <Mail size={12} aria-hidden /> {job.reporterEmail}
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </div>
 
                       <div>
@@ -541,12 +552,19 @@ export default function JobDetailPage() {
 
                       {job.assignedTo && (
                         <div>
-                          <p className="text-xs font-semibold mb-1 text-slate-400">
+                          <p className="text-xs font-semibold mb-2 text-slate-400">
                             ผู้รับผิดชอบ
                           </p>
-                          <p className="text-sm text-slate-200">
-                            {job.assignedTo.name}
-                          </p>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <PersonAvatar
+                              imageUrl={job.assignedTo.image}
+                              nameLabel={job.assignedTo.name}
+                              size="md"
+                            />
+                            <p className="text-sm text-slate-200 font-medium min-w-0 truncate">
+                              {job.assignedTo.name}
+                            </p>
+                          </div>
                         </div>
                       )}
                     </div>

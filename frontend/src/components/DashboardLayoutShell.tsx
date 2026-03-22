@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { useSession } from "next-auth/react";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -19,11 +18,13 @@ import {
   FileEdit,
   Search,
   Shield,
+  Loader2,
 } from "lucide-react";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import UserMenuDropdown from "@/components/UserMenuDropdown";
 import NotificationsBell from "@/components/NotificationsBell";
+import DashboardRouteLoading from "@/components/DashboardRouteLoading";
 
 /** เมนูตาม permission (RBAC dynamic) — ถ้าไม่มี permissions จาก API จะ fallback ใช้ roles */
 const navigation = [
@@ -45,9 +46,17 @@ function isActive(href: string, pathname: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
+/** หน้าปัจจุบันตรงกับลิงก์เมนูแล้ว — ไม่ต้องนำทางซ้ำ */
+function isSameRouteAsNav(href: string, pathname: string): boolean {
+  if (href === "/dashboard") return pathname === "/dashboard";
+  return pathname === href || pathname.startsWith(href + "/");
+}
+
 export default function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [isNavPending, startNavTransition] = useTransition();
+  const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const { data: session, status } = useSession();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [permissions, setPermissions] = useState<string[] | null>(null);
@@ -65,6 +74,19 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
       .then((data) => setPermissions(data?.permissions ?? null))
       .catch(() => setPermissions(null));
   }, [token, status, API]);
+
+  useEffect(() => {
+    setNavigatingTo(null);
+  }, [pathname]);
+
+  const navigateFromSidebar = (href: string) => {
+    setSidebarOpen(false);
+    if (isSameRouteAsNav(href, pathname)) return;
+    setNavigatingTo(href);
+    startNavTransition(() => {
+      router.push(href);
+    });
+  };
 
   const navFiltered = (() => {
     if (Array.isArray(permissions) && permissions.length > 0) {
@@ -120,37 +142,35 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {navFiltered.map((item) => {
           const active = isActive(item.href, pathname);
+          const rowLoading = navigatingTo === item.href && isNavPending;
           return (
-            <Link
+            <button
               key={item.href}
-              href={item.href}
-              onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
-                active 
-                  ? "bg-blue-500/20 text-blue-400 font-semibold shadow-sm ring-1 ring-blue-500/30" 
+              type="button"
+              onClick={() => navigateFromSidebar(item.href)}
+              disabled={rowLoading}
+              aria-current={active ? "page" : undefined}
+              aria-busy={rowLoading}
+              className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 cursor-pointer disabled:opacity-80 disabled:cursor-wait ${
+                active
+                  ? "bg-blue-500/20 text-blue-400 font-semibold shadow-sm ring-1 ring-blue-500/30"
                   : "text-slate-400 hover:bg-white/5 hover:text-white font-medium"
               }`}
             >
-              <item.icon 
-                size={18} 
-                className={`shrink-0 transition-colors ${active ? "text-blue-400" : "text-slate-500 group-hover:text-slate-300"}`} 
+              <item.icon
+                size={18}
+                className={`shrink-0 transition-colors ${active ? "text-blue-400" : "text-slate-500"}`}
               />
               <span className="flex-1 truncate">{item.name}</span>
-              {active && <ChevronRight size={14} className="text-blue-600 opacity-70" />}
-            </Link>
+              {rowLoading ? (
+                <Loader2 size={16} className="shrink-0 text-blue-400 animate-spin" aria-hidden />
+              ) : active ? (
+                <ChevronRight size={14} className="text-blue-600 opacity-70 shrink-0" aria-hidden />
+              ) : null}
+            </button>
           );
         })}
       </nav>
-      <div className="p-4 border-t border-white/5 bg-slate-900/30 shrink-0">
-        <Link
-          href="/public/report"
-          onClick={() => setSidebarOpen(false)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-white/5 text-slate-300 border border-white/10 shadow-sm hover:shadow-md hover:bg-white/10 transition-all group"
-        >
-          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse group-hover:bg-green-600" />
-          หน้าแจ้งซ่อมระบบ
-        </Link>
-      </div>
     </>
   );
 
@@ -194,7 +214,23 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
           {sidebarContent}
         </aside>
 
-        <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 min-w-0 w-full">{children}</main>
+        <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 min-w-0 w-full relative min-h-0">
+          <div
+            className={isNavPending ? "opacity-45 pointer-events-none transition-opacity duration-200" : "transition-opacity duration-200"}
+            aria-hidden={isNavPending}
+          >
+            {children}
+          </div>
+          {isNavPending && (
+            <div
+              className="absolute inset-0 z-20 flex items-start justify-center pt-10 sm:pt-14 px-4 bg-[#0a1128]/65 backdrop-blur-sm"
+              aria-busy="true"
+              aria-label="กำลังเปลี่ยนหน้า"
+            >
+              <DashboardRouteLoading variant="overlay" />
+            </div>
+          )}
+        </main>
       </div>
 
       <SiteFooter isDark={true} />
