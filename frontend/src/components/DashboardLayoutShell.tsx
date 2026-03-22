@@ -1,0 +1,203 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  LayoutDashboard,
+  AlertCircle,
+  Wrench,
+  CheckCircle,
+  Clock,
+  Settings,
+  ChevronRight,
+  Menu,
+  X,
+  UserCog,
+  User,
+  FileEdit,
+  Search,
+  Shield,
+} from "lucide-react";
+import SiteHeader from "@/components/SiteHeader";
+import SiteFooter from "@/components/SiteFooter";
+import UserMenuDropdown from "@/components/UserMenuDropdown";
+import NotificationsBell from "@/components/NotificationsBell";
+
+/** เมนูตาม permission (RBAC dynamic) — ถ้าไม่มี permissions จาก API จะ fallback ใช้ roles */
+const navigation = [
+  { name: "แจ้งปัญหา", href: "/public/report", icon: FileEdit, permission: "menu.report", roles: ["USER"] },
+  { name: "ตรวจสอบสถานะ", href: "/public/status", icon: Search, permission: "menu.status", roles: ["USER"] },
+  { name: "ภาพรวม", href: "/dashboard", icon: LayoutDashboard, permission: "menu.dashboard", roles: ["ADMIN", "STAFF"] },
+  { name: "รอดำเนินการ", href: "/dashboard/pending", icon: AlertCircle, permission: "menu.pending", roles: ["ADMIN", "STAFF", "SUPERVISOR"] },
+  { name: "งานที่รับผิดชอบ", href: "/dashboard/my-jobs", icon: User, permission: "menu.myJobs", roles: ["ADMIN", "STAFF", "SUPERVISOR"] },
+  { name: "กำลังแก้ไข", href: "/dashboard/in-progress", icon: Wrench, permission: "menu.inProgress", roles: ["ADMIN", "STAFF"] },
+  { name: "ประวัติทั้งหมด", href: "/dashboard/all", icon: CheckCircle, permission: "menu.all", roles: ["ADMIN", "STAFF"] },
+  { name: "นอกสัญญา", href: "/dashboard/out-of-contract", icon: Clock, permission: "menu.outOfContract", roles: ["ADMIN", "STAFF"] },
+  { name: "จัดการผู้ใช้", href: "/dashboard/users", icon: UserCog, permission: "menu.users", roles: ["ADMIN"] },
+  { name: "จัดการบทบาทและสิทธิ์", href: "/dashboard/roles", icon: Shield, permission: "menu.roles", roles: ["ADMIN"] },
+  { name: "ตั้งค่าระบบ", href: "/dashboard/settings", icon: Settings, permission: "menu.settings", roles: ["ADMIN"] },
+];
+
+function isActive(href: string, pathname: string): boolean {
+  if (href === "/dashboard") return pathname === "/dashboard";
+  return pathname === href || pathname.startsWith(href + "/");
+}
+
+export default function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { data: session, status } = useSession();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [permissions, setPermissions] = useState<string[] | null>(null);
+  const userRole = (session?.user as { role?: string })?.role ?? "USER";
+  const token = (session as { accessToken?: string })?.accessToken;
+  const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
+
+  useEffect(() => {
+    if (!token || status !== "authenticated") {
+      setPermissions(null);
+      return;
+    }
+    fetch(`${API}/roles/me/permissions`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => setPermissions(data?.permissions ?? null))
+      .catch(() => setPermissions(null));
+  }, [token, status, API]);
+
+  const navFiltered = (() => {
+    if (Array.isArray(permissions) && permissions.length > 0) {
+      return navigation.filter((n) => n.permission && permissions.includes(n.permission));
+    }
+    return navigation.filter((n) => n.roles.includes(userRole));
+  })();
+  const currentPage = navFiltered.find((n) => isActive(n.href, pathname));
+
+  useEffect(() => {
+    if (status !== "authenticated" || !session?.user) return;
+    const allowedPaths = navFiltered.flatMap((n) => (n.href === "/dashboard" ? [n.href] : [n.href, n.href + "/"]));
+    const pathAllowed =
+      pathname === "/public/report" ||
+      pathname === "/public/status" ||
+      pathname === "/report" ||
+      pathname === "/status" ||
+      allowedPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
+    if (
+      !pathAllowed &&
+      (pathname.startsWith("/dashboard") ||
+        pathname === "/report" ||
+        pathname === "/status" ||
+        pathname === "/public/report" ||
+        pathname === "/public/status")
+    ) {
+      router.replace(allowedPaths[0] || "/public/report");
+    }
+  }, [status, session, pathname, router, navFiltered]);
+
+  const headerRight = (
+    <div className="flex items-center gap-2 sm:gap-3">
+      <button
+        type="button"
+        onClick={() => setSidebarOpen(true)}
+        className="md:hidden flex items-center justify-center w-9 h-9 rounded-lg border border-white/20 bg-slate-800/50 text-slate-300 hover:bg-slate-700/50 transition-colors"
+        aria-label="เปิดเมนู"
+      >
+        <Menu size={18} />
+      </button>
+      {status === "authenticated" && token && ["ADMIN", "STAFF", "SUPERVISOR"].includes(userRole) && (
+        <NotificationsBell token={token} apiBase={API} />
+      )}
+      <UserMenuDropdown
+        name={session?.user?.name ?? undefined}
+        image={(session?.user as { image?: string })?.image}
+      />
+    </div>
+  );
+
+  const sidebarContent = (
+    <>
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {navFiltered.map((item) => {
+          const active = isActive(item.href, pathname);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setSidebarOpen(false)}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
+                active 
+                  ? "bg-blue-500/20 text-blue-400 font-semibold shadow-sm ring-1 ring-blue-500/30" 
+                  : "text-slate-400 hover:bg-white/5 hover:text-white font-medium"
+              }`}
+            >
+              <item.icon 
+                size={18} 
+                className={`shrink-0 transition-colors ${active ? "text-blue-400" : "text-slate-500 group-hover:text-slate-300"}`} 
+              />
+              <span className="flex-1 truncate">{item.name}</span>
+              {active && <ChevronRight size={14} className="text-blue-600 opacity-70" />}
+            </Link>
+          );
+        })}
+      </nav>
+      <div className="p-4 border-t border-white/5 bg-slate-900/30 shrink-0">
+        <Link
+          href="/public/report"
+          onClick={() => setSidebarOpen(false)}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-white/5 text-slate-300 border border-white/10 shadow-sm hover:shadow-md hover:bg-white/10 transition-all group"
+        >
+          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse group-hover:bg-green-600" />
+          หน้าแจ้งซ่อมระบบ
+        </Link>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="h-screen flex flex-col overflow-hidden bg-[#0a1128] text-slate-200">
+      <SiteHeader right={headerRight} subtitle={currentPage?.name} isDark={true} />
+
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {sidebarOpen && (
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(false)}
+            className="md:hidden fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-sm"
+            aria-label="ปิดเมนู"
+          />
+        )}
+
+        <aside
+          className={`
+            w-64 shrink-0 bg-slate-900/60 backdrop-blur-xl border-r border-white/10 shadow-2xl flex flex-col z-50
+            fixed md:sticky left-0 top-[62px] md:top-0 transform transition-transform duration-300 ease-out
+            h-[calc(100vh-62px)] md:h-full md:self-stretch
+            ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+          `}
+        >
+          <div
+            className="flex items-center justify-between p-3 border-b border-white/10 md:hidden bg-slate-900/80"
+          >
+            <span className="text-sm font-semibold text-slate-200">
+              เมนู
+            </span>
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+              aria-label="ปิด"
+            >
+              <X size={18} className="text-slate-400" />
+            </button>
+          </div>
+          {sidebarContent}
+        </aside>
+
+        <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 min-w-0 w-full">{children}</main>
+      </div>
+
+      <SiteFooter isDark={true} />
+    </div>
+  );
+}

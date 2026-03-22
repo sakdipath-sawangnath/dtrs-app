@@ -1,0 +1,314 @@
+{
+  "title": "CCTV Maintenance API - รายการเส้นทาง API",
+  "baseUrl": "http://localhost:4000/api",
+  "updated": "2026-03-22",
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/api",
+      "auth": false,
+      "description": "Health check / Hello"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "auth": false,
+      "description": "เข้าสู่ระบบ (คืนค่า access_token, user)",
+      "body": { "email": "หรือ username", "password": "รหัสผ่าน" }
+    },
+    {
+      "method": "GET",
+      "path": "/api/users/reporters",
+      "auth": false,
+      "description": "ดึงรายชื่อผู้แจ้งซ่อม (role=USER) สำหรับ dropdown"
+    },
+    {
+      "method": "GET",
+      "path": "/api/users/me",
+      "auth": "Bearer JWT",
+      "description": "โปรไฟล์ของตัวเอง"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/users/me/password",
+      "auth": "Bearer JWT",
+      "description": "เปลี่ยนรหัสผ่านตัวเอง",
+      "body": { "currentPassword": "", "newPassword": "" }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/users/me",
+      "auth": "Bearer JWT",
+      "description": "อัปเดตโปรไฟล์ตัวเอง (ชื่อ, อีเมล, เบอร์, ตำแหน่ง, รูป)",
+      "body": { "name": "", "email": "", "phone": "", "position": "", "image": "" }
+    },
+    {
+      "method": "GET",
+      "path": "/api/users/assignable",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN", "SUPERVISOR", "STAFF"],
+      "description": "รายชื่อเจ้าหน้าที่ที่มอบหมายงานได้ (STAFF/SUPERVISOR) — สำหรับ modal มอบหมายงาน · STAFF เรียกได้เพื่อ flow รับงาน"
+    },
+    {
+      "method": "GET",
+      "path": "/api/users",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN"],
+      "description": "รายชื่อผู้ใช้ทั้งหมด"
+    },
+    {
+      "method": "GET",
+      "path": "/api/users/:id",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN"],
+      "description": "ดูข้อมูลผู้ใช้ตาม id"
+    },
+    {
+      "method": "POST",
+      "path": "/api/users",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN"],
+      "description": "สร้างผู้ใช้",
+      "body": { "email": "", "password": "", "name": "", "phone": "", "position": "", "role": "STAFF|ADMIN|USER|SUPERVISOR" }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/users/:id/password",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN"],
+      "description": "เปลี่ยนรหัสผ่านผู้ใช้ (Admin)",
+      "body": { "password": "" }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/users/:id",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN"],
+      "description": "แก้ไขผู้ใช้ (ชื่อ, อีเมล, เบอร์, ตำแหน่ง, role)",
+      "body": { "name": "", "email": "", "phone": "", "position": "", "role": "" }
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/users/:id",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN"],
+      "description": "ลบผู้ใช้"
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs",
+      "auth": false,
+      "description": "แจ้งซ่อมใหม่ (สาธารณะ)",
+      "body": { "province": "", "district": "", "location": "", "reporterName": "", "reporterPhone": "", "reporterEmail": "", "description": "", "images": [] }
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/list",
+      "auth": "Bearer JWT",
+      "description": "รายการแจ้งซ่อมทั้งหมด"
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/status/:ticketNo",
+      "auth": false,
+      "description": "ตรวจสอบสถานะด้วยเลขที่ใบแจ้งซ่อม"
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/:id",
+      "auth": "Bearer JWT",
+      "description": "ดูงานตาม id"
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/:id/image/:kind/:index",
+      "auth": "Bearer JWT",
+      "description": "สตรีมรูปงาน (proxy same-origin) · kind = issue | fix · index = 0–2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/:id/report-pdf",
+      "auth": "Bearer JWT",
+      "description": "สร้างไฟล์ PDF รายงานการบำรุงรักษา (Chromium + emulate print)"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/jobs/:id/status",
+      "auth": "Bearer JWT",
+      "description": "อัปเดตสถานะงาน",
+      "body": { "status": "PENDING|IN_PROGRESS|RESOLVED" }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/jobs/:id/assign",
+      "auth": "Bearer JWT",
+      "description": "มอบหมายงาน: ADMIN/SUPERVISOR ส่ง staffId ใครก็ได้; STAFF ส่งได้เฉพาะ staffId = ตัวเอง (รับงาน)",
+      "body": { "staffId": "number (user id ของผู้รับผิดชอบ)" }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/jobs/:id/fix",
+      "auth": "Bearer JWT",
+      "description": "บันทึกการแก้ไขงาน (multipart/form-data: ฟิลด์ข้อความ + ไฟล์ fixImages) · เฉพาะผู้รับงาน (assignee) ไม่ยกเว้น ADMIN · ถ้าสถานะยัง RESOLVED ต้อง PATCH reopen ก่อน · ตั้ง status=RESOLVED และ fixDate อัตโนมัติ",
+      "body": {
+        "brokenPartType": "optional",
+        "cause": "optional",
+        "fixMethod": "optional",
+        "note": "optional",
+        "oldSerialNumber": "optional",
+        "newSerialNumber": "optional",
+        "fixImages": "ไฟล์ (optional)"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/jobs/:id/reopen",
+      "auth": "Bearer JWT",
+      "description": "เปิดงานใหม่หลังปิด: RESOLVED → IN_PROGRESS, ล้าง fixDate, ต่อท้ายเหตุผลใน fixNote · เฉพาะผู้รับงาน (assignee)",
+      "body": { "reason": "เหตุผล (required)" }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/jobs/:id/out-of-contract",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN", "SUPERVISOR"],
+      "description": "ย้ายนอกสัญญา: ตั้ง isOutOfContract=true โดยคงสถานะ PENDING ตาม logic backend",
+      "body": { "isOutOfContract": true }
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/jobs/:id",
+      "auth": "Bearer JWT",
+      "description": "ลบงาน: ถ้าเป็น ADMIN และงานสถานะ IN_PROGRESS จะลบได้ทันที; มิฉะนั้นลบได้เฉพาะงาน PENDING ที่ยังไม่มีผู้รับผิดชอบ (ADMIN หรือ SUPERVISOR)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sites",
+      "auth": false,
+      "description": "รายการพื้นที่โครงการ (จังหวัด/อำเภอ/หน่วยงาน) สำหรับหน้าแจ้งปัญหา"
+    },
+    {
+      "method": "POST",
+      "path": "/api/sites",
+      "auth": "Bearer JWT",
+      "description": "สร้าง Site"
+    },
+    {
+      "method": "GET",
+      "path": "/api/areas",
+      "auth": "Bearer JWT",
+      "description": "รายการพื้นที่รับผิดชอบ"
+    },
+    {
+      "method": "POST",
+      "path": "/api/areas",
+      "auth": "Bearer JWT",
+      "description": "สร้าง Area"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/email-smtp",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN"],
+      "description": "อ่านการตั้งค่า SMTP (ไม่คืนรหัสผ่าน; มี passwordSet, tlsRejectUnauthorized)"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/settings/email-smtp",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN"],
+      "description": "บันทึกการตั้งค่า SMTP (nodemailer, เก็บใน Setting key email_smtp) · password ว่าง = คงรหัสเดิม · env SMTP_TLS_REJECT_UNAUTHORIZED สำหรับ default TLS verify",
+      "body": {
+        "smtpHost": "",
+        "smtpPort": "587",
+        "username": "",
+        "password": "optional — ว่างถ้าไม่เปลี่ยน",
+        "secure": false,
+        "from": "noreply@example.com",
+        "tlsRejectUnauthorized": true
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/settings/email-smtp/test",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN"],
+      "description": "ทดสอบส่งอีเมล (ใช้ค่าที่บันทึกแล้ว + override ฟิลด์ SMTP ได้)",
+      "body": {
+        "to": "recipient@example.com",
+        "smtpHost": "optional override",
+        "smtpPort": "optional",
+        "username": "optional",
+        "password": "optional",
+        "secure": "optional",
+        "from": "optional",
+        "tlsRejectUnauthorized": "optional"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/roles",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN"],
+      "description": "รายการบทบาท (AppRole) ทั้งหมด"
+    },
+    {
+      "method": "GET",
+      "path": "/api/roles/permissions",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN"],
+      "description": "รายการสิทธิ์ (Permission) ทั้งหมด สำหรับกำหนดให้บทบาท"
+    },
+    {
+      "method": "GET",
+      "path": "/api/roles/me/permissions",
+      "auth": "Bearer JWT",
+      "description": "สิทธิ์ของตัวเอง (สำหรับแสดงเมนูตาม RBAC)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/roles/:id",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN"],
+      "description": "ดูบทบาทตาม id"
+    },
+    {
+      "method": "GET",
+      "path": "/api/roles/:id/permissions",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN"],
+      "description": "รายการ permission id ที่บทบาทนี้มี"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/roles/:id/permissions",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN"],
+      "description": "ตั้งค่าสิทธิ์ของบทบาท",
+      "body": { "permissionIds": [1, 2, 3] }
+    },
+    {
+      "method": "POST",
+      "path": "/api/roles",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN"],
+      "description": "สร้างบทบาทใหม่",
+      "body": { "code": "", "name": "", "description": "" }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/roles/:id",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN"],
+      "description": "แก้ไขบทบาท (ชื่อ, คำอธิบาย)",
+      "body": { "name": "", "description": "" }
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/roles/:id",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN"],
+      "description": "ลบบทบาท (ต้องไม่มีผู้ใช้ผูกอยู่)"
+    }
+  ]
+}

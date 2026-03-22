@@ -1,0 +1,31 @@
+# โปรเจกต์นี้ขึ้น Git เฉพาะ: backend/, frontend/, README PLAN AGENT_INSTRUCTIONS AGENTS TASK STATUS
+# ทุกอย่างที่ root นอกจากรายการด้านล่าง — ไม่ติดตาม
+/*
+!/backend/
+!/frontend/
+!/README.md
+!/PLAN.md
+!/AGENT_INSTRUCTIONS.md
+!/AGENTS.md
+!/TASK.md
+!/STATUS.md
+!.gitignore
+
+# ให้ติดตามเนื้อหาในโฟลเดอร์ที่อนุญาต (ชัดเจนกรณี Git เวอร์ชันเก่า)
+!/backend/**
+!/frontend/**
+
+# ไม่ขึ้น repo: ความลับ, build, dependency (ใช้ร่วมกับ .gitignore ย่อยในแต่ละโฟลเดอร์)
+**/.env
+**/.env.*
+!**/.env.example
+**/node_modules/
+**/.next/
+**/out/
+**/dist/
+**/build/
+**/.turbo/
+**/coverage/
+*.log
+.DS_Store
+Thumbs.db

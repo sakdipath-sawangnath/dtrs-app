@@ -1,0 +1,51 @@
+# Frontend - ระบบแจ้งซ่อม CCTV
+
+Next.js 15 (App Router) สำหรับระบบแจ้งปัญหาและจัดการการซ่อมบำรุง CCTV
+
+## Tech Stack
+
+- **Framework:** Next.js 15 (App Router)
+- **UI:** Tailwind CSS, Lucide React, recharts
+- **Auth:** NextAuth.js (Credentials + JWT จาก Backend)
+- **HTTP:** Axios; แจ้งเตือน: SweetAlert2 (Toast ผ่าน `@/lib/toast`)
+
+## โครงสร้างหลัก
+
+- `src/app/` — หน้าและ layout (report, status, login, dashboard)
+- `src/components/` — SiteHeader, SiteFooter, PublicLayoutShell, DashboardPageShell, DashboardFilterBar, CrudModal, UserMenuDropdown, SegmentedTabs, JobsList (ตารางงาน + แท็บสัญญา/นอกสัญญา **ไม่ห่อ glass ชั้นนอก** + badge งานค้าง + modal อัปเดตการแก้ไขแบบ Dark Glass + ดูรายละเอียด full page `/dashboard/jobs/:id` + มอบหมายงาน react-select / รับงาน; รองรับ `assignedToMe` สำหรับงานที่รับผิดชอบ; ADMIN ลบ IN_PROGRESS ได้ที่หน้า `/dashboard/in-progress`)
+- `src/lib/` — auth.ts (NextAuth), toast.ts (toastSuccess, toastError, confirmDialog)
+
+### Flow สำคัญ
+
+- **/report**
+  - กรอกเบอร์โทรศัพท์ได้เฉพาะตัวเลข 10 หลัก และต้องตรงกับผู้แจ้งที่มีอยู่ในระบบ (`/api/users/reporter-by-phone/:phone`) การ์ดอื่น (สถานที่, รายละเอียด, รูปภาพ) จะใช้งานได้เมื่อเบอร์โทรถูกต้องและพบผู้ใช้เท่านั้น
+  - เมื่อส่งฟอร์ม ระบบจะสร้าง `Job` ใหม่ + เลขที่ใบแจ้งซ่อม (`ticketNo` เป็นรหัส hex 8 ตัว) แสดง Toast แจ้งเลข Ticket แล้ว redirect ไปหน้า `/status?ticketNo=...`
+
+- **/status**
+  - ฟอร์มค้นหารับเลขที่ใบแจ้งซ่อม แล้วเรียก `GET /api/jobs/status/:ticketNo`
+  - ถ้ามี `?ticketNo=...` ใน URL จะกรอกช่องค้นหาให้อัตโนมัติและยิงค้นหาให้ทันที เพื่อรองรับการ redirect จากหน้า `/report`
+
+- **/dashboard/my-jobs**
+  - งานที่รับผิดชอบ — JobsList แสดงเฉพาะงานที่รับมอบหมายให้ผู้ใช้ปัจจุบัน; filter + DataTable
+
+- **/dashboard/jobs/[id]**
+  - รายละเอียดงานเต็มหน้า: การ์ดข้อมูลการแจ้งข้อขัดข้อง + การ์ดข้อมูลการแก้ไข + ฟอร์มบันทึกการแก้ไข (ส่วนขัดข้อง, สาเหตุ, วิธีแก้ไข, รูปการแก้ไข สูงสุด 3 รูป, หมายเหตุ, Serial เก่า/ใหม่); **บันทึกการแก้ไข / Reopen — เฉพาะผู้รับงาน (assignee)**; Reopen มี `confirmDialog` ก่อนเรียก API; เมื่อสถานะ Resolved — พิมพ์/PDF ผ่านหน้า **`/print/jobs/[id]`** + `JobMaintenancePdfTemplate` + `print.css` (หรือดาวน์โหลด PDF ฝั่ง backend `GET /jobs/:id/report-pdf`)
+
+- **/dashboard/settings** (ADMIN)
+  - ตั้งค่า **SMTP** — โหลด/บันทึก/ทดสอบส่งอีเมล (`GET/PUT /api/settings/email-smtp`, `POST /api/settings/email-smtp/test`); ตัวเลือก TLS / self-signed; โครง layout เนื้อหาแบบหน้า `/dashboard`
+
+- **/dashboard/users** (ADMIN)
+  - จัดการผู้ใช้ — คลิกรูปโปรไฟล์ในตารางเพื่อดูรูปขนาดใหญ่ (lightbox)
+
+## รันพัฒนา
+
+```bash
+npm install
+npm run dev
+```
+
+เปิด [http://localhost:3000](http://localhost:3000) (Backend ต้องรันที่ `http://localhost:4000/api`)
+
+## เอกสารเพิ่มเติม
+
+- สถานะโปรเจกต์และ API: ดูที่ root [STATUS.md](../STATUS.md) และ [README.md](../README.md)

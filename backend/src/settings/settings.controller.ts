@@ -1,0 +1,40 @@
+import { Body, Controller, Get, Post, Put, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { TestEmailSmtpDto, UpdateEmailSmtpDto } from './dto/email-smtp.dto';
+import { SettingsService } from './settings.service';
+
+@Controller('settings')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ADMIN')
+export class SettingsController {
+  constructor(private readonly settingsService: SettingsService) {}
+
+  @Get('email-smtp')
+  async getEmailSmtp() {
+    const data = await this.settingsService.getEmailSmtp();
+    if (!data) {
+      return {
+        smtpHost: '',
+        smtpPort: '587',
+        username: '',
+        secure: false,
+        from: '',
+        passwordSet: false,
+        tlsRejectUnauthorized: true,
+      };
+    }
+    return data;
+  }
+
+  @Put('email-smtp')
+  async putEmailSmtp(@Body() dto: UpdateEmailSmtpDto) {
+    return this.settingsService.updateEmailSmtp(dto);
+  }
+
+  @Post('email-smtp/test')
+  async postTest(@Body() dto: TestEmailSmtpDto) {
+    return this.settingsService.testEmailSmtp(dto);
+  }
+}

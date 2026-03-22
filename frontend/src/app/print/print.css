@@ -1,0 +1,142 @@
+/* ใช้กับหน้า /print/jobs/[id] — พิมพ์ด้วยเครื่องมือของเบราว์เซอร์ (ไม่ผ่าน html2canvas) */
+
+/* บนจอ: แยก “แผ่นกระดาษ” + ช่องรูปมีความสูงพอดู */
+@media screen {
+  .print-shell .pdf-page-1,
+  .print-shell .pdf-page-2 {
+    border-radius: 2px;
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.06),
+      0 8px 24px rgba(15, 23, 42, 0.1);
+    border: 1px solid rgba(148, 163, 184, 0.45);
+  }
+
+  .print-shell .pdf-page-1 {
+    margin-bottom: 2rem;
+    /* ซ้าย-ขวาเท่าหน้า 2 (อ้างอิง 11mm) */
+    padding-left: 11mm !important;
+    padding-right: 11mm !important;
+  }
+
+  .print-shell .pdf-report-content {
+    width: 100% !important;
+    max-width: 182mm !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box !important;
+  }
+
+  .print-shell .pdf-page-2 {
+    margin-bottom: 0;
+    /* ห่างจากขอบบนกระดาษ — override padding จาก inline PAGE */
+    padding: 18mm 11mm 12mm 11mm !important;
+  }
+
+  .pdf-image-slot {
+    min-height: 200px;
+  }
+
+  .pdf-print-img {
+    max-height: 220px;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+  }
+
+  .print-shell {
+    background: #ffffff !important;
+  }
+
+  .pdf-page-1 {
+    page-break-after: always;
+    break-after: page;
+    /* ขอบซ้าย-ขวากระดาษเท่าหน้า 2 (11mm) — ตารางกว้างเท่า pdf-report-content */
+    padding: 15mm 11mm 15mm 11mm !important;
+    min-height: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .pdf-page-1,
+  .pdf-page-2 {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+
+  /*
+   * หน้า 2: ระยะบนมากกว่าข้าง — ไม่ให้หัวข้อ/ตารางชิดขอบบนกระดาษ
+   */
+  .pdf-page-2 {
+    padding: 18mm 11mm 10mm 11mm !important;
+    min-height: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* หน้า 1 และ 2: ความกว้างตารางเท่ากัน (อ้างอิงหน้า 2 = 182mm) */
+  .pdf-report-content {
+    width: 100% !important;
+    max-width: 182mm !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box !important;
+  }
+
+  .pdf-page-2-heading {
+    margin: 0 0 8px !important;
+    font-size: 13px !important;
+    line-height: 1.35 !important;
+    letter-spacing: 0.02em;
+  }
+
+  .pdf-images-table {
+    margin-top: 6px !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .pdf-images-table tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .pdf-images-table td {
+    padding: 9px 10px !important;
+    vertical-align: top !important;
+  }
+
+  .pdf-page-2 .pdf-image-label {
+    margin-bottom: 5px !important;
+    font-size: 9px !important;
+    line-height: 1.35 !important;
+  }
+
+  .pdf-page-2 .pdf-image-slot {
+    box-sizing: border-box !important;
+    min-height: 0 !important;
+    /* ~52mm × 3 แถว + หัวข้อ + padding ≈ ยังอยู่ในหนึ่งหน้า A4 */
+    height: 52mm !important;
+    max-height: 52mm !important;
+    overflow: hidden !important;
+    padding: 2mm !important;
+  }
+
+  .pdf-print-img {
+    max-height: 48mm !important;
+    max-width: 100% !important;
+    width: auto !important;
+    height: auto !important;
+    object-fit: contain !important;
+  }
+}

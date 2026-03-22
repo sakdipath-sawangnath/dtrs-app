@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  STAFF
+  USER
+  SUPERVISOR  // หัวหน้างาน — เห็นเมนูแบบเจ้าหน้าที่ + มอบหมายงานได้
+}
+
+enum JobStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+}
+
+model AppRole {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique // ADMIN, STAFF, USER หรือชื่อที่กำหนดเอง
+  name        String   // ชื่อแสดง เช่น ผู้ดูแลระบบ
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  users       User[]   @relation("UserRole")
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique // menu.dashboard, menu.users, ...
+  name        String
+  category    String?  // menu, api
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+  role         AppRole    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  @@id([roleId, permissionId])
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String?  @unique
+  username     String   @unique
+  password     String
+  name         String?
+  role         Role     @default(STAFF) // เลิกใช้เมื่อ migrate ไป roleId แล้ว
+  roleId       Int? // ถ้ามีค่า ใช้สิทธิ์จากตาราง Role/Permission
+  roleRef      AppRole? @relation("UserRole", fields: [roleId], references: [id])
+  phone        String?
+  position     String? // ตำแหน่ง
+  image        String? // รูปภาพ
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  jobs         Job[]    @relation("AssignedJobs")
+  reportedJobs Job[]    @relation("ReportedJobs")
+  areas        Area[] // พื้นที่รับผิดชอบ
+}
+
+model Area {
+  id        Int      @id @default(autoincrement())
+  district  String // อำเภอ
+  staffId   Int
+  staff     User     @relation(fields: [staffId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Site {
+  id        Int      @id @default(autoincrement())
+  province  String // จังหวัด
+  district  String // อำเภอ
+  agency    String // หน่วยงาน
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Job {
+  id         Int       @id @default(autoincrement())
+  ticketNo   String?   @unique // เลขที่ใบแจ้งซ่อม
+  reportDate DateTime? // วัน เวลาที่แจ้งซ่อม Auto
+
+  // Location
+  province String? // จังหวัด
+  district String? // อำเภอ
+  location String? // สถานที่
+
+  // Reporter
+  reporterId    Int?
+  reporter      User?   @relation("ReportedJobs", fields: [reporterId], references: [id])
+  reporterName  String? // ชื่อ-สกุล
+  reporterPhone String? // เบอร์โทร
+  reporterEmail String? // Email ผู้แจ้ง
+
+  // Issue Details
+  title       String?
+  description String? @db.Text // ข้อขัดข้อง
+  images      Json? // 1.รูปภาพขัดข้อง, 2, 3
+
+  status JobStatus @default(PENDING)
+
+  // Fix Details
+  fixTicketNo String? // เลขที่ใบแก้ไข
+  fixDate     DateTime? // วัน เวลาที่แก้ไข Auto
+
+  assignedToId Int?
+  assignedTo   User?   @relation("AssignedJobs", fields: [assignedToId], references: [id])
+  fixerPhone   String? // เบอร์โทรผู้แก้ไข
+  fixerEmail   String? // Email ผู้แก้ไข
+
+  brokenPart String? @db.Text // ส่วนที่ขัดข้อง
+  cause      String? @db.Text // สาเหตุ
+  fixMethod  String? @db.Text // วิธีแก้ไข
+
+  oldSerialNumber String? // Serial Number อุปกรณ์เดิม
+  newSerialNumber String? // Serial Number อุปกรณ์ใหม่
+
+  fixImages    Json? // 1.รูปการแก้ไข, 2, 3
+  fixNote      String? @db.Text // หมายเหตุการแก้ไข
+  systemStatus String? // สถานะระบบ
+
+  isOutOfContract Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Setting {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value Json
+}

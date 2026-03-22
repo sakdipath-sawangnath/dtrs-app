@@ -1,0 +1,443 @@
+{
+  "info": {
+    "name": "CCTV Maintenance API",
+    "description": "API ระบบแจ้งซ่อม CCTV · Backend NestJS\n\n**วิธีใช้:**\n1. ตั้งค่า baseUrl = http://localhost:4000/api (หรือตาม server)\n2. รัน request \"Auth > Login\" แล้วคัดลอก access_token จาก response ไปใส่ในตัวแปร access_token ของ Collection\n\n**อัปเดต:** Jobs — fix/reopen เฉพาะผู้รับงาน; Settings — SMTP (ADMIN); ดูรายละเอียดใน `backend/docs/api-endpoints.json`",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000/api" },
+    { "key": "access_token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login",
+            "description": "เข้าสู่ระบบ (ใช้ email หรือ username) · คืนค่า access_token และ user"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get Reporters (Public)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/reporters",
+            "description": "ดึงรายชื่อผู้แจ้งซ่อม (role=USER) สำหรับ dropdown ฟอร์มแจ้งปัญหา"
+          }
+        },
+        {
+          "name": "Get Me (Profile)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{baseUrl}}/users/me",
+            "description": "โปรไฟล์ของตัวเอง (ต้อง login)"
+          }
+        },
+        {
+          "name": "Update Me (Profile)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"ชื่อใหม่\",\n  \"email\": \"new@example.com\",\n  \"phone\": \"0812345678\",\n  \"position\": \"ตำแหน่ง\"\n}"
+            },
+            "url": "{{baseUrl}}/users/me",
+            "description": "อัปเดตโปรไฟล์ตัวเอง"
+          }
+        },
+        {
+          "name": "Update My Password",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"รหัสเดิม\",\n  \"newPassword\": \"รหัสใหม่\"\n}"
+            },
+            "url": "{{baseUrl}}/users/me/password",
+            "description": "เปลี่ยนรหัสผ่านตัวเอง"
+          }
+        },
+        {
+          "name": "Get All Users (ADMIN)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{baseUrl}}/users",
+            "description": "รายชื่อผู้ใช้ทั้งหมด · เฉพาะ ADMIN"
+          }
+        },
+        {
+          "name": "Get Assignable Staff (ADMIN/SUPERVISOR)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{baseUrl}}/users/assignable",
+            "description": "รายชื่อเจ้าหน้าที่ที่มอบหมายงานได้ (STAFF/SUPERVISOR) · สำหรับ modal มอบหมายงาน"
+          }
+        },
+        {
+          "name": "Get User by ID (ADMIN)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{baseUrl}}/users/1",
+            "description": "ดูข้อมูลผู้ใช้ตาม id · เฉพาะ ADMIN"
+          }
+        },
+        {
+          "name": "Create User (ADMIN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"staff@example.com\",\n  \"password\": \"password123\",\n  \"name\": \"ชื่อผู้ใช้\",\n  \"role\": \"STAFF\"\n}"
+            },
+            "url": "{{baseUrl}}/users",
+            "description": "สร้างผู้ใช้ · เฉพาะ ADMIN · role: ADMIN | STAFF | USER"
+          }
+        },
+        {
+          "name": "Update User (ADMIN)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"ชื่อที่แก้ไข\",\n  \"email\": \"updated@example.com\",\n  \"role\": \"STAFF\"\n}"
+            },
+            "url": "{{baseUrl}}/users/1",
+            "description": "แก้ไขผู้ใช้ · เฉพาะ ADMIN"
+          }
+        },
+        {
+          "name": "Update User Password (ADMIN)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"newPassword123\"\n}"
+            },
+            "url": "{{baseUrl}}/users/1/password",
+            "description": "เปลี่ยนรหัสผ่านผู้ใช้ (Admin) · เฉพาะ ADMIN"
+          }
+        },
+        {
+          "name": "Delete User (ADMIN)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{baseUrl}}/users/1",
+            "description": "ลบผู้ใช้ · เฉพาะ ADMIN"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Jobs",
+      "item": [
+        {
+          "name": "Create Job (Public)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"province\": \"สงขลา\",\n  \"district\": \"เมือง\",\n  \"location\": \"สถานีตำรวจ\",\n  \"reporterName\": \"ผู้แจ้ง\",\n  \"reporterPhone\": \"0812345678\",\n  \"reporterEmail\": \"reporter@example.com\",\n  \"description\": \"รายละเอียดปัญหา\"\n}"
+            },
+            "url": "{{baseUrl}}/jobs",
+            "description": "แจ้งซ่อมใหม่ (ไม่ต้อง login)"
+          }
+        },
+        {
+          "name": "Get All Jobs",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{baseUrl}}/jobs/list",
+            "description": "รายการแจ้งซ่อมทั้งหมด (ต้อง login)"
+          }
+        },
+        {
+          "name": "Get Job Status by TicketNo (Public)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/jobs/status/TICKET-001",
+            "description": "ตรวจสอบสถานะด้วยเลขที่ใบแจ้งซ่อม (สาธารณะ)"
+          }
+        },
+        {
+          "name": "Get Job by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{baseUrl}}/jobs/1",
+            "description": "ดูงานตาม id"
+          }
+        },
+        {
+          "name": "Stream Job Image (issue/fix)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{baseUrl}}/jobs/1/image/issue/0",
+            "description": "สตรีมรูปงาน (proxy) · แก้ path เป็น issue|fix และ index 0–2"
+          }
+        },
+        {
+          "name": "Download Report PDF",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{baseUrl}}/jobs/1/report-pdf",
+            "description": "ดาวน์โหลด PDF รายงานการบำรุงรักษา (งานที่ resolve แล้ว)"
+          }
+        },
+        {
+          "name": "Update Job Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}"
+            },
+            "url": "{{baseUrl}}/jobs/1/status",
+            "description": "อัปเดตสถานะ · PENDING | IN_PROGRESS | RESOLVED"
+          }
+        },
+        {
+          "name": "Assign Job to Staff",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"staffId\": 1\n}"
+            },
+            "url": "{{baseUrl}}/jobs/1/assign",
+            "description": "มอบหมายงานให้ staff · ADMIN/SUPERVISOR ส่ง staffId ใครก็ได้ · STAFF ส่งได้เฉพาะตัวเอง"
+          }
+        },
+        {
+          "name": "Update Fix Info (assignee only)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "brokenPartType", "value": "HARDWARE", "type": "text" },
+                { "key": "cause", "value": "สาเหตุ", "type": "text" },
+                { "key": "fixMethod", "value": "วิธีแก้ไข", "type": "text" },
+                { "key": "note", "value": "หมายเหตุ", "type": "text" },
+                { "key": "oldSerialNumber", "value": "", "type": "text" },
+                { "key": "newSerialNumber", "value": "", "type": "text" },
+                { "key": "fixImages", "type": "file", "src": [], "disabled": true }
+              ]
+            },
+            "url": "{{baseUrl}}/jobs/1/fix",
+            "description": "บันทึกการแก้ไข + รูปการแก้ไข (optional) · เฉพาะผู้รับงาน · ถ้ายัง RESOLVED ต้อง Reopen ก่อน"
+          }
+        },
+        {
+          "name": "Reopen Job (assignee only)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"ต้องแก้ไขเพิ่มเติม\"\n}"
+            },
+            "url": "{{baseUrl}}/jobs/1/reopen",
+            "description": "Reopen: RESOLVED → IN_PROGRESS · เฉพาะผู้รับงาน"
+          }
+        },
+        {
+          "name": "Move Out of Contract (ADMIN/SUPERVISOR)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isOutOfContract\": true\n}"
+            },
+            "url": "{{baseUrl}}/jobs/1/out-of-contract",
+            "description": "ย้ายนอกสัญญา (คงสถานะ PENDING ตาม backend)"
+          }
+        },
+        {
+          "name": "Delete Job",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{baseUrl}}/jobs/1",
+            "description": "ลบงาน · ADMIN + IN_PROGRESS ได้ทันที · มิฉะนั้น PENDING ไม่มอบหมาย (ADMIN/SUPERVISOR)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Settings",
+      "item": [
+        {
+          "name": "Get Email SMTP (ADMIN)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{baseUrl}}/settings/email-smtp",
+            "description": "อ่านการตั้งค่า SMTP (ไม่คืนรหัสผ่าน)"
+          }
+        },
+        {
+          "name": "Put Email SMTP (ADMIN)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"smtpHost\": \"smtp.example.com\",\n  \"smtpPort\": \"587\",\n  \"username\": \"user\",\n  \"password\": \"\",\n  \"secure\": false,\n  \"from\": \"noreply@example.com\",\n  \"tlsRejectUnauthorized\": true\n}"
+            },
+            "url": "{{baseUrl}}/settings/email-smtp",
+            "description": "บันทึก SMTP · password ว่าง = คงรหัสเดิม · tlsRejectUnauthorized=false สำหรับ self-signed"
+          }
+        },
+        {
+          "name": "Test Email SMTP (ADMIN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to\": \"you@example.com\"\n}"
+            },
+            "url": "{{baseUrl}}/settings/email-smtp/test",
+            "description": "ทดสอบส่งอีเมลไปที่ to (ใช้ค่าที่บันทึกแล้ว; override ฟิลด์อื่นได้)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sites",
+      "item": [
+        {
+          "name": "Get All Sites (Public)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/sites",
+            "description": "รายการพื้นที่โครงการ (จังหวัด/อำเภอ/หน่วยงาน) สำหรับ dropdown หน้าแจ้งปัญหา"
+          }
+        },
+        {
+          "name": "Create Site",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"province\": \"สงขลา\",\n  \"district\": \"เมือง\",\n  \"agency\": \"สถานีตำรวจ\"\n}"
+            },
+            "url": "{{baseUrl}}/sites",
+            "description": "สร้าง Site (ต้อง login)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Areas",
+      "item": [
+        {
+          "name": "Get All Areas",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{baseUrl}}/areas",
+            "description": "รายการพื้นที่รับผิดชอบ"
+          }
+        },
+        {
+          "name": "Create Area",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"district\": \"อำเภอ\",\n  \"staffId\": 1\n}"
+            },
+            "url": "{{baseUrl}}/areas",
+            "description": "สร้าง Area"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Hello",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}",
+            "description": "Health check (root /api)"
+          }
+        }
+      ]
+    }
+  ]
+}
