@@ -131,7 +131,7 @@ python .agents/skills/ui-ux-pro-max/scripts/search.py "accessibility" --domain u
 ## เอกสารโปรเจกต์ (อ้างอิงฟีเจอร์/API)
 
 - ภาพรวมและตาราง endpoint: `README.md` (บันทึกการอัปเดตล่าสุดที่ส่วนต้นไฟล์), `STATUS.md`
-- แผน/งาน: `PLAN.md`, `TASK.md` (Phase 6.4 = SMTP, Reopen, assignee-only fix, CLI v11, JobsList แท็บ · Phase 6.5 = GitLab CI, Docker, พอร์ต PRD, production URL, `npm run build` fixes)
+- แผน/งาน: `PLAN.md`, `TASK.md` (Phase 6.4 = SMTP, Reopen… · 6.5 = GitLab CI, Docker… · 6.6 = RBAC sidebar `unwrapApiData`, `API_INTERNAL_BASE_URL`, `ALLOWED_ORIGINS`, `next.config.mjs`)
 - RBAC: `backend/docs/RBAC-Setup.md`
 - สรุป API เป็น JSON: `backend/docs/api-endpoints.json`
 - Postman: `backend/postman/README.md`

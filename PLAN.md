@@ -1,6 +1,6 @@
 # แผนปรับปรุงระบบแจ้งซ่อม CCTV
 
-**อัปเดต:** 2026-03-23
+**อัปเดต:** 2026-03-23 (ส่วน 4.6 — RBAC sidebar + env PRD)
 
 ---
 
@@ -129,11 +129,19 @@
 
 ## 4.5 GitLab CI, Docker, production URL & build (2026-03-23)
 
-- [x] **`.gitlab-ci.yml`** — stages: build (frontend+backend), deploy (สรุป), deploy_docker (build image + SSH `docker run`), cleanup (manual); map พอร์ต **8309:3000**, **8310:4000**; container **`cctv-app-ticket`**
-- [x] **`Dockerfile` + `docker/entrypoint.sh`** — multi-stage build; runtime `dumb-init` + Nest + Next
+- [x] **`.gitlab-ci.yml`** — stages: build (frontend+backend), deploy (สรุป), deploy_docker (build image + SSH `docker run`), cleanup (manual); map พอร์ต **8309:3000**, **8310:4000**; container แยก **`cctv-app-ticket-frontend`** / **`cctv-app-ticket-backend`**
+- [x] **`backend/Dockerfile` + `frontend/Dockerfile`** — multi-stage build; backend runtime `dumb-init` + **`node dist/src/main.js`** (สอดคล้องผล `nest build` ใต้ `dist/src/`)
 - [x] **ตัวแปร CI** — `FRONTEND_BASE_URL` รวมบทบาทเดิมของ `FRONTEND_URL_PRD` + ใช้กับ backend PDF
 - [x] **เอกสาร production** — โดเมนเดียว + `/api` + proxy **`/socket.io`**; ตัวอย่าง `MINIO_PUBLIC_URL` (เช่น minio-it.forth.co.th) ใน `README.md`
 - [x] **`npm run build`** — แก้ ESLint/TS + Suspense หน้า `/public/report`; เพิ่ม `frontend/src/lib/apiResponse.ts`
+
+## 4.6 RBAC เมนู + Deploy PRD (NextAuth / CORS) (2026-03-23)
+
+- [x] **`DashboardLayoutShell`** — แกะ `GET /roles/me/permissions` ผ่าน **`unwrapApiData`**; ถ้ากรอง permission แล้วเมนูว่างให้ fallback ตาม role; `userRole` ใช้ **uppercase**; เพิ่ม **SUPERVISOR** ในเมนูเดียวกับ STAFF ที่เกี่ยวข้อง
+- [x] **`frontend/src/lib/apiResponse.ts`** — export **`unwrapApiData`** ใช้ร่วมกับ fetch/axios กับ backend
+- [x] **`next.config.mjs`** — แทน `next.config.ts` เพื่อไม่ให้ production image ต้องมี `typescript` ตอน `next start`
+- [x] **`API_INTERNAL_BASE_URL`** — default ใน `.gitlab-ci.yml` + `docker-compose` ชี้ backend ใน Docker network (แก้ hairpin/timeout ตอน login)
+- [x] **`ALLOWED_ORIGINS`** — ส่งจาก GitLab Variables เข้า backend container ใน deploy
 
 ---
 

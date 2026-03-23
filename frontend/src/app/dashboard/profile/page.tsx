@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
 import { User, Lock, Loader2, Eye, EyeOff, Camera } from "lucide-react";
-import DashboardPageShell from "@/components/DashboardPageShell";
 import SegmentedTabs from "@/components/SegmentedTabs";
 import { toastSuccess, toastError } from "@/lib/toast";
+import { unwrapApiData } from "@/lib/apiResponse";
 
 interface Profile {
   id: number;
@@ -20,18 +20,6 @@ interface Profile {
 }
 
 type TabId = "profile" | "password";
-
-function unwrapApiData<T>(root: unknown): T | null {
-  if (!root) return null;
-  if (
-    typeof root === "object" &&
-    root !== null &&
-    "data" in (root as Record<string, unknown>)
-  ) {
-    return ((root as { data?: unknown }).data as T) ?? null;
-  }
-  return root as T;
-}
 
 export default function ProfilePage() {
   const { data: session, update: updateSession } = useSession();
@@ -64,11 +52,11 @@ export default function ProfilePage() {
   const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
   const token = (session as { accessToken?: string })?.accessToken;
 
-  const fetchProfile = useCallback(() => {
-    if (!token) return;
+  const fetchProfile = useCallback((): Promise<Profile | null> => {
+    if (!token) return Promise.resolve(null);
     setLoading(true);
     setLoadError(null);
-    axios
+    return axios
       .get<Profile>(`${API}/users/me`, { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => {
         const p = unwrapApiData<Profile>(res.data);
@@ -84,7 +72,7 @@ export default function ProfilePage() {
           setForm({ name: "", email: "", phone: "", position: "" });
           setAvatarPreview(null);
           setLoadError(notFoundMsg);
-          return;
+          return null;
         }
         setProfile(p);
         setForm({
@@ -99,6 +87,7 @@ export default function ProfilePage() {
           return null;
         });
         setAvatarLoadFailed(false);
+        return p;
       })
       .catch((err: unknown) => {
         const status = (err as { response?: { status?: number } })?.response?.status;
@@ -108,6 +97,7 @@ export default function ProfilePage() {
           "โหลดโปรไฟล์ไม่สำเร็จ";
         setLoadError(`(${status ?? "?"}) ${msg}`);
         toastError("โหลดโปรไฟล์ไม่สำเร็จ", msg);
+        return null;
       })
       .finally(() => setLoading(false));
   }, [token, API]);
@@ -154,16 +144,12 @@ export default function ProfilePage() {
     if (!token) return;
     setSaving(true);
     try {
-      // อัปโหลด avatar ถ้ามีไฟล์ใหม่
-      let newImageUrl: string | undefined;
       if (avatarFile) {
         const fd = new FormData();
         fd.append("image", avatarFile);
-        const res = await axios.patch(`${API}/users/me/avatar`, fd, {
+        await axios.patch(`${API}/users/me/avatar`, fd, {
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
         });
-        const payload = unwrapApiData<{ image?: string }>(res.data);
-        newImageUrl = payload?.image;
       }
       await axios.patch(
         `${API}/users/me`,
@@ -176,14 +162,16 @@ export default function ProfilePage() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       toastSuccess("บันทึกโปรไฟล์สำเร็จ", 1200);
-      fetchProfile();
-      await updateSession({
-        user: {
-          ...session?.user,
-          name: (form.name.trim() || session?.user?.name) ?? undefined,
-          image: newImageUrl ?? (session?.user as { image?: string })?.image ?? undefined,
-        },
-      });
+      setAvatarFile(null);
+      const refreshed = await fetchProfile();
+      if (refreshed) {
+        await updateSession({
+          user: {
+            name: refreshed.name ?? undefined,
+            image: refreshed.image ?? undefined,
+          },
+        });
+      }
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       toastError("บันทึกไม่สำเร็จ", Array.isArray(msg) ? msg.join(", ") : msg || "เกิดข้อผิดพลาด");
@@ -232,14 +220,24 @@ export default function ProfilePage() {
     { id: "password", label: "รหัสผ่าน", icon: Lock },
   ];
 
+  const pwdToggleBtn =
+    "absolute right-1.5 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50";
+
   return (
-    <DashboardPageShell
-      title="โปรไฟล์"
-      subtitle="จัดการข้อมูลส่วนตัวและรหัสผ่าน"
-      cardOverflow="visible"
-    >
-      <div className="flex flex-col h-full min-h-0">
-        {/* Tab menu (shared segmented control) */}
+    <div className="animate-fade-up w-full min-w-0 space-y-6">
+      <div className="min-w-0">
+        <h1 className="text-lg sm:text-xl font-bold truncate text-white">โปรไฟล์</h1>
+        <p className="text-sm mt-0.5 text-slate-400">
+          จัดการข้อมูลส่วนตัวและรหัสผ่าน
+        </p>
+      </div>
+
+      <div className="rounded-xl border border-white/10 p-4 sm:p-5 w-full bg-slate-900/50 backdrop-blur-md shadow-2xl ring-1 ring-white/5">
+        <div className="flex items-center gap-2 mb-4 shrink-0">
+          <User size={18} className="text-slate-400 shrink-0" aria-hidden />
+          <h2 className="font-bold text-sm text-slate-200">ข้อมูลบัญชี</h2>
+        </div>
+
         <SegmentedTabs
           tabs={tabs}
           activeId={tab}
@@ -247,23 +245,23 @@ export default function ProfilePage() {
           ariaLabel="แท็บโปรไฟล์"
         />
 
-        <div className="p-4 sm:p-6">
+        <div className="mt-4 sm:mt-6">
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 size={28} className="animate-spin text-slate-500" />
+            <div className="flex items-center justify-center py-16 text-slate-400 gap-2">
+              <Loader2 className="animate-spin" size={22} aria-hidden />
+              <span>กำลังโหลดข้อมูล…</span>
             </div>
           ) : tab === "profile" ? (
             <form onSubmit={handleSaveProfile} className="w-full">
               {loadError && (
                 <div
                   className="mb-4 rounded-xl border border-red-500/30 px-3 py-2 text-sm bg-red-500/10 text-red-400"
+                  role="alert"
                 >
                   {loadError}
                 </div>
               )}
-              <div
-                className="rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-md p-4 sm:p-5"
-              >
+              <div className="rounded-xl border border-white/10 bg-slate-950/40 backdrop-blur-sm p-4 sm:p-5">
                 <div className="flex flex-col sm:flex-row items-start gap-4">
                   <div className="shrink-0">
                     {avatarPreview && !avatarLoadFailed ? (
@@ -319,7 +317,7 @@ export default function ProfilePage() {
                       <button
                         type="button"
                         onClick={() => avatarInputRef.current?.click()}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 text-xs sm:text-sm font-medium bg-slate-800/50 text-slate-300 hover:bg-slate-700/60 hover:text-white transition-colors"
+                        className="flex items-center gap-2 min-h-[44px] px-3 py-2 rounded-xl border border-white/10 text-xs sm:text-sm font-medium bg-slate-800/50 text-slate-300 hover:bg-slate-700/60 hover:text-white transition-all active:scale-95 cursor-pointer shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
                         aria-label="เปลี่ยนรูปโปรไฟล์"
                       >
                         <Camera size={16} /> เปลี่ยนรูป
@@ -356,12 +354,12 @@ export default function ProfilePage() {
 
                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-slate-300">
+                    <label className="block text-sm font-medium mb-1.5 text-slate-300">
                       ชื่อ-สกุล
                     </label>
                     <input
                       type="text"
-                      className="form-input rounded-xl border border-white/10 bg-slate-800/50 text-slate-200 placeholder:text-slate-500 outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                      className="form-input-glass"
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
                       placeholder="ชื่อจริง"
@@ -369,12 +367,12 @@ export default function ProfilePage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-slate-300">
+                    <label className="block text-sm font-medium mb-1.5 text-slate-300">
                       Username
                     </label>
                     <input
                       type="text"
-                      className="form-input rounded-xl border border-white/10 bg-slate-800/70 text-slate-500 cursor-not-allowed"
+                      className="form-input-glass opacity-70 cursor-not-allowed"
                       value={profile?.username ?? ""}
                       disabled
                     />
@@ -384,12 +382,12 @@ export default function ProfilePage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-slate-300">
+                    <label className="block text-sm font-medium mb-1.5 text-slate-300">
                       อีเมล
                     </label>
                     <input
                       type="email"
-                      className="form-input rounded-xl border border-white/10 bg-slate-800/50 text-slate-200 placeholder:text-slate-500 outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                      className="form-input-glass"
                       value={form.email}
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
                       placeholder="email@example.com"
@@ -397,12 +395,12 @@ export default function ProfilePage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-slate-300">
+                    <label className="block text-sm font-medium mb-1.5 text-slate-300">
                       เบอร์โทร
                     </label>
                     <input
                       type="text"
-                      className="form-input rounded-xl border border-white/10 bg-slate-800/50 text-slate-200 placeholder:text-slate-500 outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                      className="form-input-glass"
                       value={form.phone}
                       onChange={(e) => setForm({ ...form, phone: e.target.value })}
                       placeholder="08xxxxxxxx"
@@ -410,12 +408,12 @@ export default function ProfilePage() {
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium mb-1 text-slate-300">
+                    <label className="block text-sm font-medium mb-1.5 text-slate-300">
                       ตำแหน่ง
                     </label>
                     <input
                       type="text"
-                      className="form-input rounded-xl border border-white/10 bg-slate-800/50 text-slate-200 placeholder:text-slate-500 outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                      className="form-input-glass"
                       value={form.position}
                       onChange={(e) => setForm({ ...form, position: e.target.value })}
                       placeholder="ตำแหน่งงาน"
@@ -423,40 +421,35 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <div className="mt-4 flex justify-end">
+                <div className="mt-6 pt-6 border-t border-white/10 flex justify-end">
                   <button
                     type="submit"
                     disabled={saving}
-                    className="px-5 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-60 bg-blue-600 hover:bg-blue-500 transition-colors shadow-lg shadow-blue-600/20"
+                    className="inline-flex items-center justify-center gap-2 min-h-[44px] px-6 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-60 disabled:active:scale-100 bg-blue-600 hover:bg-blue-500 transition-all active:scale-95 shadow-lg shadow-blue-900/30 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                   >
-                    {saving ? "กำลังบันทึก..." : "บันทึก"}
+                    {saving ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
                   </button>
                 </div>
               </div>
             </form>
           ) : (
-            <form onSubmit={handleChangePassword} className="w-full space-y-4">
-              <div
-                className="rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-md p-4 sm:p-5"
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <Lock size={16} className="text-slate-400" />
-                  <h2 className="text-sm font-bold text-white">
-                    เปลี่ยนรหัสผ่าน
-                  </h2>
+            <form onSubmit={handleChangePassword} className="w-full">
+              <div className="rounded-xl border border-white/10 bg-slate-950/40 backdrop-blur-sm p-4 sm:p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <Lock size={18} className="text-slate-400 shrink-0" aria-hidden />
+                  <h3 className="text-sm font-bold text-slate-200">เปลี่ยนรหัสผ่าน</h3>
                 </div>
 
-                <div className="space-y-3">
-                  {/* Panel: current password */}
-                  <section className="rounded-xl border border-white/10 p-3 bg-slate-800/30">
-                    <label className="block text-sm font-medium mb-1 text-slate-300">
+                <div className="space-y-4">
+                  <section className="rounded-xl border border-white/10 p-4 bg-slate-900/40">
+                    <label className="block text-sm font-medium mb-1.5 text-slate-300">
                       รหัสผ่านปัจจุบัน
                     </label>
                     <div className="relative">
                       <input
                         type={showCurrentPassword ? "text" : "password"}
                         required
-                        className="form-input pr-10 rounded-xl border border-white/10 bg-slate-800/50 text-slate-200 placeholder:text-slate-500 outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                        className="form-input-glass pr-11"
                         value={passwordForm.currentPassword}
                         onChange={(e) =>
                           setPasswordForm({ ...passwordForm, currentPassword: e.target.value })
@@ -466,7 +459,7 @@ export default function ProfilePage() {
                       />
                       <button
                         type="button"
-                        className="btn-icon absolute right-2 top-1/2 -translate-y-1/2"
+                        className={pwdToggleBtn}
                         aria-label={showCurrentPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
                         aria-pressed={showCurrentPassword}
                         onClick={() => setShowCurrentPassword((v) => !v)}
@@ -476,9 +469,8 @@ export default function ProfilePage() {
                     </div>
                   </section>
 
-                  {/* Panel: new password */}
-                  <section className="rounded-xl border border-white/10 p-3 bg-slate-800/30">
-                    <label className="block text-sm font-medium mb-1 text-slate-300">
+                  <section className="rounded-xl border border-white/10 p-4 bg-slate-900/40">
+                    <label className="block text-sm font-medium mb-1.5 text-slate-300">
                       รหัสผ่านใหม่
                     </label>
                     <div className="relative">
@@ -486,7 +478,7 @@ export default function ProfilePage() {
                         type={showNewPassword ? "text" : "password"}
                         required
                         minLength={6}
-                        className="form-input pr-10 rounded-xl border border-white/10 bg-slate-800/50 text-slate-200 placeholder:text-slate-500 outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                        className="form-input-glass pr-11"
                         value={passwordForm.newPassword}
                         onChange={(e) =>
                           setPasswordForm({ ...passwordForm, newPassword: e.target.value })
@@ -496,7 +488,7 @@ export default function ProfilePage() {
                       />
                       <button
                         type="button"
-                        className="btn-icon absolute right-2 top-1/2 -translate-y-1/2"
+                        className={pwdToggleBtn}
                         aria-label={showNewPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
                         aria-pressed={showNewPassword}
                         onClick={() => setShowNewPassword((v) => !v)}
@@ -504,21 +496,20 @@ export default function ProfilePage() {
                         {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
                     </div>
-                    <p className="text-[11px] mt-1 text-slate-500">
+                    <p className="text-[11px] mt-1.5 text-slate-500">
                       ต้องมีความยาวอย่างน้อย 6 ตัวอักษร
                     </p>
                   </section>
 
-                  {/* Panel: confirm password */}
-                  <section className="rounded-xl border border-white/10 p-3 bg-slate-800/30">
-                    <label className="block text-sm font-medium mb-1 text-slate-300">
+                  <section className="rounded-xl border border-white/10 p-4 bg-slate-900/40">
+                    <label className="block text-sm font-medium mb-1.5 text-slate-300">
                       ยืนยันรหัสผ่านใหม่
                     </label>
                     <div className="relative">
                       <input
                         type={showConfirmPassword ? "text" : "password"}
                         required
-                        className="form-input pr-10 rounded-xl border border-white/10 bg-slate-800/50 text-slate-200 placeholder:text-slate-500 outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                        className="form-input-glass pr-11"
                         value={passwordForm.confirmPassword}
                         onChange={(e) =>
                           setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })
@@ -528,7 +519,7 @@ export default function ProfilePage() {
                       />
                       <button
                         type="button"
-                        className="btn-icon absolute right-2 top-1/2 -translate-y-1/2"
+                        className={pwdToggleBtn}
                         aria-label={showConfirmPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
                         aria-pressed={showConfirmPassword}
                         onClick={() => setShowConfirmPassword((v) => !v)}
@@ -539,11 +530,11 @@ export default function ProfilePage() {
                   </section>
                 </div>
 
-                <div className="mt-4 flex items-center justify-end">
+                <div className="mt-6 pt-6 border-t border-white/10 flex justify-end">
                   <button
                     type="submit"
                     disabled={saving}
-                    className="px-5 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-60 bg-blue-600 hover:bg-blue-500 transition-colors shadow-lg shadow-blue-600/20"
+                    className="inline-flex items-center justify-center gap-2 min-h-[44px] px-6 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-60 disabled:active:scale-100 bg-blue-600 hover:bg-blue-500 transition-all active:scale-95 shadow-lg shadow-blue-900/30 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                   >
                     {saving ? "กำลังบันทึก..." : "เปลี่ยนรหัสผ่าน"}
                   </button>
@@ -553,6 +544,6 @@ export default function ProfilePage() {
           )}
         </div>
       </div>
-    </DashboardPageShell>
+    </div>
   );
 }

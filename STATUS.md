@@ -33,6 +33,7 @@
    - **MinIO**: ใช้ `MINIO_PUBLIC_URL` (ถ้ามี) สำหรับ URL รูปที่ browser เข้าถึงได้; bucket policy ตั้งเป็น public read ตอน onModuleInit
 
 3. 🖥️ **Frontend & UI Design (Modern Minimal Theme & UX Improvements): `🟢 สมบูรณ์`**
+   - **RBAC Sidebar (แก้แล้ว):** `DashboardLayoutShell` แกะ response `/roles/me/permissions` แบบเดียวกับ `ResponseInterceptor`; ถ้า permission ที่ได้ไม่ map กับรายการเมนูใน sidebar จะ fallback ตามบทบาท; เมนูสำหรับ **SUPERVISOR** ในหมวดเดียวกับ STAFF (ภาพรวม, กำลังแก้ไข, ประวัติ, นอกสัญญา) สอดคล้องเอกสาร
    - **Unified Public Template (`PublicLayoutShell`)**: หน้า `/report`, `/status` และ `/login` ใช้ Layout และ Background Glassmorphism แบบเดียวกันทั้งหมด สร้างความเป็นเอกภาพ (Consistency)
    - **Global Font เปลี่ยนเป็น `Sarabun`**: แก้ไข Layout หลักให้ดึงฟอนต์ Sarabun แทน Prompt เพื่อเพิ่มความเป็นทางการและดูหน้าเชื่อถือ
    - **Login**: กรอกอีเมลหรือชื่อผู้ใช้ + รหัสผ่าน มีปุ่มแสดง/ซ่อนรหัสผ่าน (password toggle)
@@ -143,7 +144,9 @@ npx ts-node scripts/seed-roles-permissions.ts
 - **แจ้งซ่อม + รายการงาน**: Validation/API ชัดเจนขึ้น; รายการใน Dashboard ใช้ **`GET /jobs/list`**; flow เจ้าหน้าที่บน `/report` แยกจากผู้ใช้ทั่วไป
 - **ตั้งค่าอีเมล (SMTP) + Reopen (2026-03-22)**: API ตั้งค่า SMTP (ADMIN); **`PATCH /jobs/:id/fix`** และ **`PATCH /jobs/:id/reopen`** — เฉพาะผู้รับงาน; Frontend หน้า settings + Reopen ยืนยันก่อนเรียก API; `@nestjs/cli` v11; `JobsList` แท็บสัญญา/นอกสัญญาไม่ห่อ glass ชั้นนอก
 - **Deploy / CI (2026-03-23)**: **GitLab CI** (`.gitlab-ci.yml`) + **`Dockerfile`** — build แยก frontend/backend ใน pipeline, image production รัน Nest + Next; พอร์ต host ตัวอย่าง **8309→3000**, **8310→4000**; ตัวแปร **`FRONTEND_BASE_URL`** แทน `FRONTEND_URL_PRD`; คู่มือ production โดเมนเดียว + `/api` + `/socket.io` และ `MINIO_PUBLIC_URL` สรุปใน `README.md`
+- **Backend Docker entry (Nest + nodenext)**: image backend ใช้ **`node dist/src/main.js`** — ไม่ใช่ `dist/main.js`; สาเหตุเดิมของ error PRD `MODULE_NOT_FOUND` คือ path entry ไม่ตรงกับผล compile
 - **Frontend build (2026-03-23)**: `apiResponse.ts`; **`/public/report`** ใช้ `<Suspense>` รอบ `useSearchParams` เพื่อให้ `next build` ผ่าน
+- **Deploy PRD (2026-03-23 ต่อ):** `next.config.mjs` (ไม่ต้องมี TypeScript ใน runner image); **`API_INTERNAL_BASE_URL`** สำหรับ `authorize()` → backend ใน Docker network; GitLab ส่ง **`ALLOWED_ORIGINS`** เข้า backend container
 
 ---
 

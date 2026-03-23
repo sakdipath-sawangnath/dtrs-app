@@ -31,9 +31,9 @@
 
 ## ไฟล์/เอกสารที่ควรรู้
 - ภาพรวมระบบ: `README.md`
-- สถานะ/แผน/งาน: `STATUS.md`, `PLAN.md`, `TASK.md` (รวม Phase 6.5: GitLab CI, Docker, พอร์ต 8309/8310, `FRONTEND_BASE_URL`, production `/api` + `/socket.io`, build fixes)
+- สถานะ/แผน/งาน: `STATUS.md`, `PLAN.md`, `TASK.md` (รวม Phase 6.5–6.6: GitLab CI, Docker, พอร์ต 8309/8310, `FRONTEND_BASE_URL`, `ALLOWED_ORIGINS`, `API_INTERNAL_BASE_URL`, RBAC sidebar, production `/api` + `/socket.io`, build fixes)
 - Mapping ข้อมูล CSV: `docs/CSV-vs-System-Mapping.md`
 - RBAC: `backend/docs/RBAC-Setup.md`
 - Postman / สรุป endpoint: `backend/postman/README.md`, `backend/docs/api-endpoints.json`
-- Deploy: `.gitlab-ci.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml` — อ่านคู่กับ `README.md`
+- Deploy: `.gitlab-ci.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml` — อ่านคู่กับ `README.md` (backend รัน **`dist/src/main.js`** ใน image ไม่ใช่ `dist/main.js`; frontend ใช้ **`next.config.mjs`**; ตั้ง **`ALLOWED_ORIGINS`** / **`API_INTERNAL_BASE_URL`** ตาม `README.md`)
 

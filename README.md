@@ -4,13 +4,18 @@
 
 ## บันทึกการอัปเดตล่าสุด (2026-03-23)
 
+- **RBAC เมนู (Sidebar)** — `DashboardLayoutShell` ดึง `GET /roles/me/permissions` แล้ว **แกะ `data` ตาม ResponseInterceptor** (`unwrapApiData` ใน `src/lib/apiResponse.ts`); ถ้ากรองตาม permission แล้วไม่มีรายการใน sidebar (เช่น มีแค่ `menu.profile`) จะ **fallback ตามบทบาท**; role ใน session ใช้ **uppercase**; เมนูภาพรวม/กำลังแก้ไข/ประวัติ/นอกสัญญา รวม **SUPERVISOR** ให้สอดคล้อง STAFF
+- **Deploy PRD — Next.js** — ใช้ **`next.config.mjs`** แทน `.ts` เพื่อไม่ให้ image production (`npm prune --omit=dev`) ต้องมี `typescript` ตอน `next start`
+- **Deploy PRD — NextAuth → Backend** — ตั้ง **`API_INTERNAL_BASE_URL`** (เช่น `http://cctv-app-ticket-backend:4000/api`) ใน container frontend เพื่อให้ `authorize()` เรียก backend ใน Docker network แทน public URL (กัน **ConnectTimeout / hairpin** ไปโดเมน PRD)
+- **Deploy PRD — CORS** — GitLab CI ส่ง **`ALLOWED_ORIGINS`** เข้า backend container; ตั้งค่าใน GitLab Variables เป็น origin จริงของเว็บ (คั่นด้วย comma)
 - **GitLab CI/CD** — `.gitlab-ci.yml`: stages `build` → `deploy` → `deploy_docker` → `cleanup`; build แยก `frontend` / `backend`; build image **สองตัว** บน Docker daemon PRD (`cctv-app-ticket-frontend`, `cctv-app-ticket-backend`); SSH รัน **สอง container** + network `cctv-app-ticket-net` — map **8309→3000** (Next.js), **8310→4000** (NestJS)
 - **Docker** — `backend/Dockerfile` + `frontend/Dockerfile` + `docker-compose.yml` (รันทดสอบแยกคอนเทนเนอร์); build frontend ใช้ `--build-arg NEXT_PUBLIC_API_BASE_URL=...`
+- **Backend ใน container** — รันด้วย `node dist/src/main.js` (และ `npm run start:prod` ชี้ path เดียวกัน) เพราะ TypeScript ใช้ `module: "nodenext"` ทำให้ผล `nest build` อยู่ใต้ `dist/src/` ไม่ใช่ `dist/main.js` — ถ้า PRD ขึ้น `Cannot find module '/app/dist/main.js'` ให้ตรวจว่า image มาจาก commit ที่แก้ Dockerfile แล้ว และไม่ override `command` เป็น path เก่า
 - **ตัวแปร CI (GitLab)** — ใช้ **`FRONTEND_BASE_URL`** เดียวสำหรับลิงก์ Environment, ส่งเข้า container และ `JobsPdfService` (ไม่แยก `FRONTEND_URL_PRD`); รายการตัวแปรอื่นดูคอมเมนต์ใน `.gitlab-ci.yml`
 - **Production โดเมนเดียว (ตัวอย่าง)** — เว็บ `https://cctv-app.forth.co.th` + API ที่ **`/api`**: ตั้ง `NEXT_PUBLIC_API_BASE_URL=https://cctv-app.forth.co.th/api`, `NEXTAUTH_URL`, `ALLOWED_ORIGINS`, `FRONTEND_BASE_URL` ให้สอดคล้อง origin จริง; reverse proxy ต้องส่งต่อ **`/socket.io`** ไป backend (Socket.IO ไม่อยู่ใต้ `/api`)
 - **MINIO_PUBLIC_URL (ตัวอย่าง)** — เช่น `https://minio-it.forth.co.th` สำหรับ URL รูปที่ browser โหลดได้ (ค่าจริงใส่เฉพาะ `.env` / GitLab Variables)
 - **Git** — `.gitignore` ที่ root กำหนดขอบเขตขึ้น repo: `backend/`, `frontend/`, `README.md`, `PLAN.md`, `TASK.md`, `STATUS.md`, `AGENTS.md`, `AGENT_INSTRUCTIONS.md`, `.gitlab-ci.yml`, `docker-compose.yml`, `.dockerignore`, `docker/`
-- **Frontend `npm run build`** — เพิ่ม `src/lib/apiResponse.ts` (ดึงรายชื่อ assignable + แปลง error จาก axios แบบ type-safe); หน้า **`/public/report`**: ห่อ `useSearchParams` ด้วย `<Suspense>` ตาม Next.js 15
+- **Frontend `npm run build`** — `src/lib/apiResponse.ts` รวม **`unwrapApiData`** (แกะ `{ data }` จาก backend) + ฟังก์ชันช่วย assignable/error; หน้า **`/public/report`**: ห่อ `useSearchParams` ด้วย `<Suspense>` ตาม Next.js 15
 
 ### ย้อนหลัง (2026-03-22)
 

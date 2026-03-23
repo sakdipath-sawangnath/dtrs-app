@@ -59,7 +59,7 @@
 ## การทำงาน
 
 - **Login / Session:** ยังใช้ `user.role` (enum) จาก JWT สำหรับ Guards ที่ตรวจบทบาท (เช่น ADMIN only)
-- **Sidebar:** เรียก `GET /roles/me/permissions` เพื่อดึงสิทธิ์ของ user แล้วแสดงเฉพาะเมนูที่ user มีสิทธิ์
+- **Sidebar:** เรียก `GET /roles/me/permissions` เพื่อดึงสิทธิ์ของ user แล้วแสดงเฉพาะเมนูที่ user มีสิทธิ์ — ฝั่ง `DashboardLayoutShell` ต้อง **แกะ `data` จาก body มาตรฐาน** (`{ success, data: { permissions } }`) เหมือนหน้าอื่นที่ใช้ `unwrapApiData`; ถ้ารายการสิทธิ์ที่ได้ **ไม่ตรงกับเมนูใน sidebar เลย** (เช่น มีแค่ `menu.profile`) ให้ **fallback ตามบทบาท** เพื่อไม่ให้เมนูว่าง
 - **หน้าจัดการบทบาท:** `/dashboard/roles` (เฉพาะ ADMIN ที่มีสิทธิ์ menu.roles) — สร้าง/แก้ไขบทบาท และกำหนดสิทธิ์ (checkbox) ให้แต่ละบทบาท
 - **ผู้ใช้:** ตอนสร้าง/แก้ไข user เลือก role เป็น ADMIN/STAFF/USER/SUPERVISOR ได้ ระบบจะ map ไปที่ AppRole และ set User.roleId ให้
 - **มอบหมายงาน:** หน้ารอดำเนินการ (`/dashboard/pending`) แสดงปุ่ม "มอบหมายงาน" เฉพาะผู้ใช้ที่มีบทบาท ADMIN หรือ SUPERVISOR (หรือมีสิทธิ์ job.assign) ปุ่ม "รับงาน" ใช้สำหรับ STAFF รับงานตัวเอง

@@ -73,9 +73,9 @@ export default function SiteHeader({ right, subtitle, isDark = false }: SiteHead
                   : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
               }`}
             >
-              {session?.user && (session.user as { image?: string })?.image ? (
+              {session?.user && avatarImage && !avatarImgError ? (
                 <img
-                  src={avatarImage as string}
+                  src={avatarImage}
                   alt={session.user.name || "โปรไฟล์"}
                   className={`w-7 h-7 rounded-full object-cover border shrink-0 ${isDark ? 'border-slate-600' : 'border-slate-200'}`}
                   onError={() => setAvatarImgError(true)}

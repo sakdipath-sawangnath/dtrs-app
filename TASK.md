@@ -146,7 +146,7 @@
 
 ### CI / Deploy
 - [x] **`.gitlab-ci.yml`** — build แยก `frontend` / `backend`, deploy Docker บน PRD, SSH run; พอร์ต **8309→3000**, **8310→4000**; cleanup image แบบ manual
-- [x] **`Dockerfile`**, **`.dockerignore`**, **`docker/entrypoint.sh`**
+- [x] **`backend/Dockerfile`**, **`frontend/Dockerfile`**, **`docker-compose.yml`**, **`.dockerignore`** (ไม่ใช้ `docker/entrypoint.sh` รวมอีกต่อไป); backend CMD / `start:prod` → **`dist/src/main.js`**
 - [x] **GitLab Variables** — ใช้ **`FRONTEND_BASE_URL`** เดียว (เลิกใช้ `FRONTEND_URL_PRD` ใน pipeline)
 
 ### Frontend
@@ -157,4 +157,17 @@
 ### เอกสาร
 - [x] อัปเดต `README.md`, `STATUS.md`, `PLAN.md`, `TASK.md`, `AGENTS.md`, `AGENT_INSTRUCTIONS.md`, `frontend/README.md`, `backend/postman/README.md`, `backend/docs/RBAC-Setup.md` (ถ้ามีบรรทัดที่เกี่ยวข้อง)
 
+## 16. Phase 6.6 — RBAC sidebar + PRD env (NextAuth / CORS / next.config) (2026-03-23)
+
+### Frontend
+- [x] **`DashboardLayoutShell`** — แกะ response `/roles/me/permissions` ตาม `ResponseInterceptor`; fallback เมนูเมื่อ permission ไม่ชี้ sidebar; **SUPERVISOR** ในเมนูที่เทียบ STAFF
+- [x] **`apiResponse.ts`** — **`unwrapApiData`** สำหรับ body มาตรฐาน `{ success, data }`
+
+### Deploy / CI
+- [x] **`next.config.mjs`** + **Dockerfile** copy ไฟล์ที่ถูกต้อง
+- [x] **`API_INTERNAL_BASE_URL`** (GitLab default + docker-compose) สำหรับ server-side login
+- [x] **`ALLOWED_ORIGINS`** ใน `.gitlab-ci.yml` → backend container
+
+### เอกสาร
+- [ ] อัปเดต `README.md`, `STATUS.md`, `PLAN.md`, `TASK.md`, `AGENTS.md`, `backend/docs/RBAC-Setup.md` (รอบนี้แก้ local — **ยังไม่ push git** ตามคำขอ)
 

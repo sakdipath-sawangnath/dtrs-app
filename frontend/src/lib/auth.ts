@@ -107,7 +107,7 @@ export const authOptions: NextAuthOptions = {
         }),
     ],
     callbacks: {
-        async jwt({ token, user }) {
+        async jwt({ token, user, trigger, session }) {
             if (user) {
                 token.accessToken =
                     (user as { accessToken?: string }).accessToken ??
@@ -115,7 +115,17 @@ export const authOptions: NextAuthOptions = {
                     (user as { access_token?: string }).access_token;
                 token.role = (user as { role?: string }).role;
                 token.uid = (user as { id?: string }).id;
-                (token as { image?: string }).image = (user as { image?: string }).image;
+                (token as { image?: string | null }).image = (user as { image?: string }).image;
+                const uName = (user as { name?: string | null }).name;
+                if (uName != null) token.name = uName;
+            }
+            // `update()` จาก client — อัปเดตรูป/ชื่อใน JWT โดยไม่ต้อง login ใหม่
+            if (trigger === 'update' && session) {
+                const s = session as { user?: { name?: string | null; image?: string | null } };
+                if (s.user?.name != null) token.name = s.user.name;
+                if (s.user && 'image' in s.user) {
+                    (token as { image?: string | null }).image = s.user.image ?? undefined;
+                }
             }
             return token;
         },
@@ -128,9 +138,10 @@ export const authOptions: NextAuthOptions = {
             (session as { userRole?: string }).userRole = (token.role as string) || 'STAFF';
             (session as { userId?: string }).userId = token.uid as string;
             if (session.user) {
+                if (typeof token.name === 'string') session.user.name = token.name;
                 (session.user as { role?: string }).role = (token.role as string) || 'STAFF';
                 (session.user as { id?: string }).id = token.uid as string;
-                (session.user as { image?: string }).image = (token as { image?: string }).image;
+                (session.user as { image?: string | null }).image = (token as { image?: string | null }).image;
             }
             return session;
         },
