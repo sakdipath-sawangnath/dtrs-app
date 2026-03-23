@@ -2,6 +2,7 @@
 # ตั้งค่าใน GitLab: SSH_PRIVATE_KEY, DATABASE_URL, JWT_SECRET, NEXTAUTH_SECRET, NEXTAUTH_URL,
 #   NEXT_PUBLIC_API_BASE_URL (URL ที่ client เรียก API — ควรตรงพอร์ตที่ map ไป backend เช่น :8310/api),
 #   FRONTEND_BASE_URL (URL หน้าเว็บ PRD — ใช้ทั้ง GitLab Environment, คอนเทนเนอร์, และ backend PDF/Puppeteer)
+#   ALLOWED_ORIGINS (คั่นด้วย comma — origin ของ frontend สำหรับ CORS ใน production)
 #   ตัวแปร MinIO/SMTP ตาม backend
 
 stages:
@@ -138,6 +139,7 @@ deploy:prd:docker:
         -e PORT=4000 \
         -e DATABASE_URL='${DATABASE_URL}' \
         -e JWT_SECRET='${JWT_SECRET}' \
+        -e ALLOWED_ORIGINS='${ALLOWED_ORIGINS}' \
         -e FRONTEND_BASE_URL='${FRONTEND_BASE_URL}' \
         -e MINIO_ENDPOINT='${MINIO_ENDPOINT}' \
         -e MINIO_PORT='${MINIO_PORT}' \
