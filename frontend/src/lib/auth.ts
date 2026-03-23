@@ -14,6 +14,13 @@ function unwrapApiData<T>(root: unknown): T | null {
     return root as T;
 }
 
+/** ฝั่งเซิร์ฟเวอร์ (authorize): ใช้ API_INTERNAL_BASE_URL ถ้ามี เพื่อเรียก backend ใน Docker network แทน public URL (กัน hairpin timeout) */
+function getServerApiBaseUrl(): string {
+    const internal = process.env.API_INTERNAL_BASE_URL?.trim();
+    if (internal) return internal.replace(/\/$/, '');
+    return (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
+}
+
 export const authOptions: NextAuthOptions = {
     providers: [
         CredentialsProvider({
@@ -27,7 +34,8 @@ export const authOptions: NextAuthOptions = {
                 if (!identifier || !credentials?.password) return null;
 
                 try {
-                    const res = await fetch(process.env.NEXT_PUBLIC_API_BASE_URL + '/auth/login', {
+                    const apiBase = getServerApiBaseUrl();
+                    const res = await fetch(`${apiBase}/auth/login`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -60,7 +68,7 @@ export const authOptions: NextAuthOptions = {
                         // ดึง image เพิ่มเติมเพื่อให้ header แสดงรูปได้ (ถ้ามี)
                         let image: string | undefined;
                         try {
-                            const meRes = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/users/me`, {
+                            const meRes = await fetch(`${apiBase}/users/me`, {
                                 headers: {
                                     Authorization: `Bearer ${accessToken}`,
                                 },

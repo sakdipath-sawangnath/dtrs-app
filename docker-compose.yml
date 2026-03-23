@@ -34,5 +34,7 @@ services:
     environment:
       NODE_ENV: production
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:8309}
+      # ให้ตรงกับ service name + PORT ของ backend ใน compose (server-side login)
+      API_INTERNAL_BASE_URL: ${API_INTERNAL_BASE_URL:-http://backend:4000/api}
     depends_on:
       - backend

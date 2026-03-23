@@ -21,7 +21,7 @@ COPY --from=builder /app/package-lock.json ./package-lock.json
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/next.config.ts ./next.config.ts
+COPY --from=builder /app/next.config.mjs ./next.config.mjs
 EXPOSE 3000
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["./node_modules/.bin/next", "start", "-H", "0.0.0.0", "-p", "3000"]
