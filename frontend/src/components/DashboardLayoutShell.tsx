@@ -25,17 +25,18 @@ import SiteFooter from "@/components/SiteFooter";
 import UserMenuDropdown from "@/components/UserMenuDropdown";
 import NotificationsBell from "@/components/NotificationsBell";
 import DashboardRouteLoading from "@/components/DashboardRouteLoading";
+import { unwrapApiData } from "@/lib/apiResponse";
 
 /** เมนูตาม permission (RBAC dynamic) — ถ้าไม่มี permissions จาก API จะ fallback ใช้ roles */
 const navigation = [
   { name: "แจ้งปัญหา", href: "/public/report", icon: FileEdit, permission: "menu.report", roles: ["USER"] },
   { name: "ตรวจสอบสถานะ", href: "/public/status", icon: Search, permission: "menu.status", roles: ["USER"] },
-  { name: "ภาพรวม", href: "/dashboard", icon: LayoutDashboard, permission: "menu.dashboard", roles: ["ADMIN", "STAFF"] },
+  { name: "ภาพรวม", href: "/dashboard", icon: LayoutDashboard, permission: "menu.dashboard", roles: ["ADMIN", "STAFF", "SUPERVISOR"] },
   { name: "รอดำเนินการ", href: "/dashboard/pending", icon: AlertCircle, permission: "menu.pending", roles: ["ADMIN", "STAFF", "SUPERVISOR"] },
   { name: "งานที่รับผิดชอบ", href: "/dashboard/my-jobs", icon: User, permission: "menu.myJobs", roles: ["ADMIN", "STAFF", "SUPERVISOR"] },
-  { name: "กำลังแก้ไข", href: "/dashboard/in-progress", icon: Wrench, permission: "menu.inProgress", roles: ["ADMIN", "STAFF"] },
-  { name: "ประวัติทั้งหมด", href: "/dashboard/all", icon: CheckCircle, permission: "menu.all", roles: ["ADMIN", "STAFF"] },
-  { name: "นอกสัญญา", href: "/dashboard/out-of-contract", icon: Clock, permission: "menu.outOfContract", roles: ["ADMIN", "STAFF"] },
+  { name: "กำลังแก้ไข", href: "/dashboard/in-progress", icon: Wrench, permission: "menu.inProgress", roles: ["ADMIN", "STAFF", "SUPERVISOR"] },
+  { name: "ประวัติทั้งหมด", href: "/dashboard/all", icon: CheckCircle, permission: "menu.all", roles: ["ADMIN", "STAFF", "SUPERVISOR"] },
+  { name: "นอกสัญญา", href: "/dashboard/out-of-contract", icon: Clock, permission: "menu.outOfContract", roles: ["ADMIN", "STAFF", "SUPERVISOR"] },
   { name: "จัดการผู้ใช้", href: "/dashboard/users", icon: UserCog, permission: "menu.users", roles: ["ADMIN"] },
   { name: "จัดการบทบาทและสิทธิ์", href: "/dashboard/roles", icon: Shield, permission: "menu.roles", roles: ["ADMIN"] },
   { name: "ตั้งค่าระบบ", href: "/dashboard/settings", icon: Settings, permission: "menu.settings", roles: ["ADMIN"] },
@@ -60,7 +61,9 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
   const { data: session, status } = useSession();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [permissions, setPermissions] = useState<string[] | null>(null);
-  const userRole = (session?.user as { role?: string })?.role ?? "USER";
+  const userRole = (
+    (session?.user as { role?: string })?.role ?? "USER"
+  ).toUpperCase();
   const token = (session as { accessToken?: string })?.accessToken;
   const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
 
@@ -70,8 +73,12 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
       return;
     }
     fetch(`${API}/roles/me/permissions`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => setPermissions(data?.permissions ?? null))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((raw) => {
+        const payload = unwrapApiData<{ permissions?: string[] }>(raw);
+        const list = payload?.permissions;
+        setPermissions(Array.isArray(list) ? list : null);
+      })
       .catch(() => setPermissions(null));
   }, [token, status, API]);
 
@@ -89,10 +96,15 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
   };
 
   const navFiltered = (() => {
+    const byRole = () => navigation.filter((n) => n.roles.includes(userRole));
     if (Array.isArray(permissions) && permissions.length > 0) {
-      return navigation.filter((n) => n.permission && permissions.includes(n.permission));
+      const byPerm = navigation.filter(
+        (n) => n.permission && permissions.includes(n.permission)
+      );
+      // ถ้า DB มีแค่สิทธิ์ที่ไม่มีเมนูใน sidebar (เช่น menu.profile อย่างเดียว) ให้ fallback ตาม role
+      if (byPerm.length > 0) return byPerm;
     }
-    return navigation.filter((n) => n.roles.includes(userRole));
+    return byRole();
   })();
   const currentPage = navFiltered.find((n) => isActive(n.href, pathname));
 

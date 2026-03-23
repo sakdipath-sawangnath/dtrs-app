@@ -1,3 +1,12 @@
+/** รูปแบบมาตรฐาน backend `{ success, data: T }` — ใช้กับ axios/fetch หลัง parse JSON */
+export function unwrapApiData<T>(root: unknown): T | null {
+  if (!root) return null;
+  if (typeof root === "object" && root !== null && "data" in (root as Record<string, unknown>)) {
+    return ((root as { data?: unknown }).data as T) ?? null;
+  }
+  return root as T;
+}
+
 /** ดึง array จาก response /users/assignable (หลายรูปแบบ wrapper) */
 export function extractAssignableArray(root: unknown): unknown[] {
   if (Array.isArray(root)) return root;
