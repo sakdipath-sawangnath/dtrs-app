@@ -97,6 +97,14 @@ export class UsersController {
         return this.usersService.updatePassword(+id, body.password);
     }
 
+    /** รีเซ็ตรหัสผ่านเป็น Default Pass (เฉพาะ ADMIN) */
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    @Post(':id/reset-password')
+    async resetPasswordToDefault(@Param('id') id: string) {
+        return this.usersService.resetPasswordToDefault(+id);
+    }
+
     /** แก้ไขผู้ใช้ (ชื่อ, อีเมล, เบอร์, ตำแหน่ง, role) - เฉพาะ ADMIN */
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles('ADMIN')

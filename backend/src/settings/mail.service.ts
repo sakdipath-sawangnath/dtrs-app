@@ -67,4 +67,73 @@ export class MailService {
       );
     }
   }
+
+  /** ส่งอีเมล HTML (แจ้งเตือนงาน) — ใช้ค่า SMTP เดียวกับทดสอบ */
+  async sendHtmlMail(
+    config: EmailSmtpConfig,
+    options: {
+      to: string[];
+      cc?: string[];
+      subject: string;
+      html: string;
+      text?: string;
+    },
+  ): Promise<void> {
+    const to = options.to.map((e) => e.trim()).filter(Boolean);
+    if (to.length === 0) {
+      throw new BadRequestException('ไม่มีผู้รับอีเมล (To)');
+    }
+
+    const port = Number.parseInt(config.smtpPort, 10);
+    if (Number.isNaN(port) || port < 1 || port > 65535) {
+      throw new BadRequestException('พอร์ต SMTP ไม่ถูกต้อง');
+    }
+
+    const secure = config.secure === true;
+    const envTls = process.env.SMTP_TLS_REJECT_UNAUTHORIZED;
+    const envAllowInsecure =
+      envTls === 'false' || envTls === '0' || envTls === 'no';
+    const rejectUnauthorized = envAllowInsecure
+      ? false
+      : config.tlsRejectUnauthorized !== false;
+
+    const transporter = nodemailer.createTransport({
+      host: config.smtpHost.trim(),
+      port,
+      secure,
+      auth: {
+        user: config.username.trim(),
+        pass: config.password,
+      },
+      tls: {
+        rejectUnauthorized,
+      },
+    });
+
+    const cc = (options.cc ?? [])
+      .map((e) => e.trim())
+      .filter(Boolean);
+
+    try {
+      await transporter.sendMail({
+        from: config.from.trim(),
+        to,
+        cc: cc.length > 0 ? cc : undefined,
+        subject: options.subject,
+        html: options.html,
+        text: options.text ?? options.subject,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`sendHtmlMail failed: ${msg}`);
+      const certHint =
+        /self-signed|certificate|UNABLE_TO_VERIFY|cert/i.test(msg) &&
+        rejectUnauthorized
+          ? ' ลองปิดตัวเลือก «ตรวจสอบใบรับรอง TLS» ในหน้าตั้งค่า'
+          : '';
+      throw new BadRequestException(
+        `ส่งอีเมลไม่สำเร็จ (${msg})${certHint}`,
+      );
+    }
+  }
 }

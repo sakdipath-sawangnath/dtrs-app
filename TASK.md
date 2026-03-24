@@ -169,5 +169,23 @@
 - [x] **`ALLOWED_ORIGINS`** ใน `.gitlab-ci.yml` → backend container
 
 ### เอกสาร
-- [ ] อัปเดต `README.md`, `STATUS.md`, `PLAN.md`, `TASK.md`, `AGENTS.md`, `backend/docs/RBAC-Setup.md` (รอบนี้แก้ local — **ยังไม่ push git** ตามคำขอ)
+- [x] อัปเดต `README.md`, `STATUS.md`, `PLAN.md`, `TASK.md`, `AGENTS.md`, `backend/docs/RBAC-Setup.md`, `backend/docs/api-endpoints.json` (รอบ 6.7 — เทมเพลตอีเมล + `docs/Email-Notifications.md`)
+
+## 17. Phase 6.7 — เทมเพลตอีเมลแจ้งงาน + เอกสาร flow (2026-03-24)
+
+### Backend / Frontend
+- [x] **เทมเพลตอีเมล** — `GET/PUT /api/settings/email-templates`; ส่งอีเมลเมื่อแจ้งเหตุ / มอบหมาย / ปิดงาน (`JobEmailNotificationService` + HTML โทนสว่าง, badge สถานะ)
+- [x] **หน้า settings** — ตั้งค่า `publicBaseUrl`, โลโก้, To เพิ่มเติม, CC, **แจ้งตาม Role** (`notifyRoleIds`)
+
+### เอกสาร
+- [x] [`docs/Email-Notifications.md`](docs/Email-Notifications.md) — flow ผู้รับ To/CC เริ่มต้น; อัปเดต `README.md`, `STATUS.md`, `PLAN.md`, `TASK.md`, `AGENTS.md`, `AGENT_INSTRUCTIONS.md`, `backend/README.md`, `frontend/README.md`, `backend/postman/README.md`
+
+## 18. Phase 6.8 — CrudModal + หน้า Roles (Dark Glass) (2026-03-24)
+
+### Frontend
+- [x] **`CrudModal`** — Portal ไป `document.body`, `z-100`, สไตล์ Dark Glass, `size` md/lg
+- [x] **`/dashboard/roles`** — `form-input-glass`, modal กำหนดสิทธิ์ + กล่องรายการ permission
+
+### เอกสาร
+- [x] อัปเดต `README.md`, `STATUS.md`, `PLAN.md`, `TASK.md`, `AGENTS.md`, `AGENT_INSTRUCTIONS.md`, `frontend/README.md`
 

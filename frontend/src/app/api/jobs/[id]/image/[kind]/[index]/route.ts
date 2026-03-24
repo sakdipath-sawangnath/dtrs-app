@@ -1,8 +1,7 @@
 import { getToken } from "next-auth/jwt";
 import type { NextRequest } from "next/server";
 import { authOptions } from "@/lib/auth";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+import { getServerApiBaseUrl } from "@/lib/serverApiBase";
 
 /**
  * Proxy รูปงานไปยัง Nest API — same-origin สำหรับ `<img>` + html2canvas (ไม่ติด CORS จาก MinIO)
@@ -23,7 +22,8 @@ export async function GET(
   }
 
   const { id, kind, index } = await context.params;
-  const url = `${API_BASE}/jobs/${encodeURIComponent(id)}/image/${encodeURIComponent(kind)}/${encodeURIComponent(index)}`;
+  const apiBase = getServerApiBaseUrl();
+  const url = `${apiBase}/jobs/${encodeURIComponent(id)}/image/${encodeURIComponent(kind)}/${encodeURIComponent(index)}`;
 
   const res = await fetch(url, {
     headers: {

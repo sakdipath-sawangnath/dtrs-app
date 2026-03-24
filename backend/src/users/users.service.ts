@@ -2,10 +2,52 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { DEFAULT_PASS_SETTING_KEY } from '../settings/settings.service';
 
 @Injectable()
 export class UsersService {
     constructor(private prisma: PrismaService) { }
+
+    private readonly DEFAULT_PASS_SENTINEL = "__DEFAULT_PASS__";
+    private readonly DEFAULT_PASS_FALLBACK = "F0rth2026@";
+
+    private async resolvePassword(rawPassword: string | null | undefined): Promise<string> {
+        const pwd = typeof rawPassword === "string" ? rawPassword.trim() : "";
+        if (!pwd) return this.DEFAULT_PASS_FALLBACK;
+
+        if (pwd === this.DEFAULT_PASS_SENTINEL) {
+            const row = await this.prisma.setting.findUnique({
+                where: { key: DEFAULT_PASS_SETTING_KEY },
+                select: { value: true },
+            });
+            const v = row?.value as any;
+            const storedPwd = v && typeof v === "object" && !Array.isArray(v) ? String(v.password ?? "").trim() : "";
+            return storedPwd || this.DEFAULT_PASS_FALLBACK;
+        }
+        return pwd;
+    }
+
+    private mapToEnumRole(code: string | null | undefined): Role | null {
+        const c = code?.trim()?.toUpperCase();
+        if (!c) return null;
+        if (c === Role.ADMIN) return Role.ADMIN;
+        if (c === Role.STAFF) return Role.STAFF;
+        if (c === Role.USER) return Role.USER;
+        if (c === Role.SUPERVISOR) return Role.SUPERVISOR;
+        return null;
+    }
+
+    /**
+     * สำหรับส่งกลับ client:
+     * - ถ้ามี roleRef ใช้ AppRole.code (รองรับ role ที่เพิ่มเอง)
+     * - ถ้าไม่มี roleRef ใช้ enum role
+     */
+    private mapUserRoleForClient<T extends { role: Role; roleRef?: { code?: string | null } | null }>(
+        u: T,
+    ): Omit<T, "role"> & { role: string } {
+        const code = u.roleRef?.code?.trim();
+        return { ...(u as any), role: (code ? String(code) : String(u.role)).toUpperCase() } as any;
+    }
 
     async findOne(username: string) {
         return this.prisma.user.findUnique({
@@ -28,10 +70,12 @@ export class UsersService {
     }
 
     async findById(id: number) {
-        return this.prisma.user.findUnique({
+        const user = await this.prisma.user.findUnique({
             where: { id },
             select: { id: true, name: true, username: true, email: true, role: true, roleId: true, roleRef: { select: { id: true, code: true, name: true } }, phone: true, position: true, image: true },
         });
+        if (!user) return null;
+        return this.mapUserRoleForClient(user as any);
     }
 
     /**
@@ -100,29 +144,57 @@ export class UsersService {
             const byEmail = await this.prisma.user.findFirst({ where: { email } });
             if (byEmail) throw new ConflictException('อีเมลนี้ถูกใช้แล้ว');
         }
-        const hashed = data.password ? await bcrypt.hash(String(data.password), 10) : await bcrypt.hash('changeme123', 10);
-        const roleCode = (data as any).role as string | undefined;
+
+        const phone = typeof data.phone === "string" ? data.phone.trim() : null;
+        if (phone) {
+            const byPhone = await this.prisma.user.findFirst({ where: { phone } });
+            if (byPhone) throw new ConflictException('เบอร์โทรนี้ถูกใช้แล้ว');
+        }
+
+        const fullName = typeof data.name === "string" ? data.name.trim() : null;
+        if (fullName) {
+            const byName = await this.prisma.user.findFirst({ where: { name: fullName } });
+            if (byName) throw new ConflictException('ชื่อ-สกุลนี้ถูกใช้แล้ว');
+        }
+
+        const resolvedPassword = await this.resolvePassword(
+            data.password ? String(data.password) : undefined,
+        );
+        const hashed = await bcrypt.hash(resolvedPassword, 10);
+        const roleCode = typeof (data as any).role === "string" ? String((data as any).role) : undefined;
         let roleId: number | undefined;
-        let resolvedRoleEnum: Role | undefined;
+        const enumRole = this.mapToEnumRole(roleCode);
         if (roleCode) {
-            const appRole = await this.prisma.appRole.findUnique({ where: { code: roleCode.toUpperCase() } });
-            if (appRole) {
-                roleId = appRole.id;
-                resolvedRoleEnum = appRole.code as Role;
-            }
+            const appRole = await this.prisma.appRole.findUnique({
+                where: { code: roleCode.toUpperCase() },
+            });
+            if (appRole) roleId = appRole.id;
         }
         const createData: Prisma.UserCreateInput = {
             ...data,
             username,
             email: email || undefined,
             password: hashed,
-            role: resolvedRoleEnum ?? (data as { role?: Role }).role,
+            // user.role เป็น enum (Prisma schema) รองรับแค่ ADMIN/STAFF/USER/SUPERVISOR
+            // ถ้า roleCode เป็นค่าใหม่ (เช่น CCTV) ให้เก็บไว้ที่ roleRef/roleId แทน
+            role: enumRole ?? Role.STAFF,
             roleRef: roleId != null ? { connect: { id: roleId } } : undefined,
         };
-        return this.prisma.user.create({
+        const created = await this.prisma.user.create({
             data: createData,
-            select: { id: true, name: true, username: true, email: true, role: true, roleId: true, phone: true, position: true },
+            select: {
+                id: true,
+                name: true,
+                username: true,
+                email: true,
+                role: true,
+                roleId: true,
+                roleRef: { select: { code: true } },
+                phone: true,
+                position: true,
+            },
         });
+        return this.mapUserRoleForClient(created as any);
     }
 
     /** แก้ไขผู้ใช้ — ถ้ามี email ให้ sync username = email (อ้างอิงอีเมลเป็นหลัก) */
@@ -144,25 +216,46 @@ export class UsersService {
                 if (existing) throw new ConflictException('อีเมลนี้ถูกใช้โดยผู้ใช้อื่นแล้ว');
             }
         }
-        const roleCode = (updateData as any).role as string | undefined;
+        const roleCode = typeof (updateData as any).role === "string" ? String((updateData as any).role) : undefined;
         if (roleCode) {
-            const appRole = await this.prisma.appRole.findUnique({ where: { code: roleCode.toUpperCase() } });
+            const appRole = await this.prisma.appRole.findUnique({
+                where: { code: roleCode.toUpperCase() },
+            });
             if (appRole) {
+                // roleRef/roleId เป็นทางเดียวที่รองรับ role code ที่เพิ่มเอง
                 (updateData as any).roleId = appRole.id;
-                (updateData as any).role = appRole.code as Role;
             }
+            // สำคัญ: ห้าม set user.role เป็นค่า custom (Prisma enum จะ error)
+            (updateData as any).role = this.mapToEnumRole(roleCode) ?? Role.STAFF;
         }
-        return this.prisma.user.update({
+        const updated = await this.prisma.user.update({
             where: { id },
             data: updateData as any,
-            select: { id: true, name: true, username: true, email: true, role: true, roleId: true, phone: true, position: true, image: true },
+            select: {
+                id: true,
+                name: true,
+                username: true,
+                email: true,
+                role: true,
+                roleId: true,
+                roleRef: { select: { code: true } },
+                phone: true,
+                position: true,
+                image: true,
+            },
         });
+        return this.mapUserRoleForClient(updated as any);
     }
 
     async updatePassword(id: number, newPassword: string) {
-        const hashed = await bcrypt.hash(newPassword, 10);
+        const resolved = await this.resolvePassword(newPassword);
+        const hashed = await bcrypt.hash(resolved, 10);
         await this.prisma.user.update({ where: { id }, data: { password: hashed } });
         return { ok: true };
+    }
+
+    async resetPasswordToDefault(id: number) {
+        return this.updatePassword(id, this.DEFAULT_PASS_SENTINEL);
     }
 
     async updateImage(id: number, imageUrl: string) {
@@ -187,10 +280,11 @@ export class UsersService {
     }
 
     async findAll() {
-        return this.prisma.user.findMany({
+        const users = await this.prisma.user.findMany({
             select: { id: true, name: true, username: true, email: true, role: true, roleId: true, roleRef: { select: { code: true, name: true } }, phone: true, position: true, image: true },
             orderBy: [{ role: 'asc' }, { username: 'asc' }],
         });
+        return users.map((u) => this.mapUserRoleForClient(u as any));
     }
 
     async findByRole(role: string) {

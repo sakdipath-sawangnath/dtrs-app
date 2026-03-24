@@ -1,6 +1,6 @@
 # แผนปรับปรุงระบบแจ้งซ่อม CCTV
 
-**อัปเดต:** 2026-03-23 (ส่วน 4.6 — RBAC sidebar + env PRD)
+**อัปเดต:** 2026-03-24 (ส่วน 4.7–4.8 — อีเมล + Modal/UI roles)
 
 ---
 
@@ -142,6 +142,18 @@
 - [x] **`next.config.mjs`** — แทน `next.config.ts` เพื่อไม่ให้ production image ต้องมี `typescript` ตอน `next start`
 - [x] **`API_INTERNAL_BASE_URL`** — default ใน `.gitlab-ci.yml` + `docker-compose` ชี้ backend ใน Docker network (แก้ hairpin/timeout ตอน login)
 - [x] **`ALLOWED_ORIGINS`** — ส่งจาก GitLab Variables เข้า backend container ใน deploy
+
+## 4.7 เทมเพลตอีเมลแจ้งงาน + ลิงก์ production (2026-03-24)
+
+- [x] **Backend** — เก็บ `email_templates` ใน `Setting`; `GET/PUT /api/settings/email-templates`; `JobEmailNotificationService` (แจ้งเหตุ / มอบหมาย / ปิดงาน); ลิงก์อีเมลใช้ `publicBaseUrl` ก่อน แล้วจึง `FRONTEND_BASE_URL`
+- [x] **Frontend** — `/dashboard/settings`: แก้ไขเทมเพลต, `publicBaseUrl`, เลือก **แจ้งตามบทบาท** (`notifyRoleIds`) ต่อเทมเพลต
+- [x] **เอกสาร** — [`docs/Email-Notifications.md`](docs/Email-Notifications.md) สรุปตาราง To/CC ตามหน้า settings (ไม่แทรกผู้รับงานเป็น CC อัตโนมัติเมื่อปิดงาน)
+
+## 4.8 Modal แดชบอร์ด + หน้า Roles (Dark Glass) (2026-03-24)
+
+- [x] **`CrudModal`** — `createPortal` → `document.body`, `z-100`, โทน Dark Glass (`ring`, backdrop), พร็อพ `size` md/lg, ล็อก scroll `body`
+- [x] **`/dashboard/roles`** — ฟอร์มบทบาท + กำหนดสิทธิ์ใช้ `form-input-glass`; รายการ checkbox ในกล่องแก้ว
+- [x] **เอกสาร** — อัปเดต `README.md`, `STATUS.md`, `TASK.md`, `AGENTS.md`, `AGENT_INSTRUCTIONS.md`, `frontend/README.md`
 
 ---
 

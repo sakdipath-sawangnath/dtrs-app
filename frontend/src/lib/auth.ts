@@ -1,5 +1,6 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import { getServerApiBaseUrl } from '@/lib/serverApiBase';
 
 type BackendLoginResponse = {
     access_token: string;
@@ -12,13 +13,6 @@ function unwrapApiData<T>(root: unknown): T | null {
         return ((root as { data?: unknown }).data as T) ?? null;
     }
     return root as T;
-}
-
-/** ฝั่งเซิร์ฟเวอร์ (authorize): ใช้ API_INTERNAL_BASE_URL ถ้ามี เพื่อเรียก backend ใน Docker network แทน public URL (กัน hairpin timeout) */
-function getServerApiBaseUrl(): string {
-    const internal = process.env.API_INTERNAL_BASE_URL?.trim();
-    if (internal) return internal.replace(/\/$/, '');
-    return (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
 }
 
 export const authOptions: NextAuthOptions = {

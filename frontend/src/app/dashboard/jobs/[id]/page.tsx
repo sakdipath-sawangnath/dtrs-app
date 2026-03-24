@@ -907,9 +907,21 @@ export default function JobDetailPage() {
                       >
                         {saving ? "กำลังบันทึก..." : "บันทึกและปิดงาน (สถานะ: เสร็จสิ้น)"}
                       </button>
-                    ) : (
+                    ) : isResolved && isAssignee ? (
                       <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-white/15 text-slate-300 bg-slate-800/40 backdrop-blur-sm">
-                        งานนี้ถูกปิดแล้ว — หากเป็นผู้รับงาน ให้ใช้ขั้นตอน Reopen ด้านล่างเพื่อแก้ไขข้อมูล
+                        งานนี้ถูกปิดแล้ว — หากต้องการแก้ไขข้อมูลการแก้ไข ให้ใช้ขั้นตอน Reopen ด้านล่าง
+                      </div>
+                    ) : isResolved ? (
+                      <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-white/15 text-slate-400 bg-slate-800/40 backdrop-blur-sm">
+                        งานนี้ปิดแล้ว — ข้อมูลการแก้ไขเป็นโหมดอ่านอย่างเดียว — หากต้องการแก้ไข ให้ติดต่อผู้รับงานหรือผู้ดูแลระบบ
+                      </div>
+                    ) : job && !job.assignedTo ? (
+                      <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-amber-500/25 text-amber-100/90 bg-amber-950/20 backdrop-blur-sm">
+                        ยังไม่มีผู้รับผิดชอบงาน — มอบหมายหรือรับงานด้านบนก่อน จึงจะบันทึกการแก้ไขและปิดงานได้
+                      </div>
+                    ) : (
+                      <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-white/15 text-slate-400 bg-slate-800/40 backdrop-blur-sm">
+                        เฉพาะผู้รับงานที่ถูกมอบหมายเท่านั้นที่บันทึกและปิดงานได้
                       </div>
                     )}
 

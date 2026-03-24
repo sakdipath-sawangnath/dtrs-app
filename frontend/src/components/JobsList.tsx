@@ -1856,9 +1856,21 @@ export default function JobsList({
                                   ? "กำลังบันทึก..."
                                   : "บันทึกและปิดงาน (สถานะ: เสร็จสิ้น)"}
                               </button>
-                            ) : (
+                            ) : isUpdateResolved && isUpdateAssignee ? (
                               <div className="w-full mt-2 py-2.5 rounded-xl text-xs font-semibold text-center border border-dashed border-white/15 bg-slate-800/40 text-slate-400">
-                                งานนี้ถูกปิดแล้ว — หากเป็นผู้รับงาน ให้ใช้ขั้นตอน Reopen ด้านล่าง
+                                งานนี้ถูกปิดแล้ว — หากต้องการแก้ไข ให้ใช้ขั้นตอน Reopen ด้านล่าง
+                              </div>
+                            ) : isUpdateResolved ? (
+                              <div className="w-full mt-2 py-2.5 rounded-xl text-xs font-semibold text-center border border-dashed border-white/15 bg-slate-800/40 text-slate-500">
+                                งานนี้ปิดแล้ว — โหมดอ่านอย่างเดียว — หากต้องการแก้ไข ให้ติดต่อผู้รับงานหรือผู้ดูแลระบบ
+                              </div>
+                            ) : updateFixJob && !updateFixJob.assignedTo ? (
+                              <div className="w-full mt-2 py-2.5 rounded-xl text-xs font-semibold text-center border border-dashed border-amber-500/25 bg-amber-950/20 text-amber-100/90">
+                                ยังไม่มีผู้รับผิดชอบ — มอบหมายหรือรับงานก่อน จึงจะบันทึกการแก้ไขได้
+                              </div>
+                            ) : (
+                              <div className="w-full mt-2 py-2.5 rounded-xl text-xs font-semibold text-center border border-dashed border-white/15 bg-slate-800/40 text-slate-500">
+                                เฉพาะผู้รับงานที่ถูกมอบหมายเท่านั้นที่บันทึกและปิดงานได้
                               </div>
                             )}
 

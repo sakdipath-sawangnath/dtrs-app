@@ -3,6 +3,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { TestEmailSmtpDto, UpdateEmailSmtpDto } from './dto/email-smtp.dto';
+import { UpdateEmailTemplatesDto } from './dto/email-templates.dto';
+import { UpdateDefaultPassDto } from './dto/default-pass.dto';
 import { SettingsService } from './settings.service';
 
 @Controller('settings')
@@ -31,6 +33,26 @@ export class SettingsController {
   @Put('email-smtp')
   async putEmailSmtp(@Body() dto: UpdateEmailSmtpDto) {
     return this.settingsService.updateEmailSmtp(dto);
+  }
+
+  @Get('email-templates')
+  async getEmailTemplates() {
+    return this.settingsService.getEmailTemplates();
+  }
+
+  @Put('email-templates')
+  async putEmailTemplates(@Body() dto: UpdateEmailTemplatesDto) {
+    return this.settingsService.updateEmailTemplates(dto);
+  }
+
+  @Get('default-pass')
+  async getDefaultPass() {
+    return this.settingsService.getDefaultPass();
+  }
+
+  @Put('default-pass')
+  async putDefaultPass(@Body() dto: UpdateDefaultPassDto) {
+    return this.settingsService.updateDefaultPass(dto);
   }
 
   @Post('email-smtp/test')

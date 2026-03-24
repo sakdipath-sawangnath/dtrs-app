@@ -16,6 +16,10 @@
 !/docker/
 !/docker/**
 
+# เอกสาร root (เช่น flow อีเมล, mapping CSV)
+!/docs/
+!/docs/**
+
 # ให้ติดตามเนื้อหาในโฟลเดอร์ที่อนุญาต (ชัดเจนกรณี Git เวอร์ชันเก่า)
 !/backend/**
 !/frontend/**

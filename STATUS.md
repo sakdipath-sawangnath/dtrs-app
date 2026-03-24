@@ -1,6 +1,6 @@
 # Project Status - ระบบแจ้งซ่อม CCTV
 
-**วันที่อัปเดตสถานะ:** 2026-03-23
+**วันที่อัปเดตสถานะ:** 2026-03-24
 
 ---
 
@@ -26,6 +26,7 @@
    - **บันทึกการแก้ไขงาน**: `PATCH /jobs/:id/fix` — **เฉพาะผู้รับงาน (assignee)** ไม่ยกเว้น ADMIN; ถ้าสถานะยังเป็น `RESOLVED` ต้อง **`PATCH /jobs/:id/reopen`** ก่อน; ส่ง brokenPartType, cause, fixMethod, note, oldSerialNumber, newSerialNumber และไฟล์รูปการแก้ไข (fixImages) อัปโหลดไป MinIO เก็บ URL ใน Job; ระบบตั้ง status = RESOLVED และ fixDate อัตโนมัติ
    - **เปิดงานใหม่หลังปิด (Reopen)**: `PATCH /jobs/:id/reopen` — **เฉพาะผู้รับงาน**; `RESOLVED` → `IN_PROGRESS`, ล้าง `fixDate`, ต่อท้ายเหตุผลใน `fixNote`
    - **ตั้งค่าอีเมล (SMTP)**: `GET/PUT /api/settings/email-smtp`, `POST /api/settings/email-smtp/test` (ADMIN + JWT) — เก็บใน `Setting` คีย์ `email_smtp` ด้วย **nodemailer**; รองรับ `tlsRejectUnauthorized` และ env `SMTP_TLS_REJECT_UNAUTHORIZED`
+   - **เทมเพลตอีเมลแจ้งงาน**: `GET/PUT /api/settings/email-templates` (ADMIN + JWT) — เก็บใน `Setting` คีย์ `email_templates` (โลโก้, `publicBaseUrl`, เทมเพลตแจ้งเหตุ/รับเรื่อง/ปิดงาน: เปิดปิด, `toExtra`, `cc`, `notifyRoleIds`); ส่งผ่าน `JobEmailNotificationService` — **สรุปผู้รับ To/CC เริ่มต้นและเหตุที่อาจได้รับเมล admin** ดู [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
    - **Jobs**: สร้างงานตรวจสอบ Site ว่าจังหวัด/อำเภอ/หน่วยงานมีในระบบก่อน (SitesService.existsByLocation); หลังสร้างงาน ถ้า `reporterPhone` ตรงกับผู้ใช้ในระบบจะ **เชื่อม `reporterId`** อัตโนมัติ (`UsersService.findByPhone`)
    - **รายการงาน (Dashboard)**: `GET /jobs/list` — ดึงรายการแจ้งซ่อม (JWT); ไม่มี `GET /api/jobs` แบบเปล่า — แยก path เพื่อไม่ให้สับสนกับ `POST /jobs` (แจ้งซ่อมสาธารณะ) เมื่อเปิด URL ในเบราว์เซอร์
    - **ลบงาน `DELETE /jobs/:id`**: ถ้าเป็น **ADMIN** และงานสถานะ **IN_PROGRESS** จะลบได้ทันที; มิฉะนั้นใช้กับงาน **PENDING** ที่ยังไม่มอบหมายเท่านั้น (ต้องเป็น **ADMIN** หรือ **SUPERVISOR** ตาม logic เดิม)
@@ -46,7 +47,9 @@
    - **งานที่รับผิดชอบ** (`/dashboard/my-jobs`): DataTable งานที่รับมอบหมายให้ผู้ใช้ปัจจุบัน พร้อม filter; ปุ่มดูรายละเอียดไปหน้า `/dashboard/jobs/:id`
    - **หน้ารายละเอียดงาน** (`/dashboard/jobs/:id`): แสดงเต็มพื้นที่ — การ์ดซ้าย "ข้อมูลการแจ้งข้อขัดข้อง", การ์ดขวา "ข้อมูลการแก้ไข" + ฟอร์มบันทึกการแก้ไข (ส่วนขัดข้อง, สาเหตุ, วิธีแก้ไข, รูปการแก้ไข สูงสุด 3 รูป, หมายเหตุ, Serial เก่า/ใหม่); **บันทึกการแก้ไข / Reopen — เฉพาะผู้รับงาน** (assignee); เมื่อสถานะเป็น `RESOLVED` มีปุ่ม **Reopen** (ยืนยันผ่าน `confirmDialog` ก่อนเรียก API); สไตล์ฟอร์มแก้ไขเป็น **Dark Glassmorphism** ตามมาตรฐานโปรเจกต์; **พิมพ์/PDF รายงาน** — ไม่ใช้ดาวน์โหลดแบบ html2canvas บนหน้ารายละเอียดแล้ว ใช้หน้า **`/print/jobs/[id]`** + `print.css` + เทมเพลต `JobMaintenancePdfTemplate` (พิมพ์จากเบราว์เซอร์; ฝั่ง backend มี `JobsPdfService` พร้อม `emulateMediaType('print')` เมื่อสร้าง PDF)
    - **หน้าแจ้งซ่อม** (`/report`): ผู้ใช้ทั่วไปยังต้องกด **ตรวจสอบ** ให้พบผู้แจ้งในระบบก่อนเลือกสถานที่; **เจ้าหน้าที่ที่ล็อกอิน** (บทบาท STAFF / ADMIN / SUPERVISOR) ใช้ flow แยก — โหลด `GET /sites` ทันที, กรอกเบอร์ 10 หลักแล้วดำเนินการต่อได้โดยไม่บังคับพบจากระบบ (กรอกชื่อ-สกุลเองเมื่อไม่พบ), ส่ง `POST /jobs` พร้อม **`Authorization: Bearer`** เมื่อมี session, หลังสำเร็จ redirect ไป **`/dashboard/jobs`**; แสดงข้อความ error จาก API ชัดเจน (`extractApiErrorMessage`)
-   - **Component ร่วม**: `DashboardPageShell`, `DashboardFilterBar`, `CrudModal`, `JobsList` (รองรับ prop `assignedToMe`), Toast (`toastSuccess` ปิดอัตโนมัติ 1.2 วินาที, `toastError`, `toastWarning`, `confirmDialog`)
+   - **Component ร่วม**: `DashboardPageShell`, `DashboardFilterBar`, **`CrudModal`** (portal ไป `document.body`, `z-100`, Dark Glass, พร็อพ `size` md/lg; ใช้ที่ `/dashboard/users`, `/dashboard/roles` ฯลฯ), `JobsList` (รองรับ prop `assignedToMe`), Toast (`toastSuccess` ปิดอัตโนมัติ 1.2 วินาที, `toastError`, `toastWarning`, `confirmDialog`)
+   - **ฟอร์มแดชบอร์ด (พื้นหลังเข้ม)**: ช่อง input แนะนำ class **`form-input-glass`** ใน `globals.css` (ไม่ใช้ `.form-input` คู่กับพื้นขาวบน dark layout)
+   - **หน้าจัดการบทบาท** (`/dashboard/roles`): modal สร้าง/แก้ไข/กำหนดสิทธิ์ — UI Dark Glass + `form-input-glass` + กล่องรายการ permission แบบ scroll
    - **Sidebar**: ไม่แสดงเมนู "โปรไฟล์"; **เมนูผู้ใช้**: Dropdown ใน header มี โปรไฟล์ → `/dashboard/profile` และ ออกจากระบบ
    - **สัญญา/นอกสัญญา (Contract Tabs)**: `SegmentedTabs` บน `/dashboard/my-jobs`, `/dashboard/all`, `/dashboard/in-progress` — แยกตาม `Job.isOutOfContract`; **ไม่ห่อด้วย card/glass ชั้นนอก** (เหลือเฉพาะกล่องควบคุมในแท็บ); **badge สีน้ำเงิน** แสดงจำนวนงานที่ยังไม่เสร็จ (ไม่นับ `RESOLVED`) ต่อแท็บ
    - **Modal อัปเดตจากรายการงาน**: modal “ข้อมูลการแก้ไข” ใน `JobsList` ใช้ธีม **Dark Glassmorphism** สอดคล้อง `AGENTS.md`
@@ -86,6 +89,8 @@
 | GET | `/settings/email-smtp` | ✅ JWT (ADMIN) | อ่านการตั้งค่า SMTP (ไม่คืนรหัสผ่าน) |
 | PUT | `/settings/email-smtp` | ✅ JWT (ADMIN) | บันทึกการตั้งค่า SMTP (รหัสผ่านเข้ารหัสใน DB) |
 | POST | `/settings/email-smtp/test` | ✅ JWT (ADMIN) | ทดสอบส่งอีเมลด้วยค่าที่บันทึกแล้ว |
+| GET | `/settings/email-templates` | ✅ JWT (ADMIN) | อ่านเทมเพลตอีเมลแจ้งงาน (`email_templates`) |
+| PUT | `/settings/email-templates` | ✅ JWT (ADMIN) | บันทึกเทมเพลตอีเมล (รวม `publicBaseUrl`, `notifyRoleIds` ต่อเทมเพลต) |
 | PATCH | `/jobs/:id/out-of-contract` | ✅ JWT (ADMIN, STAFF, SUPERVISOR) | ย้ายนอกสัญญา: ตั้ง `isOutOfContract=true` โดย “คงสถานะเป็น PENDING” |
 | DELETE | `/jobs/:id` | ✅ JWT | **ADMIN**: ลบงาน **IN_PROGRESS** ได้; **ADMIN/SUPERVISOR**: ลบงาน **PENDING** ที่ยังไม่มีผู้รับผิดชอบ (`deleteUnassigned`) |
 | GET | `/sites` | ❌ Public | ข้อมูลพื้นที่โครงการ (สำหรับหน้าแจ้งปัญหา) |
@@ -118,7 +123,7 @@
 | `/dashboard/out-of-contract` | นอกสัญญา – DataTable + filter |
 | `/dashboard/users` | จัดการผู้ใช้ – DataTable + filter; ADMIN ทำ CRUD ได้ (Modal + Toast); เลือกบทบาทได้ ADMIN/STAFF/SUPERVISOR/USER |
 | `/dashboard/profile` | โปรไฟล์ – แก้ไขข้อมูลผู้ใช้ / เปลี่ยนรหัสผ่าน (เข้าได้จากเมนูผู้ใช้ dropdown; ไม่แสดงใน sidebar) |
-| `/dashboard/settings` | ตั้งค่าระบบ (ADMIN) — **SMTP**: โหลด/บันทึก/ทดสอบส่งอีเมล; layout เนื้อหาแบบหน้า `/dashboard` (ไม่ใช้ `DashboardPageShell` เป็นห่อหลัก) |
+| `/dashboard/settings` | ตั้งค่าระบบ (ADMIN) — **SMTP** + **เทมเพลตอีเมลแจ้งงาน** (โลโก้, `publicBaseUrl`, แจ้งเหตุ/รับเรื่อง/ปิดงาน, CC/To เพิ่มเติม, แจ้งตาม Role); layout เนื้อหาแบบหน้า `/dashboard` (ไม่ใช้ `DashboardPageShell` เป็นห่อหลัก) — flow อีเมล: [`docs/Email-Notifications.md`](docs/Email-Notifications.md) |
 
 **หมายเหตุ:** `/dashboard/staff` ถูกลบแล้ว; redirect ไป `/dashboard/users`
 
@@ -143,6 +148,8 @@ npx ts-node scripts/seed-roles-permissions.ts
 - **รายงาน PDF / พิมพ์ (งาน Resolved)**: ใช้หน้า `/print/jobs/[id]` + `JobMaintenancePdfTemplate` + `print.css` (พิมพ์จากเบราว์เซอร์); ลบ dependency **html2canvas / jsPDF** ออกจากหน้ารายละเอียดงานแล้ว
 - **แจ้งซ่อม + รายการงาน**: Validation/API ชัดเจนขึ้น; รายการใน Dashboard ใช้ **`GET /jobs/list`**; flow เจ้าหน้าที่บน `/report` แยกจากผู้ใช้ทั่วไป
 - **ตั้งค่าอีเมล (SMTP) + Reopen (2026-03-22)**: API ตั้งค่า SMTP (ADMIN); **`PATCH /jobs/:id/fix`** และ **`PATCH /jobs/:id/reopen`** — เฉพาะผู้รับงาน; Frontend หน้า settings + Reopen ยืนยันก่อนเรียก API; `@nestjs/cli` v11; `JobsList` แท็บสัญญา/นอกสัญญาไม่ห่อ glass ชั้นนอก
+- **เทมเพลตอีเมลแจ้งงาน + Role (2026-03-24)**: `GET/PUT /settings/email-templates`, `JobEmailNotificationService`, HTML โทนสว่าง + badge สถานะ; เอกสาร flow: [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
+- **UI Modal + บทบาท (2026-03-24)**: `CrudModal` — portal, `z-100`, Dark Glass; `/dashboard/roles` — `form-input-glass` + modal กำหนดสิทธิ์ (`size="lg"`)
 - **Deploy / CI (2026-03-23)**: **GitLab CI** (`.gitlab-ci.yml`) + **`Dockerfile`** — build แยก frontend/backend ใน pipeline, image production รัน Nest + Next; พอร์ต host ตัวอย่าง **8309→3000**, **8310→4000**; ตัวแปร **`FRONTEND_BASE_URL`** แทน `FRONTEND_URL_PRD`; คู่มือ production โดเมนเดียว + `/api` + `/socket.io` และ `MINIO_PUBLIC_URL` สรุปใน `README.md`
 - **Backend Docker entry (Nest + nodenext)**: image backend ใช้ **`node dist/src/main.js`** — ไม่ใช่ `dist/main.js`; สาเหตุเดิมของ error PRD `MODULE_NOT_FOUND` คือ path entry ไม่ตรงกับผล compile
 - **Frontend build (2026-03-23)**: `apiResponse.ts`; **`/public/report`** ใช้ `<Suspense>` รอบ `useSearchParams` เพื่อให้ `next build` ผ่าน

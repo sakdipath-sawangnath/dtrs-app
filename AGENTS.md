@@ -19,8 +19,9 @@
 - **Standard Style**: ทุกหน้าต้องเป็น **Dark Glassmorphism** และโครงสร้างแบบ **No-Card Layout** (ยกเว้นหน้า Dashboard Overview)
     - **Background**: `bg-[#020617]` หรือ `bg-slate-950`
     - **Glass Card**: `rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl`
-    - **Inputs**: `rounded-xl bg-slate-900/40 border-white/10 focus:ring-blue-500/50`
+    - **Inputs**: `rounded-xl bg-slate-900/40 border-white/10 focus:ring-blue-500/50` — บนแดชบอร์ดใช้ class **`form-input-glass`** ใน `frontend/src/app/globals.css` แทน `.form-input` ที่ไปคู่พื้นสว่าง
     - **Buttons**: `rounded-xl transition-all active:scale-95 shadow-lg` (Confirm: Blue/Red, Cancel: Slate-800)
+    - **Modal แดชบอร์ด**: `CrudModal` — แสดงด้วย **portal ไป `document.body`**, **`z-100`** (เหนือ header `z-50`), โทน Dark Glass ตามด้านบน
 
 ## Definition of Done — API/NestJS (Backend)
 - **Validation**: validate input ทุก endpoint (DTO + pipes/validators) ก่อนแตะ DB
@@ -31,7 +32,8 @@
 
 ## ไฟล์/เอกสารที่ควรรู้
 - ภาพรวมระบบ: `README.md`
-- สถานะ/แผน/งาน: `STATUS.md`, `PLAN.md`, `TASK.md` (รวม Phase 6.5–6.6: GitLab CI, Docker, พอร์ต 8309/8310, `FRONTEND_BASE_URL`, `ALLOWED_ORIGINS`, `API_INTERNAL_BASE_URL`, RBAC sidebar, production `/api` + `/socket.io`, build fixes)
+- สถานะ/แผน/งาน: `STATUS.md`, `PLAN.md`, `TASK.md` (รวม Phase 6.5–6.8: …, **เทมเพลตอีเมล**, **CrudModal + `/dashboard/roles` Dark Glass**)
+- การแจ้งเตือนอีเมล (To/CC เริ่มต้น, `publicBaseUrl`, Role): `docs/Email-Notifications.md`
 - Mapping ข้อมูล CSV: `docs/CSV-vs-System-Mapping.md`
 - RBAC: `backend/docs/RBAC-Setup.md`
 - Postman / สรุป endpoint: `backend/postman/README.md`, `backend/docs/api-endpoints.json`

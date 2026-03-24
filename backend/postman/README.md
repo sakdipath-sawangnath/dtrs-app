@@ -26,7 +26,7 @@
 - **Auth** – Login (สาธารณะ)
 - **Users** – ผู้ใช้ (reporters สาธารณะ, me, **assignable** สำหรับ ADMIN/SUPERVISOR/**STAFF**, CRUD ต้อง JWT/ADMIN)
 - **Jobs** – งานแจ้งซ่อม (สร้าง/สถานะสาธารณะ, อื่นๆ ต้อง JWT; assign: ADMIN/SUPERVISOR มอบหมายได้, STAFF รับงานตัวเอง; **PATCH :id/fix**: บันทึกการแก้ไข — **เฉพาะผู้รับงาน**; **PATCH :id/reopen**: เปิดงานใหม่หลังปิด — **เฉพาะผู้รับงาน**; อัปโหลดรูปการแก้ไข; **DELETE :id**: ADMIN ลบงาน **IN_PROGRESS** ได้; ADMIN/SUPERVISOR ลบงาน **PENDING** ที่ยังไม่มอบหมายได้) — ดูรายละเอียดใน `../docs/api-endpoints.json`
-- **Settings** – ตั้งค่าระบบ (ADMIN): **GET/PUT** `settings/email-smtp`, **POST** `settings/email-smtp/test` (ทดสอบส่งอีเมล)
+- **Settings** – ตั้งค่าระบบ (ADMIN): **GET/PUT** `settings/email-smtp`, **POST** `settings/email-smtp/test` (ทดสอบส่งอีเมล); **GET/PUT** `settings/email-templates` (เทมเพลตแจ้งเหตุ/รับเรื่อง/ปิดงาน, `publicBaseUrl`, `notifyRoleIds` ฯลฯ) — สรุปการส่งอีเมล: [`../../docs/Email-Notifications.md`](../../docs/Email-Notifications.md)
 - **Sites** – พื้นที่โครงการ (GET สาธารณะ, POST ต้อง JWT)
 - **Areas** – พื้นที่รับผิดชอบ (ต้อง JWT)
 - **Health** – Hello (health check)

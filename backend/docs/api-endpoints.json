@@ -247,6 +247,20 @@
     },
     {
       "method": "GET",
+      "path": "/api/settings/email-templates",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN"],
+      "description": "อ่านเทมเพลตอีเมลแจ้งงาน (Setting key email_templates: brandingLogoUrl, publicBaseUrl, onReported/onAssigned/onClosed — enabled, toExtra, cc, notifyRoleIds)"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/settings/email-templates",
+      "auth": "Bearer JWT",
+      "roles": ["ADMIN"],
+      "description": "บันทึกเทมเพลตอีเมลแจ้งงาน — flow การส่ง To/CC ดู docs/Email-Notifications.md ที่ root โปรเจกต์"
+    },
+    {
+      "method": "GET",
       "path": "/api/roles",
       "auth": "Bearer JWT",
       "roles": ["ADMIN"],

@@ -31,6 +31,7 @@ import { unwrapApiData } from "@/lib/apiResponse";
 const navigation = [
   { name: "แจ้งปัญหา", href: "/public/report", icon: FileEdit, permission: "menu.report", roles: ["USER"] },
   { name: "ตรวจสอบสถานะ", href: "/public/status", icon: Search, permission: "menu.status", roles: ["USER"] },
+  { name: "โปรไฟล์", href: "/dashboard/profile", icon: User, permission: "menu.profile", roles: ["USER", "ADMIN", "STAFF", "SUPERVISOR"] },
   { name: "ภาพรวม", href: "/dashboard", icon: LayoutDashboard, permission: "menu.dashboard", roles: ["ADMIN", "STAFF", "SUPERVISOR"] },
   { name: "รอดำเนินการ", href: "/dashboard/pending", icon: AlertCircle, permission: "menu.pending", roles: ["ADMIN", "STAFF", "SUPERVISOR"] },
   { name: "งานที่รับผิดชอบ", href: "/dashboard/my-jobs", icon: User, permission: "menu.myJobs", roles: ["ADMIN", "STAFF", "SUPERVISOR"] },
@@ -110,6 +111,10 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
 
   useEffect(() => {
     if (status !== "authenticated" || !session?.user) return;
+    // กันกรณี permissions กำลังโหลด: ถ้าเพิ่งเข้า route `/dashboard/...`
+    // แล้ว state permissions ยังเป็น `null` จะทำให้ fallback byRole ตัดเมนูออกและ redirect ทันที
+    // รอให้ permissions โหลดเสร็จก่อน (โดยเฉพาะ route ที่อาศัย permission เช่น `/dashboard/profile`)
+    if (pathname.startsWith("/dashboard") && permissions === null) return;
     const allowedPaths = navFiltered.flatMap((n) => (n.href === "/dashboard" ? [n.href] : [n.href, n.href + "/"]));
     const pathAllowed =
       pathname === "/public/report" ||
@@ -127,7 +132,7 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
     ) {
       router.replace(allowedPaths[0] || "/public/report");
     }
-  }, [status, session, pathname, router, navFiltered]);
+  }, [status, session, pathname, router, navFiltered, permissions]);
 
   const headerRight = (
     <div className="flex items-center gap-2 sm:gap-3">

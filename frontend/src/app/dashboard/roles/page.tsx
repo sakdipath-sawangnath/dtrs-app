@@ -298,6 +298,7 @@ export default function RolesPage() {
       <CrudModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
+        size={modalMode === "permissions" ? "lg" : "md"}
         title={
           modalMode === "create"
             ? "เพิ่มบทบาท"
@@ -310,19 +311,30 @@ export default function RolesPage() {
         onSubmit={modalMode === "permissions" ? handleSavePermissions : handleSaveRole}
       >
         {modalMode === "permissions" ? (
-          <div className="space-y-3 max-h-80 overflow-y-auto">
-            <p className="text-sm text-slate-400">เลือกสิทธิ์เมนู/งานที่บทบาทนี้สามารถใช้งานได้</p>
-            <div className="space-y-2">
+          <div className="space-y-3">
+            <p className="text-sm text-slate-400 leading-relaxed">
+              เลือกสิทธิ์เมนู/งานที่บทบาทนี้สามารถใช้งานได้
+            </p>
+            <div
+              className="rounded-xl border border-white/10 bg-slate-950/40 backdrop-blur-sm p-3 max-h-[min(22rem,50vh)] overflow-y-auto space-y-0.5 shadow-inner ring-1 ring-white/5"
+              role="group"
+              aria-label="รายการสิทธิ์"
+            >
               {rolePerms.map((p) => (
-                <label key={p.id} className="flex items-center gap-2 cursor-pointer">
+                <label
+                  key={p.id}
+                  className="flex items-start gap-3 cursor-pointer rounded-lg px-2 py-2 hover:bg-white/5 transition-colors min-h-[44px]"
+                >
                   <input
                     type="checkbox"
                     checked={rolePermissionIds.includes(p.id)}
                     onChange={() => togglePermission(p.id)}
-                    className="rounded border-slate-300"
+                    className="mt-1 h-4 w-4 shrink-0 rounded border-white/20 bg-slate-900/60 text-blue-600 focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-0 focus:ring-offset-transparent cursor-pointer"
                   />
-                  <span className="text-sm text-slate-300">{p.name}</span>
-                  <span className="text-xs font-mono text-slate-500">({p.code})</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-sm text-slate-200">{p.name}</span>
+                    <span className="text-xs font-mono text-slate-500">({p.code})</span>
+                  </span>
                 </label>
               ))}
             </div>
@@ -330,33 +342,45 @@ export default function RolesPage() {
         ) : (
           <>
             <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">รหัสบทบาท (code)</label>
+              <label className="block text-sm font-medium mb-1.5 text-slate-200" htmlFor="role-code">
+                รหัสบทบาท (code)
+              </label>
               <input
+                id="role-code"
                 type="text"
-                className="form-input rounded-xl border border-white/10 bg-slate-800/50 text-slate-200 placeholder:text-slate-500 outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                className="form-input-glass"
                 value={form.code}
                 onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
                 placeholder="เช่น STAFF, CUSTOM"
                 disabled={modalMode === "edit"}
+                autoComplete="off"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">ชื่อบทบาท</label>
+              <label className="block text-sm font-medium mb-1.5 text-slate-200" htmlFor="role-name">
+                ชื่อบทบาท
+              </label>
               <input
+                id="role-name"
                 type="text"
-                className="form-input rounded-xl border border-white/10 bg-slate-800/50 text-slate-200 placeholder:text-slate-500 outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                className="form-input-glass"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="เช่น ช่างเทคนิค"
+                autoComplete="off"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">คำอธิบาย</label>
+              <label className="block text-sm font-medium mb-1.5 text-slate-200" htmlFor="role-desc">
+                คำอธิบาย
+              </label>
               <textarea
-                className="form-input min-h-[80px] rounded-xl border border-white/10 bg-slate-800/50 text-slate-200 placeholder:text-slate-500 outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                id="role-desc"
+                className="form-input-glass min-h-[88px] py-2.5 resize-y"
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="อธิบายบทบาทนี้"
+                rows={3}
               />
             </div>
           </>

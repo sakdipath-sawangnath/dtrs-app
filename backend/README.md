@@ -31,6 +31,7 @@ Backend API สำหรับ **ระบบแจ้งซ่อม CCTV** —
 - **Jobs Flow:** `POST /jobs` รับฟอร์มแจ้งซ่อมจากหน้า `/report` (multipart/form-data) อัปโหลดรูปไป MinIO ผ่าน `MinioService.uploadFile()` เก็บ URL ลง `Job.images` และถ้าไม่ส่ง `ticketNo` มาด้วย ระบบจะสร้างรหัสใหม่เป็น hex 8 ตัว ไม่ซ้ำ (ให้รูปแบบใกล้เคียงกับข้อมูลเดิมใน CSV)
 - **MinIO:** รองรับ `MINIO_PUBLIC_URL` ใน `.env` สำหรับ URL รูปที่ browser เข้าถึงได้; bucket policy ตั้งเป็น public read ตอน service init
 - **Scripts:** `scripts/seed-admin.ts`, `scripts/seed-roles-permissions.ts` (บทบาท+สิทธิ์ รวม SUPERVISOR, job.assign), `scripts/seed-from-excel.ts`, `scripts/seed-from-csv.ts`, `scripts/migrate-appsheet-images-to-minio.ts`, `scripts/import-appsheet-employees.ts`
+- **อีเมลแจ้งงาน:** `JobEmailNotificationService` + `GET/PUT /settings/email-templates` (เก็บ `email_templates`); สรุปผู้รับ To/CC — [../docs/Email-Notifications.md](../docs/Email-Notifications.md)
 
 รายละเอียด API และสถานะโปรเจกต์: ดูที่ root [STATUS.md](../STATUS.md) และ [README.md](../README.md).
 

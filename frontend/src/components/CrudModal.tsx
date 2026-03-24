@@ -1,10 +1,15 @@
 "use client";
 
+import { useEffect } from "react";
+import { createPortal } from "react-dom";
+
 interface CrudModalProps {
   open: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  /** ความกว้างกรอบ — `lg` สำหรับฟอร์มยาว (เช่น กำหนดสิทธิ์) */
+  size?: "md" | "lg";
   /** กำลังบันทึก/ส่ง - ปิด modal ไม่ได้ และปุ่ม submit ถูก disable */
   saving?: boolean;
   /** ปุ่มยกเลิก (ถ้าไม่ส่ง จะมีปุ่มยกเลิก default) */
@@ -22,26 +27,42 @@ export default function CrudModal({
   onClose,
   title,
   children,
+  size = "md",
   saving = false,
   cancelLabel = "ยกเลิก",
   submitLabel,
   onSubmit,
 }: CrudModalProps) {
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   if (!open) return null;
 
-  return (
+  /** Portal → body + z-index สูงกว่า SiteHeader/sidebar (z-50) เพื่อไม่ถูกบังหรือ clip */
+  const modal = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-100 flex items-center justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] bg-slate-950/70 backdrop-blur-md"
       onClick={() => !saving && onClose()}
     >
       <div
-        className="rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto flex flex-col"
+        className={`rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl ring-1 ring-white/5 w-full max-h-[min(90vh,calc(100vh-2rem))] overflow-y-auto flex flex-col ${
+          size === "lg" ? "max-w-lg" : "max-w-md"
+        }`}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        aria-labelledby="crud-modal-title"
       >
-        <div className="p-4 sm:p-6 border-b border-white/10 shrink-0">
-          <h3 className="text-lg font-bold tracking-tight text-white">{title}</h3>
+        <div className="p-4 sm:p-6 border-b border-white/10 bg-slate-950/30 shrink-0">
+          <h3 id="crud-modal-title" className="text-lg font-bold tracking-tight text-white">
+            {title}
+          </h3>
         </div>
         <form
           onSubmit={(e) => {
@@ -50,8 +71,8 @@ export default function CrudModal({
           }}
           className="flex flex-col flex-1 min-h-0"
         >
-          <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">{children}</div>
-          <div className="flex gap-3 p-4 sm:p-6 border-t border-white/10 shrink-0">
+          <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 bg-slate-950/20">{children}</div>
+          <div className="flex gap-3 p-4 sm:p-6 border-t border-white/10 bg-slate-950/35 backdrop-blur-sm shrink-0">
             <button
               type="button"
               onClick={onClose}
@@ -74,4 +95,8 @@ export default function CrudModal({
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(modal, document.body);
 }

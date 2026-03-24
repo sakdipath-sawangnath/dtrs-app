@@ -12,6 +12,9 @@ import {
   User,
   Shield,
   X,
+  Eye,
+  EyeOff,
+  KeyRound,
 } from "lucide-react";
 import DashboardPageShell from "@/components/DashboardPageShell";
 import DashboardFilterBar from "@/components/DashboardFilterBar";
@@ -30,6 +33,15 @@ interface UserRow {
   image?: string | null;
 }
 
+type AxiosErrorLike = {
+  response?: {
+    data?: {
+      error?: { message?: string };
+      message?: string;
+    };
+  };
+};
+
 function unwrapApiData<T>(root: unknown): T | null {
   if (!root) return null;
   if (typeof root === "object" && root !== null && "data" in (root as Record<string, unknown>)) {
@@ -38,12 +50,14 @@ function unwrapApiData<T>(root: unknown): T | null {
   return root as T;
 }
 
-const ROLE_LABEL: Record<string, string> = {
-  ADMIN: "ผู้ดูแลระบบ",
-  STAFF: "ช่างเทคนิค",
-  USER: "ผู้แจ้งซ่อม",
-  SUPERVISOR: "หัวหน้างาน",
-};
+function getApiErrorMessage(err: unknown): string | undefined {
+  const e = err as AxiosErrorLike;
+  return (
+    e.response?.data?.error?.message ??
+    e.response?.data?.message ??
+    undefined
+  );
+}
 
 const ROLE_OPTIONS = [
   { value: "ADMIN", label: "ผู้ดูแลระบบ" },
@@ -51,6 +65,8 @@ const ROLE_OPTIONS = [
   { value: "SUPERVISOR", label: "หัวหน้างาน" },
   { value: "USER", label: "ผู้แจ้งซ่อม" },
 ];
+
+const DEFAULT_PASS_SENTINEL = "__DEFAULT_PASS__";
 
 const PAGE_SIZE_OPTIONS = [
   { value: 15, label: "15" },
@@ -117,14 +133,32 @@ function UserAvatarCell({
 
 const emptyForm = () => ({
   username: "",
-  password: "",
+  password: DEFAULT_PASS_SENTINEL,
   name: "",
   email: "",
   phone: "",
   position: "",
-  role: "STAFF",
+  role: "USER",
   image: "",
 });
+
+function normalizeEmail(v: string) {
+  return v.trim().toLowerCase();
+}
+
+function normalizePhone(v: string) {
+  return v.replace(/\s+/g, "").trim();
+}
+
+function generateRandomPassword(length = 12) {
+  const chars =
+    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@$!%*?";
+  let out = "";
+  for (let i = 0; i < length; i++) {
+    out += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return out;
+}
 
 /** Dark Glass — ช่องกรอกใน modal (ไม่ใช้ .form-input เพื่อไม่ให้พื้นขาว) */
 const MODAL_GLASS_FIELD =
@@ -152,12 +186,62 @@ export default function UsersPage() {
   const token = (session as { accessToken?: string })?.accessToken;
   const userRole = (session?.user as { role?: string })?.role ?? "STAFF";
   const isAdmin = userRole === "ADMIN";
+  const [roles, setRoles] = useState<Array<{ id: number; code: string; name: string }>>([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [resettingUserId, setResettingUserId] = useState<number | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   /** lightbox รูปโปรไฟล์จากตาราง */
   const [avatarLightbox, setAvatarLightbox] = useState<{ src: string; alt: string } | null>(
     null,
   );
+
+  const fetchRoles = () => {
+    if (!token || !isAdmin) return;
+    setRolesLoading(true);
+    axios
+      .get<Array<{ id: number; code: string; name: string }>>(`${API}/roles`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((r) => {
+        const payload = unwrapApiData<unknown>(r?.data);
+        setRoles(Array.isArray(payload) ? (payload as Array<{ id: number; code: string; name: string }>) : []);
+      })
+      .catch(() => setRoles([]))
+      .finally(() => setRolesLoading(false));
+  };
+
+  useEffect(() => {
+    fetchRoles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, isAdmin]);
+
+  const allRoleOptions = useMemo(() => {
+    const map = new Map<string, { value: string; label: string }>();
+    for (const o of ROLE_OPTIONS) map.set(o.value, o);
+    for (const r of roles) {
+      const code = String(r.code || "").toUpperCase().trim();
+      if (!code) continue;
+      map.set(code, { value: code, label: r.name?.trim() ? r.name : code });
+    }
+    return [...map.values()];
+  }, [roles]);
+
+  const roleLabelByCode = useMemo(() => {
+    return allRoleOptions.reduce<Record<string, string>>((acc, o) => {
+      acc[o.value] = o.label;
+      return acc;
+    }, {});
+  }, [allRoleOptions]);
+
+  const getRoleSummaryText = (code: string) => {
+    const c = code.toUpperCase().trim();
+    if (c === "ADMIN") return "เข้าถึงทุกเมนู รวม จัดการผู้ใช้ และ ตั้งค่าระบบ · CRUD ผู้ใช้ได้ทั้งหมด";
+    if (c === "STAFF") return "ภาพรวม, รอดำเนินการ, กำลังแก้ไข, ประวัติทั้งหมด, นอกสัญญา · ไม่มีเมนู จัดการผู้ใช้ และ ตั้งค่าระบบ";
+    if (c === "USER") return "เฉพาะ โปรไฟล์, แจ้งปัญหา, ตรวจสอบสถานะ";
+    return "สิทธิ์ตามที่กำหนดไว้ในหน้าบทบาทและสิทธิ์ (RBAC)";
+  };
 
   const fetchUsers = () => {
     if (!token) return;
@@ -244,6 +328,7 @@ export default function UsersPage() {
     setEditingId(null);
     setAvatarFile(null);
     setAvatarPreview(null);
+    setShowEditPassword(false);
     setModalOpen(true);
   };
 
@@ -263,6 +348,7 @@ export default function UsersPage() {
     setEditingId(u.id);
     setAvatarFile(null);
     setAvatarPreview(u.image ?? null);
+    setShowEditPassword(false);
     setModalOpen(true);
   };
 
@@ -272,6 +358,41 @@ export default function UsersPage() {
     if (modalMode === "create" && (!form.email.trim() || !form.password.trim())) {
       toastWarning("กรุณากรอกอีเมลและรหัสผ่าน");
       return;
+    }
+    if (modalMode === "create") {
+      const email = normalizeEmail(form.email);
+      const fullName = form.name.trim();
+      const phone = normalizePhone(form.phone || "");
+      if (!fullName) {
+        toastWarning("กรุณากรอกชื่อ-สกุล");
+        return;
+      }
+      if (!phone) {
+        toastWarning("กรุณากรอกเบอร์โทร");
+        return;
+      }
+
+      const emailExists = list.some(
+        (u) => normalizeEmail(u.email ?? u.username ?? "") === email,
+      );
+      if (emailExists) {
+        toastError("เพิ่มผู้ใช้ไม่สำเร็จ", "อีเมลนี้มีอยู่แล้วในระบบ");
+        return;
+      }
+
+      const nameExists = list.some(
+        (u) => (u.name ?? "").trim().toLowerCase() === fullName.toLowerCase(),
+      );
+      if (nameExists) {
+        toastError("เพิ่มผู้ใช้ไม่สำเร็จ", "ชื่อ-สกุลนี้มีอยู่แล้วในระบบ");
+        return;
+      }
+
+      const phoneExists = list.some((u) => normalizePhone(u.phone ?? "") === phone);
+      if (phoneExists) {
+        toastError("เพิ่มผู้ใช้ไม่สำเร็จ", "เบอร์โทรนี้มีอยู่แล้วในระบบ");
+        return;
+      }
     }
     setSaving(true);
     try {
@@ -324,13 +445,43 @@ export default function UsersPage() {
       setModalOpen(false);
       fetchUsers();
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      const msg =
+        getApiErrorMessage(err);
       toastError(
         modalMode === "create" ? "เพิ่มผู้ใช้ไม่สำเร็จ" : "บันทึกไม่สำเร็จ",
         Array.isArray(msg) ? msg.join(", ") : msg || "เกิดข้อผิดพลาด"
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleResetPassword = async (userId: number, username: string) => {
+    const ok = await confirmDialog({
+      title: "รีเซ็ตรหัสผ่าน",
+      text: `ต้องการรีเซ็ตรหัสผ่านของ "${username}" เป็น Default Pass ใช่หรือไม่?`,
+      confirmText: "รีเซ็ตรหัสผ่าน",
+      cancelText: "ยกเลิก",
+    });
+    if (!ok || !token) return;
+
+    try {
+      setResettingUserId(userId);
+      await axios.post(
+        `${API}/users/${userId}/reset-password`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      toastSuccess("รีเซ็ตรหัสผ่านแล้ว", 1200);
+      fetchUsers();
+    } catch (err: unknown) {
+      const msg =
+        getApiErrorMessage(err);
+      toastError("รีเซ็ตรหัสผ่านไม่สำเร็จ", Array.isArray(msg) ? msg.join(", ") : msg || "เกิดข้อผิดพลาด");
+    } finally {
+      setResettingUserId(null);
     }
   };
 
@@ -402,23 +553,24 @@ export default function UsersPage() {
           <div className="max-w-2xl space-y-4">
             <h3 className="text-base font-bold text-white">สิทธิ์ตามบทบาท (RBAC)</h3>
             <div className="rounded-xl border border-white/10 p-4 space-y-3 bg-slate-800/30">
-              <div>
-                <p className="font-semibold text-sm text-slate-200">ผู้ดูแลระบบ (ADMIN)</p>
-                <p className="text-sm mt-0.5 text-slate-400">เข้าถึงทุกเมนู รวม จัดการผู้ใช้ และ ตั้งค่าระบบ · CRUD ผู้ใช้ได้ทั้งหมด</p>
-              </div>
-              <div>
-                <p className="font-semibold text-sm text-slate-200">ช่างเทคนิค (STAFF)</p>
-                <p className="text-sm mt-0.5 text-slate-400">ภาพรวม, รอดำเนินการ, กำลังแก้ไข, ประวัติทั้งหมด, นอกสัญญา · ไม่มีเมนู จัดการผู้ใช้ และ ตั้งค่าระบบ</p>
-              </div>
-              <div>
-                <p className="font-semibold text-sm text-slate-200">ผู้แจ้งซ่อม (USER)</p>
-                <p className="text-sm mt-0.5 text-slate-400">เฉพาะ โปรไฟล์, แจ้งปัญหา, ตรวจสอบสถานะ</p>
-              </div>
+              {allRoleOptions.map((o) => (
+                <div key={o.value}>
+                  <p className="font-semibold text-sm text-slate-200">
+                    {o.label} ({o.value})
+                  </p>
+                  <p className="text-sm mt-0.5 text-slate-400">{getRoleSummaryText(o.value)}</p>
+                </div>
+              ))}
+              {rolesLoading && (
+                <div>
+                  <p className="text-sm mt-0.5 text-slate-400">กำลังโหลดบทบาทใหม่...</p>
+                </div>
+              )}
             </div>
             <div className="rounded-xl border border-white/10 p-4">
               <p className="text-xs font-medium mb-2 text-slate-400">สรุปจำนวนผู้ใช้ตามบทบาท</p>
               <div className="flex flex-wrap gap-3">
-                {ROLE_OPTIONS.map((o) => (
+                {allRoleOptions.map((o) => (
                   <span key={o.value} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-slate-800/50 text-slate-300 border border-white/5">
                     {o.label}: <strong>{list.filter((u) => u.role === o.value).length}</strong>
                   </span>
@@ -451,7 +603,7 @@ export default function UsersPage() {
             onChange={(e) => setRoleFilter(e.target.value)}
           >
             <option value="">ทุกบทบาท</option>
-            {ROLE_OPTIONS.map((o) => (
+            {allRoleOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
@@ -538,11 +690,22 @@ export default function UsersPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className={`badge justify-center min-w-[88px] ${u.role === "ADMIN" ? "badge-resolved" : u.role === "USER" ? "badge-pending" : "badge-progress"}`}>
-                        {ROLE_LABEL[u.role] || u.role}
+                        {roleLabelByCode[u.role] || u.role}
                       </span>
                     </td>
                     {isAdmin && (
                       <td className="px-4 py-3 text-right">
+                        {!isSoleAdmin(u) && (
+                          <button
+                            type="button"
+                            onClick={() => void handleResetPassword(u.id, u.username)}
+                            disabled={resettingUserId === u.id}
+                            className="p-2 rounded-lg hover:bg-white/10 inline-flex text-slate-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="รีเซ็ตรหัสผ่านเป็น Default Pass"
+                          >
+                            <KeyRound size={14} />
+                          </button>
+                        )}
                         <button type="button" onClick={() => openEdit(u)} className="p-2 rounded-lg hover:bg-white/10 inline-flex text-slate-400 hover:text-white transition-colors" title="แก้ไข">
                           <Pencil size={14} />
                         </button>
@@ -619,28 +782,41 @@ export default function UsersPage() {
                 </div>
               )}
               <div className="flex flex-col gap-1.5 min-w-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const input = document.createElement("input");
-                    input.type = "file";
-                    input.accept = "image/*";
-                    input.onchange = (ev: Event) => {
-                      const file = (ev.target as HTMLInputElement).files?.[0] || null;
-                      if (file) {
-                        setAvatarFile(file);
-                        setAvatarPreview(URL.createObjectURL(file));
-                      }
-                    };
-                    input.click();
-                  }}
-                  className="w-fit px-3 py-2 rounded-xl border border-white/15 bg-slate-800/50 backdrop-blur-sm text-xs font-medium text-slate-200 hover:bg-slate-700/55 hover:border-white/25 transition-all active:scale-95 cursor-pointer"
-                >
-                  {avatarPreview ? "เปลี่ยนรูปโปรไฟล์" : "อัปโหลดรูปโปรไฟล์"}
-                </button>
-                <span className="text-[11px] text-slate-500 leading-snug">
-                  รองรับ JPG, PNG ขนาดไม่เกิน ~2MB
-                </span>
+                {modalMode === "create" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const input = document.createElement("input");
+                        input.type = "file";
+                        input.accept = "image/*";
+                        input.onchange = (ev: Event) => {
+                          const file =
+                            (ev.target as HTMLInputElement).files?.[0] || null;
+                          if (file) {
+                            setAvatarFile(file);
+                            setAvatarPreview(URL.createObjectURL(file));
+                          }
+                        };
+                        input.click();
+                      }}
+                      className="w-fit px-3 py-2 rounded-xl border border-white/15 bg-slate-800/50 backdrop-blur-sm text-xs font-medium text-slate-200 hover:bg-slate-700/55 hover:border-white/25 transition-all active:scale-95 cursor-pointer"
+                    >
+                      {avatarPreview ? "เปลี่ยนรูปโปรไฟล์" : "อัปโหลดรูปโปรไฟล์"}
+                    </button>
+                    <span className="text-[11px] text-slate-500 leading-snug">
+                      รองรับ JPG, PNG ขนาดไม่เกิน ~2MB
+                    </span>
+                  </>
+                ) : (
+                  <div
+                    className="w-fit px-3 py-2 rounded-xl border border-white/15 bg-slate-800/40 text-xs font-medium text-slate-300 flex items-center gap-2"
+                    aria-label="ใช้รูปโปรไฟล์เดิม"
+                  >
+                    <User size={14} aria-hidden />
+                    <span>รูปเดิม</span>
+                  </div>
+                )}
               </div>
             </div>
             {modalMode === "create" && (
@@ -658,14 +834,32 @@ export default function UsersPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1 text-slate-300">รหัสผ่าน <span className="text-red-400">*</span></label>
-                  <input
-                    type="password"
-                    required
-                    className={MODAL_GLASS_FIELD}
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    placeholder="รหัสผ่าน"
-                  />
+                  <div className="relative">
+                    <input
+                      type="password"
+                      required
+                      className={`${MODAL_GLASS_FIELD} pr-32`}
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      placeholder="รหัสผ่าน"
+                    />
+                    <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, password: DEFAULT_PASS_SENTINEL }))}
+                        className="h-10 px-3 rounded-lg border border-white/10 bg-slate-800/40 text-xs text-slate-300 hover:bg-slate-700/50 transition-colors cursor-pointer"
+                      >
+                        ค่าเริ่มต้น
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, password: generateRandomPassword(12) }))}
+                        className="h-10 px-3 rounded-lg border border-white/10 bg-blue-600/20 text-xs text-blue-200 hover:bg-blue-600/30 transition-colors cursor-pointer"
+                      >
+                        สุ่ม
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </>
             )}
@@ -673,13 +867,24 @@ export default function UsersPage() {
               <>
                 <div>
                   <label className="block text-sm font-medium mb-1 text-slate-300">เปลี่ยนรหัสผ่าน (ถ้าต้องการ)</label>
-                  <input
-                    type="password"
-                    className={MODAL_GLASS_FIELD}
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    placeholder="เว้นว่างถ้าไม่เปลี่ยน"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showEditPassword ? "text" : "password"}
+                      className={`${MODAL_GLASS_FIELD} pr-12`}
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      placeholder="เว้นว่างถ้าไม่เปลี่ยน"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowEditPassword((v) => !v)}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                      aria-label={showEditPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                      aria-pressed={showEditPassword}
+                    >
+                      {showEditPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1 text-slate-300">Username / อีเมล</label>
@@ -692,6 +897,7 @@ export default function UsersPage() {
               <input
                 type="text"
                 className={MODAL_GLASS_FIELD}
+                required={modalMode === "create"}
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="ชื่อจริง"
@@ -714,8 +920,14 @@ export default function UsersPage() {
               <input
                 type="text"
                 className={MODAL_GLASS_FIELD}
+                required={modalMode === "create"}
                 value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                onChange={(e) => {
+                  const onlyDigits = e.target.value.replace(/[^0-9]/g, "");
+                  setForm({ ...form, phone: onlyDigits });
+                }}
                 placeholder="08xxxxxxxx"
               />
             </div>
@@ -737,18 +949,17 @@ export default function UsersPage() {
             <div>
               <label className="block text-sm font-medium mb-1 text-slate-300">บทบาท (Role)</label>
               <select className="select-native-glass w-full" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                {ROLE_OPTIONS.map((o) => (
+                {allRoleOptions.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
             </div>
             <div className="rounded-2xl p-4 text-xs space-y-2 bg-slate-900/40 backdrop-blur-sm border border-white/10 text-slate-400 shadow-inner">
               <p className="font-semibold text-slate-300">สิทธิ์ตามบทบาท (RBAC)</p>
-              <ul className="list-disc list-inside space-y-0.5">
-                <li><strong>ผู้ดูแลระบบ (ADMIN):</strong> เข้าถึงทุกเมนู รวมจัดการผู้ใช้ และตั้งค่าระบบ (CRUD ได้ทั้งหมด)</li>
-                <li><strong>ช่างเทคนิค (STAFF):</strong> ภาพรวม, แจ้งปัญหา, ตรวจสอบสถานะ, รอดำเนินการ, กำลังแก้ไข, ประวัติ, นอกสัญญา, โปรไฟล์ (ไม่มีจัดการผู้ใช้/ตั้งค่า)</li>
-                <li><strong>ผู้แจ้งซ่อม (USER):</strong> เฉพาะ โปรไฟล์, แจ้งปัญหา, ตรวจสอบสถานะ</li>
-              </ul>
+              <p className="text-slate-300">
+                {roleLabelByCode[form.role] || form.role}: {getRoleSummaryText(form.role)}
+              </p>
+              <p className="text-slate-400/90">รายละเอียดสิทธิ์แต่ละเมนูดูได้ที่หน้าจัดการบทบาทและสิทธิ์</p>
             </div>
           </div>
         )}

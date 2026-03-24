@@ -1,9 +1,8 @@
 import { getToken } from "next-auth/jwt";
 import type { NextRequest } from "next/server";
 import { authOptions } from "@/lib/auth";
+import { getServerApiBaseUrl } from "@/lib/serverApiBase";
 import type { PdfPrefetchedImages } from "@/components/pdf/JobMaintenancePdfTemplate";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
 
 function unwrapApiData<T>(root: unknown): T | null {
   if (!root) return null;
@@ -19,7 +18,8 @@ async function fetchImageDataUrl(
   kind: "issue" | "fix",
   index: number,
 ): Promise<string | null> {
-  const url = `${API_BASE}/jobs/${jobId}/image/${kind}/${index}`;
+  const apiBase = getServerApiBaseUrl();
+  const url = `${apiBase}/jobs/${jobId}/image/${kind}/${index}`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
@@ -60,7 +60,8 @@ export async function GET(
     return Response.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const res = await fetch(`${API_BASE}/jobs/${jobId}`, {
+  const apiBase = getServerApiBaseUrl();
+  const res = await fetch(`${apiBase}/jobs/${jobId}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });

@@ -14,6 +14,7 @@ import { JobStatus, Prisma } from '@prisma/client';
 import { SitesService } from '../sites/sites.service';
 import { UsersService } from '../users/users.service';
 import { MinioService } from '../minio/minio.service';
+import { JobEmailNotificationService } from './job-email-notification.service';
 import axios from 'axios';
 
 @Injectable()
@@ -23,6 +24,7 @@ export class JobsService {
         private sitesService: SitesService,
         private usersService: UsersService,
         private minioService: MinioService,
+        private jobEmailNotifications: JobEmailNotificationService,
     ) { }
 
     /** ปรับ URL รูปผู้ใช้ (avatar) ให้เบราว์เซอร์เข้าถึง MinIO ภายนอกได้ */
@@ -80,9 +82,11 @@ export class JobsService {
             }
         }
 
-        return this.prisma.job.create({
+        const created = await this.prisma.job.create({
             data: createData,
         });
+        void this.jobEmailNotifications.notifyReported(created.id);
+        return created;
     }
 
     async findAll() {
@@ -249,10 +253,20 @@ export class JobsService {
     }
 
     async updateStatus(id: number, status: any) {
-        return this.prisma.job.update({
+        const prev = await this.prisma.job.findUnique({
+            where: { id },
+            select: { status: true },
+        });
+        const updated = await this.prisma.job.update({
             where: { id },
             data: { status },
         });
+        const nextSt = String(status ?? '').toUpperCase();
+        const wasResolved = prev?.status === JobStatus.RESOLVED;
+        if (nextSt === 'RESOLVED' && !wasResolved) {
+            void this.jobEmailNotifications.notifyClosed(updated.id);
+        }
+        return updated;
     }
 
     async updateImages(id: number, images: string[]) {
@@ -376,17 +390,27 @@ export class JobsService {
             data.fixImages = payload.fixImagesUrls;
         }
 
-        return this.prisma.job.update({
+        const closed = await this.prisma.job.update({
             where: { id },
             data,
         });
+        void this.jobEmailNotifications.notifyClosed(closed.id);
+        return closed;
     }
 
     async assignStaff(id: number, staffId: number) {
-        return this.prisma.job.update({
+        const before = await this.prisma.job.findUnique({
+            where: { id },
+            select: { assignedToId: true },
+        });
+        const updated = await this.prisma.job.update({
             where: { id },
             data: { assignedToId: staffId, status: 'IN_PROGRESS' },
         });
+        if (before?.assignedToId !== staffId) {
+            void this.jobEmailNotifications.notifyAssigned(updated.id);
+        }
+        return updated;
     }
 
     /**

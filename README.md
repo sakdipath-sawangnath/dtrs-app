@@ -2,7 +2,15 @@
 
 ระบบแจ้งปัญหาและระบบจัดการการซ่อมบำรุงกล้องวงจรปิด (CCTV) ซึ่งพัฒนาต่อเนื่องมาจากการใช้งานผ่าน AppSheet
 
-## บันทึกการอัปเดตล่าสุด (2026-03-23)
+## บันทึกการอัปเดตล่าสุด (2026-03-24)
+
+- **อีเมลแจ้งงาน (เทมเพลต + Role)** — เก็บใน `Setting` คีย์ `email_templates`; หน้า **`/dashboard/settings`** (ADMIN): โลโก้, **`publicBaseUrl`** สำหรับลิงก์ในอีเมล, เทมเพลต **แจ้งเหตุ / รับเรื่อง / ปิดงาน** (เปิดปิด, To เพิ่มเติม, CC, **แจ้งตามบทบาท** `notifyRoleIds`); HTML อีเมลโทนสว่าง สถานะเป็น badge — **flow ผู้รับ To/CC เริ่มต้น** ดู [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
+- **API:** `GET/PUT /api/settings/email-templates` (ADMIN)
+- **CC อีเมล** — CC มาจากช่องตั้งค่า + บทบาทที่เลือกเท่านั้น (ไม่แทรกผู้รับงานเป็น CC อัตโนมัติเมื่อปิดงาน) — สรุปใน [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
+- **Modal แดชบอร์ด (`CrudModal`)** — แสดงด้วย **`createPortal` → `document.body`**, **`z-100`** ให้อยู่เหนือ `SiteHeader`/`sidebar` (`z-50`); โทน **Dark Glassmorphism** (backdrop, `ring-1 ring-white/5`, พร็อพ **`size`**: `md` | `lg`); ล็อก scroll `body` ขณะเปิด
+- **หน้า `/dashboard/roles`** — modal เพิ่ม/แก้ไขบทบาทและกำหนดสิทธิ์: ฟิลด์ใช้ **`form-input-glass`** (`globals.css`); รายการสิทธิ์ในกล่องแก้ว + checkbox สไตล์ dark
+
+### ย้อนหลัง (2026-03-23)
 
 - **RBAC เมนู (Sidebar)** — `DashboardLayoutShell` ดึง `GET /roles/me/permissions` แล้ว **แกะ `data` ตาม ResponseInterceptor** (`unwrapApiData` ใน `src/lib/apiResponse.ts`); ถ้ากรองตาม permission แล้วไม่มีรายการใน sidebar (เช่น มีแค่ `menu.profile`) จะ **fallback ตามบทบาท**; role ใน session ใช้ **uppercase**; เมนูภาพรวม/กำลังแก้ไข/ประวัติ/นอกสัญญา รวม **SUPERVISOR** ให้สอดคล้อง STAFF
 - **Deploy PRD — Next.js** — ใช้ **`next.config.mjs`** แทน `.ts` เพื่อไม่ให้ image production (`npm prune --omit=dev`) ต้องมี `typescript` ตอน `next start`
@@ -12,9 +20,9 @@
 - **Docker** — `backend/Dockerfile` + `frontend/Dockerfile` + `docker-compose.yml` (รันทดสอบแยกคอนเทนเนอร์); build frontend ใช้ `--build-arg NEXT_PUBLIC_API_BASE_URL=...`
 - **Backend ใน container** — รันด้วย `node dist/src/main.js` (และ `npm run start:prod` ชี้ path เดียวกัน) เพราะ TypeScript ใช้ `module: "nodenext"` ทำให้ผล `nest build` อยู่ใต้ `dist/src/` ไม่ใช่ `dist/main.js` — ถ้า PRD ขึ้น `Cannot find module '/app/dist/main.js'` ให้ตรวจว่า image มาจาก commit ที่แก้ Dockerfile แล้ว และไม่ override `command` เป็น path เก่า
 - **ตัวแปร CI (GitLab)** — ใช้ **`FRONTEND_BASE_URL`** เดียวสำหรับลิงก์ Environment, ส่งเข้า container และ `JobsPdfService` (ไม่แยก `FRONTEND_URL_PRD`); รายการตัวแปรอื่นดูคอมเมนต์ใน `.gitlab-ci.yml`
-- **Production โดเมนเดียว (ตัวอย่าง)** — เว็บ `https://cctv-app.forth.co.th` + API ที่ **`/api`**: ตั้ง `NEXT_PUBLIC_API_BASE_URL=https://cctv-app.forth.co.th/api`, `NEXTAUTH_URL`, `ALLOWED_ORIGINS`, `FRONTEND_BASE_URL` ให้สอดคล้อง origin จริง; reverse proxy ต้องส่งต่อ **`/socket.io`** ไป backend (Socket.IO ไม่อยู่ใต้ `/api`)
+- **Production โดเมนเดียว (ตัวอย่าง)** — เว็บ `https://cctv-app.forth.co.th` + API ที่ **`/api`**: ตั้ง `NEXT_PUBLIC_API_BASE_URL=https://cctv-app.forth.co.th/api`, `NEXTAUTH_URL`, `ALLOWED_ORIGINS`, `FRONTEND_BASE_URL` ให้สอดคล้อง origin จริง; reverse proxy ต้องส่งต่อ **`/socket.io`** ไป backend (Socket.IO ไม่อยู่ใต้ `/api`); รายละเอียด path **Nginx Proxy Manager** (แยก `/api/auth`, `/api/print-jobs` → Next **8309**; `/api/` + `/socket.io` → Nest **8310**) ดู `backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md`
 - **MINIO_PUBLIC_URL (ตัวอย่าง)** — เช่น `https://minio-it.forth.co.th` สำหรับ URL รูปที่ browser โหลดได้ (ค่าจริงใส่เฉพาะ `.env` / GitLab Variables)
-- **Git** — `.gitignore` ที่ root กำหนดขอบเขตขึ้น repo: `backend/`, `frontend/`, `README.md`, `PLAN.md`, `TASK.md`, `STATUS.md`, `AGENTS.md`, `AGENT_INSTRUCTIONS.md`, `.gitlab-ci.yml`, `docker-compose.yml`, `.dockerignore`, `docker/`
+- **Git** — `.gitignore` ที่ root กำหนดขอบเขตขึ้น repo: `backend/`, `frontend/`, `docs/`, `README.md`, `PLAN.md`, `TASK.md`, `STATUS.md`, `AGENTS.md`, `AGENT_INSTRUCTIONS.md`, `.gitlab-ci.yml`, `docker-compose.yml`, `.dockerignore`, `docker/`
 - **Frontend `npm run build`** — `src/lib/apiResponse.ts` รวม **`unwrapApiData`** (แกะ `{ data }` จาก backend) + ฟังก์ชันช่วย assignable/error; หน้า **`/public/report`**: ห่อ `useSearchParams` ด้วย `<Suspense>` ตาม Next.js 15
 
 ### ย้อนหลัง (2026-03-22)
@@ -129,5 +137,5 @@
    - **งานที่รับผิดชอบ** — รายการงานที่รับมอบหมาย (filter + datatable)
    - กำลังแก้ไข (`/dashboard/in-progress`): แท็บสัญญา/นอกสัญญา + badge งานค้าง; ปุ่มอัปเดต (ผู้รับผิดชอบ); **ADMIN ลบงาน IN_PROGRESS ได้** (ปุ่มลบผู้ดูแลระบบ); ข้อขัดข้องทั้งหมด, นอกสัญญา (แสดงเฉพาะ PENDING ที่ `isOutOfContract=true`)
    - จัดการผู้ใช้ (ADMIN: CRUD; บทบาท: ADMIN, STAFF, หัวหน้างาน, ผู้แจ้งซ่อม) — คลิกรูปโปรไฟล์ในตารางเปิด modal ดูรูปขนาดใหญ่
-   - จัดการบทบาทและสิทธิ์ (ADMIN), **ตั้งค่าระบบ** (`/dashboard/settings`, ADMIN) — กำหนด SMTP, ทดสอบส่งอีเมล, ตัวเลือก TLS
+   - จัดการบทบาทและสิทธิ์ (ADMIN), **ตั้งค่าระบบ** (`/dashboard/settings`, ADMIN) — กำหนด SMTP, ทดสอบส่งอีเมล, ตัวเลือก TLS, เทมเพลตอีเมลแจ้งงาน (รวม `publicBaseUrl`, แจ้งตาม Role); สรุป flow การส่งอีเมล: [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
    - โปรไฟล์เข้าได้จากเมนูผู้ใช้ (dropdown) ไม่แสดงใน sidebar
