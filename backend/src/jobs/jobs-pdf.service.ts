@@ -33,8 +33,14 @@ export class JobsPdfService {
       process.env.FRONTEND_BASE_URL || 'http://localhost:3000'
     ).replace(/\/$/, '');
 
+    const executablePath =
+      process.env.PUPPETEER_EXECUTABLE_PATH ||
+      process.env.CHROME_BIN ||
+      (process.platform === 'linux' ? '/usr/bin/chromium' : undefined);
+
     const browser = await puppeteer.launch({
       headless: true,
+      ...(executablePath ? { executablePath } : {}),
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
