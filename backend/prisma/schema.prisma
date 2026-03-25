@@ -120,7 +120,8 @@ model Job {
   fixerPhone   String? // เบอร์โทรผู้แก้ไข
   fixerEmail   String? // Email ผู้แก้ไข
 
-  brokenPart String? @db.Text // ส่วนที่ขัดข้อง
+  brokenPart String? @db.Text // ส่วนที่ขัดข้อง / ประเภทงาน เช่น Hardware, Software
+  fixEnvironment String? // INDOOR | OUTDOOR — สถานที่ติดตั้งตอนแก้ไข
   cause      String? @db.Text // สาเหตุ
   fixMethod  String? @db.Text // วิธีแก้ไข
 

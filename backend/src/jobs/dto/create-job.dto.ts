@@ -32,8 +32,12 @@ export const CreateJobSchema = z.object({
    */
   reporterEmail: z.preprocess(
     (val) => normalizeOptionalEmail(val),
-    z.union([z.literal(''), z.string().email('รูปแบบอีเมลไม่ถูกต้อง')]),
+    z.string().min(1, 'กรุณาระบุอีเมล').email('รูปแบบอีเมลไม่ถูกต้อง'),
   ),
+  /** ตำแหน่งงาน — เก็บที่ User ตอนสร้าง/อัปเดตผู้แจ้งจากหน้า public/report */
+  reporterPosition: z
+    .preprocess((v) => (v === undefined || v === null ? '' : String(v).trim()), z.string().max(200, 'ตำแหน่งยาวเกินไป'))
+    .optional(),
   isOutOfContract: z.any().optional(),
 });
 
@@ -56,8 +60,24 @@ export type ReopenJobDto = z.infer<typeof ReopenJobSchema>;
 
 export const UpdateFixInfoSchema = z.object({
   brokenPartType: z.string().optional(),
-  cause: z.string().optional(),
-  fixMethod: z.string().optional(),
+  fixEnvironment: z.preprocess(
+    (val) => {
+      if (val === undefined || val === null) return undefined;
+      const s = String(val).trim();
+      if (s === '') return null;
+      if (s === 'INDOOR' || s === 'OUTDOOR') return s;
+      return undefined;
+    },
+    z.union([z.enum(['INDOOR', 'OUTDOOR']), z.null()]).optional(),
+  ),
+  cause: z
+    .string()
+    .trim()
+    .min(1, 'กรุณาระบุสาเหตุ'),
+  fixMethod: z
+    .string()
+    .trim()
+    .min(1, 'กรุณาระบุวิธีแก้ไข'),
   note: z.string().optional(),
   oldSerialNumber: z.string().optional(),
   newSerialNumber: z.string().optional(),

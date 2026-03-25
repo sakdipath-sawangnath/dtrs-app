@@ -203,6 +203,27 @@ function limitText(s: string, maxLen: number): { short: string; full: string; cl
   return { short: clipped ? full.slice(0, maxLen) + "…" : full, full, clipped };
 }
 
+/** ให้ตรงกับหน้า `/dashboard/jobs/[id]` — ข้อมูลการแก้ไข */
+const FIX_ENVIRONMENT_OPTIONS = [
+  { value: "INDOOR", label: "Indoor (ในอาคาร)" },
+  { value: "OUTDOOR", label: "Outdoor (นอกอาคาร)" },
+] as const;
+
+const FIX_CATEGORY_OPTIONS = [
+  { value: "Hardware", label: "Hardware (ฮาร์ดแวร์)" },
+  { value: "Software", label: "Software (ซอฟต์แวร์)" },
+] as const;
+
+function normalizeSerialNumberInput(raw: string): string {
+  return raw.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+}
+
+const GLASS_MODAL_LABEL =
+  "block text-xs font-semibold mb-1 text-slate-200";
+const GLASS_MODAL_FIELD =
+  "w-full text-xs sm:text-sm rounded-xl border border-white/10 bg-slate-900/40 px-3 py-2.5 text-slate-100 placeholder:text-slate-500 shadow-inner focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/50 outline-none transition-all disabled:cursor-not-allowed disabled:bg-slate-900/25 disabled:text-slate-500 disabled:opacity-80 [color-scheme:dark]";
+const GLASS_MODAL_TEXTAREA = `${GLASS_MODAL_FIELD} min-h-[100px] resize-y`;
+
 interface Job {
   id: number;
   ticketNo?: string;
@@ -229,6 +250,7 @@ interface Job {
   fixImages?: string[] | null;
   fixDate?: string | null;
   fixNote?: string | null;
+  fixEnvironment?: string | null;
   isOutOfContract?: boolean;
 }
 
@@ -312,13 +334,6 @@ const GLASS_SECTION =
 const CONTRACT_TABS_ROW_WRAP =
   "shrink-0 w-full sm:w-fit max-w-full min-w-0 self-stretch sm:self-start";
 
-/** Modal อัปเดตข้อมูลการแก้ไข — Dark Glass (ช่องกรอก) */
-const UPDATE_FIX_MODAL_LABEL = "block text-xs font-semibold mb-1 text-slate-300";
-const UPDATE_FIX_MODAL_FIELD =
-  "w-full rounded-xl border border-white/10 bg-slate-900/40 backdrop-blur-sm px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 shadow-inner outline-none transition-all focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/50 [color-scheme:dark] disabled:opacity-50 disabled:cursor-not-allowed";
-const UPDATE_FIX_MODAL_TEXTAREA =
-  "w-full rounded-xl border border-white/10 bg-slate-900/40 backdrop-blur-sm px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 shadow-inner outline-none transition-all min-h-[80px] focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/50 [color-scheme:dark] disabled:opacity-50";
-
 export default function JobsList({
   statusFilter,
   showOutOfContract = false,
@@ -377,6 +392,7 @@ export default function JobsList({
   const [updateFixSaving, setUpdateFixSaving] = useState(false);
 
   const [updateBrokenPartType, setUpdateBrokenPartType] = useState<string>("");
+  const [updateFixEnvironment, setUpdateFixEnvironment] = useState<string>("");
   const [updateCause, setUpdateCause] = useState<string>("");
   const [updateFixMethod, setUpdateFixMethod] = useState<string>("");
   const [updateNote, setUpdateNote] = useState<string>("");
@@ -399,10 +415,26 @@ export default function JobsList({
     useRef<HTMLInputElement>(null),
   ];
 
+  const updateFixEnvironmentSelectValue = useMemo(() => {
+    if (!updateFixEnvironment) return null;
+    return (
+      FIX_ENVIRONMENT_OPTIONS.find((o) => o.value === updateFixEnvironment) ?? null
+    );
+  }, [updateFixEnvironment]);
+
+  const updateFixCategorySelectValue = useMemo(() => {
+    if (!updateBrokenPartType) return null;
+    return (
+      FIX_CATEGORY_OPTIONS.find((o) => o.value === updateBrokenPartType) ?? null
+    );
+  }, [updateBrokenPartType]);
+
   const [updateReopenReason, setUpdateReopenReason] = useState("");
   const [updateFixReopening, setUpdateFixReopening] = useState(false);
   const [updatePreviewImages, setUpdatePreviewImages] = useState<string[] | null>(null);
   const [updatePreviewIndex, setUpdatePreviewIndex] = useState(0);
+  /** Portal ไป document.body — หลีกเลี่ยงการถูก parent clip และ z-index ต่ำกว่า header */
+  const [portalMounted, setPortalMounted] = useState(false);
   const API =
     process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
   const token = (session as { accessToken?: string })?.accessToken;
@@ -641,6 +673,19 @@ export default function JobsList({
   }, [provinceFilter, districtFilter, search, pageSize, showOutOfContract]);
 
   useEffect(() => {
+    setPortalMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (updateFixJob == null) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [updateFixJob]);
+
+  useEffect(() => {
     // reset district เมื่อเปลี่ยนจังหวัด
     setDistrictFilter("");
   }, [provinceFilter]);
@@ -683,6 +728,7 @@ export default function JobsList({
     setUpdatePreviewIndex(0);
     setUpdateFixImages([null, null, null]);
     setUpdateFixPreviews([null, null, null]);
+    setUpdateFixEnvironment("");
 
     try {
       const res = await axios.get(`${API}/jobs/${jobId}`, {
@@ -696,12 +742,14 @@ export default function JobsList({
       }
 
       setUpdateFixJob(job);
-      setUpdateBrokenPartType((job.brokenPart ?? "") as string);
+      const env = (job.fixEnvironment ?? "") as string;
+      setUpdateFixEnvironment(env);
+      setUpdateBrokenPartType(env ? ((job.brokenPart ?? "") as string) : "");
       setUpdateCause((job.cause ?? "") as string);
       setUpdateFixMethod((job.fixMethod ?? "") as string);
       setUpdateNote((job.fixNote ?? "") as string);
-      setUpdateOldSerial((job.oldSerialNumber ?? "") as string);
-      setUpdateNewSerial((job.newSerialNumber ?? "") as string);
+      setUpdateOldSerial(normalizeSerialNumberInput((job.oldSerialNumber ?? "") as string));
+      setUpdateNewSerial(normalizeSerialNumberInput((job.newSerialNumber ?? "") as string));
     } catch {
       toastError("โหลดข้อมูลไม่สำเร็จ", "ไม่สามารถโหลดข้อมูลใบแจ้งซ่อมได้");
     } finally {
@@ -737,12 +785,14 @@ export default function JobsList({
       const j = payload as Job | null;
       if (j) {
         setUpdateFixJob(j);
-        setUpdateBrokenPartType((j.brokenPart ?? "") as string);
+        const env = (j.fixEnvironment ?? "") as string;
+        setUpdateFixEnvironment(env);
+        setUpdateBrokenPartType(env ? ((j.brokenPart ?? "") as string) : "");
         setUpdateCause((j.cause ?? "") as string);
         setUpdateFixMethod((j.fixMethod ?? "") as string);
         setUpdateNote((j.fixNote ?? "") as string);
-        setUpdateOldSerial((j.oldSerialNumber ?? "") as string);
-        setUpdateNewSerial((j.newSerialNumber ?? "") as string);
+        setUpdateOldSerial(normalizeSerialNumberInput((j.oldSerialNumber ?? "") as string));
+        setUpdateNewSerial(normalizeSerialNumberInput((j.newSerialNumber ?? "") as string));
       }
       await fetchJobs();
     } catch (err: unknown) {
@@ -785,16 +835,37 @@ export default function JobsList({
       toastError("สิทธิ์ไม่เพียงพอ", "เฉพาะผู้รับงานเท่านั้นที่บันทึกและปิดงานได้");
       return;
     }
+    if (updateFixEnvironment !== "INDOOR" && updateFixEnvironment !== "OUTDOOR") {
+      toastError("ข้อมูลไม่ครบ", "กรุณาเลือกประเภทสถานที่ (Indoor / Outdoor)");
+      return;
+    }
+    if (updateBrokenPartType !== "Hardware" && updateBrokenPartType !== "Software") {
+      toastError("ข้อมูลไม่ครบ", "กรุณาเลือกประเภทงาน (Hardware / Software)");
+      return;
+    }
+    if (!updateCause.trim()) {
+      toastError("ข้อมูลไม่ครบ", "กรุณาระบุสาเหตุ");
+      return;
+    }
+    if (!updateFixMethod.trim()) {
+      toastError("ข้อมูลไม่ครบ", "กรุณาระบุวิธีแก้ไข");
+      return;
+    }
+    if (!updateFixImages[0] || !updateFixImages[1]) {
+      toastError("รูปภาพไม่ครบ", "กรุณาแนบรูปการแก้ไขอย่างน้อย 2 รูปแรก");
+      return;
+    }
 
     setUpdateFixSaving(true);
     try {
       const form = new FormData();
       form.append("brokenPartType", updateBrokenPartType);
+      form.append("fixEnvironment", updateFixEnvironment);
       form.append("cause", updateCause);
       form.append("fixMethod", updateFixMethod);
       form.append("note", updateNote);
-      form.append("oldSerialNumber", updateOldSerial);
-      form.append("newSerialNumber", updateNewSerial);
+      form.append("oldSerialNumber", normalizeSerialNumberInput(updateOldSerial));
+      form.append("newSerialNumber", normalizeSerialNumberInput(updateNewSerial));
 
       const filesToUpload = updateFixImages.filter(
         (f): f is File => f instanceof File,
@@ -1126,6 +1197,18 @@ export default function JobsList({
     isUpdateAssignee &&
     !isUpdateResolved;
   const updateIsReadOnlyFix = !!updateFixJob && !updateCanEditFix;
+
+  // หลีกเลี่ยง `useMemo` เพราะไฟล์นี้มี early-return หลายจุด
+  // (React Hooks ต้องเรียกทุกครั้งตามกฎ-of-hooks)
+  const updateFixFormReadyToSubmit = updateCanEditFix
+    ? (updateFixEnvironment === "INDOOR" || updateFixEnvironment === "OUTDOOR") &&
+      (updateBrokenPartType === "Hardware" ||
+        updateBrokenPartType === "Software") &&
+      updateCause.trim().length > 0 &&
+      updateFixMethod.trim().length > 0 &&
+      updateFixImages[0] != null &&
+      updateFixImages[1] != null
+    : true;
 
   const tableAndPagination = (
     <>
@@ -1561,12 +1644,14 @@ export default function JobsList({
         </div>
       )}
 
-      {/* Modal ข้อมูลการแก้ไข (IN_PROGRESS) */}
-      {updateFixJob != null && (
-        <>
-          {updatePreviewImages && updatePreviewImages.length > 0 && (
+      {/* Modal ข้อมูลการแก้ไข (IN_PROGRESS) — portal + z เหนือ SiteHeader (z-50) */}
+      {portalMounted &&
+        updateFixJob != null &&
+        createPortal(
+          <>
+            {updatePreviewImages && updatePreviewImages.length > 0 && (
             <div
-              className="fixed inset-0 z-80 flex items-center justify-center bg-black/75 px-3 sm:px-6"
+              className="fixed inset-0 z-110 flex items-center justify-center bg-black/75 px-3 sm:px-6"
               onClick={() => setUpdatePreviewImages(null)}
             >
               <div
@@ -1597,15 +1682,22 @@ export default function JobsList({
           )}
 
           <div
-            className="fixed inset-0 z-70 flex items-center justify-center px-3 sm:px-6 py-4 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-100 flex items-center justify-center px-3 sm:px-6 py-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] bg-slate-950/70 backdrop-blur-md"
             onClick={() => setUpdateFixJob(null)}
+            role="presentation"
           >
             <div
-              className={`${GLASS_SECTION} w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col`}
+              className={`${GLASS_SECTION} w-full max-w-5xl max-h-[min(90dvh,calc(100dvh-2rem))] overflow-hidden flex flex-col shadow-2xl ring-1 ring-white/5`}
               onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="update-fix-modal-title"
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 shrink-0">
-                <h3 className="font-bold text-base sm:text-lg text-white">
+                <h3
+                  id="update-fix-modal-title"
+                  className="font-bold text-base sm:text-lg text-white"
+                >
                   ข้อมูลการแก้ไข {updateFixJob.ticketNo && `· ${updateFixJob.ticketNo}`}
                 </h3>
                 <button
@@ -1618,7 +1710,7 @@ export default function JobsList({
                 </button>
               </div>
 
-              <div className="px-5 sm:px-6 py-4 overflow-y-auto">
+              <div className="px-5 sm:px-6 py-4 overflow-y-auto flex-1 min-h-0">
                 {updateFixLoading ? (
                   <p className="text-sm text-slate-400">กำลังโหลด...</p>
                 ) : (
@@ -1701,54 +1793,136 @@ export default function JobsList({
                         {/* ฟอร์ม */}
                         <div className="mt-4 border-t border-white/10 pt-4 space-y-4">
                           <form onSubmit={handleSubmitUpdateFix} className="space-y-4">
-                            <div>
-                              <label className={UPDATE_FIX_MODAL_LABEL}>
-                                ส่วนที่ขัดข้อง
-                              </label>
-                              <select
-                                className="select-native-glass w-full text-xs"
-                                value={updateBrokenPartType}
-                                onChange={(e) => setUpdateBrokenPartType(e.target.value)}
-                                disabled={updateFixSaving || updateIsReadOnlyFix}
-                              >
-                                <option value="">-- เลือกประเภท --</option>
-                                <option value="Hardware">Hardware</option>
-                                <option value="Software">Software</option>
-                              </select>
+                            <div className="rounded-xl border border-white/10 bg-slate-950/40 p-3 sm:p-4 space-y-3">
+                              <p className="text-xs text-slate-400 leading-relaxed">
+                                <span className="text-red-400">*</span> บังคับกรอก:{" "}
+                                <span className="text-slate-300 font-medium">
+                                  ประเภทสถานที่ (Indoor / Outdoor)
+                                </span>
+                                ,{" "}
+                                <span className="text-slate-300 font-medium">
+                                  ประเภทงาน (Hardware / Software)
+                                </span>
+                                ,{" "}
+                                <span className="text-slate-300 font-medium">สาเหตุ</span>
+                                ,{" "}
+                                <span className="text-slate-300 font-medium">วิธีแก้ไข</span>
+                                และแนบรูป 2 รูปแรก — เลือกประเภทสถานที่ก่อน จึงจะเลือกประเภทงานได้
+                                หมายเหตุและ Serial ไม่บังคับ
+                              </p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label
+                                    className={GLASS_MODAL_LABEL}
+                                    htmlFor="modal-update-fix-environment"
+                                  >
+                                    ประเภทสถานที่ <span className="text-red-400">*</span>
+                                  </label>
+                                  <Select
+                                    inputId="modal-update-fix-environment"
+                                    instanceId="modal-update-fix-environment"
+                                    options={[...FIX_ENVIRONMENT_OPTIONS]}
+                                    value={updateFixEnvironmentSelectValue}
+                                    onChange={(opt) => {
+                                      const v = opt
+                                        ? String((opt as { value: string }).value)
+                                        : "";
+                                      setUpdateFixEnvironment(v);
+                                      if (!v) setUpdateBrokenPartType("");
+                                    }}
+                                    isDisabled={updateFixSaving || updateIsReadOnlyFix}
+                                    isClearable
+                                    placeholder="เลือก Indoor / Outdoor"
+                                    styles={reactSelectGlassStyles}
+                                    menuPortalTarget={
+                                      typeof document !== "undefined"
+                                        ? document.body
+                                        : null
+                                    }
+                                    menuPosition="fixed"
+                                    classNamePrefix="react-select"
+                                  />
+                                </div>
+                                <div>
+                                  <label
+                                    className={GLASS_MODAL_LABEL}
+                                    htmlFor="modal-update-fix-category"
+                                  >
+                                    ประเภทงาน <span className="text-red-400">*</span>
+                                  </label>
+                                  <Select
+                                    inputId="modal-update-fix-category"
+                                    instanceId="modal-update-fix-category"
+                                    options={[...FIX_CATEGORY_OPTIONS]}
+                                    value={updateFixCategorySelectValue}
+                                    onChange={(opt) =>
+                                      setUpdateBrokenPartType(
+                                        opt
+                                          ? String((opt as { value: string }).value)
+                                          : "",
+                                      )
+                                    }
+                                    isDisabled={
+                                      updateFixSaving ||
+                                      updateIsReadOnlyFix ||
+                                      !updateFixEnvironment
+                                    }
+                                    isClearable
+                                    placeholder={
+                                      updateFixEnvironment
+                                        ? "เลือก Hardware / Software"
+                                        : "เลือกประเภทสถานที่ก่อน"
+                                    }
+                                    styles={reactSelectGlassStyles}
+                                    menuPortalTarget={
+                                      typeof document !== "undefined"
+                                        ? document.body
+                                        : null
+                                    }
+                                    menuPosition="fixed"
+                                    classNamePrefix="react-select"
+                                  />
+                                </div>
+                              </div>
                             </div>
 
                             <div>
-                              <label className={UPDATE_FIX_MODAL_LABEL}>
-                                สาเหตุ
+                              <label className={GLASS_MODAL_LABEL} htmlFor="modal-update-cause">
+                                สาเหตุ <span className="text-red-400">*</span>
                               </label>
                               <input
+                                id="modal-update-cause"
                                 type="text"
-                                className={UPDATE_FIX_MODAL_FIELD}
+                                className={GLASS_MODAL_FIELD}
                                 value={updateCause}
                                 onChange={(e) => setUpdateCause(e.target.value)}
                                 disabled={updateFixSaving || updateIsReadOnlyFix}
+                                required={updateCanEditFix}
                               />
                             </div>
 
                             <div>
-                              <label className={UPDATE_FIX_MODAL_LABEL}>
-                                วิธีแก้ไข
+                              <label className={GLASS_MODAL_LABEL} htmlFor="modal-update-fix-method">
+                                วิธีแก้ไข <span className="text-red-400">*</span>
                               </label>
                               <textarea
-                                className={UPDATE_FIX_MODAL_TEXTAREA}
+                                id="modal-update-fix-method"
+                                className={GLASS_MODAL_TEXTAREA}
                                 value={updateFixMethod}
                                 onChange={(e) => setUpdateFixMethod(e.target.value)}
                                 disabled={updateFixSaving || updateIsReadOnlyFix}
+                                required={updateCanEditFix}
                               />
                             </div>
 
                             <div>
-                              <label className={UPDATE_FIX_MODAL_LABEL}>
+                              <label className={GLASS_MODAL_LABEL} htmlFor="modal-update-note">
                                 หมายเหตุการแก้ไข
                               </label>
                               <input
+                                id="modal-update-note"
                                 type="text"
-                                className={UPDATE_FIX_MODAL_FIELD}
+                                className={GLASS_MODAL_FIELD}
                                 value={updateNote}
                                 onChange={(e) => setUpdateNote(e.target.value)}
                                 disabled={updateFixSaving || updateIsReadOnlyFix}
@@ -1756,53 +1930,84 @@ export default function JobsList({
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <p
+                                id="modal-update-serial-hint"
+                                className="text-xs text-slate-500 leading-relaxed sm:col-span-2 -mb-0.5"
+                              >
+                                รับเฉพาะตัวอักษร A–Z และตัวเลข 0–9 เท่านั้น (ตัวพิมพ์เล็กจะถูกแปลงเป็นตัวใหญ่อัตโนมัติ
+                                อักขระอื่นจะถูกตัดออก)
+                              </p>
                               <div>
-                                <label className={UPDATE_FIX_MODAL_LABEL}>
+                                <label className={GLASS_MODAL_LABEL} htmlFor="modal-update-serial-old">
                                   Serial Number อุปกรณ์เดิม
                                 </label>
                                 <input
+                                  id="modal-update-serial-old"
                                   type="text"
-                                  className={UPDATE_FIX_MODAL_FIELD}
+                                  inputMode="text"
+                                  autoComplete="off"
+                                  spellCheck={false}
+                                  className={`${GLASS_MODAL_FIELD} font-mono tracking-wide uppercase`}
                                   value={updateOldSerial}
-                                  onChange={(e) => setUpdateOldSerial(e.target.value)}
+                                  onChange={(e) =>
+                                    setUpdateOldSerial(
+                                      normalizeSerialNumberInput(e.target.value),
+                                    )
+                                  }
                                   disabled={updateFixSaving || updateIsReadOnlyFix}
+                                  aria-describedby="modal-update-serial-hint"
                                 />
                               </div>
                               <div>
-                                <label className={UPDATE_FIX_MODAL_LABEL}>
+                                <label className={GLASS_MODAL_LABEL} htmlFor="modal-update-serial-new">
                                   Serial Number อุปกรณ์ใหม่
                                 </label>
                                 <input
+                                  id="modal-update-serial-new"
                                   type="text"
-                                  className={UPDATE_FIX_MODAL_FIELD}
+                                  inputMode="text"
+                                  autoComplete="off"
+                                  spellCheck={false}
+                                  className={`${GLASS_MODAL_FIELD} font-mono tracking-wide uppercase`}
                                   value={updateNewSerial}
-                                  onChange={(e) => setUpdateNewSerial(e.target.value)}
+                                  onChange={(e) =>
+                                    setUpdateNewSerial(
+                                      normalizeSerialNumberInput(e.target.value),
+                                    )
+                                  }
                                   disabled={updateFixSaving || updateIsReadOnlyFix}
+                                  aria-describedby="modal-update-serial-hint"
                                 />
                               </div>
                             </div>
 
                             {updateFixJob.assignedTo && !updateIsReadOnlyFix && (
                               <div>
-                                <label className={UPDATE_FIX_MODAL_LABEL}>
-                                  รูปการแก้ไข (สูงสุด 3 รูป)
-                                </label>
+                                <span className={GLASS_MODAL_LABEL}>
+                                  รูปการแก้ไข{" "}
+                                  <span className="text-slate-400 font-normal">
+                                    (บังคับ 2 รูปแรก — รูปที่ 3 ไม่บังคับ)
+                                  </span>
+                                </span>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mt-1">
                                   {[0, 1, 2].map((i) => (
                                     <div key={i} className="flex flex-col group">
                                       <p className="text-[11px] mb-1.5 font-medium text-slate-400">
-                                        รูปที่ {i + 1}
+                                        รูปที่ {i + 1}{" "}
+                                        {i < 2 && (
+                                          <span className="text-red-400">*</span>
+                                        )}
                                       </p>
                                       <div
                                         onClick={() => updateFixFileRefs[i].current?.click()}
                                         className={`relative aspect-square rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all duration-200 ${
                                           updateFixPreviews[i]
                                             ? "border-transparent bg-transparent"
-                                            : "border-white/15 bg-slate-900/40"
+                                            : "border-white/20 bg-slate-900/30"
                                         }`}
                                       >
                                         {!updateFixPreviews[i] && (
-                                          <div className="absolute inset-0 group-hover:bg-white/5 transition-colors" />
+                                          <div className="absolute inset-0 group-hover:bg-slate-800/40 transition-colors" />
                                         )}
                                         {updateFixPreviews[i] ? (
                                           <>
@@ -1818,8 +2023,8 @@ export default function JobsList({
                                             </div>
                                           </>
                                         ) : (
-                                          <div className="flex flex-col items-center gap-1.5 z-10 text-slate-500 group-hover:text-blue-400 transition-colors">
-                                            <Camera size={22} />
+                                          <div className="flex flex-col items-center gap-1.5 z-10 text-slate-400 group-hover:text-sky-400 transition-colors">
+                                            <Camera size={22} aria-hidden />
                                             <span className="text-[10px] font-medium uppercase tracking-wider">
                                               Upload
                                             </span>
@@ -1848,9 +2053,12 @@ export default function JobsList({
                               <button
                                 type="submit"
                                 disabled={
-                                  updateFixSaving || updateFixLoading || updateIsReadOnlyFix
+                                  updateFixSaving ||
+                                  updateFixLoading ||
+                                  updateIsReadOnlyFix ||
+                                  !updateFixFormReadyToSubmit
                                 }
-                                className="w-full mt-2 py-2.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-lg transition-all active:scale-95 disabled:opacity-60 disabled:active:scale-100 cursor-pointer"
+                                className="w-full mt-3 py-3 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-lg active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100 transition-all focus:ring-2 focus:ring-blue-500/40 outline-none cursor-pointer disabled:cursor-not-allowed"
                               >
                                 {updateFixSaving
                                   ? "กำลังบันทึก..."
@@ -1880,7 +2088,7 @@ export default function JobsList({
                                     เฉพาะผู้รับงาน: Reopen เพื่อเปลี่ยนสถานะเป็น &quot;กำลังแก้ไข&quot; แล้วจึงแก้ไขข้อมูลได้
                                   </div>
                                   <textarea
-                                    className={`${UPDATE_FIX_MODAL_TEXTAREA} border-amber-400/25 focus:border-amber-400/50 focus:ring-amber-500/30 text-amber-50 placeholder:text-amber-200/50`}
+                                    className="w-full rounded-xl border border-orange-500/30 bg-slate-900/50 px-3 py-2 text-xs sm:text-sm text-slate-100 placeholder:text-orange-200/40 focus:border-orange-400/60 focus:ring-2 focus:ring-orange-500/25 outline-none transition-all min-h-[80px] resize-y"
                                     rows={2}
                                     placeholder="ระบุเหตุผลในการ Reopen เช่น ต้องแก้ไขรายละเอียดวิธีการแก้ไข หรืออัปเดตรูปเพิ่มเติม"
                                     value={updateReopenReason}
@@ -1915,8 +2123,9 @@ export default function JobsList({
               </div>
             </div>
           </div>
-        </>
-      )}
+          </>,
+          document.body,
+        )}
 
       {/* Modal มอบหมายงาน (สำหรับ SUPERVISOR/ADMIN) */}
       {assignJob != null && (

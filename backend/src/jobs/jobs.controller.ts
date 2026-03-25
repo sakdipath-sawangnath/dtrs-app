@@ -189,6 +189,10 @@ export class JobsController {
         /** Reopen/บันทึกการแก้ไข — เฉพาะผู้รับงาน (assignedTo) เท่านั้น ไม่ยกเว้น ADMIN */
         await this.jobsService.assertUserIsAssigneeForFix(+id, userId);
 
+        if (!files || files.length < 2) {
+            throw new BadRequestException('กรุณาแนบรูปการแก้ไขอย่างน้อย 2 รูป');
+        }
+
         const uploadedUrls: string[] = [];
         if (files && files.length > 0) {
             let index = 1;
@@ -201,6 +205,7 @@ export class JobsController {
 
         const updated = await this.jobsService.updateFixInfo(+id, {
             brokenPartType: body.brokenPartType ?? null,
+            fixEnvironment: body.fixEnvironment,
             cause: body.cause ?? null,
             fixMethod: body.fixMethod ?? null,
             note: body.note ?? null,

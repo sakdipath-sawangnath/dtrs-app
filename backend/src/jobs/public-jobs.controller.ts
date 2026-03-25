@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Param, UseInterceptors, UploadedFiles, Body, UsePipes } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { Controller, Get, Post, Param, UseInterceptors, UploadedFiles, Body } from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { JobsService } from './jobs.service';
 import { MinioService } from '../minio/minio.service';
 import { EventsGateway } from '../events/events.gateway';
@@ -19,22 +19,32 @@ export class PublicJobsController {
         private readonly eventsGateway: EventsGateway,
     ) { }
 
-    /** แจ้งซ่อม (multipart) — ไม่ต้อง JWT */
+    /** แจ้งซ่อม (multipart) — ไม่ต้อง JWT; รูป issue = images[], รูปโปรไฟล์ผู้แจ้ง = reporterAvatar */
     @Post()
-    @UseInterceptors(FilesInterceptor('images'))
+    @UseInterceptors(
+        FileFieldsInterceptor([
+            { name: 'images', maxCount: 10 },
+            { name: 'reporterAvatar', maxCount: 1 },
+        ]),
+    )
     async createReport(
         @Body(new ZodValidationPipe(CreateJobSchema)) createJobDto: any,
-        @UploadedFiles() files: Array<Express.Multer.File>,
+        @UploadedFiles()
+        files?: { images?: Express.Multer.File[]; reporterAvatar?: Express.Multer.File[] },
     ) {
+        const issueFiles = files?.images ?? [];
+        const reporterAvatar = files?.reporterAvatar?.[0];
         const baseData: Prisma.JobCreateInput = {
             ...createJobDto,
         };
-        const created = await this.jobsService.create(baseData);
+        const created = await this.jobsService.createFromPublicReport(baseData as Record<string, unknown>, {
+            reporterAvatar,
+        });
 
         const uploadedUrls: string[] = [];
-        if (created?.id && files && files.length > 0) {
+        if (created?.id && issueFiles.length > 0) {
             let index = 1;
-            for (const file of files) {
+            for (const file of issueFiles) {
                 const url = await this.minioService.uploadJobImage(created.id, 'issue', index, file);
                 uploadedUrls.push(url);
                 index++;

@@ -51,6 +51,7 @@ interface JobDetail {
   fixMethod?: string | null;
   fixImages?: string[] | null;
   fixNote?: string | null;
+  fixEnvironment?: string | null;
   oldSerialNumber?: string | null;
   newSerialNumber?: string | null;
   systemStatus?: string | null;
@@ -82,6 +83,21 @@ const STATUS_BADGE_CLASS: Record<string, string> = {
   RESOLVED: "badge badge-resolved",
 };
 
+const FIX_ENVIRONMENT_OPTIONS = [
+  { value: "INDOOR", label: "Indoor (ในอาคาร)" },
+  { value: "OUTDOOR", label: "Outdoor (นอกอาคาร)" },
+] as const;
+
+const FIX_CATEGORY_OPTIONS = [
+  { value: "Hardware", label: "Hardware (ฮาร์ดแวร์)" },
+  { value: "Software", label: "Software (ซอฟต์แวร์)" },
+] as const;
+
+/** Serial Number: เฉพาะ A–Z / 0–9 — ตัดอักขระอื่น และแปลงตัวพิมพ์เล็กเป็นตัวใหญ่ */
+function normalizeSerialNumberInput(raw: string): string {
+  return raw.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+}
+
 /** Dark Glassmorphism — ฟิลด์ฟอร์ม (AGENTS.md: inputs) */
 const GLASS_LABEL = "block text-xs font-semibold mb-1 text-slate-200";
 const GLASS_FIELD =
@@ -103,6 +119,7 @@ export default function JobDetailPage() {
   const token = (session as { accessToken?: string })?.accessToken;
 
   const [brokenPartType, setBrokenPartType] = useState<string>("");
+  const [fixEnvironment, setFixEnvironment] = useState<string>("");
   const [cause, setCause] = useState<string>("");
   const [fixMethod, setFixMethod] = useState<string>("");
   const [note, setNote] = useState<string>("");
@@ -144,12 +161,14 @@ export default function JobDetailPage() {
         const data = isJobDetail(payload) ? payload : null;
         setJob(data);
         if (data) {
-          setBrokenPartType(data.brokenPart ?? "");
+          const env = data.fixEnvironment ?? "";
+          setFixEnvironment(env);
+          setBrokenPartType(env ? (data.brokenPart ?? "") : "");
           setCause(data.cause ?? "");
           setFixMethod(data.fixMethod ?? "");
           setNote(data.fixNote ?? "");
-          setOldSerial(data.oldSerialNumber ?? "");
-          setNewSerial(data.newSerialNumber ?? "");
+          setOldSerial(normalizeSerialNumberInput(data.oldSerialNumber ?? ""));
+          setNewSerial(normalizeSerialNumberInput(data.newSerialNumber ?? ""));
         }
       })
       .catch(() => setError("ไม่พบข้อมูลใบแจ้งซ่อมนี้"))
@@ -194,6 +213,40 @@ export default function JobDetailPage() {
     });
   }, [job?.fixDate]);
 
+  const fixEnvironmentSelectValue = useMemo(() => {
+    if (!fixEnvironment) return null;
+    return (
+      FIX_ENVIRONMENT_OPTIONS.find((o) => o.value === fixEnvironment) ?? null
+    );
+  }, [fixEnvironment]);
+
+  const fixCategorySelectValue = useMemo(() => {
+    if (!brokenPartType) return null;
+    return (
+      FIX_CATEGORY_OPTIONS.find((o) => o.value === brokenPartType) ?? null
+    );
+  }, [brokenPartType]);
+
+  /** บังคับ: ประเภทสถานที่ + ประเภทงาน + สาเหตุ + วิธีแก้ไข + รูป 2 รูปแรก — ใช้ปิดปุ่มบันทึก */
+  const fixFormReadyToSubmit = useMemo(() => {
+    if (!canEditFix) return true;
+    const envOk =
+      fixEnvironment === "INDOOR" || fixEnvironment === "OUTDOOR";
+    const catOk =
+      brokenPartType === "Hardware" || brokenPartType === "Software";
+    const causeOk = cause.trim().length > 0;
+    const methodOk = fixMethod.trim().length > 0;
+    const imagesOk = fixImages[0] != null && fixImages[1] != null;
+    return envOk && catOk && causeOk && methodOk && imagesOk;
+  }, [
+    canEditFix,
+    fixEnvironment,
+    brokenPartType,
+    cause,
+    fixMethod,
+    fixImages,
+  ]);
+
   const handleFixImage = (index: number, file: File | null) => {
     const imgs = [...fixImages];
     imgs[index] = file;
@@ -210,10 +263,31 @@ export default function JobDetailPage() {
       toastError("สิทธิ์ไม่เพียงพอ", "เฉพาะผู้รับงานเท่านั้นที่บันทึกและปิดงานได้");
       return;
     }
+    if (fixEnvironment !== "INDOOR" && fixEnvironment !== "OUTDOOR") {
+      toastError("ข้อมูลไม่ครบ", "กรุณาเลือกประเภทสถานที่ (Indoor / Outdoor)");
+      return;
+    }
+    if (brokenPartType !== "Hardware" && brokenPartType !== "Software") {
+      toastError("ข้อมูลไม่ครบ", "กรุณาเลือกประเภทงาน (Hardware / Software)");
+      return;
+    }
+    if (!cause.trim()) {
+      toastError("ข้อมูลไม่ครบ", "กรุณาระบุสาเหตุ");
+      return;
+    }
+    if (!fixMethod.trim()) {
+      toastError("ข้อมูลไม่ครบ", "กรุณาระบุวิธีแก้ไข");
+      return;
+    }
+    if (!fixImages[0] || !fixImages[1]) {
+      toastError("รูปภาพไม่ครบ", "กรุณาแนบรูปการแก้ไขอย่างน้อย 2 รูปแรก");
+      return;
+    }
     setSaving(true);
     try {
       const form = new FormData();
       form.append("brokenPartType", brokenPartType);
+      form.append("fixEnvironment", fixEnvironment);
       form.append("cause", cause);
       form.append("fixMethod", fixMethod);
       form.append("note", note);
@@ -256,12 +330,14 @@ export default function JobDetailPage() {
       const data = isJobDetail(payload) ? payload : null;
       setJob(data);
       if (data) {
-        setBrokenPartType(data.brokenPart ?? "");
+        const env = data.fixEnvironment ?? "";
+        setFixEnvironment(env);
+        setBrokenPartType(env ? (data.brokenPart ?? "") : "");
         setCause(data.cause ?? "");
         setFixMethod(data.fixMethod ?? "");
         setNote(data.fixNote ?? "");
-        setOldSerial(data.oldSerialNumber ?? "");
-        setNewSerial(data.newSerialNumber ?? "");
+        setOldSerial(normalizeSerialNumberInput(data.oldSerialNumber ?? ""));
+        setNewSerial(normalizeSerialNumberInput(data.newSerialNumber ?? ""));
       }
     } catch {
       setError("ไม่พบข้อมูลใบแจ้งซ่อมนี้");
@@ -756,25 +832,95 @@ export default function JobDetailPage() {
                 <div className={`${GLASS_SECTION} space-y-4`}>
                 {(canEditFix || isReadOnlyFix) ? (
                   <form onSubmit={handleSubmitFix} className="space-y-4">
-                    <div>
-                      <label className={GLASS_LABEL} htmlFor="job-broken-part">
-                        ส่วนที่ขัดข้อง
-                      </label>
-                      <select
-                        id="job-broken-part"
-                        className={`${GLASS_FIELD} cursor-pointer`}
-                        value={brokenPartType}
-                        onChange={(e) => setBrokenPartType(e.target.value)}
-                        disabled={isReadOnlyFix}
-                      >
-                        <option value="">-- เลือกประเภท --</option>
-                        <option value="Hardware">Hardware</option>
-                        <option value="Software">Software</option>
-                      </select>
+                    <div className="rounded-xl border border-white/10 bg-slate-950/40 p-3 sm:p-4 space-y-3">
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        <span className="text-red-400">*</span> บังคับกรอก:{" "}
+                        <span className="text-slate-300 font-medium">
+                          ประเภทสถานที่ (Indoor / Outdoor)
+                        </span>
+                        ,{" "}
+                        <span className="text-slate-300 font-medium">
+                          ประเภทงาน (Hardware / Software)
+                        </span>{" "}
+                        ,{" "}
+                        <span className="text-slate-300 font-medium">สาเหตุ</span>
+                        ,{" "}
+                        <span className="text-slate-300 font-medium">วิธีแก้ไข</span>
+                        และแนบรูป 2 รูปแรก — เลือกประเภทสถานที่ก่อน จึงจะเลือกประเภทงานได้
+                        หมายเหตุและ Serial ไม่บังคับ
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label
+                            className={GLASS_LABEL}
+                            htmlFor="job-fix-environment"
+                          >
+                            ประเภทสถานที่ <span className="text-red-400">*</span>
+                          </label>
+                          <Select
+                            inputId="job-fix-environment"
+                            instanceId="job-fix-environment"
+                            options={[...FIX_ENVIRONMENT_OPTIONS]}
+                            value={fixEnvironmentSelectValue}
+                            onChange={(opt) => {
+                              const v = opt
+                                ? String((opt as { value: string }).value)
+                                : "";
+                              setFixEnvironment(v);
+                              if (!v) setBrokenPartType("");
+                            }}
+                            isDisabled={isReadOnlyFix}
+                            isClearable
+                            placeholder="เลือก Indoor / Outdoor"
+                            styles={reactSelectGlassStyles}
+                            menuPortalTarget={
+                              typeof document !== "undefined"
+                                ? document.body
+                                : null
+                            }
+                            menuPosition="fixed"
+                            classNamePrefix="react-select"
+                          />
+                        </div>
+                        <div>
+                          <label
+                            className={GLASS_LABEL}
+                            htmlFor="job-fix-category"
+                          >
+                            ประเภทงาน <span className="text-red-400">*</span>
+                          </label>
+                          <Select
+                            inputId="job-fix-category"
+                            instanceId="job-fix-category"
+                            options={[...FIX_CATEGORY_OPTIONS]}
+                            value={fixCategorySelectValue}
+                            onChange={(opt) =>
+                              setBrokenPartType(
+                                opt ? String((opt as { value: string }).value) : "",
+                              )
+                            }
+                            isDisabled={isReadOnlyFix || !fixEnvironment}
+                            isClearable
+                            placeholder={
+                              fixEnvironment
+                                ? "เลือก Hardware / Software"
+                                : "เลือกประเภทสถานที่ก่อน"
+                            }
+                            styles={reactSelectGlassStyles}
+                            menuPortalTarget={
+                              typeof document !== "undefined"
+                                ? document.body
+                                : null
+                            }
+                            menuPosition="fixed"
+                            classNamePrefix="react-select"
+                          />
+                        </div>
+                      </div>
                     </div>
                     <div>
                       <label className={GLASS_LABEL} htmlFor="job-cause">
-                        สาเหตุ
+                        สาเหตุ <span className="text-red-400">*</span>
                       </label>
                       <input
                         id="job-cause"
@@ -783,11 +929,12 @@ export default function JobDetailPage() {
                         value={cause}
                         onChange={(e) => setCause(e.target.value)}
                         disabled={isReadOnlyFix}
+                        required={canEditFix}
                       />
                     </div>
                     <div>
                       <label className={GLASS_LABEL} htmlFor="job-fix-method">
-                        วิธีแก้ไข
+                        วิธีแก้ไข <span className="text-red-400">*</span>
                       </label>
                       <textarea
                         id="job-fix-method"
@@ -795,6 +942,7 @@ export default function JobDetailPage() {
                         value={fixMethod}
                         onChange={(e) => setFixMethod(e.target.value)}
                         disabled={isReadOnlyFix}
+                        required={canEditFix}
                       />
                     </div>
                     <div>
@@ -811,6 +959,13 @@ export default function JobDetailPage() {
                       />
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <p
+                        id="job-serial-hint"
+                        className="text-xs text-slate-500 leading-relaxed sm:col-span-2 -mb-0.5"
+                      >
+                        รับเฉพาะตัวอักษร A–Z และตัวเลข 0–9 เท่านั้น (ตัวพิมพ์เล็กจะถูกแปลงเป็นตัวใหญ่อัตโนมัติ
+                        อักขระอื่นจะถูกตัดออก)
+                      </p>
                       <div>
                         <label className={GLASS_LABEL} htmlFor="job-serial-old">
                           Serial Number อุปกรณ์เดิม
@@ -818,10 +973,18 @@ export default function JobDetailPage() {
                         <input
                           id="job-serial-old"
                           type="text"
-                          className={GLASS_FIELD}
+                          inputMode="text"
+                          autoComplete="off"
+                          spellCheck={false}
+                          className={`${GLASS_FIELD} font-mono tracking-wide uppercase`}
                           value={oldSerial}
-                          onChange={(e) => setOldSerial(e.target.value)}
+                          onChange={(e) =>
+                            setOldSerial(
+                              normalizeSerialNumberInput(e.target.value),
+                            )
+                          }
                           disabled={isReadOnlyFix}
+                          aria-describedby="job-serial-hint"
                         />
                       </div>
                       <div>
@@ -831,23 +994,37 @@ export default function JobDetailPage() {
                         <input
                           id="job-serial-new"
                           type="text"
-                          className={GLASS_FIELD}
+                          inputMode="text"
+                          autoComplete="off"
+                          spellCheck={false}
+                          className={`${GLASS_FIELD} font-mono tracking-wide uppercase`}
                           value={newSerial}
-                          onChange={(e) => setNewSerial(e.target.value)}
+                          onChange={(e) =>
+                            setNewSerial(
+                              normalizeSerialNumberInput(e.target.value),
+                            )
+                          }
                           disabled={isReadOnlyFix}
+                          aria-describedby="job-serial-hint"
                         />
                       </div>
                     </div>
                     {!isReadOnlyFix && (
                       <div>
                         <span className={GLASS_LABEL}>
-                          รูปการแก้ไข (สูงสุด 3 รูป)
+                          รูปการแก้ไข{" "}
+                          <span className="text-slate-400 font-normal">
+                            (บังคับ 2 รูปแรก — รูปที่ 3 ไม่บังคับ)
+                          </span>
                         </span>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mt-1">
                           {[0, 1, 2].map((i) => (
                             <div key={i} className="flex flex-col group">
                               <p className="text-[11px] mb-1.5 font-medium text-slate-400">
-                                รูปที่ {i + 1}
+                                รูปที่ {i + 1}{" "}
+                                {i < 2 && (
+                                  <span className="text-red-400">*</span>
+                                )}
                               </p>
                               <div
                                 onClick={() => fixFileRefs[i].current?.click()}
@@ -902,7 +1079,7 @@ export default function JobDetailPage() {
                     {canEditFix ? (
                       <button
                         type="submit"
-                        disabled={saving || isReadOnlyFix}
+                        disabled={saving || !fixFormReadyToSubmit}
                         className="w-full mt-3 py-3 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-lg active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100 transition-all focus:ring-2 focus:ring-blue-500/40 outline-none cursor-pointer disabled:cursor-not-allowed"
                       >
                         {saving ? "กำลังบันทึก..." : "บันทึกและปิดงาน (สถานะ: เสร็จสิ้น)"}

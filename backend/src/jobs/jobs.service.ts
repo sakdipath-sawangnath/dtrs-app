@@ -74,11 +74,13 @@ export class JobsService {
             createData.reportDate = new Date();
         }
 
-        const phone = (createData.reporterPhone as string | undefined)?.trim();
-        if (phone) {
-            const u = await this.usersService.findByPhone(phone);
-            if (u?.id) {
-                createData.reporter = { connect: { id: u.id } };
+        if (!createData.reporter) {
+            const phone = (createData.reporterPhone as string | undefined)?.trim();
+            if (phone) {
+                const u = await this.usersService.findByPhone(phone);
+                if (u?.id) {
+                    createData.reporter = { connect: { id: u.id } };
+                }
             }
         }
 
@@ -87,6 +89,29 @@ export class JobsService {
         });
         void this.jobEmailNotifications.notifyReported(created.id);
         return created;
+    }
+
+    /**
+     * แจ้งซ่อมจากหน้าสาธารณะ — สร้าง/อัปเดต User บทบาทผู้แจ้ง (USER) + เชื่อม reporter ก่อนบันทึก Job
+     */
+    async createFromPublicReport(
+        dto: Record<string, unknown>,
+        opts?: { reporterAvatar?: Express.Multer.File },
+    ) {
+        const reporterPosition =
+            typeof dto.reporterPosition === 'string' ? String(dto.reporterPosition).trim() : '';
+        const { reporterPosition: _omit, ...rest } = dto;
+        const reporterUserId = await this.usersService.ensureReporterUserFromPublicReport({
+            phone: String(rest.reporterPhone ?? '').trim(),
+            name: String(rest.reporterName ?? '').trim(),
+            email: String(rest.reporterEmail ?? '').trim(),
+            position: reporterPosition || undefined,
+            avatarFile: opts?.reporterAvatar,
+        });
+        return this.create({
+            ...(rest as Prisma.JobCreateInput),
+            reporter: { connect: { id: reporterUserId } },
+        });
     }
 
     async findAll() {
@@ -342,6 +367,7 @@ export class JobsService {
         id: number,
         payload: {
             brokenPartType?: string | null;
+            fixEnvironment?: string | null;
             cause?: string | null;
             fixMethod?: string | null;
             note?: string | null;
@@ -370,6 +396,9 @@ export class JobsService {
 
         if (payload.brokenPartType !== undefined) {
             data.brokenPart = payload.brokenPartType;
+        }
+        if (payload.fixEnvironment !== undefined) {
+            data.fixEnvironment = payload.fixEnvironment;
         }
         if (payload.cause !== undefined) {
             data.cause = payload.cause;

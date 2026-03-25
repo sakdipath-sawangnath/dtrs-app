@@ -3,10 +3,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { DEFAULT_PASS_SETTING_KEY } from '../settings/settings.service';
+import { MinioService } from '../minio/minio.service';
 
 @Injectable()
 export class UsersService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private minioService: MinioService,
+    ) { }
 
     private readonly DEFAULT_PASS_SENTINEL = "__DEFAULT_PASS__";
     private readonly DEFAULT_PASS_FALLBACK = "F0rth2026@";
@@ -93,13 +97,127 @@ export class UsersService {
         return u.role != null ? String(u.role).toUpperCase() : null;
     }
 
-    /** ค้นหาผู้ใช้จากเบอร์โทรศัพท์ (เฉพาะคนที่มี role เป็น USER หรือ STAFF) */
+    /** ค้นหาผู้ใช้จากเบอร์โทรศัพท์ — ใช้หน้าแจ้งซ่อมสาธารณะ (รวมตำแหน่ง/รูปโปรไฟล์) */
     async findByPhone(phone: string) {
         if (!phone?.trim()) return null;
-        return this.prisma.user.findFirst({
+        const row = await this.prisma.user.findFirst({
             where: { phone: phone.trim() },
-            select: { id: true, name: true, phone: true, email: true },
+            select: { id: true, name: true, phone: true, email: true, position: true, image: true },
         });
+        if (!row) return null;
+        const image = this.minioService.rewriteStorageUrlForClient(row.image ?? undefined);
+        return { ...row, image };
+    }
+
+    /**
+     * สร้างหรืออัปเดต User บทบาทผู้แจ้งซ่อม (USER / AppRole USER) จากหน้าแจ้งปัญหาสาธารณะ
+     * — ผู้ใช้ใหม่ได้สิทธิ์เฉพาะกลุ่มผู้แจ้ง; ถ้ามีเบอร์ในระบบแล้ว (รวม STAFF) จะอัปเดตโปรไฟล์จากฟอร์มโดยไม่ลดสิทธิ์
+     */
+    /**
+     * ตรวจสอบว่าอีเมลใช้แจ้งซ่อมได้หรือไม่ — ว่างถ้าเป็นบัญชีเดียวกันกับเบอร์นี้ (อัปเดตโปรไฟล์ได้)
+     */
+    async isEmailAvailableForPublicReport(
+        email: string,
+        reporterPhone?: string,
+    ): Promise<{ available: boolean }> {
+        const normalized = email?.trim() ?? '';
+        if (!normalized) {
+            return { available: false };
+        }
+        const existing = await this.prisma.user.findFirst({
+            where: {
+                OR: [{ email: normalized }, { username: normalized }],
+            },
+            select: { id: true, phone: true },
+        });
+        if (!existing) {
+            return { available: true };
+        }
+        const phone = reporterPhone?.trim();
+        if (phone && existing.phone === phone) {
+            return { available: true };
+        }
+        return { available: false };
+    }
+
+    async ensureReporterUserFromPublicReport(params: {
+        phone: string;
+        name: string;
+        email: string;
+        position?: string;
+        avatarFile?: Express.Multer.File;
+    }): Promise<number> {
+        const phone = params.phone.trim();
+        const name = params.name.trim();
+        const email = params.email?.trim();
+        if (!phone || !name) {
+            throw new BadRequestException('ข้อมูลผู้แจ้งไม่ครบ');
+        }
+        if (!email) {
+            throw new BadRequestException('กรุณาระบุอีเมล');
+        }
+        const position = params.position?.trim() || undefined;
+
+        const existing = await this.prisma.user.findFirst({
+            where: { phone },
+            select: { id: true, email: true, username: true },
+        });
+
+        if (existing) {
+            if (email !== (existing.email ?? '')) {
+                const taken = await this.prisma.user.findFirst({
+                    where: {
+                        id: { not: existing.id },
+                        OR: [{ email }, { username: email }],
+                    },
+                    select: { id: true },
+                });
+                if (taken) throw new ConflictException('อีเมลนี้ถูกใช้โดยผู้ใช้อื่นแล้ว');
+            }
+            const updateData: Prisma.UserUpdateInput = {
+                name,
+                email,
+                username: email,
+                ...(position !== undefined ? { position } : {}),
+            };
+            await this.prisma.user.update({
+                where: { id: existing.id },
+                data: updateData,
+            });
+            if (params.avatarFile) {
+                const url = await this.minioService.uploadUserAvatar(existing.id, params.avatarFile);
+                await this.prisma.user.update({ where: { id: existing.id }, data: { image: url } });
+            }
+            return existing.id;
+        }
+
+        const appRole = await this.prisma.appRole.findUnique({ where: { code: 'USER' } });
+        const byEmail = await this.prisma.user.findFirst({ where: { email }, select: { id: true } });
+        if (byEmail) {
+            throw new ConflictException('อีเมลนี้ถูกใช้แล้ว');
+        }
+        const username = email;
+
+        const resolvedPassword = await this.resolvePassword(this.DEFAULT_PASS_SENTINEL);
+        const hashed = await bcrypt.hash(resolvedPassword, 10);
+        const created = await this.prisma.user.create({
+            data: {
+                username,
+                email,
+                password: hashed,
+                name,
+                phone,
+                position: position ?? null,
+                role: Role.USER,
+                roleRef: appRole ? { connect: { id: appRole.id } } : undefined,
+            },
+            select: { id: true },
+        });
+        if (params.avatarFile) {
+            const url = await this.minioService.uploadUserAvatar(created.id, params.avatarFile);
+            await this.prisma.user.update({ where: { id: created.id }, data: { image: url } });
+        }
+        return created.id;
     }
 
     /** อัปเดตโปรไฟล์ของตัวเอง (ไม่รวม role) — username อ้างอิง email เป็นหลัก */

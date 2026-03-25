@@ -5,14 +5,19 @@ import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { toastSuccess, toastError, toastWarning } from '@/lib/toast';
-import { MapPin, User as UserIcon, MessageSquare, Camera, Phone, Search, AlertCircle } from 'lucide-react';
+import { MapPin, User as UserIcon, UserCircle, MessageSquare, Camera, Phone, Search, AlertCircle, Info } from 'lucide-react';
 import PublicLayoutShell from '@/components/PublicLayoutShell';
 import DashboardLayoutShell from '@/components/DashboardLayoutShell';
 import Select from 'react-select';
 import { getReactSelectGlassStyles } from '@/lib/reactSelectGlassStyles';
 
 interface Site { id: number; province: string; district: string; agency: string; }
-type ReporterPayload = { name: string; email?: string | null };
+type ReporterPayload = {
+  name: string;
+  email?: string | null;
+  position?: string | null;
+  image?: string | null;
+};
 
 function isReporterPayload(v: unknown): v is ReporterPayload {
   return !!v && typeof v === 'object' && 'name' in v && typeof (v as { name?: unknown }).name === 'string';
@@ -70,12 +75,19 @@ function ReportPageContent() {
   const [form, setForm] = useState({
     province: '', district: '', location: '',
     reporterName: '', reporterPhone: '', reporterEmail: '',
+    reporterPosition: '',
     description: '',
   });
 
   const [images, setImages] = useState<(File | null)[]>([null, null, null]);
   const [previews, setPreviews] = useState<(string | null)[]>([null, null, null]);
   const fileRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
+  const reporterAvatarRef = useRef<HTMLInputElement>(null);
+  const [reporterAvatarFile, setReporterAvatarFile] = useState<File | null>(null);
+  const [reporterAvatarLocalUrl, setReporterAvatarLocalUrl] = useState<string | null>(null);
+  const [remoteReporterAvatarUrl, setRemoteReporterAvatarUrl] = useState<string | null>(null);
+  const [reporterEmailError, setReporterEmailError] = useState<string | null>(null);
+  const [emailChecking, setEmailChecking] = useState(false);
 
   const role = (session?.user as { role?: string })?.role;
   const isStaffFlow =
@@ -129,6 +141,12 @@ function ReportPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, isStaffFlow]);
 
+  useEffect(() => {
+    return () => {
+      if (reporterAvatarLocalUrl) URL.revokeObjectURL(reporterAvatarLocalUrl);
+    };
+  }, [reporterAvatarLocalUrl]);
+
   // --- 1. Load Draft from Session Storage ---
   useEffect(() => {
     setSitesLoading(false);
@@ -144,8 +162,8 @@ function ReportPageContent() {
         if (parsed?.isUserFound) setIsUserFound(parsed.isUserFound);
         if (parsed?.phoneSearched) setPhoneSearched(parsed.phoneSearched);
         
-        // If they already passed the phone check in the previous session, fetch sites instantly!
-        if (parsed?.isUserFound && parsed?.phoneSearched) {
+        // หลังกดตรวจสอบเบอร์แล้ว (พบหรือไม่พบในระบบ) ต้องโหลด sites
+        if (parsed?.phoneSearched) {
           fetchSites();
         }
       }
@@ -211,23 +229,52 @@ function ReportPageContent() {
         setForm(p => ({
           ...p,
           reporterName: payload.name,
-          reporterEmail: (payload.email || '').replace(/\s/g, '')
+          reporterEmail: (payload.email || '').replace(/\s/g, ''),
+          reporterPosition: (payload.position ?? '').trim(),
         }));
+        setRemoteReporterAvatarUrl(
+          typeof payload.image === 'string' && payload.image.trim() ? payload.image.trim() : null,
+        );
+        setReporterAvatarFile(null);
+        setReporterAvatarLocalUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return null;
+        });
         setIsUserFound(true);
         toastSuccess('ดึงข้อมูลผู้แจ้งสำเร็จ', 1500);
         // เมื่อผ่านการตรวจสอบเบอร์โทรแล้วค่อยโหลดรายการสถานที่
         fetchSites();
       } else {
-        setForm(p => ({ ...p, reporterName: '', reporterEmail: '' }));
+        setForm(p => ({ ...p, reporterName: '', reporterEmail: '', reporterPosition: '' }));
+        setRemoteReporterAvatarUrl(null);
+        setReporterAvatarFile(null);
+        setReporterAvatarLocalUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return null;
+        });
         setIsUserFound(false);
-        toastWarning('ไม่พบประวัติ', 'ไม่พบข้อมูลผู้แจ้งจากเบอร์โทรนี้ในระบบ');
+        toastWarning(
+          'ไม่พบประวัติในระบบ',
+          'กรุณากรอกชื่อ-สกุล (และอีเมลถ้ามี) แล้วดำเนินการแจ้งซ่อมได้',
+        );
+        fetchSites();
       }
       setPhoneSearched(true);
     } catch {
-      toastWarning('ไม่พบประวัติ', 'ไม่พบข้อมูลผู้แจ้งจากเบอร์โทรนี้ในระบบ');
-      setForm(p => ({ ...p, reporterName: '', reporterEmail: '' }));
+      toastWarning(
+        'ไม่พบประวัติในระบบ',
+        'กรุณากรอกชื่อ-สกุล (และอีเมลถ้ามี) แล้วดำเนินการแจ้งซ่อมได้',
+      );
+      setForm(p => ({ ...p, reporterName: '', reporterEmail: '', reporterPosition: '' }));
+      setRemoteReporterAvatarUrl(null);
+      setReporterAvatarFile(null);
+      setReporterAvatarLocalUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
       setIsUserFound(false);
       setPhoneSearched(true);
+      fetchSites();
     } finally {
       setIsSearchingPhone(false);
     }
@@ -239,6 +286,75 @@ function ReportPageContent() {
     setImages(imgs); setPreviews(pv);
   };
 
+  const handleReporterAvatarChange = (file: File | null) => {
+    setReporterAvatarFile(file);
+    setReporterAvatarLocalUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return file ? URL.createObjectURL(file) : null;
+    });
+  };
+
+  const reporterAvatarDisplayUrl = reporterAvatarLocalUrl || remoteReporterAvatarUrl || null;
+
+  const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const parseEmailAvailablePayload = (root: unknown): { available?: boolean } => {
+    if (!root || typeof root !== 'object') return {};
+    const d = root as Record<string, unknown>;
+    if ('data' in d && d.data && typeof d.data === 'object') {
+      return d.data as { available?: boolean };
+    }
+    return root as { available?: boolean };
+  };
+
+  const checkReporterEmailAvailability = async (
+    emailTrim: string,
+    phoneTrim: string,
+  ): Promise<boolean> => {
+    if (!EMAIL_PATTERN.test(emailTrim)) return false;
+    if (!/^\d{10}$/.test(phoneTrim)) return true;
+    const r = await axios.get(`${API}/public/users/email-available`, {
+      params: { email: emailTrim, phone: phoneTrim },
+      timeout: 10000,
+    });
+    const root: unknown = r?.data;
+    const nested =
+      root && typeof root === 'object' && 'data' in root
+        ? (root as { data?: unknown }).data
+        : undefined;
+    const payload = parseEmailAvailablePayload(nested ?? root);
+    return payload.available === true;
+  };
+
+  const validateReporterEmailOnBlur = async () => {
+    const emailTrim = form.reporterEmail.trim();
+    const phoneTrim = form.reporterPhone.trim();
+    if (!emailTrim) {
+      setReporterEmailError('กรุณาระบุอีเมล');
+      return;
+    }
+    if (!EMAIL_PATTERN.test(emailTrim)) {
+      setReporterEmailError('รูปแบบอีเมลไม่ถูกต้อง');
+      return;
+    }
+    if (!/^\d{10}$/.test(phoneTrim)) {
+      setReporterEmailError(null);
+      return;
+    }
+    setEmailChecking(true);
+    setReporterEmailError(null);
+    try {
+      const ok = await checkReporterEmailAvailability(emailTrim, phoneTrim);
+      if (!ok) {
+        setReporterEmailError('อีเมลนี้ถูกใช้โดยผู้ใช้อื่นแล้ว');
+      }
+    } catch {
+      setReporterEmailError(null);
+    } finally {
+      setEmailChecking(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const phoneOk = /^\d{10}$/.test(form.reporterPhone.trim());
@@ -246,12 +362,41 @@ function ReportPageContent() {
       toastWarning('เบอร์โทรศัพท์', 'กรุณากรอกเบอร์โทรให้ถูกต้อง (10 หลัก)');
       return;
     }
-    if (!isUserFound && !isStaffFlow) {
-      toastWarning('ข้อมูลผู้แจ้งไม่ถูกต้อง', 'กรุณากด "ตรวจสอบ" ให้พบผู้แจ้งในระบบ');
-      return;
+    if (!isStaffFlow) {
+      if (!phoneSearched) {
+        toastWarning('ข้อมูลผู้แจ้งไม่ครบ', 'กรุณากด "ตรวจสอบ" หลังกรอกเบอร์โทรศัพท์');
+        return;
+      }
+      if (!isUserFound && !form.reporterName.trim()) {
+        toastWarning('ข้อมูลผู้แจ้งไม่ครบ', 'กรุณาระบุชื่อ-สกุลผู้แจ้ง');
+        return;
+      }
     }
     if (isStaffFlow && !isUserFound && !form.reporterName.trim()) {
       toastWarning('ไม่พบประวัติจากเบอร์', 'กรุณาระบุชื่อ-สกุลผู้แจ้ง');
+      return;
+    }
+    const emailTrim = form.reporterEmail.trim();
+    if (!emailTrim) {
+      setReporterEmailError('กรุณาระบุอีเมล');
+      toastWarning('อีเมล', 'กรุณาระบุอีเมล');
+      return;
+    }
+    if (!EMAIL_PATTERN.test(emailTrim)) {
+      setReporterEmailError('รูปแบบอีเมลไม่ถูกต้อง');
+      toastWarning('อีเมล', 'รูปแบบอีเมลไม่ถูกต้อง');
+      return;
+    }
+    const phoneTrim = form.reporterPhone.trim();
+    try {
+      const emailFree = await checkReporterEmailAvailability(emailTrim, phoneTrim);
+      if (!emailFree) {
+        setReporterEmailError('อีเมลนี้ถูกใช้โดยผู้ใช้อื่นแล้ว');
+        toastWarning('อีเมล', 'อีเมลนี้ถูกใช้โดยผู้ใช้อื่นแล้ว กรุณาใช้อีเมลอื่น');
+        return;
+      }
+    } catch {
+      toastWarning('การเชื่อมต่อ', 'ไม่สามารถตรวจสอบอีเมลได้ ลองอีกครั้ง');
       return;
     }
     if (!sitesFetched) {
@@ -280,6 +425,10 @@ function ReportPageContent() {
       });
       formData.append('isOutOfContract', isOutOfContract ? 'true' : 'false');
       formData.append('reportDate', new Date().toISOString());
+
+      if (reporterAvatarFile) {
+        formData.append('reporterAvatar', reporterAvatarFile);
+      }
       
       images.forEach((img) => {
         if (img) {
@@ -311,8 +460,24 @@ function ReportPageContent() {
       } else {
         toastSuccess('แจ้งซ่อมสำเร็จ! ทีมช่างจะดำเนินการในเร็วๆ นี้', 1500);
       }
-      setForm({ province: '', district: '', location: '', reporterName: '', reporterPhone: '', reporterEmail: '', description: '' });
+      setForm({
+        province: '',
+        district: '',
+        location: '',
+        reporterName: '',
+        reporterPhone: '',
+        reporterEmail: '',
+        reporterPosition: '',
+        description: '',
+      });
       setImages([null, null, null]); setPreviews([null, null, null]);
+      setReporterAvatarFile(null);
+      setRemoteReporterAvatarUrl(null);
+      setReporterAvatarLocalUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      setReporterEmailError(null);
       setPhoneSearched(false);
       setIsUserFound(false);
     } catch (err: unknown) {
@@ -323,12 +488,23 @@ function ReportPageContent() {
 
   const provinces = [...new Set(sites.map((s) => s.province))];
   const isPhoneValid = /^\d{10}$/.test(form.reporterPhone.trim());
-  const canProceed = isPhoneValid && (isUserFound || isStaffFlow);
-  const nameOkForStaff =
-    !isStaffFlow || isUserFound || form.reporterName.trim().length > 0;
+  /** สาธารณะ: หลังกดตรวจสอบแล้ว — พบผู้แจ้ง หรือ ไม่พบแต่จะกรอกชื่อเอง; เจ้าหน้าที่: เบอร์ถูกต้องพอ */
+  const canProceed =
+    isPhoneValid &&
+    (isStaffFlow ||
+      isUserFound ||
+      (phoneSearched && !isUserFound));
+  const nameOk =
+    isUserFound || form.reporterName.trim().length > 0;
+  const emailTrimForUi = form.reporterEmail.trim();
+  const emailFormatOk = EMAIL_PATTERN.test(emailTrimForUi);
+  const emailOk =
+    emailFormatOk && emailTrimForUi.length > 0 && !reporterEmailError;
   const canSubmit =
     canProceed &&
-    nameOkForStaff &&
+    nameOk &&
+    emailOk &&
+    !emailChecking &&
     sitesFetched &&
     !!form.province &&
     !!form.district &&
@@ -386,6 +562,33 @@ function ReportPageContent() {
               <UserIcon size={18} className={headerIconClass} />
               <h2 className={headerTitleClass}>ข้อมูลผู้แจ้ง</h2>
             </div>
+            <div
+              role="note"
+              aria-label="คำแนะนำการกรอกข้อมูลผู้แจ้ง"
+              className="mb-5 flex gap-3 rounded-xl border border-sky-500/25 bg-sky-950/35 px-3.5 py-3 sm:px-4 sm:py-3.5 backdrop-blur-sm"
+            >
+              <Info
+                className="h-5 w-5 shrink-0 text-sky-400 mt-0.5"
+                strokeWidth={2}
+                aria-hidden="true"
+              />
+              <div className="min-w-0 space-y-2 text-[13px] sm:text-sm leading-snug text-slate-300">
+                {isStaffFlow ? (
+                  <p>
+                    กด &quot;ตรวจสอบ&quot; เพื่อดึงข้อมูลจากระบบ หรือกรอกแทนได้ — ส่งแล้วจะอัปเดตผู้แจ้งและผูกกับใบแจ้งซ่อมนี้
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-slate-200/95">
+                      กรอกเบอร์ → กด &quot;ตรวจสอบ&quot; — มีบัญชีในระบบจะดึงข้อมูลให้
+                    </p>
+                    <p className="text-slate-400 border-t border-white/5 pt-2">
+                      ยังไม่มีบัญชี: กรอกชื่อ อีเมล ตำแหน่ง และรูปโปรไฟล์ — ส่งแล้วสร้างหรืออัปเดตบัญชีผู้แจ้งซ่อม ไม่ต้องให้ผู้ดูแลสร้าง User แยก
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
@@ -413,6 +616,13 @@ function ReportPageContent() {
                         setForm({ ...form, reporterPhone: val });
                         if(phoneSearched) setPhoneSearched(false);
                         if(isUserFound) setIsUserFound(false);
+                        setReporterAvatarFile(null);
+                        setRemoteReporterAvatarUrl(null);
+                        setReporterAvatarLocalUrl((prev) => {
+                          if (prev) URL.revokeObjectURL(prev);
+                          return null;
+                        });
+                        setReporterEmailError(null);
                         // สาธารณะ: เปลี่ยนเบอร์ต้องตรวจสอบใหม่ — รีเซ็ตสถานที่; เจ้าหน้าที่โหลดสถานที่ไว้แล้ว ไม่ต้องรีเซ็ต
                         if (!isStaffFlow && sitesFetched) {
                           setSitesFetched(false);
@@ -447,36 +657,113 @@ function ReportPageContent() {
                   <p className="text-xs text-slate-500 mt-2">กรอกเบอร์ 10 หลักได้เลย หรือกด &quot;ตรวจสอบ&quot; หากต้องการดึงข้อมูลผู้แจ้งจากระบบ</p>
                 )}
                 {!phoneSearched && !isStaffFlow && (
-                  <p className="text-xs text-slate-500 mt-2">กรอกเบอร์โทรศัพท์แล้วกด &quot;ตรวจสอบ&quot; เพื่อดึงข้อมูลเดิม</p>
+                  <p className="text-xs text-slate-500 mt-2">
+                    กรอกเบอร์ 10 หลักแล้วกด &quot;ตรวจสอบ&quot; — หากมีข้อมูลในระบบจะดึงชื่อให้อัตโนมัติ
+                    หากยังไม่มีบัญชี ให้กรอกชื่อ-สกุลและอีเมล
+                  </p>
                 )}
               </div>
 
-              {(isUserFound || (isStaffFlow && isPhoneValid && !isUserFound)) && (
-                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in mt-2">
-                  <div>
-                    <label className={labelClass}>ชื่อ-สกุล <span className="text-red-500">*</span></label>
-                    <input 
-                      type="text" 
-                      required
-                      readOnly={isUserFound}
-                      placeholder="ชื่อ และ นามสกุล"
-                      className={`${inputClass} ${isUserFound ? (isDark ? 'bg-slate-800/30 text-slate-500 cursor-not-allowed border-white/5 opacity-60' : 'bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200 focus:ring-0 shadow-inner') : ''}`}
-                      value={form.reporterName}
-                      onChange={(e) => setForm({ ...form, reporterName: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass}>อีเมล <span className="text-slate-400 font-normal text-xs ml-1">(ถ้ามี)</span></label>
-                    <input 
-                      type="email" 
-                      readOnly={isUserFound}
-                      placeholder="example@email.com"
-                      className={`${inputClass} ${isUserFound ? (isDark ? 'bg-slate-800/30 text-slate-500 cursor-not-allowed border-white/5 opacity-60' : 'bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200 focus:ring-0 shadow-inner') : ''}`}
-                      value={form.reporterEmail}
-                      onChange={(e) =>
-                        setForm({ ...form, reporterEmail: e.target.value.replace(/\s/g, '') })
-                      }
-                    />
+              {(isUserFound ||
+                (isPhoneValid && !isUserFound && (phoneSearched || isStaffFlow))) && (
+                <div className="md:col-span-2 animate-fade-in mt-2 space-y-4">
+                  <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+                    <div className="flex flex-col items-center sm:items-start gap-2 shrink-0">
+                      <span className={labelClass}>รูปโปรไฟล์</span>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => reporterAvatarRef.current?.click()}
+                          className={`relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-2 border-dashed transition-colors cursor-pointer min-h-[112px] min-w-[112px] ${
+                            isDark
+                              ? 'border-white/15 bg-slate-900/50 hover:border-blue-400/40'
+                              : 'border-slate-300 bg-slate-50 hover:border-blue-400'
+                          }`}
+                          aria-label="เลือกรูปโปรไฟล์ผู้แจ้ง"
+                        >
+                          {reporterAvatarDisplayUrl ? (
+                            <img
+                              src={reporterAvatarDisplayUrl}
+                              alt="รูปโปรไฟล์ผู้แจ้ง"
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <UserCircle className="h-14 w-14 text-slate-500" aria-hidden="true" />
+                          )}
+                        </button>
+                        <input
+                          ref={reporterAvatarRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) =>
+                            handleReporterAvatarChange(e.target.files?.[0] ?? null)
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div className="min-w-0 flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className={labelClass}>ชื่อ-สกุล <span className="text-red-500">*</span></label>
+                        <input 
+                          type="text" 
+                          required
+                          readOnly={isUserFound}
+                          placeholder="ชื่อ และ นามสกุล"
+                          className={`${inputClass} ${isUserFound ? (isDark ? 'bg-slate-800/30 text-slate-500 cursor-not-allowed border-white/5 opacity-60' : 'bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200 focus:ring-0 shadow-inner') : ''}`}
+                          value={form.reporterName}
+                          onChange={(e) => setForm({ ...form, reporterName: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass} htmlFor="reporter-email-input">
+                          อีเมล <span className="text-red-500">*</span>
+                        </label>
+                        <input 
+                          id="reporter-email-input"
+                          type="email" 
+                          required
+                          readOnly={isUserFound && !!form.reporterEmail.trim()}
+                          placeholder="example@email.com"
+                          autoComplete="email"
+                          aria-invalid={reporterEmailError ? true : undefined}
+                          aria-describedby={reporterEmailError ? 'reporter-email-error' : undefined}
+                          className={`${inputClass} ${isUserFound && !!form.reporterEmail.trim() ? (isDark ? 'bg-slate-800/30 text-slate-500 cursor-not-allowed border-white/5 opacity-60' : 'bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200 focus:ring-0 shadow-inner') : ''} ${reporterEmailError ? 'border-red-500/60 focus:ring-red-500/20' : ''}`}
+                          value={form.reporterEmail}
+                          onChange={(e) => {
+                            setReporterEmailError(null);
+                            setForm({ ...form, reporterEmail: e.target.value.replace(/\s/g, '') });
+                          }}
+                          onBlur={() => void validateReporterEmailOnBlur()}
+                        />
+                        {emailChecking && (
+                          <p className="text-xs text-slate-500 mt-1.5" aria-live="polite">
+                            กำลังตรวจสอบอีเมลซ้ำ…
+                          </p>
+                        )}
+                        {reporterEmailError && !emailChecking && (
+                          <p id="reporter-email-error" className="text-xs text-red-400 mt-1.5" role="alert">
+                            {reporterEmailError}
+                          </p>
+                        )}
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className={labelClass}>
+                          ตำแหน่ง <span className="text-slate-400 font-normal text-xs ml-1">(ถ้ามี)</span>
+                        </label>
+                        <input
+                          type="text"
+                          readOnly={isUserFound}
+                          placeholder="เช่น เจ้าหน้าที่ IT, ผู้ประสานงาน"
+                          maxLength={200}
+                          className={`${inputClass} ${isUserFound ? (isDark ? 'bg-slate-800/30 text-slate-500 cursor-not-allowed border-white/5 opacity-60' : 'bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200 focus:ring-0 shadow-inner') : ''}`}
+                          value={form.reporterPosition}
+                          onChange={(e) =>
+                            setForm({ ...form, reporterPosition: e.target.value })
+                          }
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -548,14 +835,27 @@ function ReportPageContent() {
               <h2 className={headerTitleClass}>รายละเอียดปัญหา</h2>
             </div>
             <div>
-              <label className={labelClass}>อาการที่พบ <span className="text-red-500">*</span></label>
+              <label className={labelClass} htmlFor="report-description">
+                อาการที่พบ <span className="text-red-500">*</span>
+              </label>
+              <p
+                id="report-description-hint"
+                className="text-xs text-slate-500 leading-relaxed mb-2 max-w-3xl"
+              >
+                ระบบจะรับเมื่อมีอย่างน้อย <span className="text-slate-400 font-medium">10 ตัวอักษร</span>
+                &nbsp;กรุณาเขียนให้ครบอย่างน้อยหนึ่งประโยค เช่น อาการที่เห็น (เสียง ภาพ ไฟ ฯลฯ) จุดที่เกิด
+                (ห้อง/ชั้น/อุปกรณ์) เวลาที่พบ หรือความถี่ของปัญหา
+              </p>
               <textarea
+                id="report-description"
                 required
+                minLength={10}
                 className={`${inputClass} min-h-[140px] resize-y`}
                 placeholder="ระบุอาการ, จุดสังเกต หรือปัญหาที่พบให้ละเอียด..."
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 rows={5}
+                aria-describedby="report-description-hint"
               />
             </div>
           </section>
