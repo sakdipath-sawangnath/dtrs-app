@@ -44,7 +44,7 @@ export default function LoginPage() {
     const identifier = email.trim();
     try {
       const apiBase = getClientApiBaseUrl();
-      const loginRes = await fetch(`${apiBase}/auth/login`, {
+      const loginRes = await fetch(`${apiBase}/backend-auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: identifier, password }),

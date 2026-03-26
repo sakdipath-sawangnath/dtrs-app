@@ -1,7 +1,11 @@
 import { Controller, Post, Body, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
-@Controller('auth')
+/**
+ * หมายเหตุ: หลีกเลี่ยงชนกับ NextAuth ที่ใช้ path `/api/auth/*` บนโดเมนเดียวกัน
+ * จึงแยก backend login เป็น `/api/backend-auth/login`
+ */
+@Controller('backend-auth')
 export class AuthController {
     constructor(private authService: AuthService) { }
 

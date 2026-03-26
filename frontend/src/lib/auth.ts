@@ -78,7 +78,7 @@ export const authOptions: NextAuthOptions = {
                 if (!identifier || !credentials?.password) return null;
 
                 try {
-                    const res = await fetch(`${apiBase}/auth/login`, {
+                    const res = await fetch(`${apiBase}/backend-auth/login`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
