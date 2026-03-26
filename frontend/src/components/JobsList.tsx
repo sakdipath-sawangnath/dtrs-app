@@ -215,7 +215,7 @@ const FIX_CATEGORY_OPTIONS = [
 ] as const;
 
 function normalizeSerialNumberInput(raw: string): string {
-  return raw.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  return raw.replace(/[^a-zA-Z0-9-]/g, "").toUpperCase();
 }
 
 const GLASS_MODAL_LABEL =
@@ -1934,7 +1934,7 @@ export default function JobsList({
                                 id="modal-update-serial-hint"
                                 className="text-xs text-slate-500 leading-relaxed sm:col-span-2 -mb-0.5"
                               >
-                                รับเฉพาะตัวอักษร A–Z และตัวเลข 0–9 เท่านั้น (ตัวพิมพ์เล็กจะถูกแปลงเป็นตัวใหญ่อัตโนมัติ
+                                รับเฉพาะตัวอักษร A–Z / ตัวเลข 0–9 / - เท่านั้น (ตัวพิมพ์เล็กจะถูกแปลงเป็นตัวใหญ่อัตโนมัติ
                                 อักขระอื่นจะถูกตัดออก)
                               </p>
                               <div>

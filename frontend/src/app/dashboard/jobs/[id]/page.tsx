@@ -93,9 +93,9 @@ const FIX_CATEGORY_OPTIONS = [
   { value: "Software", label: "Software (ซอฟต์แวร์)" },
 ] as const;
 
-/** Serial Number: เฉพาะ A–Z / 0–9 — ตัดอักขระอื่น และแปลงตัวพิมพ์เล็กเป็นตัวใหญ่ */
+/** Serial Number: รองรับ 0–9 / A–Z / '-' — ตัดอักขระอื่น และแปลงตัวพิมพ์เล็กเป็นตัวใหญ่อัตโนมัติ */
 function normalizeSerialNumberInput(raw: string): string {
-  return raw.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  return raw.replace(/[^a-zA-Z0-9-]/g, "").toUpperCase();
 }
 
 /** Dark Glassmorphism — ฟิลด์ฟอร์ม (AGENTS.md: inputs) */
@@ -963,7 +963,7 @@ export default function JobDetailPage() {
                         id="job-serial-hint"
                         className="text-xs text-slate-500 leading-relaxed sm:col-span-2 -mb-0.5"
                       >
-                        รับเฉพาะตัวอักษร A–Z และตัวเลข 0–9 เท่านั้น (ตัวพิมพ์เล็กจะถูกแปลงเป็นตัวใหญ่อัตโนมัติ
+                        รับเฉพาะตัวอักษร A–Z / ตัวเลข 0–9 / - เท่านั้น (ตัวพิมพ์เล็กจะถูกแปลงเป็นตัวใหญ่อัตโนมัติ
                         อักขระอื่นจะถูกตัดออก)
                       </p>
                       <div>

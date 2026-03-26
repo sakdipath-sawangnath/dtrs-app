@@ -608,7 +608,7 @@ function ReportPageContent() {
                       type="tel" 
                       required
                       maxLength={10}
-                      placeholder="เช่น 0812345678"
+                      placeholder="กรอกเบอร์โทรศัพท์มือถือ"
                       className={`${inputClass} pl-10`}
                       value={form.reporterPhone}
                       onChange={(e) => {

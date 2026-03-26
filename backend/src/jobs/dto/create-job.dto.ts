@@ -79,8 +79,30 @@ export const UpdateFixInfoSchema = z.object({
     .trim()
     .min(1, 'กรุณาระบุวิธีแก้ไข'),
   note: z.string().optional(),
-  oldSerialNumber: z.string().optional(),
-  newSerialNumber: z.string().optional(),
+  oldSerialNumber: z.preprocess(
+    (val) => {
+      if (val === undefined || val === null) return undefined;
+      const s = String(val).trim();
+      if (!s) return undefined;
+      return s.toUpperCase();
+    },
+    z
+      .string()
+      .regex(/^[0-9A-Z-]+$/, "Serial Number อนุญาตเฉพาะ 0–9, A–Z และ '-' เท่านั้น")
+      .optional(),
+  ),
+  newSerialNumber: z.preprocess(
+    (val) => {
+      if (val === undefined || val === null) return undefined;
+      const s = String(val).trim();
+      if (!s) return undefined;
+      return s.toUpperCase();
+    },
+    z
+      .string()
+      .regex(/^[0-9A-Z-]+$/, "Serial Number อนุญาตเฉพาะ 0–9, A–Z และ '-' เท่านั้น")
+      .optional(),
+  ),
 });
 
 export type UpdateFixInfoDto = z.infer<typeof UpdateFixInfoSchema>;
