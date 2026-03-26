@@ -7,12 +7,29 @@ type BackendLoginResponse = {
     user: { id: number; name: string; username: string; role: string; image?: string; email?: string };
 };
 
+type MeResponse = {
+    id: number;
+    name?: string | null;
+    username: string;
+    role: string;
+    image?: string | null;
+    isLocked?: boolean;
+};
+
 function unwrapApiData<T>(root: unknown): T | null {
     if (!root) return null;
     if (typeof root === 'object' && root !== null && 'data' in (root as Record<string, unknown>)) {
         return ((root as { data?: unknown }).data as T) ?? null;
     }
     return root as T;
+}
+
+function getErrorMessageFromBody(raw: unknown): string | undefined {
+    if (!raw || typeof raw !== 'object') return undefined;
+    const r = raw as { error?: { message?: string }; message?: string };
+    if (typeof r.error?.message === 'string') return r.error.message;
+    if (typeof r.message === 'string') return r.message;
+    return undefined;
 }
 
 export const authOptions: NextAuthOptions = {
@@ -22,18 +39,49 @@ export const authOptions: NextAuthOptions = {
             credentials: {
                 email: { label: 'อีเมล', type: 'text' },
                 password: { label: 'รหัสผ่าน', type: 'password' },
+                accessToken: { label: 'token', type: 'text' },
             },
             async authorize(credentials) {
+                const accessToken = credentials?.accessToken?.trim();
+                const apiBase = getServerApiBaseUrl();
+
+                if (accessToken) {
+                    try {
+                        const meRes = await fetch(`${apiBase}/users/me`, {
+                            headers: { Authorization: `Bearer ${accessToken}` },
+                        });
+                        const meRaw: unknown = await meRes.json().catch(() => null);
+                        const me = unwrapApiData<MeResponse>(meRaw);
+                        if (!meRes.ok || !me) {
+                            return null;
+                        }
+                        if (me.isLocked) {
+                            return null;
+                        }
+                        const identifier = credentials?.email?.trim() || me.username;
+                        return {
+                            id: String(me.id),
+                            name: me.name || identifier,
+                            token: accessToken,
+                            accessToken,
+                            role: (me.role || 'STAFF').toUpperCase(),
+                            username: me.username || identifier,
+                            image: me.image ?? undefined,
+                        };
+                    } catch (error) {
+                        console.error('Session from token error', error);
+                    }
+                    return null;
+                }
+
                 const identifier = credentials?.email?.trim();
                 if (!identifier || !credentials?.password) return null;
 
                 try {
-                    const apiBase = getServerApiBaseUrl();
                     const res = await fetch(`${apiBase}/auth/login`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            // backend รองรับ identifier ผ่าน email หรือ username
                             email: identifier,
                             password: credentials.password,
                         }),
@@ -41,7 +89,6 @@ export const authOptions: NextAuthOptions = {
 
                     const raw: unknown = await res.json().catch(() => null);
                     const payload = unwrapApiData<BackendLoginResponse>(raw);
-                    // Debug: ช่วยตรวจว่ามี token จาก backend กลับมาถูกต้องหรือไม่
                     const rawWrapped =
                         !!raw &&
                         typeof raw === 'object' &&
@@ -56,15 +103,19 @@ export const authOptions: NextAuthOptions = {
                         role: payload?.user?.role,
                     });
 
+                    if (res.status === 403) {
+                        const msg = getErrorMessageFromBody(raw);
+                        throw new Error(msg || 'บัญชีถูกระงับการเข้าสู่ระบบ');
+                    }
+
                     if (res.ok && payload?.access_token) {
                         const u = payload.user || ({} as BackendLoginResponse['user']);
-                        const accessToken = payload.access_token;
-                        // ดึง image เพิ่มเติมเพื่อให้ header แสดงรูปได้ (ถ้ามี)
+                        const token = payload.access_token;
                         let image: string | undefined;
                         try {
                             const meRes = await fetch(`${apiBase}/users/me`, {
                                 headers: {
-                                    Authorization: `Bearer ${accessToken}`,
+                                    Authorization: `Bearer ${token}`,
                                 },
                             });
                             const meRaw: unknown = await meRes.json().catch(() => null);
@@ -77,23 +128,17 @@ export const authOptions: NextAuthOptions = {
                         return {
                             id: String(u.id ?? ''),
                             name: u.name || identifier,
-                            // รองรับหลายชื่อ property เพื่อกัน mismatch ใน callback
-                            token: accessToken,
-                            accessToken,
+                            token,
+                            accessToken: token,
                             role: u.role || 'STAFF',
                             username: u.username || identifier,
                             image,
-                        } as {
-                            id: string;
-                            name: string;
-                            token: string;
-                            accessToken: string;
-                            role: string;
-                            username: string;
-                            image?: string;
                         };
                     }
                 } catch (error) {
+                    if (error instanceof Error) {
+                        throw error;
+                    }
                     console.error('Login error', error);
                 }
                 return null;
@@ -113,7 +158,6 @@ export const authOptions: NextAuthOptions = {
                 const uName = (user as { name?: string | null }).name;
                 if (uName != null) token.name = uName;
             }
-            // `update()` จาก client — อัปเดตรูป/ชื่อใน JWT โดยไม่ต้อง login ใหม่
             if (trigger === 'update' && session) {
                 const s = session as { user?: { name?: string | null; image?: string | null } };
                 if (s.user?.name != null) token.name = s.user.name;

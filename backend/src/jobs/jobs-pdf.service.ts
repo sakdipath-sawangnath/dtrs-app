@@ -7,7 +7,7 @@ import {
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import puppeteer from 'puppeteer';
-import { JobsService } from './jobs.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * ค้นหา Chrome / Edge ที่ติดตั้งในเครื่อง — แก้กรณี Puppeteer ยังไม่ได้รัน
@@ -116,14 +116,17 @@ function findEdgeExecutable(): string | undefined {
  */
 @Injectable()
 export class JobsPdfService {
-  constructor(private readonly jobsService: JobsService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async generateReportPdf(jobId: number, jwt: string): Promise<Buffer> {
     if (!jwt?.trim()) {
       throw new BadRequestException('ต้องมี Authorization Bearer');
     }
 
-    const job = await this.jobsService.findOne(jobId);
+    const job = await this.prisma.job.findUnique({
+      where: { id: jobId },
+      select: { id: true, status: true },
+    });
     if (!job) {
       throw new NotFoundException(`ไม่พบงาน ${jobId}`);
     }

@@ -5,6 +5,23 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, AlertCircle, LoaderCircle } from "lucide-react";
 import PublicLayoutShell from "@/components/PublicLayoutShell";
+import { getClientApiBaseUrl } from "@/lib/clientApiBase";
+
+function unwrapApiData<T>(root: unknown): T | null {
+  if (!root) return null;
+  if (typeof root === "object" && root !== null && "data" in (root as Record<string, unknown>)) {
+    return ((root as { data?: unknown }).data as T) ?? null;
+  }
+  return root as T;
+}
+
+function getApiErrorMessageFromBody(raw: unknown): string | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as { error?: { message?: string }; message?: string };
+  if (typeof r.error?.message === "string") return r.error.message;
+  if (typeof r.message === "string") return r.message;
+  return undefined;
+}
 
 /** Dark Glass — สอดคล้อง AGENTS.md */
 const GLASS_CARD =
@@ -24,14 +41,39 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    const identifier = email.trim();
     try {
+      const apiBase = getClientApiBaseUrl();
+      const loginRes = await fetch(`${apiBase}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: identifier, password }),
+      });
+      const raw: unknown = await loginRes.json().catch(() => null);
+
+      if (loginRes.status === 403) {
+        setError(
+          getApiErrorMessageFromBody(raw) ||
+            "บัญชีถูกระงับการเข้าสู่ระบบ กรุณาติดต่อผู้ดูแลระบบ",
+        );
+        setLoading(false);
+        return;
+      }
+
+      const payload = unwrapApiData<{ access_token?: string }>(raw);
+      if (!loginRes.ok || !payload?.access_token) {
+        setError("อีเมลหรือรหัสผ่านไม่ถูกต้อง");
+        setLoading(false);
+        return;
+      }
+
       const res = await signIn("credentials", {
-        email: email.trim(),
-        password,
+        email: identifier,
+        accessToken: payload.access_token,
         redirect: false,
       });
       if (res?.error) {
-        setError("อีเมลหรือรหัสผ่านไม่ถูกต้อง");
+        setError("เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่");
         setLoading(false);
         return;
       }

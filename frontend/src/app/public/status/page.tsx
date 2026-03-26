@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import axios from 'axios';
-import { Search, MapPin, Calendar, FileText, User, Phone, Mail, Image as ImageIcon, AlertTriangle } from 'lucide-react';
+import { Search, MapPin, Calendar, FileText, User, Phone, Mail, Image as ImageIcon, AlertTriangle, Info } from 'lucide-react';
 import DashboardLayoutShell from '@/components/DashboardLayoutShell';
 import PublicLayoutShell from '@/components/PublicLayoutShell';
 import Link from 'next/link';
@@ -59,6 +59,20 @@ function formatReportDateTime(iso: string | null): string {
   } catch {
     return '–';
   }
+}
+
+/**
+ * มาสก์ข้อความให้แสดงเฉพาะ "ตัวแรก" และ "ตัวท้าย" 1 ตัว
+ * - ส่วนที่เหลือแทนด้วย `*`
+ */
+function maskFirstAndLastChar(input: string): string {
+  const s = (input ?? '').trim();
+  if (!s) return '–';
+  const chars = [...s];
+  if (chars.length <= 2) return s;
+  const first = chars[0];
+  const last = chars[chars.length - 1];
+  return `${first}${'*'.repeat(chars.length - 2)}${last}`;
 }
 
 /** รูปโปรไฟล์ผู้แจ้ง (เจ้าหน้าที่ที่ล็อกอิน) — Dark Glass + fallback */
@@ -318,6 +332,38 @@ function StatusPageInner() {
             </form>
           </section>
 
+          {/* Info card (public): ข้อมูลส่วนตัว/รูปถูกมาสก์ */}
+          {!session && (
+            <section
+              role="note"
+              aria-label="คำแนะนำการดูข้อมูลแบบสาธารณะ"
+              className="rounded-2xl border border-sky-500/25 bg-sky-950/35 backdrop-blur-md px-4 py-3 shadow-lg shadow-sky-950/30 ring-1 ring-sky-400/10"
+            >
+              <div className="flex gap-3 sm:gap-4 items-start">
+                <Info
+                  size={18}
+                  className="text-sky-300 shrink-0 mt-0.5"
+                  aria-hidden
+                />
+                <div className="min-w-0 space-y-1 text-[13px] sm:text-sm leading-relaxed">
+                  <p className="text-slate-200/95">
+                    ในโหมดสาธารณะ ข้อมูลส่วนตัวและรูปภาพจะแสดงแบบมาสก์
+                  </p>
+                  <p className="text-slate-400">
+                    เข้าสู่ระบบเพื่อดูข้อมูลจริง
+                    {" "}
+                    <Link
+                      href="/login"
+                      className="font-semibold text-sky-200 underline decoration-sky-400/60 underline-offset-2 hover:text-white hover:decoration-sky-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400/80"
+                    >
+                      ที่นี่
+                    </Link>
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
+
           {/* ผลลัพธ์ */}
           {notFound && !loading && (
             <section className={`${cardOuterClass} text-center py-8`}>
@@ -429,7 +475,12 @@ function StatusPageInner() {
                     <div className="flex items-start gap-2 min-w-0">
                       <MapPin size={18} className="text-slate-400 shrink-0 mt-0.5" aria-hidden />
                       <span className="text-sm text-slate-200 leading-relaxed wrap-break-word">
-                        {[result.province, result.district, result.location].filter(Boolean).join(' • ')}
+                        {(() => {
+                          const placeText = [result.province, result.district, result.location]
+                            .filter(Boolean)
+                            .join(' • ');
+                          return isPublicMasked ? maskFirstAndLastChar(placeText) : placeText;
+                        })()}
                       </span>
                     </div>
                   </div>

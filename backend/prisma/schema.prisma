@@ -62,6 +62,7 @@ model User {
   phone        String?
   position     String? // ตำแหน่ง
   image        String? // รูปภาพ
+  isLocked     Boolean  @default(false) // ล็อกการเข้าสู่ระบบ (ADMIN ตั้งได้)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   jobs         Job[]    @relation("AssignedJobs")
@@ -76,6 +77,27 @@ model Area {
   staff     User     @relation(fields: [staffId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Province master (paired with District)
+model Province {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  districts District[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+// District belongs to one Province
+model District {
+  id         Int      @id @default(autoincrement())
+  name       String
+  provinceId Int
+  province   Province @relation(fields: [provinceId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([provinceId, name])
 }
 
 model Site {

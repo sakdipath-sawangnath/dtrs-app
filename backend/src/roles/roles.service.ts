@@ -1,12 +1,149 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+/** แคตตาล็อก Permission — ต้องสอดคล้องกับ `scripts/seed-roles-permissions.ts` */
+const RBAC_MENU_PERMISSIONS = [
+  { code: 'menu.profile', name: 'โปรไฟล์', category: 'menu' },
+  { code: 'menu.report', name: 'แจ้งปัญหา', category: 'menu' },
+  { code: 'menu.status', name: 'ตรวจสอบสถานะ', category: 'menu' },
+  { code: 'menu.dashboard', name: 'ภาพรวม', category: 'menu' },
+  { code: 'menu.pending', name: 'รอดำเนินการ', category: 'menu' },
+  { code: 'menu.myJobs', name: 'งานที่รับผิดชอบ', category: 'menu' },
+  { code: 'menu.inProgress', name: 'กำลังแก้ไข', category: 'menu' },
+  { code: 'menu.all', name: 'ประวัติทั้งหมด', category: 'menu' },
+  { code: 'menu.outOfContract', name: 'นอกสัญญา', category: 'menu' },
+  { code: 'menu.sites', name: 'จัดการ Site', category: 'menu' },
+  { code: 'menu.users', name: 'จัดการผู้ใช้', category: 'menu' },
+  { code: 'menu.settings', name: 'ตั้งค่าระบบ', category: 'menu' },
+  { code: 'menu.roles', name: 'จัดการบทบาทและสิทธิ์', category: 'menu' },
+] as const;
+
+const RBAC_ACTION_PERMISSIONS = [
+  { code: 'job.assign', name: 'มอบหมายงาน', category: 'job' },
+  { code: 'job.deleteUnassigned', name: 'ลบงานที่ยังไม่มีผู้รับผิดชอบ', category: 'job' },
+  { code: 'site.create', name: 'เพิ่ม Site', category: 'site' },
+  { code: 'site.update', name: 'แก้ไข Site', category: 'site' },
+  { code: 'site.delete', name: 'ลบ Site', category: 'site' },
+] as const;
+
+const RBAC_ALL_PERMISSIONS = [...RBAC_MENU_PERMISSIONS, ...RBAC_ACTION_PERMISSIONS];
+
+const RBAC_DEFAULT_ROLES = [
+  { code: 'ADMIN', name: 'ผู้ดูแลระบบ', description: 'เข้าถึงทุกเมนู รวมจัดการผู้ใช้และตั้งค่าระบบ' },
+  { code: 'STAFF', name: 'ช่างเทคนิค', description: 'ภาพรวม, รอดำเนินการ, กำลังแก้ไข, ประวัติ, นอกสัญญา' },
+  { code: 'USER', name: 'ผู้แจ้งซ่อม', description: 'เฉพาะ โปรไฟล์, แจ้งปัญหา, ตรวจสอบสถานะ' },
+  { code: 'SUPERVISOR', name: 'หัวหน้างาน', description: 'เทียบเท่าเจ้าหน้าที่ แต่สามารถมอบหมายงานให้เจ้าหน้าที่ได้' },
+] as const;
+
+const RBAC_STAFF_MENU_CODES = RBAC_MENU_PERMISSIONS.map((p) => p.code).filter(
+  (c) => !['menu.users', 'menu.settings', 'menu.roles', 'menu.sites'].includes(c),
+);
+
+const RBAC_ROLE_PERMISSION_CODES: Record<string, string[]> = {
+  ADMIN: [
+    ...RBAC_MENU_PERMISSIONS.map((p) => p.code),
+    ...RBAC_ACTION_PERMISSIONS.map((p) => p.code),
+  ],
+  STAFF: RBAC_STAFF_MENU_CODES,
+  USER: ['menu.profile', 'menu.report', 'menu.status'],
+  SUPERVISOR: [
+    ...RBAC_STAFF_MENU_CODES,
+    'menu.sites',
+    ...RBAC_ACTION_PERMISSIONS.map((p) => p.code),
+  ],
+};
+
 @Injectable()
-export class RolesService {
+export class RolesService implements OnModuleInit {
   constructor(private prisma: PrismaService) {}
 
   // กันปัญหา seed ซ้อนจาก concurrent requests (เช่น /roles และ /roles/permissions เรียกพร้อมกัน)
   private static rbacSeedInFlight: Promise<void> | null = null;
+  private static permissionCatalogSyncInFlight: Promise<void> | null = null;
+
+  async onModuleInit() {
+    await this.ensurePermissionCatalogSynced();
+  }
+
+  /**
+   * Upsert แถว Permission ให้ครบ (รวม menu.sites, site.*) ทุก environment
+   * ถ้ามี code ใหม่ที่เพิ่งถูกสร้าง — ผูกให้บทบาทมาตรฐานเท่าที่ seed กำหนด (createMany skipDuplicates)
+   * ไม่ลบหรือคืนสิทธิ์ที่ถอดจาก role เดิม
+   */
+  private async ensurePermissionCatalogSynced(): Promise<void> {
+    if (RolesService.permissionCatalogSyncInFlight) {
+      await RolesService.permissionCatalogSyncInFlight;
+      return;
+    }
+
+    RolesService.permissionCatalogSyncInFlight = (async () => {
+      const existingBefore = await this.prisma.permission.findMany({
+        select: { code: true },
+      });
+      const beforeCodes = new Set(existingBefore.map((p) => p.code));
+
+      for (const p of RBAC_ALL_PERMISSIONS) {
+        try {
+          await this.prisma.permission.upsert({
+            where: { code: p.code },
+            create: { code: p.code, name: p.name, category: p.category },
+            update: { name: p.name, category: p.category },
+          });
+        } catch (err: unknown) {
+          const code = (err as { code?: string })?.code;
+          if (code === 'P2002') continue;
+          throw err;
+        }
+      }
+
+      const newCodes = RBAC_ALL_PERMISSIONS.map((x) => x.code).filter(
+        (c) => !beforeCodes.has(c),
+      );
+      if (newCodes.length === 0) return;
+
+      const newCodeSet = new Set<string>(newCodes);
+      const allPerms = await this.prisma.permission.findMany({
+        select: { id: true, code: true },
+      });
+      const idByCode = Object.fromEntries(allPerms.map((p) => [p.code, p.id]));
+
+      const builtIn = await this.prisma.appRole.findMany({
+        where: { code: { in: ['ADMIN', 'STAFF', 'USER', 'SUPERVISOR'] } },
+        select: { id: true, code: true },
+      });
+
+      for (const r of builtIn) {
+        const allowed = RBAC_ROLE_PERMISSION_CODES[r.code];
+        if (!allowed) continue;
+        const toLink = allowed.filter((c) => newCodeSet.has(c));
+        const rows = toLink
+          .map((code) => {
+            const permissionId = idByCode[code];
+            return permissionId != null
+              ? { roleId: r.id, permissionId }
+              : null;
+          })
+          .filter((x): x is { roleId: number; permissionId: number } => x != null);
+        if (rows.length > 0) {
+          await this.prisma.rolePermission.createMany({
+            data: rows,
+            skipDuplicates: true,
+          });
+        }
+      }
+    })();
+
+    try {
+      await RolesService.permissionCatalogSyncInFlight;
+    } finally {
+      RolesService.permissionCatalogSyncInFlight = null;
+    }
+  }
 
   /**
    * กันปัญหา seeddata หาย/ยังไม่ถูกสร้าง
@@ -14,7 +151,7 @@ export class RolesService {
    * - ทำเฉพาะ dev (ไม่กระทบ prod)
    */
   private async ensureRbacSeedIfEmpty(): Promise<void> {
-    if (process.env.NODE_ENV === "production") return;
+    if (process.env.NODE_ENV === 'production') return;
 
     if (RolesService.rbacSeedInFlight) {
       await RolesService.rbacSeedInFlight;
@@ -22,106 +159,61 @@ export class RolesService {
     }
 
     RolesService.rbacSeedInFlight = (async () => {
-    const existingRoles = await this.prisma.appRole.count();
-    if (existingRoles > 0) return;
+      const existingRoles = await this.prisma.appRole.count();
+      if (existingRoles > 0) return;
 
-    const MENU_PERMISSIONS = [
-      { code: "menu.profile", name: "โปรไฟล์", category: "menu" },
-      { code: "menu.report", name: "แจ้งปัญหา", category: "menu" },
-      { code: "menu.status", name: "ตรวจสอบสถานะ", category: "menu" },
-      { code: "menu.dashboard", name: "ภาพรวม", category: "menu" },
-      { code: "menu.pending", name: "รอดำเนินการ", category: "menu" },
-      { code: "menu.myJobs", name: "งานที่รับผิดชอบ", category: "menu" },
-      { code: "menu.inProgress", name: "กำลังแก้ไข", category: "menu" },
-      { code: "menu.all", name: "ประวัติทั้งหมด", category: "menu" },
-      { code: "menu.outOfContract", name: "นอกสัญญา", category: "menu" },
-      { code: "menu.users", name: "จัดการผู้ใช้", category: "menu" },
-      { code: "menu.settings", name: "ตั้งค่าระบบ", category: "menu" },
-      { code: "menu.roles", name: "จัดการบทบาทและสิทธิ์", category: "menu" },
-    ] as const;
+      for (const p of RBAC_ALL_PERMISSIONS) {
+        try {
+          await this.prisma.permission.upsert({
+            where: { code: p.code },
+            create: { code: p.code, name: p.name, category: p.category },
+            update: { name: p.name, category: p.category },
+          });
+        } catch (err: unknown) {
+          const code = (err as { code?: string })?.code;
+          if (code === 'P2002') continue;
+          throw err;
+        }
+      }
 
-    const ACTION_PERMISSIONS = [
-      { code: "job.assign", name: "มอบหมายงาน", category: "job" },
-      { code: "job.deleteUnassigned", name: "ลบงานที่ยังไม่มีผู้รับผิดชอบ", category: "job" },
-    ] as const;
+      const permissions = await this.prisma.permission.findMany();
+      const permByCode = Object.fromEntries(permissions.map((p) => [p.code, p.id]));
 
-    const ALL_PERMISSIONS = [...MENU_PERMISSIONS, ...ACTION_PERMISSIONS];
-
-    const DEFAULT_ROLES = [
-      { code: "ADMIN", name: "ผู้ดูแลระบบ", description: "เข้าถึงทุกเมนู รวมจัดการผู้ใช้และตั้งค่าระบบ" },
-      { code: "STAFF", name: "ช่างเทคนิค", description: "ภาพรวม, รอดำเนินการ, กำลังแก้ไข, ประวัติ, นอกสัญญา" },
-      { code: "USER", name: "ผู้แจ้งซ่อม", description: "เฉพาะ โปรไฟล์, แจ้งปัญหา, ตรวจสอบสถานะ" },
-      { code: "SUPERVISOR", name: "หัวหน้างาน", description: "เทียบเท่าเจ้าหน้าที่ แต่สามารถมอบหมายงานให้เจ้าหน้าที่ได้" },
-    ] as const;
-
-    const STAFF_MENUS = MENU_PERMISSIONS.map((p) => p.code).filter(
-      (c) => !["menu.users", "menu.settings", "menu.roles"].includes(c)
-    );
-
-    const ROLE_PERMISSION_CODES: Record<string, string[]> = {
-      ADMIN: [...MENU_PERMISSIONS.map((p) => p.code), ...ACTION_PERMISSIONS.map((p) => p.code)],
-      STAFF: STAFF_MENUS,
-      USER: ["menu.profile", "menu.report", "menu.status"],
-      SUPERVISOR: [...STAFF_MENUS, ...ACTION_PERMISSIONS.map((p) => p.code)],
-    };
-
-    // 1) Upsert permissions
-    // หมายเหตุ: กันกรณี race condition ยังคงเกิด (เช่นภายใต้ transaction/lock ของ DB)
-    for (const p of ALL_PERMISSIONS) {
-      try {
-        await this.prisma.permission.upsert({
-          where: { code: p.code },
-          create: { code: p.code, name: p.name, category: p.category },
-          update: { name: p.name, category: p.category },
+      const roleIds: Record<string, number> = {};
+      for (const r of RBAC_DEFAULT_ROLES) {
+        const role = await this.prisma.appRole.upsert({
+          where: { code: r.code },
+          create: { code: r.code, name: r.name, description: r.description },
+          update: { name: r.name, description: r.description },
         });
-      } catch (err: any) {
-        // P2002 = unique constraint failed
-        if (err?.code === "P2002") continue;
-        throw err;
+        roleIds[r.code] = role.id;
       }
-    }
 
-    const permissions = await this.prisma.permission.findMany();
-    const permByCode = Object.fromEntries(permissions.map((p) => [p.code, p.id]));
-
-    // 2) Upsert roles
-    const roleIds: Record<string, number> = {};
-    for (const r of DEFAULT_ROLES) {
-      const role = await this.prisma.appRole.upsert({
-        where: { code: r.code },
-        create: { code: r.code, name: r.name, description: r.description },
-        update: { name: r.name, description: r.description },
-      });
-      roleIds[r.code] = role.id;
-    }
-
-    // 3) Assign role permissions
-    for (const [roleCode, permCodes] of Object.entries(ROLE_PERMISSION_CODES)) {
-      const roleId = roleIds[roleCode];
-      if (!roleId) continue;
-      const permissionIds = permCodes.map((code) => permByCode[code]).filter(Boolean) as number[];
-      if (permissionIds.length > 0) {
-        await this.prisma.rolePermission.createMany({
-          data: permissionIds.map((permissionId) => ({ roleId, permissionId })),
-          skipDuplicates: true,
-        });
+      for (const [roleCode, permCodes] of Object.entries(RBAC_ROLE_PERMISSION_CODES)) {
+        const roleId = roleIds[roleCode];
+        if (!roleId) continue;
+        const permissionIds = permCodes.map((code) => permByCode[code]).filter(Boolean) as number[];
+        if (permissionIds.length > 0) {
+          await this.prisma.rolePermission.createMany({
+            data: permissionIds.map((permissionId) => ({ roleId, permissionId })),
+            skipDuplicates: true,
+          });
+        }
       }
-    }
 
-    // 4) Sync user.roleId จาก user.role enum
-    const users = await this.prisma.user.findMany({ select: { id: true, role: true } });
-    const enumToRoleId: Record<string, number | undefined> = {
-      ADMIN: roleIds.ADMIN,
-      STAFF: roleIds.STAFF,
-      USER: roleIds.USER,
-      SUPERVISOR: roleIds.SUPERVISOR,
-    };
-    for (const u of users) {
-      const roleId = enumToRoleId[u.role as string];
-      if (roleId != null) {
-        await this.prisma.user.update({ where: { id: u.id }, data: { roleId } });
+      const users = await this.prisma.user.findMany({ select: { id: true, role: true } });
+      const enumToRoleId: Record<string, number | undefined> = {
+        ADMIN: roleIds.ADMIN,
+        STAFF: roleIds.STAFF,
+        USER: roleIds.USER,
+        SUPERVISOR: roleIds.SUPERVISOR,
+      };
+      for (const u of users) {
+        const roleId = enumToRoleId[u.role as string];
+        if (roleId != null) {
+          await this.prisma.user.update({ where: { id: u.id }, data: { roleId } });
+        }
       }
-    }
     })();
 
     try {
@@ -203,6 +295,7 @@ export class RolesService {
   }
 
   async findAllPermissions() {
+    await this.ensurePermissionCatalogSynced();
     await this.ensureRbacSeedIfEmpty();
     return this.prisma.permission.findMany({
       orderBy: [{ category: 'asc' }, { code: 'asc' }],
@@ -211,6 +304,7 @@ export class RolesService {
 
   /** สิทธิ์ของ user ตาม roleId (หรือตาม enum role ถ้าไม่มี roleId) */
   async getPermissionsForUser(userId: number): Promise<string[]> {
+    await this.ensurePermissionCatalogSynced();
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { roleId: true, role: true, roleRef: true },
@@ -221,14 +315,54 @@ export class RolesService {
         where: { roleId: user.roleId },
         include: { permission: true },
       });
+      // สิทธิ์ตามที่กำหนดใน DB เท่านั้น (หน้า /dashboard/roles) — ไม่บังคับเมนูจากโค้ด
       return rolePerms.map((rp) => rp.permission.code);
     }
     // Fallback: ใช้ enum role (ค่าเริ่มต้นก่อน migrate)
     const defaultCodes: Record<string, string[]> = {
-      ADMIN: ['menu.profile', 'menu.report', 'menu.status', 'menu.dashboard', 'menu.pending', 'menu.inProgress', 'menu.all', 'menu.outOfContract', 'menu.users', 'menu.settings', 'menu.roles', 'job.assign', 'job.deleteUnassigned'],
-      STAFF: ['menu.dashboard', 'menu.pending', 'menu.inProgress', 'menu.all', 'menu.outOfContract'],
+      ADMIN: [
+        'menu.profile',
+        'menu.report',
+        'menu.status',
+        'menu.dashboard',
+        'menu.pending',
+        'menu.myJobs',
+        'menu.inProgress',
+        'menu.all',
+        'menu.outOfContract',
+        'menu.users',
+        'menu.settings',
+        'menu.roles',
+        'menu.sites',
+        'job.assign',
+        'job.deleteUnassigned',
+        'site.create',
+        'site.update',
+        'site.delete',
+      ],
+      STAFF: [
+        'menu.dashboard',
+        'menu.pending',
+        'menu.myJobs',
+        'menu.inProgress',
+        'menu.all',
+        'menu.outOfContract',
+      ],
       USER: ['menu.profile', 'menu.report', 'menu.status'],
-      SUPERVISOR: ['menu.dashboard', 'menu.pending', 'menu.inProgress', 'menu.all', 'menu.outOfContract', 'job.assign', 'job.deleteUnassigned'],
+      SUPERVISOR: [
+        'menu.dashboard',
+        'menu.pending',
+        'menu.myJobs',
+        'menu.inProgress',
+        'menu.all',
+        'menu.outOfContract',
+        'menu.sites',
+        'job.assign',
+        'job.deleteUnassigned',
+        'site.create',
+        'site.update',
+        'site.delete',
+      ],
     };
     return defaultCodes[user.role] ?? [];
   }

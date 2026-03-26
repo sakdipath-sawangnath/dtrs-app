@@ -14,6 +14,7 @@ import { SitesModule } from './sites/sites.module';
 import { AreasModule } from './areas/areas.module';
 import { RolesModule } from './roles/roles.module';
 import { SettingsModule } from './settings/settings.module';
+import { LocationsModule } from './locations/locations.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { SettingsModule } from './settings/settings.module';
     EventsModule,
     MinioModule,
     SitesModule,
+    LocationsModule,
     AreasModule,
     RolesModule,
     SettingsModule,

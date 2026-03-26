@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../settings/mail.service';
 import { SettingsService } from '../settings/settings.service';
+import { JobsPdfService } from './jobs-pdf.service';
 import {
   buildAssignedEmailHtml,
   buildClosedEmailHtml,
@@ -23,6 +24,7 @@ export class JobEmailNotificationService {
     private readonly prisma: PrismaService,
     private readonly settingsService: SettingsService,
     private readonly mailService: MailService,
+    private readonly jobsPdfService: JobsPdfService,
   ) {}
 
   /**
@@ -276,7 +278,7 @@ export class JobEmailNotificationService {
     }
   }
 
-  async notifyClosed(jobId: number): Promise<void> {
+  async notifyClosed(jobId: number, jwtForPdf?: string): Promise<void> {
     try {
       const [templates, smtp] = await Promise.all([
         this.settingsService.getEmailTemplates(),
@@ -296,13 +298,14 @@ export class JobEmailNotificationService {
         select: {
           reporterEmail: true,
           reporter: { select: { email: true } },
+          ticketNo: true,
         },
       });
       if (!job) return;
 
       const primary = this.reporterPrimaryEmail(job);
-      const to = this.uniqueEmails([primary], block.toExtra);
-      if (to.length === 0) {
+      const toReporter = this.uniqueEmails([primary], block.toExtra);
+      if (toReporter.length === 0) {
         this.logger.warn(
           `notifyClosed(${jobId}): ข้าม — ไม่มีอีเมลผู้แจ้งและ To เพิ่มเติม`,
         );
@@ -311,8 +314,8 @@ export class JobEmailNotificationService {
       const roleEmails = await this.getEmailsForUserRoles(
         block.notifyRoleIds ?? [],
       );
-      /** CC เฉพาะจากการตั้งค่า (ช่อง CC + บทบาทที่เลือก) — ไม่แทรกผู้รับงานอัตโนมัติ */
-      const cc = this.filterCc([...block.cc, ...roleEmails], to);
+      // ผู้รับ CC ตามตั้งค่า + บทบาท (ต้องแนบ PDF ตาม requirement) — ต้องแยกส่งคนละฉบับ
+      const ccRecipients = this.filterCc([...block.cc, ...roleEmails], toReporter);
 
       const payload = await this.buildPayload(jobId);
       if (!payload) return;
@@ -321,7 +324,50 @@ export class JobEmailNotificationService {
         payload,
         templates.brandingLogoUrl,
       );
-      await this.mailService.sendHtmlMail(smtp, { to, cc, subject, html, text });
+
+      // 1) ผู้รับหลัก: อีเมลผู้แจ้ง (ไม่แนบ PDF)
+      await this.mailService.sendHtmlMail(smtp, {
+        to: toReporter,
+        subject,
+        html,
+        text,
+      });
+
+      // 2) แจ้งเตือนผู้ใช้ในบทบาท/CC: แนบ PDF (รูปแบบเดียวกับเอกสาร /print/jobs/:id)
+      if (ccRecipients.length > 0) {
+        let pdf: Buffer | null = null;
+        try {
+          const jwt = (jwtForPdf ?? '').trim();
+          if (jwt) {
+            pdf = await this.jobsPdfService.generateReportPdf(jobId, jwt);
+          } else {
+            this.logger.warn(
+              `notifyClosed(${jobId}): ไม่สามารถแนบ PDF — ไม่มี JWT สำหรับสร้างเอกสาร`,
+            );
+          }
+        } catch (e) {
+          this.logger.warn(
+            `notifyClosed(${jobId}): สร้าง PDF ไม่สำเร็จ — ${e instanceof Error ? e.message : String(e)}`,
+          );
+          pdf = null;
+        }
+
+        await this.mailService.sendHtmlMail(smtp, {
+          to: ccRecipients,
+          subject,
+          html,
+          text,
+          attachments: pdf
+            ? [
+                {
+                  filename: `CCTV-Job-${job.ticketNo ?? jobId}.pdf`,
+                  content: pdf,
+                  contentType: 'application/pdf',
+                },
+              ]
+            : undefined,
+        });
+      }
     } catch (e) {
       this.logger.warn(
         `notifyClosed(${jobId}): ${e instanceof Error ? e.message : String(e)}`,

@@ -77,6 +77,11 @@ export class MailService {
       subject: string;
       html: string;
       text?: string;
+      attachments?: Array<{
+        filename: string;
+        content: Buffer;
+        contentType?: string;
+      }>;
     },
   ): Promise<void> {
     const to = options.to.map((e) => e.trim()).filter(Boolean);
@@ -122,6 +127,14 @@ export class MailService {
         subject: options.subject,
         html: options.html,
         text: options.text ?? options.subject,
+        attachments:
+          options.attachments && options.attachments.length > 0
+            ? options.attachments.map((a) => ({
+                filename: a.filename,
+                content: a.content,
+                contentType: a.contentType,
+              }))
+            : undefined,
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

@@ -109,9 +109,13 @@ export class UsersController {
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles('ADMIN')
     @Patch(':id')
-    async update(@Param('id') id: string, @Body() body: { name?: string; email?: string; phone?: string; position?: string; role?: string }) {
+    async update(
+        @Req() req: { user: { id: number } },
+        @Param('id') id: string,
+        @Body() body: { name?: string; email?: string; phone?: string; position?: string; role?: string; isLocked?: boolean },
+    ) {
         const roleUpdate = body.role != null ? { role: body.role as any } : undefined;
-        return this.usersService.update(+id, { ...body, ...roleUpdate } as any);
+        return this.usersService.update(+id, { ...body, ...roleUpdate } as any, req.user.id);
     }
 
     /** อัปโหลดรูปโปรไฟล์ผู้ใช้ (ADMIN เท่านั้น) */

@@ -277,7 +277,7 @@ export class JobsService {
         };
     }
 
-    async updateStatus(id: number, status: any) {
+    async updateStatus(id: number, status: any, jwtForEmailPdf?: string) {
         const prev = await this.prisma.job.findUnique({
             where: { id },
             select: { status: true },
@@ -289,7 +289,7 @@ export class JobsService {
         const nextSt = String(status ?? '').toUpperCase();
         const wasResolved = prev?.status === JobStatus.RESOLVED;
         if (nextSt === 'RESOLVED' && !wasResolved) {
-            void this.jobEmailNotifications.notifyClosed(updated.id);
+            void this.jobEmailNotifications.notifyClosed(updated.id, jwtForEmailPdf);
         }
         return updated;
     }
@@ -375,6 +375,7 @@ export class JobsService {
             newSerialNumber?: string | null;
             fixImagesUrls?: string[];
         },
+        jwtForEmailPdf?: string,
     ) {
         const current = await this.prisma.job.findUnique({
             where: { id },
@@ -423,7 +424,7 @@ export class JobsService {
             where: { id },
             data,
         });
-        void this.jobEmailNotifications.notifyClosed(closed.id);
+        void this.jobEmailNotifications.notifyClosed(closed.id, jwtForEmailPdf);
         return closed;
     }
 

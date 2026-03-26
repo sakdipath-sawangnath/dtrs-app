@@ -14,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="th" className={sarabun.variable}>
+    <html lang="th" className={sarabun.variable} data-scroll-behavior="smooth">
       <body className={sarabun.className}>
         <Providers>
           {children}

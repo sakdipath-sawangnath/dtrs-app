@@ -19,6 +19,7 @@ const MENU_PERMISSIONS = [
   { code: 'menu.inProgress', name: 'กำลังแก้ไข', category: 'menu' },
   { code: 'menu.all', name: 'ประวัติทั้งหมด', category: 'menu' },
   { code: 'menu.outOfContract', name: 'นอกสัญญา', category: 'menu' },
+  { code: 'menu.sites', name: 'จัดการ Site', category: 'menu' },
   { code: 'menu.users', name: 'จัดการผู้ใช้', category: 'menu' },
   { code: 'menu.settings', name: 'ตั้งค่าระบบ', category: 'menu' },
   { code: 'menu.roles', name: 'จัดการบทบาทและสิทธิ์', category: 'menu' },
@@ -27,6 +28,9 @@ const MENU_PERMISSIONS = [
 const ACTION_PERMISSIONS = [
   { code: 'job.assign', name: 'มอบหมายงาน', category: 'job' },
   { code: 'job.deleteUnassigned', name: 'ลบงานที่ยังไม่มีผู้รับผิดชอบ', category: 'job' },
+  { code: 'site.create', name: 'เพิ่ม Site', category: 'site' },
+  { code: 'site.update', name: 'แก้ไข Site', category: 'site' },
+  { code: 'site.delete', name: 'ลบ Site', category: 'site' },
 ] as const;
 
 const ALL_PERMISSIONS = [...MENU_PERMISSIONS, ...ACTION_PERMISSIONS];
@@ -38,14 +42,16 @@ const DEFAULT_ROLES = [
   { code: 'SUPERVISOR', name: 'หัวหน้างาน', description: 'เทียบเท่าเจ้าหน้าที่ แต่สามารถมอบหมายงานให้เจ้าหน้าที่ได้' },
 ] as const;
 
-const STAFF_MENUS = MENU_PERMISSIONS.map((p) => p.code).filter((c) => !['menu.users', 'menu.settings', 'menu.roles'].includes(c));
+const STAFF_MENUS = MENU_PERMISSIONS.map((p) => p.code).filter((c) =>
+  !['menu.users', 'menu.settings', 'menu.roles', 'menu.sites'].includes(c),
+);
 
 // ADMIN ได้ทุก permission, STAFF ได้แค่เมนู, USER ได้แค่ profile/report/status, SUPERVISOR = STAFF + job.assign (+ อื่นๆของกลุ่ม job)
 const ROLE_PERMISSION_CODES: Record<string, string[]> = {
   ADMIN: [...MENU_PERMISSIONS.map((p) => p.code), ...ACTION_PERMISSIONS.map((p) => p.code)],
   STAFF: STAFF_MENUS,
   USER: ['menu.profile', 'menu.report', 'menu.status'],
-  SUPERVISOR: [...STAFF_MENUS, ...ACTION_PERMISSIONS.map((p) => p.code)],
+  SUPERVISOR: [...STAFF_MENUS, 'menu.sites', ...ACTION_PERMISSIONS.map((p) => p.code)],
 };
 
 async function main() {

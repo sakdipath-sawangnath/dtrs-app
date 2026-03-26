@@ -148,10 +148,15 @@ export class JobsController {
     @UseGuards(JwtAuthGuard)
     @Patch(':id/status')
     async updateStatus(
+        @Req() req: { headers: { authorization?: string } },
         @Param('id') id: string,
         @Body(new ZodValidationPipe(UpdateJobStatusSchema)) body: { status: any },
     ) {
-        const updated = await this.jobsService.updateStatus(+id, body.status);
+        const raw = req.headers.authorization ?? '';
+        const jwt = typeof raw === 'string' && raw.startsWith('Bearer ')
+            ? raw.slice(7).trim()
+            : '';
+        const updated = await this.jobsService.updateStatus(+id, body.status, jwt);
         this.eventsGateway.notifyJobUpdate(updated);
         return updated;
     }
@@ -177,7 +182,7 @@ export class JobsController {
     @Patch(':id/fix')
     @UseInterceptors(FilesInterceptor('fixImages'))
     async updateFixInfo(
-        @Req() req: ReqUser,
+        @Req() req: ReqUser & { headers?: { authorization?: string } },
         @Param('id') id: string,
         @Body(new ZodValidationPipe(UpdateFixInfoSchema)) body: any,
         @UploadedFiles() files: Array<Express.Multer.File>,
@@ -203,6 +208,11 @@ export class JobsController {
             }
         }
 
+        const raw = req.headers?.authorization ?? '';
+        const jwt =
+            typeof raw === 'string' && raw.startsWith('Bearer ')
+                ? raw.slice(7).trim()
+                : '';
         const updated = await this.jobsService.updateFixInfo(+id, {
             brokenPartType: body.brokenPartType ?? null,
             fixEnvironment: body.fixEnvironment,
@@ -212,7 +222,7 @@ export class JobsController {
             oldSerialNumber: body.oldSerialNumber ?? null,
             newSerialNumber: body.newSerialNumber ?? null,
             fixImagesUrls: uploadedUrls,
-        });
+        }, jwt);
         this.eventsGateway.notifyJobUpdate(updated);
         return updated;
     }

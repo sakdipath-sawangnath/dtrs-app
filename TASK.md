@@ -63,7 +63,7 @@
   - เพิ่มปุ่ม "ย้ายนอกสัญญา" ให้ Role `ADMIN/SUPERVISOR/STAFF` บนหน้ารอดำเนินการ เพื่อย้ายงาน `pending → out-of-contract` โดย “คงสถานะเป็น PENDING”
   - Backend มี endpoint `PATCH /jobs/:id/out-of-contract` เพื่อย้ายนอกสัญญา
 - [x] Sidebar: เพิ่ม "งานที่รับผิดชอบ" (`/dashboard/my-jobs`); ไม่แสดงเมนู โปรไฟล์ (เข้าได้จาก dropdown)
-- [x] หน้ารายละเอียดงาน (`/dashboard/jobs/:id`): การ์ดแจ้งข้อขัดข้อง + การ์ดข้อมูลการแก้ไข + ฟอร์มบันทึกการแก้ไข (ส่วนขัดข้อง, สาเหตุ, วิธีแก้ไข, รูป 3 รูป, หมายเหตุ, Serial); PATCH /jobs/:id/fix; พิมพ์/PDF — หน้า `/print/jobs/:id` + เทมเพลต (อัปเดต: ไม่ใช้ html2canvas บนหน้ารายละเอียด; มี `GET /jobs/:id/report-pdf` สำหรับไฟล์ PDF)
+- [x] หน้ารายละเอียดงาน (`/dashboard/jobs/:id`): การ์ดแจ้งข้อขัดข้อง + การ์ดข้อมูลการแก้ไข + ฟอร์มบันทึกการแก้ไข (ลำดับ: fixEnvironment (Indoor/Outdoor) ก่อน แล้วค่อย brokenPartType (Hardware/Software); ฟิลด์บังคับ: cause, fixMethod และรูปการแก้ไข “อย่างน้อย 2 รูปแรก”; หมายเหตุ/Serial ไม่บังคับ); PATCH /jobs/:id/fix; พิมพ์/PDF — หน้า `/print/jobs/:id` + เทมเพลต (อัปเดต: ไม่ใช้ html2canvas บนหน้ารายละเอียด; มี `GET /jobs/:id/report-pdf` สำหรับไฟล์ PDF)
 
 ## 8. Phase 4 - MinIO Integration (2026-03-11)
 - [x] ติดตั้ง NestJS MinIO SDK และระบบอัปโหลดรูปภาพ
@@ -120,7 +120,7 @@
 
 ### Frontend
 - [x] **`SegmentedTabs`** — รองรับ `badgeCount`; แท็บสัญญา/นอกสัญญาแสดงจำนวนงานค้าง; ปรับ layout กล่องให้พอดี
-- [x] **`JobsList`** — modal อัปเดตข้อมูลการแก้ไข = Dark Glass; **ADMIN** ที่หน้ากำลังแก้ไขเห็นปุ่มลบงาน IN_PROGRESS
+- [x] **`JobsList`** — modal อัปเดตข้อมูลการแก้ไข = Dark Glass (แสดงกลางจอผ่าน portal เพื่อลดปัญหา header ทับ); **ADMIN** ที่หน้ากำลังแก้ไขเห็นปุ่มลบงาน IN_PROGRESS
 - [x] **`/dashboard/users`** — คลิกรูปโปรไฟล์เปิด modal ดูรูปใหญ่
 
 ### เอกสาร

@@ -15,6 +15,7 @@ import {
   Eye,
   EyeOff,
   KeyRound,
+  Lock,
 } from "lucide-react";
 import DashboardPageShell from "@/components/DashboardPageShell";
 import DashboardFilterBar from "@/components/DashboardFilterBar";
@@ -31,6 +32,7 @@ interface UserRow {
   phone: string | null;
   position: string | null;
   image?: string | null;
+  isLocked?: boolean;
 }
 
 type AxiosErrorLike = {
@@ -140,6 +142,7 @@ const emptyForm = () => ({
   position: "",
   role: "USER",
   image: "",
+  isLocked: false,
 });
 
 function normalizeEmail(v: string) {
@@ -172,6 +175,7 @@ export default function UsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
+  const [lockFilter, setLockFilter] = useState<"" | "locked" | "unlocked">("");
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -185,6 +189,7 @@ export default function UsersPage() {
   const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
   const token = (session as { accessToken?: string })?.accessToken;
   const userRole = (session?.user as { role?: string })?.role ?? "STAFF";
+  const sessionUserId = Number((session?.user as { id?: string })?.id);
   const isAdmin = userRole === "ADMIN";
   const [roles, setRoles] = useState<Array<{ id: number; code: string; name: string }>>([]);
   const [rolesLoading, setRolesLoading] = useState(false);
@@ -294,8 +299,10 @@ export default function UsersPage() {
       );
     }
     if (roleFilter) data = data.filter((u) => u.role === roleFilter);
+    if (lockFilter === "locked") data = data.filter((u) => u.isLocked === true);
+    if (lockFilter === "unlocked") data = data.filter((u) => !u.isLocked);
     return data;
-  }, [list, search, roleFilter]);
+  }, [list, search, roleFilter, lockFilter]);
 
   const paginatedList = useMemo(() => {
     if (pageSize === "all") return filteredList;
@@ -310,7 +317,7 @@ export default function UsersPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [roleFilter, search, pageSize]);
+  }, [roleFilter, lockFilter, search, pageSize]);
 
   /** จำนวนผู้ใช้ role ADMIN ในระบบ (จากรายการเต็ม ไม่ใช่หลัง filter) */
   const adminUserCount = useMemo(
@@ -320,6 +327,15 @@ export default function UsersPage() {
 
   /** เป็นผู้ดูแลระบบคนสุดท้าย — ห้ามลบ */
   const isSoleAdmin = (u: UserRow) => u.role === "ADMIN" && adminUserCount === 1;
+
+  const isEditingSelf = useMemo(
+    () =>
+      modalMode === "edit" &&
+      editingId != null &&
+      Number.isFinite(sessionUserId) &&
+      sessionUserId === editingId,
+    [modalMode, editingId, sessionUserId],
+  );
 
   const openCreate = () => {
     setForm(emptyForm());
@@ -342,6 +358,7 @@ export default function UsersPage() {
       position: u.position ?? "",
       role: u.role,
       image: u.image ?? "",
+      isLocked: u.isLocked === true,
     });
     setModalMode("edit");
     setModalTab("account");
@@ -422,6 +439,7 @@ export default function UsersPage() {
             phone: form.phone.trim() || undefined,
             position: form.position.trim() || undefined,
             role: form.role,
+            isLocked: form.isLocked,
           },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -610,6 +628,16 @@ export default function UsersPage() {
             ))}
           </select>
           <select
+            className="select-native-glass w-full sm:w-44 md:min-w-[160px]"
+            value={lockFilter}
+            onChange={(e) => setLockFilter(e.target.value as "" | "locked" | "unlocked")}
+            aria-label="กรองสถานะการเข้าใช้"
+          >
+            <option value="">ทุกสถานะการเข้าใช้</option>
+            <option value="unlocked">เข้าใช้ได้</option>
+            <option value="locked">ล็อกแล้ว</option>
+          </select>
+          <select
             className="select-native-glass w-full sm:w-32 md:min-w-[112px]"
             value={pageSize}
             onChange={(e) => {
@@ -649,7 +677,7 @@ export default function UsersPage() {
       ) : (
         <>
           <div className="flex-1 overflow-auto min-h-0">
-            <table className="w-full min-w-[600px] text-left border-collapse">
+            <table className="w-full min-w-[720px] text-left border-collapse">
               <thead>
                 <tr
                   className="text-xs font-semibold uppercase tracking-wide sticky top-0 z-10 bg-slate-800/80 backdrop-blur-sm text-slate-400"
@@ -661,6 +689,9 @@ export default function UsersPage() {
                   <th className="px-4 py-3 border-b border-white/5 min-w-[160px]">อีเมล</th>
                   <th className="px-4 py-3 border-b border-white/5 min-w-[140px]">เบอร์ / ตำแหน่ง</th>
                   <th className="px-4 py-3 border-b border-white/5 whitespace-nowrap w-28">บทบาท</th>
+                  <th className="px-4 py-3 border-b border-white/5 whitespace-nowrap w-30 text-center">
+                    เข้าใช้
+                  </th>
                   {isAdmin && (
                     <th className="px-4 py-3 border-b border-white/5 text-right whitespace-nowrap w-24">จัดการ</th>
                   )}
@@ -692,6 +723,19 @@ export default function UsersPage() {
                       <span className={`badge justify-center min-w-[88px] ${u.role === "ADMIN" ? "badge-resolved" : u.role === "USER" ? "badge-pending" : "badge-progress"}`}>
                         {roleLabelByCode[u.role] || u.role}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 text-center align-middle">
+                      {u.isLocked ? (
+                        <span
+                          className="inline-flex items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium bg-red-950/35 text-red-200 border border-red-500/25"
+                          title="ล็อกการเข้าสู่ระบบ"
+                        >
+                          <Lock size={12} className="shrink-0" aria-hidden />
+                          ล็อก
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-500">ปกติ</span>
+                      )}
                     </td>
                     {isAdmin && (
                       <td className="px-4 py-3 text-right">
@@ -731,7 +775,7 @@ export default function UsersPage() {
             totalPages={totalPages}
             pageSize={pageSize}
             filteredCount={filteredList.length}
-            showExtraTotal={!!search.trim() || !!roleFilter}
+            showExtraTotal={!!search.trim() || !!roleFilter || !!lockFilter}
             extraTotalCount={list.length}
             onPageChange={setPage}
           />
@@ -941,6 +985,29 @@ export default function UsersPage() {
                 placeholder="ตำแหน่งงาน"
               />
             </div>
+            {modalMode === "edit" && isAdmin && (
+              <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-slate-900/30 p-4">
+                <input
+                  type="checkbox"
+                  id="user-is-locked"
+                  checked={form.isLocked}
+                  disabled={saving || isEditingSelf}
+                  onChange={(e) => setForm({ ...form, isLocked: e.target.checked })}
+                  className="mt-1 h-4 w-4 shrink-0 rounded border-white/20 bg-slate-900/50 text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <div className="min-w-0">
+                  <label htmlFor="user-is-locked" className="text-sm font-medium text-slate-200 cursor-pointer">
+                    ล็อกการเข้าสู่ระบบ
+                  </label>
+                  <p className="text-xs text-slate-500 mt-1 leading-snug">
+                    ผู้ใช้จะไม่สามารถเข้าสู่ระบบหรือเรียก API ได้จนกว่าจะปลดล็อก
+                  </p>
+                  {isEditingSelf && (
+                    <p className="text-xs text-amber-400/90 mt-1">ไม่สามารถล็อกบัญชีของตัวเองได้</p>
+                  )}
+                </div>
+              </div>
+            )}
           </>
         )}
 

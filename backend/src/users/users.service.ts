@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -76,10 +76,19 @@ export class UsersService {
     async findById(id: number) {
         const user = await this.prisma.user.findUnique({
             where: { id },
-            select: { id: true, name: true, username: true, email: true, role: true, roleId: true, roleRef: { select: { id: true, code: true, name: true } }, phone: true, position: true, image: true },
+            select: { id: true, name: true, username: true, email: true, role: true, roleId: true, roleRef: { select: { id: true, code: true, name: true } }, phone: true, position: true, image: true, isLocked: true },
         });
         if (!user) return null;
         return this.mapUserRoleForClient(user as any);
+    }
+
+    /** ใช้ใน JwtStrategy — บัญชีถูกล็อกห้ามใช้ API */
+    async isLoginLocked(id: number): Promise<boolean> {
+        const row = await this.prisma.user.findUnique({
+            where: { id },
+            select: { isLocked: true },
+        });
+        return row?.isLocked ?? false;
     }
 
     /**
@@ -244,6 +253,9 @@ export class UsersService {
     async updateMyPassword(userId: number, currentPassword: string, newPassword: string) {
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
         if (!user) throw new NotFoundException('ไม่พบผู้ใช้');
+        if (user.isLocked) {
+            throw new ForbiddenException('บัญชีถูกระงับการเข้าสู่ระบบ');
+        }
         const valid = await bcrypt.compare(currentPassword, user.password);
         if (!valid) throw new ConflictException('รหัสผ่านปัจจุบันไม่ถูกต้อง');
         const hashed = await bcrypt.hash(newPassword, 10);
@@ -290,6 +302,7 @@ export class UsersService {
         }
         const createData: Prisma.UserCreateInput = {
             ...data,
+            isLocked: false,
             username,
             email: email || undefined,
             password: hashed,
@@ -316,9 +329,24 @@ export class UsersService {
     }
 
     /** แก้ไขผู้ใช้ — ถ้ามี email ให้ sync username = email (อ้างอิงอีเมลเป็นหลัก) */
-    async update(id: number, data: { name?: string; email?: string; phone?: string; position?: string; image?: string; role?: Prisma.EnumRoleFieldUpdateOperationsInput }) {
+    async update(
+        id: number,
+        data: {
+            name?: string;
+            email?: string;
+            phone?: string;
+            position?: string;
+            image?: string;
+            role?: Prisma.EnumRoleFieldUpdateOperationsInput;
+            isLocked?: boolean;
+        },
+        actorId?: number,
+    ) {
         const user = await this.prisma.user.findUnique({ where: { id } });
         if (!user) throw new NotFoundException('ไม่พบผู้ใช้');
+        if (data.isLocked === true && actorId != null && id === actorId) {
+            throw new BadRequestException('ไม่สามารถล็อกบัญชีของตัวเองได้');
+        }
         const updateData: Record<string, unknown> = { ...data };
         if (updateData.email != null) {
             const email = String(updateData.email).trim();
@@ -360,6 +388,7 @@ export class UsersService {
                 phone: true,
                 position: true,
                 image: true,
+                isLocked: true,
             },
         });
         return this.mapUserRoleForClient(updated as any);
@@ -399,7 +428,7 @@ export class UsersService {
 
     async findAll() {
         const users = await this.prisma.user.findMany({
-            select: { id: true, name: true, username: true, email: true, role: true, roleId: true, roleRef: { select: { code: true, name: true } }, phone: true, position: true, image: true },
+            select: { id: true, name: true, username: true, email: true, role: true, roleId: true, roleRef: { select: { code: true, name: true } }, phone: true, position: true, image: true, isLocked: true },
             orderBy: [{ role: 'asc' }, { username: 'asc' }],
         });
         return users.map((u) => this.mapUserRoleForClient(u as any));
