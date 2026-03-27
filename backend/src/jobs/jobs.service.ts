@@ -301,10 +301,47 @@ export class JobsService {
         });
     }
 
+    private async getPermissionCodesForUser(userId: number): Promise<string[]> {
+        const dbUser = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { roleId: true, role: true },
+        });
+        if (!dbUser) return [];
+
+        if (dbUser.roleId != null) {
+            const rows = await this.prisma.rolePermission.findMany({
+                where: { roleId: dbUser.roleId },
+                include: { permission: { select: { code: true } } },
+            });
+            return rows.map((r) => r.permission.code);
+        }
+
+        // fallback legacy enum role: ใช้ชุด default เดียวกับ PermissionsGuard (ขั้นต่ำเพื่อไม่ให้ endpoint พัง)
+        const enumRole = dbUser.role ? String(dbUser.role).toUpperCase() : '';
+        if (enumRole === 'ADMIN') {
+            return ['job.fix.any', 'job.reopen.any'];
+        }
+        if (enumRole === 'SUPERVISOR') {
+            return ['job.fix.any', 'job.reopen.any'];
+        }
+        if (enumRole === 'STAFF') {
+            return ['job.fix.self', 'job.reopen.self'];
+        }
+        return [];
+    }
+
     /**
-     * บันทึก/แก้ไขข้อมูลการแก้ไข — อนุญาตเฉพาะผู้รับงาน (assignedTo) เท่านั้น
+     * ตรวจสิทธิ์การบันทึก/ปิดงาน (fix)
+     * - job.fix.any: ทำได้ทุกงาน
+     * - job.fix.self: ทำได้เฉพาะงานที่เป็นผู้รับงาน (assignedToId)
      */
-    async assertUserIsAssigneeForFix(jobId: number, userId: number): Promise<void> {
+    async assertUserCanFix(jobId: number, userId: number): Promise<void> {
+        const codes = await this.getPermissionCodesForUser(userId);
+        if (codes.includes('job.fix.any')) return;
+        if (!codes.includes('job.fix.self')) {
+            throw new ForbiddenException('ไม่มีสิทธิ์บันทึก/ปิดงาน');
+        }
+
         const job = await this.prisma.job.findUnique({
             where: { id: jobId },
             select: { id: true, assignedToId: true },
@@ -319,16 +356,38 @@ export class JobsService {
         const uid = Number(userId);
         if (assigneeId !== uid) {
             throw new ForbiddenException(
-                'เฉพาะผู้รับงาน (ผู้ที่ได้รับมอบหมายงานนี้) เท่านั้นที่บันทึกหรือแก้ไขข้อมูลการแก้ไขได้',
+                'ไม่มีสิทธิ์บันทึก/ปิดงานนี้ (อนุญาตเฉพาะผู้รับงาน หรือบทบาทที่ได้รับสิทธิ์)',
             );
         }
     }
 
     /**
-     * Reopen: RESOLVED → IN_PROGRESS (เฉพาะผู้รับงาน) พร้อมบันทึกเหตุผลต่อท้าย fixNote
+     * Reopen: RESOLVED → IN_PROGRESS พร้อมบันทึกเหตุผลต่อท้าย fixNote
+     * - job.reopen.any: ทำได้ทุกงาน
+     * - job.reopen.self: ทำได้เฉพาะงานที่เป็นผู้รับงาน (assignedToId)
      */
+    async assertUserCanReopen(jobId: number, userId: number): Promise<void> {
+        const codes = await this.getPermissionCodesForUser(userId);
+        if (codes.includes('job.reopen.any')) return;
+        if (!codes.includes('job.reopen.self')) {
+            throw new ForbiddenException('ไม่มีสิทธิ์ Reopen งาน');
+        }
+
+        const job = await this.prisma.job.findUnique({
+            where: { id: jobId },
+            select: { id: true, assignedToId: true },
+        });
+        if (!job) throw new NotFoundException(`ไม่พบงาน id=${jobId}`);
+        if (job.assignedToId == null) {
+            throw new BadRequestException('ยังไม่มีผู้รับผิดชอบงาน');
+        }
+        if (Number(job.assignedToId) !== Number(userId)) {
+            throw new ForbiddenException('ไม่มีสิทธิ์ Reopen งานนี้');
+        }
+    }
+
     async reopenJobByAssignee(jobId: number, userId: number, reason: string) {
-        await this.assertUserIsAssigneeForFix(jobId, userId);
+        await this.assertUserCanReopen(jobId, userId);
         const row = await this.prisma.job.findUnique({
             where: { id: jobId },
             select: { id: true, status: true, fixNote: true },

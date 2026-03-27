@@ -28,6 +28,10 @@ const MENU_PERMISSIONS = [
 const ACTION_PERMISSIONS = [
   { code: 'job.assign', name: 'มอบหมายงาน', category: 'job' },
   { code: 'job.deleteUnassigned', name: 'ลบงานที่ยังไม่มีผู้รับผิดชอบ', category: 'job' },
+  { code: 'job.fix.self', name: 'บันทึก/ปิดงาน (เฉพาะงานที่รับผิดชอบ)', category: 'job' },
+  { code: 'job.fix.any', name: 'บันทึก/ปิดงาน (ทุกงาน)', category: 'job' },
+  { code: 'job.reopen.self', name: 'Reopen งาน (เฉพาะงานที่รับผิดชอบ)', category: 'job' },
+  { code: 'job.reopen.any', name: 'Reopen งาน (ทุกงาน)', category: 'job' },
   { code: 'site.create', name: 'เพิ่ม Site', category: 'site' },
   { code: 'site.update', name: 'แก้ไข Site', category: 'site' },
   { code: 'site.delete', name: 'ลบ Site', category: 'site' },
@@ -49,7 +53,7 @@ const STAFF_MENUS = MENU_PERMISSIONS.map((p) => p.code).filter((c) =>
 // ADMIN ได้ทุก permission, STAFF ได้แค่เมนู, USER ได้แค่ profile/report/status, SUPERVISOR = STAFF + job.assign (+ อื่นๆของกลุ่ม job)
 const ROLE_PERMISSION_CODES: Record<string, string[]> = {
   ADMIN: [...MENU_PERMISSIONS.map((p) => p.code), ...ACTION_PERMISSIONS.map((p) => p.code)],
-  STAFF: STAFF_MENUS,
+  STAFF: [...STAFF_MENUS, 'job.fix.self', 'job.reopen.self'],
   USER: ['menu.profile', 'menu.report', 'menu.status'],
   SUPERVISOR: [...STAFF_MENUS, 'menu.sites', ...ACTION_PERMISSIONS.map((p) => p.code)],
 };

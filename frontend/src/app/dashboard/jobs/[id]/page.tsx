@@ -26,7 +26,7 @@ import PersonAvatar from "@/components/PersonAvatar";
 import { confirmDialog, toastError, toastSuccess } from "@/lib/toast";
 import Select from "react-select";
 import { reactSelectGlassStyles } from "@/lib/reactSelectGlassStyles";
-import { extractAssignableArray } from "@/lib/apiResponse";
+import { extractAssignableArray, unwrapApiData } from "@/lib/apiResponse";
 
 interface JobDetail {
   id: number;
@@ -55,14 +55,6 @@ interface JobDetail {
   oldSerialNumber?: string | null;
   newSerialNumber?: string | null;
   systemStatus?: string | null;
-}
-
-function unwrapApiData<T>(root: unknown): T | null {
-  if (!root) return null;
-  if (typeof root === "object" && root !== null && "data" in (root as Record<string, unknown>)) {
-    return ((root as { data?: unknown }).data as T) ?? null;
-  }
-  return root as T;
 }
 
 function isJobDetail(v: unknown): v is JobDetail {
@@ -117,6 +109,26 @@ export default function JobDetailPage() {
   const API =
     process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
   const token = (session as { accessToken?: string })?.accessToken;
+
+  const [permissions, setPermissions] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    if (!token) {
+      setPermissions(null);
+      return;
+    }
+    fetch(`${API}/roles/me/permissions`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((raw) => {
+        const payload = unwrapApiData<{ permissions?: string[] }>(raw);
+        const list = payload?.permissions;
+        setPermissions(Array.isArray(list) ? list : null);
+      })
+      .catch(() => setPermissions(null));
+  }, [token, API]);
 
   const [brokenPartType, setBrokenPartType] = useState<string>("");
   const [fixEnvironment, setFixEnvironment] = useState<string>("");
@@ -189,6 +201,10 @@ export default function JobDetailPage() {
 
   const canAssignAny = ["ADMIN", "SUPERVISOR"].includes(userRole);
   const canTakeJob = ["ADMIN", "SUPERVISOR", "STAFF"].includes(userRole);
+  const canFixAny = Array.isArray(permissions) && permissions.includes("job.fix.any");
+  const canFixSelf = Array.isArray(permissions) && permissions.includes("job.fix.self");
+  const canReopenAny = Array.isArray(permissions) && permissions.includes("job.reopen.any");
+  const canReopenSelf = Array.isArray(permissions) && permissions.includes("job.reopen.self");
 
   /** ผู้รับงาน (Owner) = ผู้ที่ถูกมอบหมายในงาน (assignedTo) — Reopen/บันทึกแก้ไขได้เฉพาะคนนี้ */
   const isAssignee =
@@ -201,7 +217,7 @@ export default function JobDetailPage() {
 
   /** แก้ไข/บันทึกได้เมื่อยังไม่ปิดงาน — หลังปิดต้อง Reopen (API) ให้เป็นกำลังแก้ไขก่อน */
   const canEditFix =
-    !!job && !!job.assignedTo && isAssignee && !isResolved;
+    !!job && !isResolved && (canFixAny || (canFixSelf && isAssignee));
 
   const isReadOnlyFix = !!job && !canEditFix;
 
@@ -259,8 +275,11 @@ export default function JobDetailPage() {
   const handleSubmitFix = async (e: FormEvent) => {
     e.preventDefault();
     if (!job || !token) return;
-    if (!job.assignedTo || !isAssignee) {
-      toastError("สิทธิ์ไม่เพียงพอ", "เฉพาะผู้รับงานเท่านั้นที่บันทึกและปิดงานได้");
+    if (!canEditFix) {
+      toastError(
+        "สิทธิ์ไม่เพียงพอ",
+        "เฉพาะผู้รับงาน หรือผู้ดูแลระบบที่เกี่ยวข้องเท่านั้นที่บันทึกและปิดงานได้",
+      );
       return;
     }
     if (fixEnvironment !== "INDOOR" && fixEnvironment !== "OUTDOOR") {
@@ -1084,7 +1103,7 @@ export default function JobDetailPage() {
                       >
                         {saving ? "กำลังบันทึก..." : "บันทึกและปิดงาน (สถานะ: เสร็จสิ้น)"}
                       </button>
-                    ) : isResolved && isAssignee ? (
+                    ) : isResolved && (canReopenAny || (canReopenSelf && isAssignee)) ? (
                       <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-white/15 text-slate-300 bg-slate-800/40 backdrop-blur-sm">
                         งานนี้ถูกปิดแล้ว — หากต้องการแก้ไขข้อมูลการแก้ไข ให้ใช้ขั้นตอน Reopen ด้านล่าง
                       </div>
@@ -1102,10 +1121,10 @@ export default function JobDetailPage() {
                       </div>
                     )}
 
-                    {job && isResolved && isAssignee && (
+                    {job && isResolved && (canReopenAny || (canReopenSelf && isAssignee)) && (
                       <div className="rounded-xl border border-orange-500/35 bg-orange-950/25 backdrop-blur-md p-4 flex flex-col gap-3 text-xs sm:text-sm mt-4 shadow-lg">
                         <div className="font-semibold text-orange-200">
-                          เฉพาะผู้รับงาน: Reopen เพื่อเปลี่ยนสถานะเป็น &quot;กำลังแก้ไข&quot; แล้วจึงแก้ไขข้อมูลได้
+                          Reopen เพื่อเปลี่ยนสถานะเป็น &quot;กำลังแก้ไข&quot; แล้วจึงแก้ไขข้อมูลได้
                         </div>
                         <textarea
                           className="w-full rounded-xl border border-orange-500/30 bg-slate-900/50 px-3 py-2 text-xs sm:text-sm text-slate-100 placeholder:text-orange-200/40 focus:border-orange-400/60 focus:ring-2 focus:ring-orange-500/25 outline-none transition-all"
@@ -1125,7 +1144,7 @@ export default function JobDetailPage() {
                             {reopening ? (
                               <Loader2 size={16} className="animate-spin shrink-0" aria-hidden />
                             ) : null}
-                            Reopen → กำลังแก้ไข (ผู้รับงานเท่านั้น)
+                            Reopen → กำลังแก้ไข
                           </button>
                         </div>
                       </div>
@@ -1133,7 +1152,7 @@ export default function JobDetailPage() {
                   </form>
                 ) : (
                   <p className="text-xs text-slate-400 text-center py-2">
-                    ข้อมูลการแก้ไขถูกบันทึกแล้ว — การ Reopen/แก้ไขเพิ่มทำได้เฉพาะผู้รับงานเท่านั้น หากคุณไม่ใช่ผู้รับงาน โปรดติดต่อผู้รับงานหรือผู้ดูแลระบบ
+                    ข้อมูลการแก้ไขถูกบันทึกแล้ว — การ Reopen/แก้ไขเพิ่มทำได้ตามสิทธิ์ที่กำหนดในบทบาท หากคุณไม่สามารถดำเนินการได้ โปรดติดต่อผู้ดูแลระบบ
                   </p>
                 )}
                 </div>

@@ -23,8 +23,15 @@
    - **โปรไฟล์ผู้ใช้**: `GET /users/me`, `PATCH /users/me` (ชื่อ, อีเมล, เบอร์, ตำแหน่ง, รูป), `PATCH /users/me/password` (เปลี่ยนรหัสผ่านต้องส่งรหัสเดิม)
    - **มอบหมายงาน**: `GET /users/assignable` (ADMIN/SUPERVISOR/STAFF) รายชื่อเจ้าหน้าที่ที่มอบหมายได้; `PATCH /jobs/:id/assign` — ADMIN/SUPERVISOR ส่ง staffId ใครก็ได้, STAFF ส่งได้เฉพาะตัวเอง (รับงาน)
    - **นอกสัญญา**: `PATCH /jobs/:id/out-of-contract` — ตั้ง `isOutOfContract=true` โดย “คงสถานะเป็น `PENDING`”
-   - **บันทึกการแก้ไขงาน**: `PATCH /jobs/:id/fix` — **เฉพาะผู้รับงาน (assignee)** ไม่ยกเว้น ADMIN; ถ้าสถานะยังเป็น `RESOLVED` ต้อง **`PATCH /jobs/:id/reopen`** ก่อน; ต้องส่ง `fixEnvironment` (INDOOR/OUTDOOR), `brokenPartType` (Hardware/Software), `cause`, `fixMethod` และ `fixImages` อย่างน้อย 2 รูปแรก; `note` และ `oldSerialNumber/newSerialNumber` เป็นฟิลด์ไม่บังคับในฟอร์ม; ระบบตั้ง status = RESOLVED และ fixDate อัตโนมัติ
-   - **เปิดงานใหม่หลังปิด (Reopen)**: `PATCH /jobs/:id/reopen` — **เฉพาะผู้รับงาน**; `RESOLVED` → `IN_PROGRESS`, ล้าง `fixDate`, ต่อท้ายเหตุผลใน `fixNote`
+  - **บันทึกการแก้ไขงาน / ปิดงาน**: `PATCH /jobs/:id/fix` — คุมสิทธิ์ผ่าน RBAC:
+    - `job.fix.any`: ทำได้ทุกงาน
+    - `job.fix.self`: ทำได้เฉพาะงานที่เป็นผู้รับงาน (assignee)
+    - ถ้างานมีสถานะ `RESOLVED` ต้อง **`PATCH /jobs/:id/reopen`** ก่อน
+    - ต้องส่ง `fixEnvironment` (INDOOR/OUTDOOR), `brokenPartType` (Hardware/Software), `cause`, `fixMethod` และ `fixImages` อย่างน้อย 2 รูปแรก; `note` และ `oldSerialNumber/newSerialNumber` เป็นฟิลด์ไม่บังคับ; ระบบตั้ง status = RESOLVED และ fixDate อัตโนมัติ
+  - **เปิดงานใหม่หลังปิด (Reopen)**: `PATCH /jobs/:id/reopen` — คุมสิทธิ์ผ่าน RBAC:
+    - `job.reopen.any`: ทำได้ทุกงาน
+    - `job.reopen.self`: ทำได้เฉพาะผู้รับงาน
+    - `RESOLVED` → `IN_PROGRESS`, ล้าง `fixDate`, ต่อท้ายเหตุผลใน `fixNote`
    - **ตั้งค่าอีเมล (SMTP)**: `GET/PUT /api/settings/email-smtp`, `POST /api/settings/email-smtp/test` (ADMIN + JWT) — เก็บใน `Setting` คีย์ `email_smtp` ด้วย **nodemailer**; รองรับ `tlsRejectUnauthorized` และ env `SMTP_TLS_REJECT_UNAUTHORIZED`
    - **เทมเพลตอีเมลแจ้งงาน**: `GET/PUT /api/settings/email-templates` (ADMIN + JWT) — เก็บใน `Setting` คีย์ `email_templates` (โลโก้, `publicBaseUrl`, เทมเพลตแจ้งเหตุ/รับเรื่อง/ปิดงาน: เปิดปิด, `toExtra`, `cc`, `notifyRoleIds`); ส่งผ่าน `JobEmailNotificationService` — **สรุปผู้รับ To/CC เริ่มต้นและเหตุที่อาจได้รับเมล admin** ดู [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
    - **Jobs**: สร้างงานตรวจสอบ Site ว่าจังหวัด/อำเภอ/หน่วยงานมีในระบบก่อน (SitesService.existsByLocation); หลังสร้างงาน ถ้า `reporterPhone` ตรงกับผู้ใช้ในระบบจะ **เชื่อม `reporterId`** อัตโนมัติ (`UsersService.findByPhone`)
@@ -45,7 +52,7 @@
    - **Dashboard ภาพรวม**: กราฟสัดส่วนสถานะ (Pie), จำนวนแจ้งซ่อมตามจังหวัด Top 8 (Bar), **แนวโน้มรายวัน 14 วัน** = แจ้งในวันนั้น vs เสร็จในวันนั้น (ใช้ `fixDate` สำหรับเสร็จ); เมนูด่วนอ้างอิง RBAC (permission)
    - **หน้ารอดำเนินการ**: ปุ่ม **ดูรายละเอียด** → ไปหน้าเต็ม `/dashboard/jobs/:id` (ไม่ใช้ modal), ปุ่ม **มอบหมายงาน** (เฉพาะ ADMIN/SUPERVISOR — modal ใช้ `react-select` เลือกเจ้าหน้าที่), ปุ่ม **รับงาน** (STAFF/SUPERVISOR รับงานตัวเอง)
    - **งานที่รับผิดชอบ** (`/dashboard/my-jobs`): DataTable งานที่รับมอบหมายให้ผู้ใช้ปัจจุบัน พร้อม filter; ปุ่มดูรายละเอียดไปหน้า `/dashboard/jobs/:id`
-   - **หน้ารายละเอียดงาน** (`/dashboard/jobs/:id`): แสดงเต็มพื้นที่ — การ์ดซ้าย "ข้อมูลการแจ้งข้อขัดข้อง", การ์ดขวา "ข้อมูลการแก้ไข" + ฟอร์มบันทึกการแก้ไข (ลำดับ: `fixEnvironment` (Indoor/Outdoor) ก่อน แล้วค่อย `brokenPartType` (Hardware/Software); ฟิลด์บังคับ: cause, fixMethod และรูปการแก้ไข “อย่างน้อย 2 รูปแรก”; หมายเหตุและ Serial ไม่บังคับ); **บันทึกการแก้ไข / Reopen — เฉพาะผู้รับงาน** (assignee); เมื่อสถานะเป็น `RESOLVED` มีปุ่ม **Reopen** (ยืนยันผ่าน `confirmDialog` ก่อนเรียก API); สไตล์ฟอร์มแก้ไขเป็น **Dark Glassmorphism** ตามมาตรฐานโปรเจกต์; **พิมพ์/PDF รายงาน** — ไม่ใช้ดาวน์โหลดแบบ html2canvas บนหน้ารายละเอียดแล้ว ใช้หน้า **`/print/jobs/[id]`** + `print.css` + เทมเพลต `JobMaintenancePdfTemplate` (พิมพ์จากเบราว์เซอร์; ฝั่ง backend มี `JobsPdfService` พร้อม `emulateMediaType('print')` เมื่อสร้าง PDF)
+  - **หน้ารายละเอียดงาน** (`/dashboard/jobs/:id`): แสดงเต็มพื้นที่ — การ์ดซ้าย "ข้อมูลการแจ้งข้อขัดข้อง", การ์ดขวา "ข้อมูลการแก้ไข" + ฟอร์มบันทึกการแก้ไข (ลำดับ: `fixEnvironment` → `brokenPartType`; ฟิลด์บังคับ: cause, fixMethod และรูปการแก้ไขอย่างน้อย 2 รูปแรก; หมายเหตุและ Serial ไม่บังคับ); **บันทึก/ปิดงาน และ Reopen คุมสิทธิ์ด้วย RBAC** (`job.fix.*`, `job.reopen.*`) ผ่าน `/dashboard/roles`; มีปุ่ม Reopen เมื่อ `RESOLVED` (ยืนยันก่อนเรียก API); สไตล์ Dark Glassmorphism; **พิมพ์/PDF รายงาน** ผ่านหน้า **`/print/jobs/[id]`** + `print.css` + เทมเพลต `JobMaintenancePdfTemplate`
    - **หน้าแจ้งซ่อม** (`/report`): ผู้ใช้ทั่วไปยังต้องกด **ตรวจสอบ** ให้พบผู้แจ้งในระบบก่อนเลือกสถานที่; **เจ้าหน้าที่ที่ล็อกอิน** (บทบาท STAFF / ADMIN / SUPERVISOR) ใช้ flow แยก — โหลด `GET /sites` ทันที, กรอกเบอร์ 10 หลักแล้วดำเนินการต่อได้โดยไม่บังคับพบจากระบบ (กรอกชื่อ-สกุลเองเมื่อไม่พบ), ส่ง `POST /jobs` พร้อม **`Authorization: Bearer`** เมื่อมี session, หลังสำเร็จ redirect ไป **`/dashboard/jobs`**; แสดงข้อความ error จาก API ชัดเจน (`extractApiErrorMessage`)
    - **Component ร่วม**: `DashboardPageShell`, `DashboardFilterBar`, **`CrudModal`** (portal ไป `document.body`, `z-100`, Dark Glass, พร็อพ `size` md/lg; ใช้ที่ `/dashboard/users`, `/dashboard/roles` ฯลฯ), `JobsList` (รองรับ prop `assignedToMe`), Toast (`toastSuccess` ปิดอัตโนมัติ 1.2 วินาที, `toastError`, `toastWarning`, `confirmDialog`)
    - **ฟอร์มแดชบอร์ด (พื้นหลังเข้ม)**: ช่อง input แนะนำ class **`form-input-glass`** ใน `globals.css` (ไม่ใช้ `.form-input` คู่กับพื้นขาวบน dark layout)
@@ -67,7 +74,7 @@
 
 | Method | Path | Auth | คำอธิบาย |
 |--------|------|------|-----------|
-| POST | `/auth/login` | ❌ | เข้าสู่ระบบ (body: email หรือ username + password; คืนค่า access_token + user) |
+| POST | `/backend-auth/login` | ❌ | เข้าสู่ระบบ (body: email หรือ username + password; คืนค่า access_token + user) |
 | GET | `/users/reporters` | ❌ | ดึงรายชื่อผู้แจ้งซ่อม (Dropdown) |
 | GET | `/users/me` | ✅ JWT | โปรไฟล์ผู้ใช้ที่ล็อกอินอยู่ |
 | PATCH | `/users/me` | ✅ JWT | แก้ไขโปรไฟล์ตัวเอง (ชื่อ, อีเมล, เบอร์, ตำแหน่ง, รูป) |
@@ -84,8 +91,8 @@
 | GET | `/jobs/:id/image/:kind/:index` | ✅ JWT | สตรีมรูป (`kind`= issue \| fix, `index`=0–2) จาก URL ใน `Job.images` / `Job.fixImages` — proxy same-origin ให้ frontend ไม่ติด CORS |
 | GET | `/jobs/:id/report-pdf` | ✅ JWT | สร้างไฟล์ PDF รายงาน (โหลดหน้า `/print/jobs/:id` + Chromium) |
 | PATCH | `/jobs/:id/assign` | ✅ JWT | มอบหมายงาน: ADMIN/SUPERVISOR กำหนด staffId ใครก็ได้; STAFF ส่งได้เฉพาะ staffId = ตัวเอง |
-| PATCH | `/jobs/:id/fix` | ✅ JWT (**เฉพาะผู้รับงาน**) | บันทึกการแก้ไข: fixEnvironment, brokenPartType, cause, fixMethod, fixImages (ต้องมีอย่างน้อย 2 รูปแรก; multipart); note/serial เป็นฟิลด์ไม่บังคับ; ตั้ง status=RESOLVED, fixDate อัตโนมัติ; ถ้ายัง `RESOLVED` ต้อง reopen ก่อน |
-| PATCH | `/jobs/:id/reopen` | ✅ JWT (**เฉพาะผู้รับงาน**) | Reopen: `RESOLVED` → `IN_PROGRESS`, ล้าง `fixDate`, ต่อท้ายเหตุผลใน `fixNote` |
+| PATCH | `/jobs/:id/fix` | ✅ JWT | บันทึก/ปิดงาน (RBAC): `job.fix.any` ทำได้ทุกงาน, `job.fix.self` ทำได้เฉพาะ assignee; multipart ต้องมีรูปแก้ไขอย่างน้อย 2 รูปแรก; ตั้ง status=RESOLVED, fixDate อัตโนมัติ; ถ้ายัง `RESOLVED` ต้อง reopen ก่อน |
+| PATCH | `/jobs/:id/reopen` | ✅ JWT | Reopen (RBAC): `job.reopen.any` ทำได้ทุกงาน, `job.reopen.self` ทำได้เฉพาะ assignee; `RESOLVED` → `IN_PROGRESS`, ล้าง `fixDate`, ต่อท้ายเหตุผลใน `fixNote` |
 | GET | `/settings/email-smtp` | ✅ JWT (ADMIN) | อ่านการตั้งค่า SMTP (ไม่คืนรหัสผ่าน) |
 | PUT | `/settings/email-smtp` | ✅ JWT (ADMIN) | บันทึกการตั้งค่า SMTP (รหัสผ่านเข้ารหัสใน DB) |
 | POST | `/settings/email-smtp/test` | ✅ JWT (ADMIN) | ทดสอบส่งอีเมลด้วยค่าที่บันทึกแล้ว |

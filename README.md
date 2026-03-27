@@ -9,6 +9,9 @@
 - **CC อีเมล** — CC มาจากช่องตั้งค่า + บทบาทที่เลือกเท่านั้น (ไม่แทรกผู้รับงานเป็น CC อัตโนมัติเมื่อปิดงาน) — สรุปใน [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
 - **Modal แดชบอร์ด (`CrudModal`)** — แสดงด้วย **`createPortal` → `document.body`**, **`z-100`** ให้อยู่เหนือ `SiteHeader`/`sidebar` (`z-50`); โทน **Dark Glassmorphism** (backdrop, `ring-1 ring-white/5`, พร็อพ **`size`**: `md` | `lg`); ล็อก scroll `body` ขณะเปิด
 - **หน้า `/dashboard/roles`** — modal เพิ่ม/แก้ไขบทบาทและกำหนดสิทธิ์: ฟิลด์ใช้ **`form-input-glass`** (`globals.css`); รายการสิทธิ์ในกล่องแก้ว + checkbox สไตล์ dark
+- **RBAC งานซ่อม (แก้ไข/ปิดงาน + Reopen)** — คุมสิทธิ์ผ่าน `/dashboard/roles` ด้วย permission:
+  - `job.fix.self` / `job.fix.any`
+  - `job.reopen.self` / `job.reopen.any`
 
 ### ย้อนหลัง (2026-03-23)
 
@@ -33,9 +36,9 @@
   - API (ADMIN + JWT): `GET/PUT /api/settings/email-smtp`, `POST /api/settings/email-smtp/test`
   - รองรับ **TLS**: ฟิลด์ `tlsRejectUnauthorized` และ env `SMTP_TLS_REJECT_UNAUTHORIZED=false` สำหรับ SMTP ภายใน / self-signed
   - Frontend: หน้า `/dashboard/settings` — โหลด/บันทึก/ทดสอบส่งอีเมล; **โครง layout เนื้อหาแบบเดียวกับหน้าภาพรวม** (`/dashboard`) ไม่ใช้ `DashboardPageShell` เป็นห่อหลัก
-- **งานปิดแล้ว (Reopen)**
-  - `PATCH /api/jobs/:id/reopen` (เฉพาะผู้รับงาน): สถานะ **เสร็จสิ้น → กำลังแก้ไข**, บันทึกเหตุผลต่อท้าย `fixNote`, ล้าง `fixDate`; กด Reopen มี **ยืนยัน** (SweetAlert) ก่อนเรียก API
-  - `PATCH /api/jobs/:id/fix`: **เฉพาะผู้รับงาน** (ไม่ยกเว้น ADMIN); ถ้ายังเป็น `RESOLVED` ต้อง Reopen ก่อน
+- **งานปิดแล้ว (Reopen) + RBAC (อัปเดต)**
+  - `PATCH /api/jobs/:id/reopen`: คุมสิทธิ์ผ่าน RBAC — `job.reopen.any` ทำได้ทุกงาน, `job.reopen.self` ทำได้เฉพาะผู้รับงาน; สถานะ **เสร็จสิ้น → กำลังแก้ไข**, บันทึกเหตุผลต่อท้าย `fixNote`, ล้าง `fixDate`; มี **ยืนยัน** (SweetAlert) ก่อนเรียก API
+  - `PATCH /api/jobs/:id/fix`: คุมสิทธิ์ผ่าน RBAC — `job.fix.any` ทำได้ทุกงาน, `job.fix.self` ทำได้เฉพาะผู้รับงาน; ถ้างานเป็น `RESOLVED` ต้อง Reopen ก่อน
 - **เครื่องมือพัฒนา Backend**: อัปเกรด `@nestjs/cli` เป็น **v11** ให้สอดคล้อง Nest 11 + TypeScript 5.7 (แก้ error watch mode `Cannot read properties of undefined (reading 'paths')`)
 - **UI รายการงาน**: แท็บ **สัญญา / นอกสัญญา** — เอา **card/glass ห่อชั้นนอก**ออก เหลือเฉพาะกล่องควบคุมใน `SegmentedTabs`
 

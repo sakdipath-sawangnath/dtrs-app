@@ -64,6 +64,7 @@
   - Backend มี endpoint `PATCH /jobs/:id/out-of-contract` เพื่อย้ายนอกสัญญา
 - [x] Sidebar: เพิ่ม "งานที่รับผิดชอบ" (`/dashboard/my-jobs`); ไม่แสดงเมนู โปรไฟล์ (เข้าได้จาก dropdown)
 - [x] หน้ารายละเอียดงาน (`/dashboard/jobs/:id`): การ์ดแจ้งข้อขัดข้อง + การ์ดข้อมูลการแก้ไข + ฟอร์มบันทึกการแก้ไข (ลำดับ: fixEnvironment (Indoor/Outdoor) ก่อน แล้วค่อย brokenPartType (Hardware/Software); ฟิลด์บังคับ: cause, fixMethod และรูปการแก้ไข “อย่างน้อย 2 รูปแรก”; หมายเหตุ/Serial ไม่บังคับ); PATCH /jobs/:id/fix; พิมพ์/PDF — หน้า `/print/jobs/:id` + เทมเพลต (อัปเดต: ไม่ใช้ html2canvas บนหน้ารายละเอียด; มี `GET /jobs/:id/report-pdf` สำหรับไฟล์ PDF)
+- [x] RBAC งานซ่อม: เพิ่ม permission `job.fix.self|any` และ `job.reopen.self|any` เพื่อให้กำหนดผ่าน `/dashboard/roles` ได้ว่า role ใด “บันทึก/ปิดงาน” และ “Reopen” ได้ (เฉพาะงานตัวเองหรือทุกงาน)
 
 ## 8. Phase 4 - MinIO Integration (2026-03-11)
 - [x] ติดตั้ง NestJS MinIO SDK และระบบอัปโหลดรูปภาพ

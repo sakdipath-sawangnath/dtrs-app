@@ -161,7 +161,7 @@ export class JobsController {
         return updated;
     }
 
-    /** Reopen: เสร็จสิ้น → กำลังแก้ไข (เฉพาะผู้รับงาน) */
+    /** Reopen: เสร็จสิ้น → กำลังแก้ไข (RBAC: job.reopen.self|any) */
     @UseGuards(JwtAuthGuard)
     @Patch(':id/reopen')
     async reopenJob(
@@ -191,8 +191,8 @@ export class JobsController {
         if (userId == null) {
             throw new ForbiddenException('ไม่มีสิทธิ์บันทึกข้อมูลการแก้ไข');
         }
-        /** Reopen/บันทึกการแก้ไข — เฉพาะผู้รับงาน (assignedTo) เท่านั้น ไม่ยกเว้น ADMIN */
-        await this.jobsService.assertUserIsAssigneeForFix(+id, userId);
+        /** Reopen/บันทึกการแก้ไข — RBAC: job.fix.self|any */
+        await this.jobsService.assertUserCanFix(+id, userId);
 
         if (!files || files.length < 2) {
             throw new BadRequestException('กรุณาแนบรูปการแก้ไขอย่างน้อย 2 รูป');

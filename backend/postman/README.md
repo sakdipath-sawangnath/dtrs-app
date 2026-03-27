@@ -7,6 +7,11 @@
 3. เลือกไฟล์ **`CCTV-Maintenance-API.postman_collection.json`** จากโฟลเดอร์นี้
 4. Collection "CCTV Maintenance API" จะปรากฏใน sidebar
 
+### ไฟล์เสริมสำหรับ debug การพิมพ์รายงาน
+
+- Collection: **`CCTV-Print-PDF-Debug.postman_collection.json`**
+- คู่มือ: **`PRINT-PDF-DEBUG.md`**
+
 ## ตัวแปร (Variables)
 
 | ตัวแปร | ค่าเริ่มต้น | คำอธิบาย |

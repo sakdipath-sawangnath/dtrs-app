@@ -44,6 +44,10 @@
 | menu.myJobs | งานที่รับผิดชอบ (รายการงานที่รับมอบหมาย) |
 | job.assign | มอบหมายงาน (ปุ่มมอบหมายงานในหน้ารอดำเนินการ) |
 | job.deleteUnassigned | ลบงานที่ยังไม่มีผู้รับผิดชอบ |
+| job.fix.self | บันทึก/ปิดงาน (เฉพาะงานที่รับผิดชอบ) |
+| job.fix.any | บันทึก/ปิดงาน (ทุกงาน) |
+| job.reopen.self | Reopen งาน (เฉพาะงานที่รับผิดชอบ) |
+| job.reopen.any | Reopen งาน (ทุกงาน) |
 
 > **หมายเหตุ (Deploy):** บน GitLab CI ใช้ตัวแปร **`FRONTEND_BASE_URL`** เป็น URL หน้าเว็บ PRD (รวมลิงก์ Environment และส่งเข้า container) — สอดคล้อง `JobsPdfService` ฝั่ง backend
 
@@ -67,5 +71,11 @@
 - **ลบงานที่ยังไม่มีผู้รับผิดชอบ:** ปุ่ม “ลบงาน” ใน `/dashboard/pending` จะขึ้นเมื่อ job.status เป็น `PENDING` และ `assignedToId = null` โดยต้องมี permission `job.deleteUnassigned` (หรือบทบาท ADMIN/SUPERVISOR ตาม fallback ในโค้ด)
 - **ลบงานกำลังแก้ไข (เฉพาะ ADMIN):** ที่หน้า `/dashboard/in-progress` ผู้ใช้บทบาท **ADMIN** เห็นปุ่ม “ลบงาน (ผู้ดูแลระบบ)” สำหรับงานสถานะ `IN_PROGRESS` — เรียก `DELETE /jobs/:id` (ฝั่ง backend แยก logic: ADMIN ลบ IN_PROGRESS ได้ก่อน แล้วจึง fallback ไปลบแบบ PENDING ไม่มอบหมาย) — **ไม่ใช้** permission code แยก แต่เช็ค `role === ADMIN` ใน API/UI
 - **สัญญา/นอกสัญญา Tabs:** หน้า `/dashboard/my-jobs`, `/dashboard/all`, และ `/dashboard/in-progress` แสดง segmented tabs “สัญญา/นอกสัญญา” โดยแยกตาม `Job.isOutOfContract` (ค่าเริ่มต้น = “สัญญา”) และมี **badge** จำนวนงานค้าง (ยังไม่ `RESOLVED`) ต่อแท็บ
-- **อัปเดตงานในกำลังแก้ไข:** หน้า `/dashboard/in-progress` ปุ่ม “อัปเดต” เปิด modal “ข้อมูลการแก้ไข” (ฟอร์มและอัปโหลดรูป) และส่ง `PATCH /jobs/:id/fix` โดยฝั่ง UI เปิดเฉพาะผู้รับผิดชอบตาม `assignedTo`
+- **บันทึก/ปิดงาน (`PATCH /jobs/:id/fix`):**
+  - `job.fix.any` ทำได้ทุกงาน
+  - `job.fix.self` ทำได้เฉพาะงานที่เป็นผู้รับงาน (`assignedToId`)
+- **Reopen (`PATCH /jobs/:id/reopen`):**
+  - `job.reopen.any` ทำได้ทุกงาน
+  - `job.reopen.self` ทำได้เฉพาะงานที่เป็นผู้รับงาน (`assignedToId`)
+- **อัปเดตงานในกำลังแก้ไข (UI):** หน้า `/dashboard/in-progress` และหน้า `/dashboard/jobs/:id` จะเปิดปุ่มตาม permission ด้านบน (อิง `/roles/me/permissions`) ไม่ hardcode role
 - **Sidebar:** เมนู "โปรไฟล์" ไม่แสดงใน sidebar; เข้าได้จากเมนูผู้ใช้ (dropdown) เท่านั้น เมนู "งานที่รับผิดชอบ" (`menu.myJobs`) แสดงสำหรับ ADMIN, STAFF, SUPERVISOR

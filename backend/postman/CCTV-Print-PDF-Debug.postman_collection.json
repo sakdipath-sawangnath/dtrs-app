@@ -1,0 +1,88 @@
+{
+  "info": {
+    "name": "CCTV Print/PDF Debug",
+    "description": "Collection สำหรับตรวจเส้นทาง Print/PDF ทั้ง Next + Backend + Reverse Proxy",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "publicBaseUrl", "value": "https://cctv-app.forth.co.th" },
+    { "key": "apiBase", "value": "https://cctv-app.forth.co.th/api" },
+    { "key": "jobId", "value": "282" },
+    { "key": "emailOrUsername", "value": "admin" },
+    { "key": "password", "value": "admin123" },
+    { "key": "access_token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "01 - Login (Backend Auth)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{emailOrUsername}}\",\n  \"password\": \"{{password}}\"\n}"
+        },
+        "url": "{{apiBase}}/backend-auth/login",
+        "description": "ได้ JWT จาก backend-auth/login (กันชนกับ NextAuth)"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const raw = pm.response.json();",
+              "const token = raw?.data?.access_token || raw?.access_token || '';",
+              "if (token) pm.collectionVariables.set('access_token', token);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Get Job by ID (Backend)",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "{{apiBase}}/jobs/{{jobId}}",
+        "description": "ตรวจสถานะงาน ต้องเป็น RESOLVED เพื่อให้พิมพ์ได้"
+      }
+    },
+    {
+      "name": "03 - Get Issue Image 0 (Backend)",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "{{apiBase}}/jobs/{{jobId}}/image/issue/0",
+        "description": "ตรวจเส้นรูป issue ผ่าน backend/proxy (ควรได้ image/* หรือ 404 ถ้าไม่มีรูปช่องนี้)"
+      }
+    },
+    {
+      "name": "04 - Get Fix Image 0 (Backend)",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "{{apiBase}}/jobs/{{jobId}}/image/fix/0",
+        "description": "ตรวจเส้นรูป fix ผ่าน backend/proxy (ควรได้ image/* หรือ 404 ถ้าไม่มีรูปช่องนี้)"
+      }
+    },
+    {
+      "name": "05 - Print Data Route (Next API)",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "{{apiBase}}/print-jobs/{{jobId}}/data",
+        "description": "ต้องได้ JSON (job + prefetchedImages) ไม่ใช่ HTML"
+      }
+    },
+    {
+      "name": "06 - Open Print Page (HTML)",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "{{publicBaseUrl}}/print/jobs/{{jobId}}",
+        "description": "ตรวจหน้า print ว่าโหลดได้ (HTML) แล้ว client จะเรียก /api/print-jobs/:id/data ต่อ"
+      }
+    }
+  ]
+}
