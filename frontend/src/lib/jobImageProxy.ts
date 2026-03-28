@@ -35,7 +35,38 @@ export async function jobImageProxyGET(
   });
 
   if (!res.ok) {
-    return new Response(null, { status: res.status });
+    let message = "";
+    const ct = res.headers.get("content-type") || "";
+    if (ct.includes("application/json")) {
+      try {
+        const text = await res.text();
+        const j = JSON.parse(text) as {
+          error?: { message?: string };
+          message?: string;
+        };
+        message =
+          (typeof j?.error?.message === "string" ? j.error.message : "") ||
+          (typeof j?.message === "string" ? j.message : "") ||
+          "";
+      } catch {
+        /* ignore */
+      }
+    }
+    const body = JSON.stringify({
+      status: res.status,
+      message:
+        message ||
+        "Upstream image request failed (Nest could not load object storage)",
+      nestPath: `/api/jobs/${id}/image/${kind}/${index}`,
+    });
+    return new Response(body, {
+      status: res.status,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Upstream-Http-Status": String(res.status),
+      },
+    });
   }
 
   const buf = await res.arrayBuffer();
