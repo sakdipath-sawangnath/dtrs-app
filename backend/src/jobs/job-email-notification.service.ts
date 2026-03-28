@@ -16,6 +16,32 @@ const STATUS_TH: Record<string, string> = {
   RESOLVED: 'แล้วเสร็จ',
 };
 
+function pickIssueSummary(
+  title: string | null | undefined,
+  description: string | null | undefined,
+): string | null {
+  const t = title?.trim();
+  if (t) return t;
+  const d = description?.trim();
+  return d || null;
+}
+
+function formatFixEnvironmentLabel(v: string | null | undefined): string | null {
+  if (!v?.trim()) return null;
+  const u = v.trim().toUpperCase();
+  if (u === 'INDOOR') return 'Indoor (ในอาคาร)';
+  if (u === 'OUTDOOR') return 'Outdoor (นอกอาคาร)';
+  return v.trim();
+}
+
+function formatJobTypeLabel(v: string | null | undefined): string | null {
+  if (!v?.trim()) return null;
+  const lower = v.trim().toLowerCase();
+  if (lower === 'hardware') return 'Hardware (ฮาร์ดแวร์)';
+  if (lower === 'software') return 'Software (ซอฟต์แวร์)';
+  return v.trim();
+}
+
 @Injectable()
 export class JobEmailNotificationService {
   private readonly logger = new Logger(JobEmailNotificationService.name);
@@ -98,10 +124,13 @@ export class JobEmailNotificationService {
         id: true,
         ticketNo: true,
         title: true,
+        description: true,
         status: true,
         province: true,
         district: true,
         location: true,
+        fixEnvironment: true,
+        brokenPart: true,
         reporterName: true,
         reporterEmail: true,
         reportDate: true,
@@ -122,10 +151,12 @@ export class JobEmailNotificationService {
 
     return {
       ticketNo: job.ticketNo,
-      title: job.title,
+      issueSummary: pickIssueSummary(job.title, job.description),
       province: job.province,
       district: job.district,
       location: job.location,
+      fixEnvironmentLabel: formatFixEnvironmentLabel(job.fixEnvironment),
+      jobTypeLabel: formatJobTypeLabel(job.brokenPart),
       statusCode: st || 'PENDING',
       statusLabel,
       reporterName: job.reporterName,

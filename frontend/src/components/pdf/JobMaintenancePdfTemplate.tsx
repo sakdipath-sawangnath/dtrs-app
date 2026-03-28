@@ -22,7 +22,10 @@ export type JobMaintenancePdfJob = {
   images?: string[] | null;
   assignedTo?: { id: number; name: string } | null;
   fixDate?: string | null;
+  /** หลังปิดงานมักเป็น Hardware | Software (ประเภทงาน) */
   brokenPart?: string | null;
+  /** INDOOR | OUTDOOR — ประเภทสถานที่ตอนแก้ไข */
+  fixEnvironment?: string | null;
   cause?: string | null;
   fixMethod?: string | null;
   fixImages?: string[] | null;
@@ -83,6 +86,12 @@ const cell: CSSProperties = {
   boxSizing: "border-box" as const,
 };
 
+/** ป้ายกำกับฟิลด์ในตาราง PDF — ตัวหนาให้แยกจากค่าได้ชัด */
+const pdfFieldLabel: CSSProperties = {
+  fontWeight: 700,
+  color: "#000000",
+};
+
 function fmtDate(d: string | null | undefined): string {
   if (!d) return "–";
   const dt = new Date(d);
@@ -104,6 +113,31 @@ function fmtTime(d: string | null | undefined): string {
     second: "2-digit",
     hour12: false,
   });
+}
+
+function formatFixEnvironmentLabel(v: string | null | undefined): string {
+  if (!v?.trim()) return "–";
+  const u = v.trim().toUpperCase();
+  if (u === "INDOOR") return "Indoor (ในอาคาร)";
+  if (u === "OUTDOOR") return "Outdoor (นอกอาคาร)";
+  return v.trim();
+}
+
+/** ค่าในฟิลด์ brokenPart หลังบันทึกการแก้ไข = ประเภทงาน */
+function formatJobTypeLabel(v: string | null | undefined): string {
+  if (!v?.trim()) return "–";
+  const t = v.trim();
+  const lower = t.toLowerCase();
+  if (lower === "hardware") return "Hardware (ฮาร์ดแวร์)";
+  if (lower === "software") return "Software (ซอฟต์แวร์)";
+  return t;
+}
+
+/** ไม่ใช้ brokenPart เป็นข้อความข้อขัดข้องถ้าเป็นค่า Hardware/Software อย่างเดียว */
+function isStoredJobTypeOnly(v: string | null | undefined): boolean {
+  if (!v?.trim()) return false;
+  const lower = v.trim().toLowerCase();
+  return lower === "hardware" || lower === "software";
 }
 
 function padImages(urls: string[] | null | undefined, n: number): (string | null)[] {
@@ -181,7 +215,12 @@ export function JobMaintenancePdfTemplate({
   const reportDt = job.reportDate ?? job.createdAt;
   const fixDt = job.fixDate;
   const issueLine =
-    job.description?.trim() || job.title?.trim() || job.brokenPart?.trim() || "–";
+    job.description?.trim() ||
+    job.title?.trim() ||
+    (isStoredJobTypeOnly(job.brokenPart) ? "" : job.brokenPart?.trim()) ||
+    "–";
+  const fixEnvironmentLine = formatFixEnvironmentLabel(job.fixEnvironment);
+  const jobTypeLine = formatJobTypeLabel(job.brokenPart);
   const causeLine = job.cause?.trim() || "–";
   const fixParts =
     [job.fixMethod?.trim(), job.fixNote?.trim()].filter(Boolean).join("\n\n") || "–";
@@ -253,34 +292,42 @@ export function JobMaintenancePdfTemplate({
                 </div>
               </td>
               <td style={{ ...cell, verticalAlign: "top" }}>
-                เลขที่ใบแจ้งซ่อม: {job.ticketNo || "–"}
+                <span style={pdfFieldLabel}>เลขที่ใบแจ้งซ่อม: </span>
+                {job.ticketNo || "–"}
               </td>
               <td style={{ ...cell, verticalAlign: "top" }}>
-                อำเภอ: {job.district || "–"}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ ...cell, verticalAlign: "top" }}>
-                วันที่แจ้งซ่อม: {fmtDate(reportDt)}
-              </td>
-              <td style={{ ...cell, verticalAlign: "top" }}>
-                จังหวัด: {job.province || "–"}
+                <span style={pdfFieldLabel}>อำเภอ: </span>
+                {job.district || "–"}
               </td>
             </tr>
             <tr>
               <td style={{ ...cell, verticalAlign: "top" }}>
-                เวลาแจ้งซ่อม: {fmtTime(reportDt)}
+                <span style={pdfFieldLabel}>วันที่แจ้งซ่อม: </span>
+                {fmtDate(reportDt)}
               </td>
               <td style={{ ...cell, verticalAlign: "top" }}>
-                ผู้แก้ไข: {job.assignedTo?.name || "–"}
+                <span style={pdfFieldLabel}>จังหวัด: </span>
+                {job.province || "–"}
               </td>
             </tr>
             <tr>
               <td style={{ ...cell, verticalAlign: "top" }}>
-                วันที่แก้ไข: {fmtDate(fixDt)}
+                <span style={pdfFieldLabel}>เวลาแจ้งซ่อม: </span>
+                {fmtTime(reportDt)}
               </td>
               <td style={{ ...cell, verticalAlign: "top" }}>
-                เวลาที่แก้ไข: {fmtTime(fixDt)}
+                <span style={pdfFieldLabel}>ผู้แก้ไข: </span>
+                {job.assignedTo?.name || "–"}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ ...cell, verticalAlign: "top" }}>
+                <span style={pdfFieldLabel}>วันที่แก้ไข: </span>
+                {fmtDate(fixDt)}
+              </td>
+              <td style={{ ...cell, verticalAlign: "top" }}>
+                <span style={pdfFieldLabel}>เวลาที่แก้ไข: </span>
+                {fmtTime(fixDt)}
               </td>
             </tr>
           </tbody>
@@ -310,15 +357,28 @@ export function JobMaintenancePdfTemplate({
           <tbody>
             <tr>
               <td rowSpan={2} style={{ ...cell, verticalAlign: "top" }}>
-                สถานที่: {job.location || "–"}
+                <span style={pdfFieldLabel}>สถานที่: </span>
+                {job.location || "–"}
               </td>
               <td style={{ ...cell, verticalAlign: "top" }}>
-                ชื่อ-สกุล: {job.reporterName || "–"}
+                <span style={pdfFieldLabel}>ชื่อ-สกุล: </span>
+                {job.reporterName || "–"}
               </td>
             </tr>
             <tr>
               <td style={{ ...cell, verticalAlign: "top" }}>
-                เบอร์โทร: {job.reporterPhone || "–"}
+                <span style={pdfFieldLabel}>เบอร์โทร: </span>
+                {job.reporterPhone || "–"}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ ...cell, verticalAlign: "top" }}>
+                <span style={pdfFieldLabel}>ประเภทสถานที่: </span>
+                {fixEnvironmentLine}
+              </td>
+              <td style={{ ...cell, verticalAlign: "top" }}>
+                <span style={pdfFieldLabel}>ประเภทงาน: </span>
+                {jobTypeLine}
               </td>
             </tr>
             <FullRow label="ข้อขัดข้อง" body={issueLine} />
@@ -454,7 +514,7 @@ function FullRow({
             minHeight: tall ? 80 : 36,
           }}
         >
-          <span style={{ fontWeight: 700 }}>{label}: </span>
+          <span style={pdfFieldLabel}>{label}: </span>
           <span>{body}</span>
         </div>
       </td>

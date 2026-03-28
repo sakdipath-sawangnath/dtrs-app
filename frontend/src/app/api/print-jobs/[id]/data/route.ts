@@ -4,6 +4,24 @@ import { authOptions } from "@/lib/auth";
 import { getServerApiBaseUrl } from "@/lib/serverApiBase";
 import type { PdfPrefetchedImages } from "@/components/pdf/JobMaintenancePdfTemplate";
 
+/** กัน server-side fetch ค้างไม่สิ้นสุด (มักเกิดเมื่อ PRD ไม่มี API_INTERNAL_BASE_URL แล้วไป hairpin ไป public URL) */
+const JOB_FETCH_MS = 25_000;
+const IMAGE_FETCH_MS = 20_000;
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function unwrapApiData<T>(root: unknown): T | null {
   if (!root) return null;
   if (typeof root === "object" && root !== null && "data" in (root as Record<string, unknown>)) {
@@ -20,14 +38,22 @@ async function fetchImageDataUrl(
 ): Promise<string | null> {
   const apiBase = getServerApiBaseUrl();
   const url = `${apiBase}/jobs/${jobId}/image/${kind}/${index}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  const buf = Buffer.from(await res.arrayBuffer());
-  const ct = res.headers.get("content-type") || "image/jpeg";
-  return `data:${ct};base64,${buf.toString("base64")}`;
+  try {
+    const res = await fetchWithTimeout(
+      url,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      },
+      IMAGE_FETCH_MS,
+    );
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    const ct = res.headers.get("content-type") || "image/jpeg";
+    return `data:${ct};base64,${buf.toString("base64")}`;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -61,10 +87,27 @@ export async function GET(
   }
 
   const apiBase = getServerApiBaseUrl();
-  const res = await fetch(`${apiBase}/jobs/${jobId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(
+      `${apiBase}/jobs/${jobId}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      },
+      JOB_FETCH_MS,
+    );
+  } catch (e) {
+    const aborted = e instanceof Error && e.name === "AbortError";
+    return Response.json(
+      {
+        error: aborted
+          ? "หมดเวลาเชื่อมต่อ API ภายใน — ตรวจสอบ API_INTERNAL_BASE_URL ใน container frontend และ reverse proxy (เส้น /api/print-jobs ต้องส่งไป Next ไม่ใช่ Nest)"
+          : "เชื่อมต่อ API ไม่สำเร็จ",
+      },
+      { status: 504 },
+    );
+  }
   if (!res.ok) {
     return Response.json({ error: "Job not found" }, { status: res.status });
   }
@@ -77,12 +120,13 @@ export async function GET(
     );
   }
 
-  const issue: (string | null)[] = [];
-  const fix: (string | null)[] = [];
-  for (let i = 0; i < 3; i++) {
-    issue.push(await fetchImageDataUrl(token, jobId, "issue", i));
-    fix.push(await fetchImageDataUrl(token, jobId, "fix", i));
-  }
+  const indices = [0, 1, 2] as const;
+  const [issue, fix] = await Promise.all([
+    Promise.all(
+      indices.map((i) => fetchImageDataUrl(token, jobId, "issue", i)),
+    ),
+    Promise.all(indices.map((i) => fetchImageDataUrl(token, jobId, "fix", i))),
+  ]);
 
   const prefetchedImages: PdfPrefetchedImages = { issue, fix };
 

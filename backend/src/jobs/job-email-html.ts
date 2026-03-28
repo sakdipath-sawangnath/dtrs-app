@@ -2,10 +2,15 @@
 
 export type JobEmailPayload = {
   ticketNo: string | null;
-  title: string | null;
+  /** แสดงในอีเมล: หัวข้อหรือรายละเอียดข้อขัดข้อง (title ก่อน แล้วค่อย description) */
+  issueSummary: string | null;
   province: string | null;
   district: string | null;
   location: string | null;
+  /** ประเภทสถานที่ (หลังมีการบันทึกการแก้ไข) */
+  fixEnvironmentLabel: string | null;
+  /** ประเภทงาน Hardware/Software (จาก brokenPart หลังปิดงาน) */
+  jobTypeLabel: string | null;
   /** PENDING | IN_PROGRESS | RESOLVED */
   statusCode: string;
   statusLabel: string;
@@ -47,17 +52,23 @@ function statusBadgeHtml(code: string, label: string): string {
   return `<span style="display:inline-block;padding:5px 14px;border-radius:9999px;font-size:12px;font-weight:600;background:${bg};color:${fg};border:1px solid ${border};">${esc(label)}</span>`;
 }
 
+/** ป้ายคอลัมน์ซ้าย — ตัวหนา อ่านง่ายในอีเมล */
+const TD_LABEL =
+  'padding:10px 14px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:13px;font-weight:700;width:38%;vertical-align:top;';
+const TD_VALUE =
+  'padding:10px 14px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:14px;vertical-align:top;';
+
 function rowText(label: string, value: string): string {
   return `<tr>
-  <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:13px;width:38%;vertical-align:top;">${esc(label)}</td>
-  <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:14px;vertical-align:top;">${value}</td>
+  <td style="${TD_LABEL}">${esc(label)}</td>
+  <td style="${TD_VALUE}">${value}</td>
 </tr>`;
 }
 
 function rowStatus(label: string, payload: JobEmailPayload): string {
   const badge = statusBadgeHtml(payload.statusCode, payload.statusLabel);
   return `<tr>
-  <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:13px;width:38%;vertical-align:middle;">${esc(label)}</td>
+  <td style="${TD_LABEL.replace('top', 'middle')}">${esc(label)}</td>
   <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;vertical-align:middle;">${badge}</td>
 </tr>`;
 }
@@ -98,8 +109,10 @@ function wrapBody(opts: {
             <td style="padding:0 16px 8px;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
                 ${rowText('เลขที่ใบแจ้ง', esc(payload.ticketNo))}
-                ${rowText('หัวข้อ / อาการ', esc(payload.title))}
+                ${rowText('เรื่อง / ข้อขัดข้อง', esc(payload.issueSummary))}
                 ${rowText('สถานที่', esc(loc))}
+                ${rowText('ประเภทสถานที่', esc(payload.fixEnvironmentLabel))}
+                ${rowText('ประเภทงาน', esc(payload.jobTypeLabel))}
                 ${rowStatus('สถานะ', payload)}
                 ${rowText('ผู้แจ้ง', esc(payload.reporterName))}
                 ${rowText('ผู้รับผิดชอบ', esc(payload.assigneeName))}
@@ -129,11 +142,22 @@ function wrapBody(opts: {
 </html>`;
 }
 
+/** ต่อท้าย subject ด้วยที่ตั้งสั้นๆ ให้สแกนกล่องจดหมายรู้เรื่อง */
+function subjectLocationSuffix(p: JobEmailPayload): string {
+  const line = [p.province, p.district, p.location].filter(Boolean).join(' - ');
+  if (!line.trim()) return '';
+  const max = 42;
+  const short = line.length > max ? `${line.slice(0, max - 1)}…` : line;
+  return ` · ${short}`;
+}
+
 export function buildReportedEmailHtml(
   payload: JobEmailPayload,
   brandingLogoUrl: string,
 ): { subject: string; html: string; text: string } {
-  const subject = `[แจ้งเหตุ] ใบแจ้งซ่อม ${payload.ticketNo ?? payload.title ?? ''}`.trim();
+  const ticket = payload.ticketNo?.trim() || 'งาน';
+  const subject =
+    `[แจ้งเหตุ] ใบแจ้งซ่อม ${ticket}${subjectLocationSuffix(payload)}`.trim();
   const html = wrapBody({
     brandingLogoUrl,
     accentTitle: 'ได้รับเรื่องแจ้งซ่อมแล้ว',
@@ -148,7 +172,9 @@ export function buildAssignedEmailHtml(
   payload: JobEmailPayload,
   brandingLogoUrl: string,
 ): { subject: string; html: string; text: string } {
-  const subject = `[รับเรื่อง] มอบหมายงาน ${payload.ticketNo ?? ''}`.trim();
+  const ticket = payload.ticketNo?.trim() || 'งาน';
+  const subject =
+    `[รับเรื่อง] มอบหมาย ${ticket}${subjectLocationSuffix(payload)}`.trim();
   const html = wrapBody({
     brandingLogoUrl,
     accentTitle: 'มีงานมอบหมาย / รับเรื่องแล้ว',
@@ -163,7 +189,9 @@ export function buildClosedEmailHtml(
   payload: JobEmailPayload,
   brandingLogoUrl: string,
 ): { subject: string; html: string; text: string } {
-  const subject = `[ปิดงาน] แจ้งซ่อม ${payload.ticketNo ?? ''} เสร็จสิ้น`.trim();
+  const ticket = payload.ticketNo?.trim() || 'งาน';
+  const subject =
+    `[ปิดงาน] ${ticket} เสร็จสิ้น${subjectLocationSuffix(payload)}`.trim();
   const html = wrapBody({
     brandingLogoUrl,
     accentTitle: 'ปิดงานเรียบร้อย',
