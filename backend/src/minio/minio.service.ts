@@ -126,6 +126,38 @@ export class MinioService implements OnModuleInit {
         }
     }
 
+    /**
+     * แปลง URL ที่ออกให้ client (MINIO_PUBLIC_URL / โดเมน HTTPS) เป็น URL ที่ backend ใช้ axios โหลด object
+     * ใช้เมื่อ DNS ภายในชี้โดเมนไป IP ที่ไม่มี :443 แต่ MinIO รับที่ :9000 (HTTP) เช่น http://192.168.0.71:9000
+     * ตั้ง MINIO_SERVER_FETCH_BASE_URL=http://192.168.0.71:9000 คู่กับ MINIO_PUBLIC_URL=https://minio-it.forth.co.th
+     */
+    rewriteStorageUrlForServerFetch(url: string): string {
+        const internalRaw = process.env.MINIO_SERVER_FETCH_BASE_URL?.trim();
+        if (!internalRaw) {
+            return url;
+        }
+        const internalBase = internalRaw.replace(/\/+$/, '');
+        const publicRaw = process.env.MINIO_PUBLIC_URL?.trim();
+        if (!publicRaw) {
+            return url;
+        }
+        const publicBase = publicRaw.replace(/\/+$/, '');
+        const trimmed = url.trim();
+        if (trimmed.startsWith(publicBase)) {
+            return `${internalBase}${trimmed.slice(publicBase.length)}`;
+        }
+        try {
+            const pub = new URL(publicBase);
+            const u = new URL(trimmed);
+            if (u.origin === pub.origin) {
+                return `${internalBase}${u.pathname}${u.search}`;
+            }
+        } catch {
+            /* keep url */
+        }
+        return url;
+    }
+
     private async putObjectAndGetUrl(objectName: string, file: Express.Multer.File): Promise<string> {
         const metaData = {
             'Content-Type': file.mimetype,

@@ -186,8 +186,9 @@ export class JobsService {
         if (!url) {
             throw new NotFoundException('ไม่มีรูปในตำแหน่งนี้');
         }
+        const fetchUrl = this.minioService.rewriteStorageUrlForServerFetch(url);
         try {
-            const resp = await axios.get<ArrayBuffer>(url, {
+            const resp = await axios.get<ArrayBuffer>(fetchUrl, {
                 responseType: 'arraybuffer',
                 timeout: 30000,
                 maxContentLength: 15 * 1024 * 1024,
