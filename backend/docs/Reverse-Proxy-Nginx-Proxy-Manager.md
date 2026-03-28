@@ -20,6 +20,7 @@
 |----------|----------------|--------|
 | `/api/auth` | `http://<IP-เครื่อง>:8309` | NextAuth — `frontend/src/app/api/auth/[...nextauth]/route.ts` |
 | `/api/print-jobs` | `http://<IP-เครื่อง>:8309` | โหลดข้อมูลหน้าพิมพ์ — `frontend/src/app/api/print-jobs/[id]/data/route.ts` |
+| `/api/job-images` | `http://<IP-เครื่อง>:8309` | Proxy รูปงานให้ `<img>` (อ่าน JWT จาก cookie) — `frontend/src/app/api/job-images/[id]/[kind]/[index]/route.ts` — **ห้ามให้ไป Nest โดยตรง** (จะได้ `401` เพราะ `<img>` ไม่ส่ง Bearer) |
 | `/socket.io` | `http://<IP-เครื่อง>:8310` | `EventsGateway` (Socket.IO) |
 | `/api/` | `http://<IP-เครื่อง>:8310` | API หลักของ Nest (รวม `/api/jobs/...`, `/api/jobs/.../report-pdf`, `/api/jobs/.../image/...`) |
 
@@ -28,7 +29,8 @@
 ### หมายเหตุสำคัญ
 
 1. **`/api/jobs/...` ไป Nest โดยตรง**  
-   ใน repo มี Route Handler ที่ `frontend/src/app/api/jobs/[id]/image/...` เป็นตัว proxy ไป Nest — เมื่อ reverse proxy ส่ง `/api/` ไปพอร์ต **8310** แล้ว คำขอจะถึง **Nest โดยตรง** (ไม่ผ่าน Next) ซึ่งถูกต้อง เพราะ Nest มี `GET /api/jobs/:id/image/...` อยู่แล้ว
+   API หลักของงาน (`GET /api/jobs/:id`, list ฯลฯ) ไป Nest ถูกต้อง  
+   **รูปใน `<img>`** ต้องใช้ **`/api/job-images/:id/:kind/:index`** ฝั่ง Next (8309) เท่านั้น — path นี้แนบ Bearer จาก session cookie แล้วค่อยดึงจาก Nest ภายใน ถ้าเบราว์เซอร์เรียก `GET /api/jobs/.../image/...` ไปชน Nest โดยตรงจะได้ **401** เพราะแท็ก `<img>` ไม่ส่ง header `Authorization`
 
 2. **WebSocket**  
    ที่ Proxy Host หลักควรเปิด **Websockets Support** (ถ้ามี) และ location `/socket.io` ต้องชี้ไป backend

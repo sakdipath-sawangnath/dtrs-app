@@ -147,7 +147,7 @@ function padImages(urls: string[] | null | undefined, n: number): (string | null
   return out;
 }
 
-/** รูป issue/fix — โหลดผ่าน Next API proxy หรือ data URL ที่ prefetch มา (Puppeteer ไม่มี session cookie) */
+/** รูป issue/fix — โหลดผ่าน Next `/api/job-images/...` (อ่าน cookie บน PRD) หรือ data URL จาก prefetch */
 function JobProxiedImage({
   jobId,
   kind,
@@ -164,7 +164,7 @@ function JobProxiedImage({
   const src =
     prefetchedSrc && prefetchedSrc.length > 0
       ? prefetchedSrc
-      : `/api/jobs/${jobId}/image/${kind}/${index}`;
+      : `/api/job-images/${jobId}/${kind}/${index}`;
   return (
     // eslint-disable-next-line @next/next/no-img-element -- เทมเพลต PDF + พิมพ์
     <img
@@ -191,7 +191,7 @@ type Props = {
   /** ถ้าไม่ส่ง (เช่น หน้าพิมพ์) ใช้ ref ภายใน — ยังใช้กับ html2canvas บนหน้ารายละเอียดงานได้ */
   page1Ref?: RefObject<HTMLDivElement | null>;
   page2Ref?: RefObject<HTMLDivElement | null>;
-  /** data URL จาก prefetch ฝั่งเซิร์ฟเวอร์ — ใช้เมื่อไม่มี cookie สำหรับ /api/jobs/.../image */
+  /** data URL จาก prefetch ฝั่งเซิร์ฟเวอร์ — ใช้เมื่อไม่มี cookie (เช่น Puppeteer) */
   prefetchedImages?: PdfPrefetchedImages;
   /** แสดงป้ายหมายเลขหน้าบนจอเท่านั้น (คลาส no-print) — ใช้หน้า /print/jobs */
   showScreenPageLabels?: boolean;

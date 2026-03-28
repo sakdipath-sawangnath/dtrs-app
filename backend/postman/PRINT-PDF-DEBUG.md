@@ -57,6 +57,7 @@
 
 - เส้น `/api/backend-auth/*` ส่งไป backend (Nest)
 - เส้น `/api/print-jobs/*` ส่งไป frontend (Next)
+- เส้น `/api/job-images/*` ส่งไป frontend (Next) — `<img>` รูปงาน (ไม่ส่ง Bearer ไป Nest โดยตรง)
 - เส้น `/api/jobs/*` ส่งไป backend (Nest)
 - มีการส่ง `Authorization` header ต่อไป upstream
 
