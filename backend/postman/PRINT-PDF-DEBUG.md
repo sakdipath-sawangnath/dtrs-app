@@ -57,7 +57,8 @@
 
 - เส้น `/api/backend-auth/*` ส่งไป backend (Nest)
 - เส้น `/api/print-jobs/*` ส่งไป frontend (Next)
-- เส้น `/api/job-images/*` ส่งไป frontend (Next) — `<img>` รูปงาน (ไม่ส่ง Bearer ไป Nest โดยตรง)
+- รูปหน้าพิมพ์โหลดที่ **`/job-images/*`** บน Next (ไม่อยู่ใต้ `/api` — ไม่ต้องแยก NPM เพิ่ม)
+- *(ทางเลือก)* เส้น `/api/job-images/*` ส่งไป frontend (Next) — ถ้าใช้ alias นี้ต้องแยก location แบบเดียวกับ `/api/print-jobs`
 - เส้น `/api/jobs/*` ส่งไป backend (Nest)
 - มีการส่ง `Authorization` header ต่อไป upstream
 

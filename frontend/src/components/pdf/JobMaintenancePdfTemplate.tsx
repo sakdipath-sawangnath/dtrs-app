@@ -147,7 +147,7 @@ function padImages(urls: string[] | null | undefined, n: number): (string | null
   return out;
 }
 
-/** รูป issue/fix — โหลดผ่าน Next `/api/job-images/...` (อ่าน cookie บน PRD) หรือ data URL จาก prefetch */
+/** รูป issue/fix — `/job-images/...` บน PRD ไป Next โดยไม่ต้องแยก NPM ใต้ `/api` หรือ data URL จาก prefetch */
 function JobProxiedImage({
   jobId,
   kind,
@@ -164,7 +164,7 @@ function JobProxiedImage({
   const src =
     prefetchedSrc && prefetchedSrc.length > 0
       ? prefetchedSrc
-      : `/api/job-images/${jobId}/${kind}/${index}`;
+      : `/job-images/${jobId}/${kind}/${index}`;
   return (
     // eslint-disable-next-line @next/next/no-img-element -- เทมเพลต PDF + พิมพ์
     <img

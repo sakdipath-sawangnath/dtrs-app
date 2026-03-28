@@ -6,7 +6,7 @@
 
 | บริการ | พอร์ต host (ตัวอย่าง) | หน้าที่ |
 |--------|----------------------|---------|
-| Next.js | `8309` → 3000 | หน้าเว็บ, NextAuth (`/api/auth/*`), Route Handler พิมพ์รายงาน (`/api/print-jobs/*`) |
+| Next.js | `8309` → 3000 | หน้าเว็บ, NextAuth (`/api/auth/*`), พิมพ์รายงาน (`/api/print-jobs/*`), **รูปงานหน้าพิมพ์ (`/job-images/*`)** |
 | NestJS | `8310` → 4000 | REST API ภายใต้ `/api/*` (เช่น `/api/jobs/...`, `/api/roles/...`), PDF (`/api/jobs/:id/report-pdf`), Socket.IO |
 
 - Backend ตั้ง `app.setGlobalPrefix('api')` — path ที่ส่งเข้า Nest ต้องมี **`/api`** นำหน้า (ห้าม strip `/api` ออกจน Nest ได้แค่ `/jobs/...` โดยไม่มี prefix)
@@ -20,7 +20,7 @@
 |----------|----------------|--------|
 | `/api/auth` | `http://<IP-เครื่อง>:8309` | NextAuth — `frontend/src/app/api/auth/[...nextauth]/route.ts` |
 | `/api/print-jobs` | `http://<IP-เครื่อง>:8309` | โหลดข้อมูลหน้าพิมพ์ — `frontend/src/app/api/print-jobs/[id]/data/route.ts` |
-| `/api/job-images` | `http://<IP-เครื่อง>:8309` | Proxy รูปงานให้ `<img>` (อ่าน JWT จาก cookie) — `frontend/src/app/api/job-images/[id]/[kind]/[index]/route.ts` — **ห้ามให้ไป Nest โดยตรง** (จะได้ `401` เพราะ `<img>` ไม่ส่ง Bearer) |
+| `/api/job-images` | `http://<IP-เครื่อง>:8309` | *(ไม่บังคับ)* alias เดียวกับรูปงาน — `frontend/src/app/api/job-images/...` — ใช้เมื่อต้องการ path ใต้ `/api` เท่านั้น |
 | `/socket.io` | `http://<IP-เครื่อง>:8310` | `EventsGateway` (Socket.IO) |
 | `/api/` | `http://<IP-เครื่อง>:8310` | API หลักของ Nest (รวม `/api/jobs/...`, `/api/jobs/.../report-pdf`, `/api/jobs/.../image/...`) |
 
@@ -30,7 +30,8 @@
 
 1. **`/api/jobs/...` ไป Nest โดยตรง**  
    API หลักของงาน (`GET /api/jobs/:id`, list ฯลฯ) ไป Nest ถูกต้อง  
-   **รูปใน `<img>`** ต้องใช้ **`/api/job-images/:id/:kind/:index`** ฝั่ง Next (8309) เท่านั้น — path นี้แนบ Bearer จาก session cookie แล้วค่อยดึงจาก Nest ภายใน ถ้าเบราว์เซอร์เรียก `GET /api/jobs/.../image/...` ไปชน Nest โดยตรงจะได้ **401** เพราะแท็ก `<img>` ไม่ส่ง header `Authorization`
+   **รูปใน `<img>` หน้าพิมพ์** ใช้ **`/job-images/:id/:kind/:index`** บน Next (8309) — path ไม่อยู่ใต้ `/api` จึงโดน forward ไป Next ตามปกติแม้ NPM ไม่ได้แยก `/api/job-images` (ถ้าแยกไป Nest จะได้ **404**) — route แนบ Bearer จาก session cookie แล้วค่อยดึงจาก Nest ภายใน ถ้าเบราว์เซอร์เรียก `GET /api/jobs/.../image/...` ไปชน Nest โดยตรงจะได้ **401** เพราะแท็ก `<img>` ไม่ส่ง header `Authorization`  
+   *(ทางเลือก)* **`/api/job-images/...`** ทำงานเหมือนกัน แต่ต้องตั้ง NPM แยกไป Next เหมือน `/api/print-jobs`
 
 2. **WebSocket**  
    ที่ Proxy Host หลักควรเปิด **Websockets Support** (ถ้ามี) และ location `/socket.io` ต้องชี้ไป backend
