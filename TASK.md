@@ -190,3 +190,28 @@
 ### เอกสาร
 - [x] อัปเดต `README.md`, `STATUS.md`, `PLAN.md`, `TASK.md`, `AGENTS.md`, `AGENT_INSTRUCTIONS.md`, `frontend/README.md`
 
+## 19. Phase 6.9 — พิมพ์ PRD, proxy รูป, MinIO fetch ภายใน (2026-03-28)
+
+### Frontend
+- [x] Route **`/job-images/*`** — ใช้ logic ร่วมกับ **`/api/job-images/*`** (`jobImageProxy.ts`); เมื่อ upstream ไม่ `ok` ส่ง JSON + header **`X-Upstream-Http-Status`** เพื่ออ่านใน DevTools
+
+### Backend
+- [x] **`getJobImageBuffer`** — แปลง URL ด้วย **`MINIO_SERVER_FETCH_BASE_URL`** + `MINIO_PUBLIC_URL` ก่อน `axios.get`; ล้มเหลว → **502** + log `getJobImageBuffer failed ...`
+
+### CI
+- [x] **`.gitlab-ci.yml`** — ส่ง env **`MINIO_SERVER_FETCH_BASE_URL`** เข้า backend container (ถ้าตั้งใน GitLab Variables)
+
+### เอกสาร
+- [x] อัปเดต `README.md`, `STATUS.md`, `PLAN.md`, `TASK.md`, `AGENTS.md`, `AGENT_INSTRUCTIONS.md`, `minio.md`, `frontend/README.md`, `backend/README.md`, `backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md`, `backend/postman/PRINT-PDF-DEBUG.md`, `backend/postman/README.md`
+
+## 20. Private MinIO + รูปผ่านสิทธิ์ (2026-03-28) — implement แล้ว
+
+สรุป: **[`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md)**
+
+- [x] Phase 1: Nest SDK + `getJobImageBuffer`
+- [x] Phase 2: `/job-images` + `dashboardJobImagePath` — job detail, JobsList, status เจ้าหน้าที่
+- [x] Phase 3: `GET /users/:id/avatar`, `/user-images`, `PersonAvatar`, auth session, users/profile
+- [x] Phase 4: default `MINIO_ENSURE_PUBLIC_READ_POLICY=false` (ลบ policy public เดิมที่ MinIO ด้วยมือถ้ามี)
+- [ ] Phase 5: ทดสอบ manual ตาม checklist ในเอกสารแผน
+- [x] Phase 6: README, STATUS, api-endpoints, Reverse-Proxy, minio.md, PLAN §4.10
+

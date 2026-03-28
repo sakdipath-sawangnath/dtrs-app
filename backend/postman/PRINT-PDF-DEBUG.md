@@ -78,3 +78,9 @@
 
 - ถ้า PRD ใช้โดเมนเดียวกับหน้าเว็บ ให้ใช้ `apiBase=https://<domain>/api` ตาม proxy จริง
 - ถ้าทดสอบ local ให้ปรับเป็น `http://localhost:3000/api` (Next) หรือ `http://localhost:4000/api` (Backend) ตามที่รันอยู่
+
+## 8) แก้ 502 ที่รูป — ตัวแปร backend `MINIO_SERVER_FETCH_BASE_URL`
+
+- ถ้า **`03` / `04` Get Image** ได้ **502** และ log มี **`getJobImageBuffer failed`** แต่ request **`07` MinIO HEAD** (หรือ browser) ไป URL สาธารณะได้ — ให้ตรวจว่า **container backend** ต่อไป URL ใน DB ได้หรือไม่ (TLS/DNS/:443)
+- ตั้งใน `.env` หรือ GitLab Variables (ส่งผ่าน `.gitlab-ci.yml`): **`MINIO_SERVER_FETCH_BASE_URL`** = ฐาน HTTP ภายในที่ MinIO รับจริง (ตัวอย่างรูปแบบ: `http://192.168.x.x:9000`) คู่ **`MINIO_PUBLIC_URL`** ที่เป็น prefix ของ URL ใน DB — Nest จะ rewrite เฉพาะส่วนที่ขึ้นต้นด้วย `MINIO_PUBLIC_URL` ก่อนโหลดไฟล์
+- หลัง deploy ต้องใช้ **image backend ใหม่** ที่มี logic นี้

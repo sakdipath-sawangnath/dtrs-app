@@ -6,7 +6,7 @@
 
 | บริการ | พอร์ต host (ตัวอย่าง) | หน้าที่ |
 |--------|----------------------|---------|
-| Next.js | `8309` → 3000 | หน้าเว็บ, NextAuth (`/api/auth/*`), พิมพ์รายงาน (`/api/print-jobs/*`), **รูปงานหน้าพิมพ์ (`/job-images/*`)** |
+| Next.js | `8309` → 3000 | หน้าเว็บ, NextAuth (`/api/auth/*`), พิมพ์รายงาน (`/api/print-jobs/*`), **รูปงาน (`/job-images/*`)**, **รูปโปรไฟล์แดชบอร์ด (`/user-images/*`)** |
 | NestJS | `8310` → 4000 | REST API ภายใต้ `/api/*` (เช่น `/api/jobs/...`, `/api/roles/...`), PDF (`/api/jobs/:id/report-pdf`), Socket.IO |
 
 - Backend ตั้ง `app.setGlobalPrefix('api')` — path ที่ส่งเข้า Nest ต้องมี **`/api`** นำหน้า (ห้าม strip `/api` ออกจน Nest ได้แค่ `/jobs/...` โดยไม่มี prefix)
@@ -45,12 +45,32 @@
 5. **PDF ฝั่งเซิร์ฟเวอร์**  
    `GET /api/jobs/:id/report-pdf` อยู่ใน Nest — ต้องมี **Chrome/Chromium สำหรับ Puppeteer** ใน container backend (แยกจากการตั้งค่า reverse proxy)
 
+6. **504 Gateway Time-out ตอนกด “ดาวน์โหลด PDF (เซิร์ฟเวอร์)” — ไม่ใช่ routing เดียวกับหน้าพิมพ์**  
+   - หน้า **`/print/jobs/:id`** ที่ผู้ใช้เปิดในเบราว์เซอร์ → traffic ไป **Next (8309)** เป็นหลาย request สั้นๆ  
+   - ปุ่มดาวน์โหลด → เบราว์เซอร์เรียก **`GET /api/jobs/:id/report-pdf`** ไป **Nest (8310)** request เดียวแต่ **ใช้เวลานาน** — `JobsPdfService` เปิด Chromium ไปที่ `FRONTEND_BASE_URL/print/jobs/:id` ด้วย `waitUntil: networkidle0` และ **timeout ฝั่ง Puppeteer 120 วินาที** (`jobs-pdf.service.ts`) ก่อนค่อย `page.pdf()`  
+   - OpenResty/Nginx ค่าเริ่มต้นมัก **`proxy_read_timeout` ~60s** → upstream (Nest) ยังไม่ตอบ → ลูกค้าได้ **504** พร้อม HTML `<title>504 Gateway Time-out</title>`  
+   - **แก้ที่ proxy:** เพิ่ม `proxy_connect_timeout`, `proxy_send_timeout`, `proxy_read_timeout` เป็น **อย่างน้อย 180s–300s** สำหรับ location ที่ forward ไป Nest สำหรับ path นี้ (หรือทั้ง `/api/` ไป backend ถ้าแยก snippet ยาก)  
+   - ตัวอย่าง snippet (ปรับให้เข้ากับ NPM / custom config ของ host):
+
+     ```nginx
+     proxy_connect_timeout 300s;
+     proxy_send_timeout 300s;
+     proxy_read_timeout 300s;
+     ```
+
 ## ตัวแปรที่ควรสอดคล้องกับ reverse proxy นี้
 
 - `NEXT_PUBLIC_API_BASE_URL=https://<โดเมน>/api`
 - `NEXTAUTH_URL=https://<โดเมน>`
 - `API_INTERNAL_BASE_URL=http://<ชื่อ-container-backend>:4000/api` (ภายใน Docker network)
 - Backend: `ALLOWED_ORIGINS=https://<โดเมน>`, `FRONTEND_BASE_URL=https://<โดเมน>`
+- Backend (ถ้าจำเป็น): **`MINIO_PUBLIC_URL`** = URL สาธารณะที่เก็บในลิงก์รูปใน DB (เช่น `https://minio-it.example.com`) คู่ **`MINIO_SERVER_FETCH_BASE_URL`** = ฐาน HTTP ภายใน LAN ที่ Nest ใช้โหลด object (เช่น `http://192.168.x.x:9000`) เมื่อจาก container backend ต่อไปโดเมนใน `MINIO_PUBLIC_URL` ไม่ได้ (เช่น :443 ปิด แต่ MinIO API รับที่พอร์ต 9000) — รายละเอียด `README.md`, `minio.md`
+
+## Troubleshooting: รูปพิมพ์ได้ 502 แต่ browser เปิด MinIO ตรงๆ ได้
+
+- อาการ: DevTools → request **`/job-images/...`** ได้ **502**; log backend มี **`getJobImageBuffer failed`**
+- สาเหตุที่พบบ่อย: DNS ภายในชี้โดเมน MinIO ไป IP เดียวกับที่ผู้ใช้ใช้ HTTPS ผ่าน reverse proxy แต่ **จากเซิร์ฟเวอร์/backend ไม่มีบริการ TLS ที่ :443** — `axios` ใน Nest ล้มเหลว
+- แนวทาง: ตั้ง **`MINIO_SERVER_FETCH_BASE_URL`** ให้ชี้ไป **MinIO S3 API** ภายใน (มักพอร์ต **9000**, scheme **http** บน LAN) คู่ **`MINIO_PUBLIC_URL`** ที่ตรงกับ prefix ของ URL ใน `Job.images` / `fixImages`; ทดสอบจาก container backend ด้วย `curl -I` ไป URL หลัง rewrite (หรือไป `http://<ip>:9000/...` ตาม policy/bucket)
 
 ---
 

@@ -2,7 +2,16 @@
 
 ระบบแจ้งปัญหาและระบบจัดการการซ่อมบำรุงกล้องวงจรปิด (CCTV) ซึ่งพัฒนาต่อเนื่องมาจากการใช้งานผ่าน AppSheet
 
-## บันทึกการอัปเดตล่าสุด (2026-03-24)
+## บันทึกการอัปเดตล่าสุด (2026-03-28)
+
+- **พิมพ์รายงานบน PRD** — รูปใน PDF โหลดทาง **`/job-images/:jobId/:kind/:index`** บน Next (ไม่อยู่ใต้ `/api` จึงไม่ต้องแยก NPM location เพิ่ม); **`/api/print-jobs/:id/data`** ยังต้องส่งไป Next; รายละเอียด NPM ดู [`backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md`](backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md)
+- **DevTools** — เมื่อ Nest ตอบ error ระหว่าง proxy รูป Next ส่ง **JSON สั้นๆ** ใน response (แทน body ว่าง) เพื่ออ่านในแท็บ Preview; ดู [`frontend/src/lib/jobImageProxy.ts`](frontend/src/lib/jobImageProxy.ts)
+- **`GET /api/jobs/:id/image/...`** — ถ้าโหลด object จาก URL ใน DB ไม่สำเร็จ → **502 Bad Gateway** + log `getJobImageBuffer failed ...` (เดิมใช้ 400)
+- **`MINIO_SERVER_FETCH_BASE_URL`** — ให้ Nest แปลง URL ที่ขึ้นต้นด้วย **`MINIO_PUBLIC_URL`** ไปโหลดทาง **HTTP ภายใน** (เช่น `http://192.168.0.71:9000`) เมื่อ DNS ภายในชี้โดเมน MinIO ไป IP ที่ไม่มี HTTPS :443 แต่ MinIO รับที่พอร์ต API; ส่งผ่าน GitLab Variable / `.gitlab-ci.yml` → container backend
+- **Postman** — อัปเดต [`backend/postman/CCTV-Print-PDF-Debug.postman_collection.json`](backend/postman/CCTV-Print-PDF-Debug.postman_collection.json) + [`backend/postman/PRINT-PDF-DEBUG.md`](backend/postman/PRINT-PDF-DEBUG.md)
+- **MinIO private + รูปผ่านสิทธิ์** — ค่าเริ่มต้น **`MINIO_ENSURE_PUBLIC_READ_POLICY=false`** (ไม่ตั้ง public read บน bucket ตอนสตาร์ท); แดชบอร์ดใช้ **`/job-images/...`** กับ **`/user-images/:userId`** บน Next (cookie + JWT → Nest); API **`GET /api/users/:id/avatar`** / **`GET /api/users/me/avatar`**; หน้า public **`/public/users/reporter-by-phone`** ไม่ส่ง `image` URL; รายละเอียด [`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md)
+
+## บันทึกการอัปเดต (2026-03-24)
 
 - **อีเมลแจ้งงาน (เทมเพลต + Role)** — เก็บใน `Setting` คีย์ `email_templates`; หน้า **`/dashboard/settings`** (ADMIN): โลโก้, **`publicBaseUrl`** สำหรับลิงก์ในอีเมล, เทมเพลต **แจ้งเหตุ / รับเรื่อง / ปิดงาน** (เปิดปิด, To เพิ่มเติม, CC, **แจ้งตามบทบาท** `notifyRoleIds`); HTML อีเมลโทนสว่าง สถานะเป็น badge — **flow ผู้รับ To/CC เริ่มต้น** ดู [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
 - **API:** `GET/PUT /api/settings/email-templates` (ADMIN)

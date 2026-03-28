@@ -1,4 +1,20 @@
-import { Controller, Get, Param, Post, Body, Patch, Delete, UseGuards, InternalServerErrorException, Req, UseInterceptors, UploadedFile } from '@nestjs/common';
+import {
+    Controller,
+    Get,
+    Param,
+    Post,
+    Body,
+    Patch,
+    Delete,
+    UseGuards,
+    InternalServerErrorException,
+    Req,
+    UseInterceptors,
+    UploadedFile,
+    ParseIntPipe,
+    Res,
+} from '@nestjs/common';
+import type { Response } from 'express';
 import { UsersService } from './users.service';
 import { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -48,6 +64,21 @@ export class UsersController {
         return this.usersService.findById(req.user.id);
     }
 
+    /** สตรีมรูปโปรไฟล์ของตัวเอง — ใช้กับ Next `/user-images/:userId` */
+    @UseGuards(JwtAuthGuard)
+    @Get('me/avatar')
+    async streamMyAvatar(
+        @Req() req: { user: { id: number } },
+        @Res() res: Response,
+    ) {
+        const { buffer, contentType } = await this.usersService.getAvatarImageBuffer(
+            req.user.id,
+        );
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Cache-Control', 'private, max-age=120');
+        res.send(buffer);
+    }
+
     /** เปลี่ยนรหัสผ่านของตัวเอง (ต้องอยู่ก่อน me) */
     @UseGuards(JwtAuthGuard)
     @Patch('me/password')
@@ -72,6 +103,19 @@ export class UsersController {
         }
         const url = await this.minioService.uploadUserAvatar(req.user.id, file);
         return this.usersService.updateImage(req.user.id, url);
+    }
+
+    /** สตรีมรูปโปรไฟล์ตาม user id — ต้อง JWT (แดชบอร์ด); ต้องอยู่ก่อน @Get(':id') */
+    @UseGuards(JwtAuthGuard)
+    @Get(':id/avatar')
+    async streamUserAvatar(
+        @Param('id', ParseIntPipe) id: number,
+        @Res() res: Response,
+    ) {
+        const { buffer, contentType } = await this.usersService.getAvatarImageBuffer(id);
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Cache-Control', 'private, max-age=120');
+        res.send(buffer);
     }
 
     @UseGuards(JwtAuthGuard, RolesGuard)

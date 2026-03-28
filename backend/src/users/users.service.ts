@@ -1,12 +1,23 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+    BadGatewayException,
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    Injectable,
+    Logger,
+    NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import axios from 'axios';
 import { DEFAULT_PASS_SETTING_KEY } from '../settings/settings.service';
 import { MinioService } from '../minio/minio.service';
 
 @Injectable()
 export class UsersService {
+    private readonly logger = new Logger(UsersService.name);
+
     constructor(
         private prisma: PrismaService,
         private minioService: MinioService,
@@ -116,6 +127,67 @@ export class UsersService {
         if (!row) return null;
         const image = this.minioService.rewriteStorageUrlForClient(row.image ?? undefined);
         return { ...row, image };
+    }
+
+    /**
+     * สตรีมไบต์รูปโปรไฟล์จากที่เก็บ (MinIO ฯลฯ) — ใช้ SDK ก่อน แล้ว fallback HTTP
+     */
+    async getAvatarImageBuffer(userId: number): Promise<{ buffer: Buffer; contentType: string }> {
+        const row = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { image: true },
+        });
+        const url = row?.image?.trim();
+        if (!url) {
+            throw new NotFoundException('ไม่มีรูปโปรไฟล์');
+        }
+
+        const objectKey = this.minioService.tryParseBucketObjectKeyFromUrl(url);
+        if (objectKey) {
+            try {
+                return await this.minioService.getBucketObjectBuffer(objectKey);
+            } catch (sdkErr: unknown) {
+                if (!this.isMinioObjectNotFoundError(sdkErr)) {
+                    this.logger.warn(
+                        `getAvatarImageBuffer MinIO SDK failed user=${userId} key=${objectKey} ${String(sdkErr)}`,
+                    );
+                }
+            }
+        }
+
+        const fetchUrl = this.minioService.rewriteStorageUrlForServerFetch(url);
+        try {
+            const resp = await axios.get<ArrayBuffer>(fetchUrl, {
+                responseType: 'arraybuffer',
+                timeout: 30000,
+                maxContentLength: 15 * 1024 * 1024,
+                validateStatus: (s) => s >= 200 && s < 400,
+            });
+            const ct = (resp.headers['content-type'] as string) || 'image/jpeg';
+            return { buffer: Buffer.from(resp.data), contentType: ct };
+        } catch (err: unknown) {
+            const detail = axios.isAxiosError(err)
+                ? `code=${err.code ?? 'n/a'} status=${err.response?.status ?? 'n/a'}`
+                : 'non-axios error';
+            this.logger.warn(`getAvatarImageBuffer failed user=${userId} ${detail}`);
+            throw new BadGatewayException(
+                'ไม่สามารถโหลดรูปโปรไฟล์จากที่เก็บได้ — ตรวจสอบ URL ใน DB และการเชื่อมต่อ MinIO',
+            );
+        }
+    }
+
+    private isMinioObjectNotFoundError(err: unknown): boolean {
+        if (!err || typeof err !== 'object') {
+            return false;
+        }
+        const e = err as { code?: string; name?: string; message?: string };
+        return (
+            e.code === 'NotFound' ||
+            e.code === 'NoSuchKey' ||
+            e.name === 'NotFound' ||
+            (typeof e.message === 'string' &&
+                /Not Found|NoSuchKey|The specified key does not exist/i.test(e.message))
+        );
     }
 
     /**

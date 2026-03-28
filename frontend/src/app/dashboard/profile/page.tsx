@@ -81,7 +81,9 @@ export default function ProfilePage() {
           phone: p.phone ?? "",
           position: p.position ?? "",
         });
-        setAvatarPreview(p.image ?? null);
+        setAvatarPreview(
+          p.image?.trim() ? `/user-images/${p.id}` : null,
+        );
         setAvatarObjectUrl((prev) => {
           if (prev) URL.revokeObjectURL(prev);
           return null;
@@ -168,7 +170,9 @@ export default function ProfilePage() {
         await updateSession({
           user: {
             name: refreshed.name ?? undefined,
-            image: refreshed.image ?? undefined,
+            image: refreshed.image?.trim()
+              ? `/user-images/${refreshed.id}`
+              : undefined,
           },
         });
       }

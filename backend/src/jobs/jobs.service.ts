@@ -186,6 +186,21 @@ export class JobsService {
         if (!url) {
             throw new NotFoundException('ไม่มีรูปในตำแหน่งนี้');
         }
+
+        const objectKey = this.minioService.tryParseBucketObjectKeyFromUrl(url);
+        if (objectKey) {
+            try {
+                return await this.minioService.getBucketObjectBuffer(objectKey);
+            } catch (sdkErr: unknown) {
+                if (!this.isMinioObjectNotFoundError(sdkErr)) {
+                    this.logger.warn(
+                        `getJobImageBuffer MinIO SDK failed job=${jobId} kind=${kind} index=${index} key=${objectKey} ${String(sdkErr)}`,
+                    );
+                }
+                // Legacy / public URL หรือ object ยังไม่อยู่ใน bucket — ลอง HTTP
+            }
+        }
+
         const fetchUrl = this.minioService.rewriteStorageUrlForServerFetch(url);
         try {
             const resp = await axios.get<ArrayBuffer>(fetchUrl, {
@@ -207,6 +222,20 @@ export class JobsService {
                 'ไม่สามารถโหลดรูปจากที่เก็บได้ — ตรวจสอบ URL ใน DB, MinIO/พร็อกซี, และว่า backend เข้าถึง object storage ได้',
             );
         }
+    }
+
+    private isMinioObjectNotFoundError(err: unknown): boolean {
+        if (!err || typeof err !== 'object') {
+            return false;
+        }
+        const e = err as { code?: string; name?: string; message?: string };
+        return (
+            e.code === 'NotFound' ||
+            e.code === 'NoSuchKey' ||
+            e.name === 'NotFound' ||
+            (typeof e.message === 'string' &&
+                /Not Found|NoSuchKey|The specified key does not exist/i.test(e.message))
+        );
     }
 
     /**
@@ -233,6 +262,7 @@ export class JobsService {
                     images: true,
                     reporter: {
                         select: {
+                            id: true,
                             image: true,
                         },
                     },

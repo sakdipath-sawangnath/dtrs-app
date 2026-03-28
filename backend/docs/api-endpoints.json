@@ -1,7 +1,7 @@
 {
   "title": "CCTV Maintenance API - รายการเส้นทาง API",
   "baseUrl": "http://localhost:4000/api",
-  "updated": "2026-03-22",
+  "updated": "2026-03-28",
   "endpoints": [
     {
       "method": "GET",
@@ -27,6 +27,18 @@
       "path": "/api/users/me",
       "auth": "Bearer JWT",
       "description": "โปรไฟล์ของตัวเอง"
+    },
+    {
+      "method": "GET",
+      "path": "/api/users/me/avatar",
+      "auth": "Bearer JWT",
+      "description": "สตรีมไบต์รูปโปรไฟล์ตัวเอง (ใช้กับ Next `/user-images/:userId`)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/users/:id/avatar",
+      "auth": "Bearer JWT",
+      "description": "สตรีมไบต์รูปโปรไฟล์ตาม user id (ผู้ล็อกอิน)"
     },
     {
       "method": "PATCH",

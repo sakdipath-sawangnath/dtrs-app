@@ -1,6 +1,6 @@
 # แผนปรับปรุงระบบแจ้งซ่อม CCTV
 
-**อัปเดต:** 2026-03-24 (ส่วน 4.7–4.8 — อีเมล + Modal/UI roles)
+**อัปเดต:** 2026-03-28 (ส่วน 4.10 — Private MinIO implement แล้ว)
 
 ---
 
@@ -154,6 +154,20 @@
 - [x] **`CrudModal`** — `createPortal` → `document.body`, `z-100`, โทน Dark Glass (`ring`, backdrop), พร็อพ `size` md/lg, ล็อก scroll `body`
 - [x] **`/dashboard/roles`** — ฟอร์มบทบาท + กำหนดสิทธิ์ใช้ `form-input-glass`; รายการ checkbox ในกล่องแก้ว
 - [x] **เอกสาร** — อัปเดต `README.md`, `STATUS.md`, `TASK.md`, `AGENTS.md`, `AGENT_INSTRUCTIONS.md`, `frontend/README.md`
+
+## 4.9 พิมพ์รายงาน PRD + MinIO fetch ภายใน (2026-03-28)
+
+- [x] **Next** — route **`/job-images/*`** + `jobImageProxy` (แชร์ logic กับ `/api/job-images/*`); error upstream ส่ง JSON ให้ DevTools
+- [x] **Nest** — `getJobImageBuffer` ใช้ **`MinioService.rewriteStorageUrlForServerFetch`** + env **`MINIO_SERVER_FETCH_BASE_URL`**; ล้มเหลวโหลด object → **502** + log
+- [x] **CI** — `.gitlab-ci.yml` ส่ง `MINIO_SERVER_FETCH_BASE_URL` เข้า backend container (optional)
+- [x] **เอกสาร** — `README.md`, `STATUS.md`, `TASK.md`, `AGENTS.md`, `AGENT_INSTRUCTIONS.md`, `minio.md`, `backend/README.md`, `backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md`, `backend/postman/PRINT-PDF-DEBUG.md`, `backend/postman/README.md`, `frontend/README.md`
+
+## 4.10 ปิด MinIO public read + โหลดรูปผ่านสิทธิ์ (2026-03-28)
+
+- [x] Backend: Phase 1 — SDK + avatar **`getAvatarImageBuffer`**; **`GET /users/me/avatar`**, **`GET /users/:id/avatar`**; public reporter-by-phone ไม่ส่ง `image`
+- [x] Frontend: **`/user-images/[userId]`**, **`dashboardJobImageUrl`**, job detail + JobsList + status staff; **`PersonAvatar`**, auth, users, profile
+- [x] Infra default: **`MINIO_ENSURE_PUBLIC_READ_POLICY=false`** — ลบ policy public เดิมบน MinIO ด้วยมือถ้าเคยเปิดไว้
+- [ ] ทดสอบ PRD ตาม checklist ใน **[`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md)**
 
 ---
 

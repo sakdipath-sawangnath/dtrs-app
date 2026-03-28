@@ -1,6 +1,6 @@
 # Project Status - ระบบแจ้งซ่อม CCTV
 
-**วันที่อัปเดตสถานะ:** 2026-03-25
+**วันที่อัปเดตสถานะ:** 2026-03-28
 
 ---
 
@@ -38,7 +38,9 @@
    - **รายการงาน (Dashboard)**: `GET /jobs/list` — ดึงรายการแจ้งซ่อม (JWT); ไม่มี `GET /api/jobs` แบบเปล่า — แยก path เพื่อไม่ให้สับสนกับ `POST /jobs` (แจ้งซ่อมสาธารณะ) เมื่อเปิด URL ในเบราว์เซอร์
    - **ลบงาน `DELETE /jobs/:id`**: ถ้าเป็น **ADMIN** และงานสถานะ **IN_PROGRESS** จะลบได้ทันที; มิฉะนั้นใช้กับงาน **PENDING** ที่ยังไม่มอบหมายเท่านั้น (ต้องเป็น **ADMIN** หรือ **SUPERVISOR** ตาม logic เดิม)
    - **Validation แจ้งซ่อม (Public POST)**: DTO + Zod (`create-job.dto`) รวมถึง `reporterEmail` preprocess/trim; `ZodValidationPipe` รวม error message เป็น array ชัดเจน
-   - **MinIO**: ใช้ `MINIO_PUBLIC_URL` (ถ้ามี) สำหรับ URL รูปที่ browser เข้าถึงได้; bucket policy ตั้งเป็น public read ตอน onModuleInit
+   - **MinIO**: ค่าเริ่มต้น **ไม่** ตั้ง public read บน bucket (`MINIO_ENSURE_PUBLIC_READ_POLICY` ปิด); เก็บ URL ใน DB ตามเดิม; Nest ดึง object ด้วย **SDK** ใน `getJobImageBuffer` / `getAvatarImageBuffer` + fallback HTTP; **`MINIO_SERVER_FETCH_BASE_URL`** ใช้เมื่อต้องโหลดภายใน LAN; **`GET /users/:id/avatar`**, **`GET /users/me/avatar`**
+   - **พิมพ์รายงาน / รูปงาน / แดชบอร์ด**: หน้าพิมพ์ — **`/job-images/...`** → Nest; แดชบอร์ด/สถานะเจ้าหน้าที่ — รูปงานผ่าน **`dashboardJobImagePath`** (`/job-images/...`); รูปโปรไฟล์ผ่าน **`/user-images/:userId`**; เอกสาร NPM: `backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md`
+   - **Public API**: `GET /public/users/reporter-by-phone` **ไม่ส่ง** `image` URL (กันเปิดรูป MinIO โดยไม่ login)
 
 3. 🖥️ **Frontend & UI Design (Modern Minimal Theme & UX Improvements): `🟢 สมบูรณ์`**
    - **RBAC Sidebar (แก้แล้ว):** `DashboardLayoutShell` แกะ response `/roles/me/permissions` แบบเดียวกับ `ResponseInterceptor`; ถ้า permission ที่ได้ไม่ map กับรายการเมนูใน sidebar จะ fallback ตามบทบาท; เมนูสำหรับ **SUPERVISOR** ในหมวดเดียวกับ STAFF (ภาพรวม, กำลังแก้ไข, ประวัติ, นอกสัญญา) สอดคล้องเอกสาร
@@ -157,7 +159,8 @@ npx ts-node scripts/seed-roles-permissions.ts
 - **ตั้งค่าอีเมล (SMTP) + Reopen (2026-03-22)**: API ตั้งค่า SMTP (ADMIN); **`PATCH /jobs/:id/fix`** และ **`PATCH /jobs/:id/reopen`** — เฉพาะผู้รับงาน; Frontend หน้า settings + Reopen ยืนยันก่อนเรียก API; `@nestjs/cli` v11; `JobsList` แท็บสัญญา/นอกสัญญาไม่ห่อ glass ชั้นนอก
 - **เทมเพลตอีเมลแจ้งงาน + Role (2026-03-24)**: `GET/PUT /settings/email-templates`, `JobEmailNotificationService`, HTML โทนสว่าง + badge สถานะ; เอกสาร flow: [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
 - **UI Modal + บทบาท (2026-03-24)**: `CrudModal` — portal, `z-100`, Dark Glass; `/dashboard/roles` — `form-input-glass` + modal กำหนดสิทธิ์ (`size="lg"`)
-- **Deploy / CI (2026-03-23)**: **GitLab CI** (`.gitlab-ci.yml`) + **`Dockerfile`** — build แยก frontend/backend ใน pipeline, image production รัน Nest + Next; พอร์ต host ตัวอย่าง **8309→3000**, **8310→4000**; ตัวแปร **`FRONTEND_BASE_URL`** แทน `FRONTEND_URL_PRD`; คู่มือ production โดเมนเดียว + `/api` + `/socket.io` และ `MINIO_PUBLIC_URL` สรุปใน `README.md`
+- **Deploy / CI (2026-03-23)**: **GitLab CI** (`.gitlab-ci.yml`) + **`Dockerfile`** — build แยก frontend/backend ใน pipeline, image production รัน Nest + Next; พอร์ต host ตัวอย่าง **8309→3000**, **8310→4000**; ตัวแปร **`FRONTEND_BASE_URL`** แทน `FRONTEND_URL_PRD`; คู่มือ production โดเมนเดียว + `/api` + `/socket.io` และ `MINIO_PUBLIC_URL` สรุปใน `README.md`; (2026-03-28) pipeline ส่ง **`MINIO_SERVER_FETCH_BASE_URL`** เข้า backend ได้เมื่อตั้งใน GitLab Variables
+- **พิมพ์ + รูปงานบน PRD (2026-03-28)**: รูปในเทมเพลตผ่าน **`/job-images/...`** บน Next; Nest **`MINIO_SERVER_FETCH_BASE_URL`** แก้กรณี backend โหลด MinIO ทาง public URL ไม่ได้ → **502** พร้อม log `getJobImageBuffer failed` ถ้ายังไม่ตั้งค่า
 - **Backend Docker entry (Nest + nodenext)**: image backend ใช้ **`node dist/src/main.js`** — ไม่ใช่ `dist/main.js`; สาเหตุเดิมของ error PRD `MODULE_NOT_FOUND` คือ path entry ไม่ตรงกับผล compile
 - **Frontend build (2026-03-23)**: `apiResponse.ts`; **`/public/report`** ใช้ `<Suspense>` รอบ `useSearchParams` เพื่อให้ `next build` ผ่าน
 - **Deploy PRD (2026-03-23 ต่อ):** `next.config.mjs` (ไม่ต้องมี TypeScript ใน runner image); **`API_INTERNAL_BASE_URL`** สำหรับ `authorize()` → backend ใน Docker network; GitLab ส่ง **`ALLOWED_ORIGINS`** เข้า backend container

@@ -14,7 +14,7 @@ Next.js 15 (App Router) สำหรับระบบแจ้งปัญห�
 - `src/app/` — หน้าและ layout (report, status, login, dashboard)
 - `src/components/` — SiteHeader, SiteFooter, PublicLayoutShell, DashboardPageShell, DashboardFilterBar, **`CrudModal`** (portal → `document.body`, **`z-100`**, Dark Glass, พร็อพ `size` md/lg — ใช้ที่ `/dashboard/users`, `/dashboard/roles` ฯลฯ), UserMenuDropdown, SegmentedTabs, JobsList (ตารางงาน + แท็บสัญญา/นอกสัญญา **ไม่ห่อ glass ชั้นนอก** + badge งานค้าง + modal อัปเดตการแก้ไขแบบ Dark Glass + ดูรายละเอียด full page `/dashboard/jobs/:id` + มอบหมายงาน react-select / รับงาน; รองรับ `assignedToMe` สำหรับงานที่รับผิดชอบ; ADMIN ลบ IN_PROGRESS ได้ที่หน้า `/dashboard/in-progress`)
 - `src/app/globals.css` — class **`form-input-glass`** สำหรับ input/textarea บนพื้นหลังแดชบอร์ดเข้ม (แยกจาก `.form-input` ที่ใช้บนฟอร์มสว่าง)
-- `src/lib/` — auth.ts (NextAuth), toast.ts (toastSuccess, toastError, confirmDialog), **apiResponse.ts** (`extractAssignableArray`, `axiosErrorData`, `formatApiErrorDetail` — ใช้ใน JobsList / หน้ารายละเอียดงาน)
+- `src/lib/` — auth.ts (NextAuth; รูปผู้ใช้ใน session ใช้ path **`/user-images/:id`** เมื่อมีรูปในระบบ), toast.ts, **apiResponse.ts**, **`jobImageProxy.ts`** + route **`/job-images/...`**, **`userImageProxy.ts`** + route **`/user-images/[userId]`**, **`dashboardJobImageUrl.ts`** — helper path รูปงานสำหรับ `<img>` บนแดชบอร์ด
 
 ### Flow สำคัญ
 
@@ -31,6 +31,11 @@ Next.js 15 (App Router) สำหรับระบบแจ้งปัญห�
 
 - **/dashboard/jobs/[id]**
   - รายละเอียดงานเต็มหน้า: การ์ดข้อมูลการแจ้งข้อขัดข้อง + การ์ดข้อมูลการแก้ไข + ฟอร์มบันทึกการแก้ไข (ส่วนขัดข้อง, สาเหตุ, วิธีแก้ไข, รูปการแก้ไข สูงสุด 3 รูป, หมายเหตุ, Serial เก่า/ใหม่); **บันทึกการแก้ไข / Reopen — เฉพาะผู้รับงาน (assignee)**; Reopen มี `confirmDialog` ก่อนเรียก API; เมื่อสถานะ Resolved — พิมพ์/PDF ผ่านหน้า **`/print/jobs/[id]`** + `JobMaintenancePdfTemplate` + `print.css` (หรือดาวน์โหลด PDF ฝั่ง backend `GET /jobs/:id/report-pdf`)
+
+- **`/print/jobs/[id]` (พิมพ์)**
+  - ข้อมูล JSON จาก **`GET /api/print-jobs/:id/data`** (Next API route); รูปในเทมเพลตใช้ **`/job-images/:id/:kind/:index`** (ไม่อยู่ใต้ `/api` — reverse proxy ส่งต่อไป Next ตาม host หลักได้โดยไม่ต้องแยก location เพิ่ม) หรือ alias **`/api/job-images/...`** ถ้าตั้ง NPM แยกเหมือน `/api/print-jobs`
+
+- **รูปโปรไฟล์ (แดชบอร์ด)** — **`/user-images/:userId`** (Next proxy → **`GET /api/users/:id/avatar`**) ใช้ใน `PersonAvatar`, หน้า users, header; path ไม่อยู่ใต้ `/api` เหมือน `/job-images`
 
 - **/dashboard/settings** (ADMIN)
   - ตั้งค่า **SMTP** — โหลด/บันทึก/ทดสอบส่งอีเมล (`GET/PUT /api/settings/email-smtp`, `POST /api/settings/email-smtp/test`); ตัวเลือก TLS / self-signed

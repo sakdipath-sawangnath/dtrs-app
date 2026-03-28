@@ -59,6 +59,8 @@ export const authOptions: NextAuthOptions = {
                             return null;
                         }
                         const identifier = credentials?.email?.trim() || me.username;
+                        const avatarProxy =
+                            me.image?.trim() ? `/user-images/${me.id}` : undefined;
                         return {
                             id: String(me.id),
                             name: me.name || identifier,
@@ -66,7 +68,7 @@ export const authOptions: NextAuthOptions = {
                             accessToken,
                             role: (me.role || 'STAFF').toUpperCase(),
                             username: me.username || identifier,
-                            image: me.image ?? undefined,
+                            image: avatarProxy,
                         };
                     } catch (error) {
                         console.error('Session from token error', error);
@@ -119,8 +121,14 @@ export const authOptions: NextAuthOptions = {
                                 },
                             });
                             const meRaw: unknown = await meRes.json().catch(() => null);
-                            const mePayload = unwrapApiData<{ image?: string }>(meRaw);
-                            image = mePayload?.image ?? undefined;
+                            const mePayload = unwrapApiData<{
+                                id?: number;
+                                image?: string;
+                            }>(meRaw);
+                            image =
+                                mePayload?.image?.trim() && mePayload?.id != null
+                                    ? `/user-images/${mePayload.id}`
+                                    : undefined;
                         } catch {
                             // ignore
                         }

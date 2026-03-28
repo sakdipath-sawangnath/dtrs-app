@@ -86,7 +86,8 @@ function UserAvatarCell({
   onPreview?: (src: string, alt: string) => void;
 }) {
   const [imgError, setImgError] = useState(false);
-  const src = u.image?.trim();
+  const raw = u.image?.trim();
+  const src = raw ? `/user-images/${u.id}` : undefined;
   const showImg = Boolean(src) && !imgError;
   const initial = (u.name?.trim()?.[0] || u.username?.[0] || "?").toUpperCase();
   const tooltip = [u.name?.trim(), u.username ? `@${u.username}` : ""]
@@ -102,7 +103,7 @@ function UserAvatarCell({
       {showImg && onPreview ? (
         <button
           type="button"
-          onClick={() => onPreview(src!, imgAlt)}
+          onClick={() => onPreview(src ?? "", imgAlt)}
           className={`${frameClass} cursor-pointer transition-shadow hover:ring-2 hover:ring-blue-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50`}
           aria-label="ดูรูปโปรไฟล์"
         >
@@ -364,7 +365,7 @@ export default function UsersPage() {
     setModalTab("account");
     setEditingId(u.id);
     setAvatarFile(null);
-    setAvatarPreview(u.image ?? null);
+    setAvatarPreview(u.image?.trim() ? `/user-images/${u.id}` : null);
     setShowEditPassword(false);
     setModalOpen(true);
   };

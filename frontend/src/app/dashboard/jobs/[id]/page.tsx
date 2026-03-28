@@ -27,6 +27,7 @@ import { confirmDialog, toastError, toastSuccess } from "@/lib/toast";
 import Select from "react-select";
 import { reactSelectGlassStyles } from "@/lib/reactSelectGlassStyles";
 import { extractAssignableArray, unwrapApiData } from "@/lib/apiResponse";
+import { dashboardJobImagePath } from "@/lib/dashboardJobImageUrl";
 
 interface JobDetail {
   id: number;
@@ -613,6 +614,11 @@ export default function JobDetailPage() {
                         <div className="flex items-start gap-3 min-w-0">
                           <PersonAvatar
                             imageUrl={job.reporter?.image}
+                            avatarUserId={
+                              job.reporter?.image && job.reporter?.id != null
+                                ? job.reporter.id
+                                : undefined
+                            }
                             nameLabel={job.reporterName ?? undefined}
                             size="md"
                           />
@@ -653,6 +659,11 @@ export default function JobDetailPage() {
                           <div className="flex items-center gap-3 min-w-0">
                             <PersonAvatar
                               imageUrl={job.assignedTo.image}
+                              avatarUserId={
+                                job.assignedTo.image
+                                  ? job.assignedTo.id
+                                  : undefined
+                              }
                               nameLabel={job.assignedTo.name}
                               size="md"
                             />
@@ -680,19 +691,34 @@ export default function JobDetailPage() {
                         รูปภาพประกอบ
                       </p>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {job.images.slice(0, 4).map((src, i) => (
+                        {job.images.slice(0, 4).map((src, i) => {
+                          if (!src) return null;
+                          return (
                           <button
                             key={i}
                             type="button"
                             onClick={() => {
-                              const imgs = (job.images as string[]).filter(Boolean);
-                              setPreviewImages(imgs);
-                              setPreviewIndex(i);
+                              if (!job) return;
+                              const slice = (job.images as string[]).slice(0, 4);
+                              const proxyUrls: string[] = [];
+                              const origIdx: number[] = [];
+                              slice.forEach((u, idx) => {
+                                if (u) {
+                                  origIdx.push(idx);
+                                  proxyUrls.push(
+                                    dashboardJobImagePath(job.id, "issue", idx),
+                                  );
+                                }
+                              });
+                              const pos = origIdx.indexOf(i);
+                              if (pos < 0) return;
+                              setPreviewImages(proxyUrls);
+                              setPreviewIndex(pos);
                             }}
                             className="relative w-full aspect-4/3 sm:aspect-video rounded-xl border border-white/10 overflow-hidden bg-slate-800/50 group cursor-pointer"
                           >
                             <img
-                              src={src}
+                              src={dashboardJobImagePath(job.id, "issue", i)}
                               alt={`รูปประกอบ ${i + 1}`}
                               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                             />
@@ -702,7 +728,8 @@ export default function JobDetailPage() {
                               </span>
                             </div>
                           </button>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -818,19 +845,34 @@ export default function JobDetailPage() {
                         รูปการแก้ไข
                       </span>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {job.fixImages.slice(0, 3).map((src, i) => (
+                        {job.fixImages.slice(0, 3).map((src, i) => {
+                          if (!src) return null;
+                          return (
                           <button
                             key={i}
                             type="button"
                             onClick={() => {
-                              const imgs = (job.fixImages as string[]).filter(Boolean);
-                              setPreviewImages(imgs);
-                              setPreviewIndex(i);
+                              if (!job) return;
+                              const slice = (job.fixImages as string[]).slice(0, 3);
+                              const proxyUrls: string[] = [];
+                              const origIdx: number[] = [];
+                              slice.forEach((u, idx) => {
+                                if (u) {
+                                  origIdx.push(idx);
+                                  proxyUrls.push(
+                                    dashboardJobImagePath(job.id, "fix", idx),
+                                  );
+                                }
+                              });
+                              const pos = origIdx.indexOf(i);
+                              if (pos < 0) return;
+                              setPreviewImages(proxyUrls);
+                              setPreviewIndex(pos);
                             }}
                             className="relative w-full aspect-4/3 rounded-xl border border-white/10 overflow-hidden bg-slate-800/50 group cursor-pointer"
                           >
                             <img
-                              src={src}
+                              src={dashboardJobImagePath(job.id, "fix", i)}
                               alt={`รูปการแก้ไข ${i + 1}`}
                               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                             />
@@ -840,7 +882,8 @@ export default function JobDetailPage() {
                               </span>
                             </div>
                           </button>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}

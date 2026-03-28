@@ -8,6 +8,7 @@ import { Search, MapPin, Calendar, FileText, User, Phone, Mail, Image as ImageIc
 import DashboardLayoutShell from '@/components/DashboardLayoutShell';
 import PublicLayoutShell from '@/components/PublicLayoutShell';
 import Link from 'next/link';
+import { dashboardJobImagePath } from '@/lib/dashboardJobImageUrl';
 
 const STATUS_LABEL: Record<string, { text: string; badgeClass: string }> = {
   PENDING: {
@@ -75,23 +76,29 @@ function maskFirstAndLastChar(input: string): string {
   return `${first}${'*'.repeat(chars.length - 2)}${last}`;
 }
 
-/** รูปโปรไฟล์ผู้แจ้ง (เจ้าหน้าที่ที่ล็อกอิน) — Dark Glass + fallback */
+/** รูปโปรไฟล์ผู้แจ้ง (เจ้าหน้าที่ที่ล็อกอิน) — Dark Glass + fallback — โหลดผ่าน `/user-images` */
 function ReporterAvatarGlass({
   imageUrl,
+  reporterUserId,
   name,
 }: {
   imageUrl: string | null | undefined;
+  reporterUserId?: number | null;
   name: string | null | undefined;
 }) {
   const [imgError, setImgError] = useState(false);
   const trimmed = imageUrl?.trim();
-  const showImg = Boolean(trimmed) && !imgError;
+  const src =
+    trimmed && reporterUserId != null
+      ? `/user-images/${reporterUserId}`
+      : trimmed ?? undefined;
+  const showImg = Boolean(src) && !imgError;
 
   return (
     <div className="relative flex h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-white/15 bg-slate-800/50 shadow-inner ring-1 ring-white/10 backdrop-blur-md sm:h-22 sm:w-22">
       {showImg ? (
         <img
-          src={trimmed}
+          src={src}
           alt={name ? `รูปโปรไฟล์ ${name}` : "ผู้แจ้ง"}
           className="h-full w-full object-cover"
           onError={() => setImgError(true)}
@@ -131,7 +138,7 @@ function StatusPageInner() {
     images?: unknown;
     /** จำนวนรูป (โหมด public มาสก์ — ไม่ส่ง URL รูป) */
     issueImageCount?: number;
-    reporter?: { image: string | null } | null;
+    reporter?: { id?: number; image: string | null } | null;
   } | null>(null);
   const [notFound, setNotFound] = useState(false);
 
@@ -150,7 +157,7 @@ function StatusPageInner() {
     reporterEmail?: string | null;
     images?: unknown;
     issueImageCount?: number;
-    reporter?: { image: string | null } | null;
+    reporter?: { id?: number; image: string | null } | null;
   } => {
     if (!v || typeof v !== 'object') return false;
     const o = v as Record<string, unknown>;
@@ -421,6 +428,7 @@ function StatusPageInner() {
                       {isStaffFlow && !isPublicMasked ? (
                         <ReporterAvatarGlass
                           imageUrl={result.reporter?.image}
+                          reporterUserId={result.reporter?.id}
                           name={result.reporterName}
                         />
                       ) : (
@@ -499,25 +507,31 @@ function StatusPageInner() {
               </section>
 
               {/* รูปภาพประกอบ — เต็ม: แสดงรูป | public มาสก์: การ์ดทึบตามจำนวน */}
-              {!isPublicMasked && issueImages.length > 0 && (
+              {!isPublicMasked &&
+                result.id != null &&
+                Array.isArray(result.images) &&
+                issueImages.length > 0 && (
                 <section className={GLASS_SECTION}>
                   <div className="flex items-center gap-2 mb-4 pb-3 border-b border-white/10">
                     <ImageIcon size={18} className="text-blue-400 shrink-0" aria-hidden />
                     <h2 className="text-base font-bold text-white">รูปภาพประกอบ</h2>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {issueImages.map((src, i) => (
+                    {(result.images as unknown[]).map((src, i) => {
+                      if (typeof src !== 'string' || !src.trim()) return null;
+                      return (
                       <div
-                        key={`${src.slice(0, 48)}-${i}`}
+                        key={i}
                         className="relative w-full aspect-video rounded-xl border border-white/10 overflow-hidden bg-slate-800/50"
                       >
                         <img
-                          src={src}
+                          src={dashboardJobImagePath(result.id!, "issue", i)}
                           alt={`รูปภาพประกอบ ${i + 1}`}
                           className="w-full h-full object-cover"
                         />
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </section>
               )}

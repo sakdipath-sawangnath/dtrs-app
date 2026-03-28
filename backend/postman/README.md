@@ -9,7 +9,7 @@
 
 ### ไฟล์เสริมสำหรับ debug การพิมพ์รายงาน
 
-- Collection: **`CCTV-Print-PDF-Debug.postman_collection.json`** — รวม MinIO HEAD (ไม่ใช้ JWT), `/job-images`, คำอธิบาย 502/404, ตัวแปร `minioBaseUrl` / `jobId`
+- Collection: **`CCTV-Print-PDF-Debug.postman_collection.json`** — รวม MinIO HEAD (ไม่ใช้ JWT), `/job-images`, คำอธิบาย 502/404, ตัวแปร `minioBaseUrl` / `jobId`, แนวทาง **`MINIO_SERVER_FETCH_BASE_URL`** ใน `PRINT-PDF-DEBUG.md` §8
 - คู่มือ: **`PRINT-PDF-DEBUG.md`**
 
 ## ตัวแปร (Variables)

@@ -9,7 +9,9 @@ export class MinioService implements OnModuleInit {
     private readonly logger = new Logger(MinioService.name);
     private readonly startupCheckEnabled = (process.env.MINIO_STARTUP_CHECK ?? 'true') === 'true';
     private readonly autoCreateBucketEnabled = (process.env.MINIO_AUTO_CREATE_BUCKET ?? 'true') === 'true';
-    private readonly ensurePublicReadPolicyEnabled = (process.env.MINIO_ENSURE_PUBLIC_READ_POLICY ?? 'true') === 'true';
+    /** ค่าเริ่มต้น false — bucket private; ตั้งเป็น true เฉพาะเมื่อยังต้องการให้ client โหลด object ตรงจาก MinIO */
+    private readonly ensurePublicReadPolicyEnabled =
+        (process.env.MINIO_ENSURE_PUBLIC_READ_POLICY ?? 'false') === 'true';
 
     constructor() {
         this.minioClient = new Minio.Client({
@@ -156,6 +158,74 @@ export class MinioService implements OnModuleInit {
             /* keep url */
         }
         return url;
+    }
+
+    /**
+     * แปลง URL ที่บันทึกใน DB (public / internal / หลัง rewrite สำหรับ client) เป็น object key ใน bucket ปัจจุบัน
+     * รูปแบบที่รองรับ: path เป็น `/{bucketName}/{objectKey}` เช่น `/cctv-app/jobs/289/fix/1.jpg`
+     */
+    tryParseBucketObjectKeyFromUrl(url: string): string | null {
+        const trimmed = url.trim();
+        if (!trimmed) {
+            return null;
+        }
+        let pathname: string;
+        try {
+            pathname = new URL(trimmed).pathname;
+        } catch {
+            return null;
+        }
+        const prefix = `/${this.bucketName}/`;
+        if (!pathname.startsWith(prefix)) {
+            return null;
+        }
+        const rawKey = pathname.slice(prefix.length);
+        if (!rawKey) {
+            return null;
+        }
+        let key: string;
+        try {
+            key = decodeURIComponent(rawKey.replace(/\+/g, ' '));
+        } catch {
+            return null;
+        }
+        const segments = key.split('/');
+        for (const seg of segments) {
+            if (seg === '' || seg === '.' || seg === '..') {
+                return null;
+            }
+        }
+        return key;
+    }
+
+    private static readonly maxJobImageBytes = 15 * 1024 * 1024;
+
+    /**
+     * อ่าน object ใน bucket ปัจจุบันด้วย credentials ของ MinIO client — ใช้เมื่อ bucket เป็น private
+     */
+    async getBucketObjectBuffer(objectName: string): Promise<{
+        buffer: Buffer;
+        contentType: string;
+    }> {
+        const stat = await this.minioClient.statObject(this.bucketName, objectName);
+        if (stat.size > MinioService.maxJobImageBytes) {
+            throw new Error(
+                `object too large: ${stat.size} bytes (max ${MinioService.maxJobImageBytes})`,
+            );
+        }
+        const stream = await this.minioClient.getObject(this.bucketName, objectName);
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream as AsyncIterable<Buffer | Uint8Array | string>) {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        }
+        const buffer = Buffer.concat(chunks);
+        const meta = stat.metaData ?? {};
+        const rawCt =
+            (meta['content-type'] as string | undefined) ||
+            (meta['Content-Type'] as string | undefined) ||
+            'application/octet-stream';
+        const contentType = rawCt.split(';')[0]?.trim() || 'application/octet-stream';
+        return { buffer, contentType };
     }
 
     private async putObjectAndGetUrl(objectName: string, file: Express.Multer.File): Promise<string> {

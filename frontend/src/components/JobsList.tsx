@@ -42,6 +42,7 @@ import {
   asRecord,
 } from "@/lib/apiResponse";
 import PersonAvatar from "@/components/PersonAvatar";
+import { dashboardJobImagePath } from "@/lib/dashboardJobImageUrl";
 
 function ActionIconButton({
   label,
@@ -1256,6 +1257,11 @@ export default function JobsList({
                     <div className="flex items-start gap-2 min-w-0">
                       <PersonAvatar
                         imageUrl={job.reporter?.image}
+                        avatarUserId={
+                          job.reporter?.image && job.reporter?.id != null
+                            ? job.reporter.id
+                            : undefined
+                        }
                         nameLabel={job.reporterName ?? undefined}
                       />
                       <div className="min-w-0 flex-1">
@@ -1286,6 +1292,11 @@ export default function JobsList({
                       <div className="flex items-center gap-2 min-w-0">
                         <PersonAvatar
                           imageUrl={job.assignedTo?.image}
+                          avatarUserId={
+                            job.assignedTo?.image
+                              ? job.assignedTo.id
+                              : undefined
+                          }
                           nameLabel={job.assignedTo?.name}
                         />
                         <span className="truncate font-medium" title={job.assignedTo?.name ?? undefined}>
@@ -1503,6 +1514,12 @@ export default function JobsList({
                       <div className="flex items-start gap-3">
                         <PersonAvatar
                           imageUrl={detailJob.reporter?.image}
+                          avatarUserId={
+                            detailJob.reporter?.image &&
+                            detailJob.reporter?.id != null
+                              ? detailJob.reporter.id
+                              : undefined
+                          }
                           nameLabel={detailJob.reporterName ?? undefined}
                           size="md"
                           variant="light"
@@ -1568,6 +1585,11 @@ export default function JobsList({
                         <div className="flex items-center gap-3">
                           <PersonAvatar
                             imageUrl={detailJob.assignedTo.image}
+                            avatarUserId={
+                              detailJob.assignedTo.image
+                                ? detailJob.assignedTo.id
+                                : undefined
+                            }
                             nameLabel={detailJob.assignedTo.name}
                             size="md"
                             variant="light"
@@ -1621,19 +1643,22 @@ export default function JobsList({
                         รูปภาพประกอบ
                       </p>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {detailJob.images.slice(0, 4).map((src, i) => (
+                        {detailJob.images.slice(0, 4).map((src, i) => {
+                          if (!src) return null;
+                          return (
                           <div
                             key={i}
                             className="relative w-full aspect-4/3 sm:aspect-video rounded-2xl border overflow-hidden bg-slate-100"
                             style={{ borderColor: "#e2e8f0" }}
                           >
                             <img
-                              src={src}
+                              src={dashboardJobImagePath(detailJob.id, "issue", i)}
                               alt={`รูปประกอบ ${i + 1}`}
                               className="w-full h-full object-cover transition-transform duration-300 hover:scale-[1.05]"
                             />
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1760,21 +1785,44 @@ export default function JobsList({
                                 </span>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                   {updateFixJob.fixImages
-                                    .filter(Boolean)
                                     .slice(0, 3)
-                                    .map((src, i) => (
+                                    .map((src, i) => {
+                                      if (!src) return null;
+                                      return (
                                       <button
                                         key={i}
                                         type="button"
                                         onClick={() => {
-                                          const imgs = (updateFixJob.fixImages as string[]).filter(Boolean);
-                                          setUpdatePreviewImages(imgs);
-                                          setUpdatePreviewIndex(i);
+                                          const slice = (
+                                            updateFixJob.fixImages as string[]
+                                          ).slice(0, 3);
+                                          const proxyUrls: string[] = [];
+                                          const origIdx: number[] = [];
+                                          slice.forEach((u, idx) => {
+                                            if (u) {
+                                              origIdx.push(idx);
+                                              proxyUrls.push(
+                                                dashboardJobImagePath(
+                                                  updateFixJob.id,
+                                                  "fix",
+                                                  idx,
+                                                ),
+                                              );
+                                            }
+                                          });
+                                          const pos = origIdx.indexOf(i);
+                                          if (pos < 0) return;
+                                          setUpdatePreviewImages(proxyUrls);
+                                          setUpdatePreviewIndex(pos);
                                         }}
                                         className="relative w-full aspect-4/3 rounded-xl border border-white/10 overflow-hidden bg-slate-800/50 group cursor-pointer"
                                       >
                                         <img
-                                          src={src}
+                                          src={dashboardJobImagePath(
+                                            updateFixJob.id,
+                                            "fix",
+                                            i,
+                                          )}
                                           alt={`รูปการแก้ไข ${i + 1}`}
                                           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                                         />
@@ -1784,7 +1832,8 @@ export default function JobsList({
                                           </span>
                                         </div>
                                       </button>
-                                    ))}
+                                      );
+                                    })}
                                 </div>
                               </div>
                             )}
