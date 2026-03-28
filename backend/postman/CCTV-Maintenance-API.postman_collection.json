@@ -1,11 +1,12 @@
 {
   "info": {
     "name": "CCTV Maintenance API",
-    "description": "API ระบบแจ้งซ่อม CCTV · Backend NestJS\n\n**วิธีใช้:**\n1. ตั้งค่า baseUrl = http://localhost:4000/api (หรือตาม server)\n2. รัน request \"Auth > Login\" แล้วคัดลอก access_token จาก response ไปใส่ในตัวแปร access_token ของ Collection\n\n**อัปเดต:** Jobs — fix/reopen เฉพาะผู้รับงาน; Settings — SMTP (ADMIN); ดูรายละเอียดใน `backend/docs/api-endpoints.json`",
+    "description": "API ระบบแจ้งซ่อม CCTV · Backend NestJS\n\n**วิธีใช้:**\n1. ตั้งค่า baseUrl = http://localhost:4000/api (หรือตาม server)\n2. ตั้ง jobId สำหรับ request ในโฟลเดอร์ Jobs\n3. รัน request \"Auth > Login\" แล้วใส่ access_token ใน Variables\n\n**รูปงาน** `GET /jobs/:id/image/:kind/:index` — **502** = โหลดจาก MinIO ไม่ได้; **404** = ไม่มีรูปในช่อง · Collection debug หน้าพิมพ์: `CCTV-Print-PDF-Debug.postman_collection.json`\n\n**อัปเดต:** Jobs — fix/reopen เฉพาะผู้รับงาน; Settings — SMTP (ADMIN); ดู `backend/docs/api-endpoints.json`",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:4000/api" },
+    { "key": "jobId", "value": "1" },
     { "key": "access_token", "value": "" }
   ],
   "item": [
@@ -203,17 +204,26 @@
           "request": {
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": "{{baseUrl}}/jobs/1",
-            "description": "ดูงานตาม id"
+            "url": "{{baseUrl}}/jobs/{{jobId}}",
+            "description": "ดูงานตาม id (ตั้งค่า collection variable jobId)"
           }
         },
         {
-          "name": "Stream Job Image (issue/fix)",
+          "name": "Stream Job Image (issue/0)",
           "request": {
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": "{{baseUrl}}/jobs/1/image/issue/0",
-            "description": "สตรีมรูปงาน (proxy) · แก้ path เป็น issue|fix และ index 0–2"
+            "url": "{{baseUrl}}/jobs/{{jobId}}/image/issue/0",
+            "description": "สตรีมรูปแจ้ง ช่อง 0 = องค์ประกอบแรกใน `images` · kind: issue|fix · index 0–2 · 502 = Nest โหลด MinIO ไม่ได้ · 404 = ช่องว่าง"
+          }
+        },
+        {
+          "name": "Stream Job Image (fix/0)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{baseUrl}}/jobs/{{jobId}}/image/fix/0",
+            "description": "สตรีมรูปแก้ไข ช่อง 0 ใน `fixImages` — ดูคำอธิบายใน request issue/0"
           }
         },
         {
@@ -221,7 +231,7 @@
           "request": {
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": "{{baseUrl}}/jobs/1/report-pdf",
+            "url": "{{baseUrl}}/jobs/{{jobId}}/report-pdf",
             "description": "ดาวน์โหลด PDF รายงานการบำรุงรักษา (งานที่ resolve แล้ว)"
           }
         },
@@ -237,7 +247,7 @@
               "mode": "raw",
               "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}"
             },
-            "url": "{{baseUrl}}/jobs/1/status",
+            "url": "{{baseUrl}}/jobs/{{jobId}}/status",
             "description": "อัปเดตสถานะ · PENDING | IN_PROGRESS | RESOLVED"
           }
         },
@@ -253,7 +263,7 @@
               "mode": "raw",
               "raw": "{\n  \"staffId\": 1\n}"
             },
-            "url": "{{baseUrl}}/jobs/1/assign",
+            "url": "{{baseUrl}}/jobs/{{jobId}}/assign",
             "description": "มอบหมายงานให้ staff · ADMIN/SUPERVISOR ส่ง staffId ใครก็ได้ · STAFF ส่งได้เฉพาะตัวเอง"
           }
         },
@@ -274,7 +284,7 @@
                 { "key": "fixImages", "type": "file", "src": [], "disabled": true }
               ]
             },
-            "url": "{{baseUrl}}/jobs/1/fix",
+            "url": "{{baseUrl}}/jobs/{{jobId}}/fix",
             "description": "บันทึกการแก้ไข + รูปการแก้ไข (optional) · เฉพาะผู้รับงาน · ถ้ายัง RESOLVED ต้อง Reopen ก่อน"
           }
         },
@@ -290,7 +300,7 @@
               "mode": "raw",
               "raw": "{\n  \"reason\": \"ต้องแก้ไขเพิ่มเติม\"\n}"
             },
-            "url": "{{baseUrl}}/jobs/1/reopen",
+            "url": "{{baseUrl}}/jobs/{{jobId}}/reopen",
             "description": "Reopen: RESOLVED → IN_PROGRESS · เฉพาะผู้รับงาน"
           }
         },
@@ -306,7 +316,7 @@
               "mode": "raw",
               "raw": "{\n  \"isOutOfContract\": true\n}"
             },
-            "url": "{{baseUrl}}/jobs/1/out-of-contract",
+            "url": "{{baseUrl}}/jobs/{{jobId}}/out-of-contract",
             "description": "ย้ายนอกสัญญา (คงสถานะ PENDING ตาม backend)"
           }
         },
@@ -315,7 +325,7 @@
           "request": {
             "method": "DELETE",
             "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": "{{baseUrl}}/jobs/1",
+            "url": "{{baseUrl}}/jobs/{{jobId}}",
             "description": "ลบงาน · ADMIN + IN_PROGRESS ได้ทันที · มิฉะนั้น PENDING ไม่มอบหมาย (ADMIN/SUPERVISOR)"
           }
         }

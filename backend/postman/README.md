@@ -9,7 +9,7 @@
 
 ### ไฟล์เสริมสำหรับ debug การพิมพ์รายงาน
 
-- Collection: **`CCTV-Print-PDF-Debug.postman_collection.json`**
+- Collection: **`CCTV-Print-PDF-Debug.postman_collection.json`** — รวม MinIO HEAD (ไม่ใช้ JWT), `/job-images`, คำอธิบาย 502/404, ตัวแปร `minioBaseUrl` / `jobId`
 - คู่มือ: **`PRINT-PDF-DEBUG.md`**
 
 ## ตัวแปร (Variables)
@@ -17,6 +17,7 @@
 | ตัวแปร | ค่าเริ่มต้น | คำอธิบาย |
 |--------|-------------|----------|
 | `baseUrl` | `http://localhost:4000/api` | URL ฐานของ API (เปลี่ยนตาม server) |
+| `jobId` | `1` | เลขงานสำหรับ request ในโฟลเดอร์ Jobs |
 | `access_token` | (ว่าง) | JWT ที่ได้จาก Login · ใส่หลังรัน request Login |
 
 ## วิธีใช้

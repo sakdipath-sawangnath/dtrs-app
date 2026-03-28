@@ -1,7 +1,9 @@
 import {
+    BadGatewayException,
     BadRequestException,
     ForbiddenException,
     Injectable,
+    Logger,
     NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,6 +21,8 @@ import axios from 'axios';
 
 @Injectable()
 export class JobsService {
+    private readonly logger = new Logger(JobsService.name);
+
     constructor(
         private prisma: PrismaService,
         private sitesService: SitesService,
@@ -191,8 +195,16 @@ export class JobsService {
             });
             const ct = (resp.headers['content-type'] as string) || 'image/jpeg';
             return { buffer: Buffer.from(resp.data), contentType: ct };
-        } catch {
-            throw new BadRequestException('ไม่สามารถโหลดรูปจากที่เก็บได้');
+        } catch (err: unknown) {
+            const detail = axios.isAxiosError(err)
+                ? `code=${err.code ?? 'n/a'} status=${err.response?.status ?? 'n/a'}`
+                : 'non-axios error';
+            this.logger.warn(
+                `getJobImageBuffer failed job=${jobId} kind=${kind} index=${index} ${detail}`,
+            );
+            throw new BadGatewayException(
+                'ไม่สามารถโหลดรูปจากที่เก็บได้ — ตรวจสอบ URL ใน DB, MinIO/พร็อกซี, และว่า backend เข้าถึง object storage ได้',
+            );
         }
     }
 

@@ -14,7 +14,8 @@
 
 - `publicBaseUrl` เช่น `https://cctv-app.forth.co.th`
 - `apiBase` เช่น `https://cctv-app.forth.co.th/api`
-- `jobId` เช่น `282`
+- `minioBaseUrl` เช่น `https://minio-it.forth.co.th` (สำหรับ request 07 — ปรับ path object ให้ตรง DB)
+- `jobId` เช่น `251` หรือ `284`
 - `emailOrUsername` และ `password` ของผู้ใช้ที่มีสิทธิ์ดูงาน
 
 ## 3) ลำดับการทดสอบ (แนะนำ)
@@ -27,6 +28,8 @@
 4. `04 - Get Fix Image 0 (Backend)`
 5. `05 - Print Data Route (Next API)`
 6. `06 - Open Print Page (HTML)`
+7. *(ถ้าต้องการ)* `07 - MinIO object HEAD` — ตรวจว่า object โหลดได้โดยตรง (ไม่ใช้ JWT; ปรับ path ให้ตรง URL ใน DB)
+8. *(ถ้าต้องการ)* `08` / `09` — ทดสอบ Next `/job-images` และ `/api/job-images` (มักต้องแนบ Cookie จากเบราว์เซอร์ใน Postman)
 
 > Request แรกจะพยายาม set `access_token` ให้อัตโนมัติใน collection variable
 
@@ -62,7 +65,16 @@
 - เส้น `/api/jobs/*` ส่งไป backend (Nest)
 - มีการส่ง `Authorization` header ต่อไป upstream
 
-## 6) หมายเหตุ
+## 6) `/job-images` หรือรูปในหน้าพิมพ์ได้ **400 / 502** (ไม่ใช่ 404)
+
+- **404** = ไม่มี URL ในช่องนั้น (ปกติ)
+- **401** = ไม่มี session / token
+- **502** (หลังอัปเดต backend) = **backend ดึงไฟล์จาก URL ใน `Job.images` / `fixImages` ไม่สำเร็จ** (เช่น MinIO ตอบ 403/404, presign หมดอายุ, backend container เข้า hostname ใน URL ไม่ได้, TLS, timeout)
+- เดิมใช้ **400** แทนกรณีนี้ — ดูใน DevTools แท็บ **Network** → คลิก request รูป → **Response** จะเป็น JSON จาก Nest (`message` อธิบาย)
+- **ตรวจสอบ:** จากเครื่อง/ container **backend** ลอง `curl -I "<URL รูปจาก DB>"` ว่าได้ `200` หรือไม่; ดู log backend บรรทัด `getJobImageBuffer failed ...`
+- **`/api/print-jobs/:id/data` ช้า:** route นี้รอ prefetch รูป issue/fix ช่อง 0–2 พร้อมกัน (timeout ฝั่ง Next ~20 วินาทีต่อรูป) — ถ้ารูปหลายช่องโหลดช้า/ค้าง จะรอจนเสร็จชุด `Promise.all` ก่อนส่ง JSON
+
+## 7) หมายเหตุ
 
 - ถ้า PRD ใช้โดเมนเดียวกับหน้าเว็บ ให้ใช้ `apiBase=https://<domain>/api` ตาม proxy จริง
 - ถ้าทดสอบ local ให้ปรับเป็น `http://localhost:3000/api` (Next) หรือ `http://localhost:4000/api` (Backend) ตามที่รันอยู่

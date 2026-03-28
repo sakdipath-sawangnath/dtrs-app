@@ -1,13 +1,14 @@
 {
   "info": {
     "name": "CCTV Print/PDF Debug",
-    "description": "Collection สำหรับตรวจเส้นทาง Print/PDF ทั้ง Next + Backend + Reverse Proxy",
+    "description": "ตรวจเส้นทาง Print/PDF + รูปงาน (Next + Nest + MinIO + Reverse Proxy)\n\n**สรุป path:**\n- `GET {{apiBase}}/print-jobs/:id/data` → Next (ต้องแยก NPM ไปพอร์ต frontend)\n- `GET {{publicBaseUrl}}/job-images/:id/issue|fix/:index` → Next — **ไม่อยู่ใต้ `/api` เท่านั้น** ไม่ต้องแยก NPM เพิ่ม\n- `GET {{apiBase}}/job-images/...` → alias บน Next (ต้องแยก NPM เหมือน print-jobs)\n- `GET {{apiBase}}/jobs/:id/image/:kind/:index` → Nest — **502** = backend โหลด URL ใน DB จาก MinIO ไม่ได้; **404** = ไม่มีรูปในช่อง; **401** = ไม่มี JWT\n\n**prefetchedImages เป็น null ทุกช่อง:** Nest โหลด object จาก MinIO ไม่สำเร็จ — ทดสอบ request **07** จากเครื่องเดียวกับ backend หรือ `curl -I` ที่ MinIO\n\n**Windows curl + HTTPS:** ถ้าเจอ `CRYPT_E_NO_REVOCATION_CHECK` ใช้ `curl -I --ssl-no-revoke \"...\"`",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "publicBaseUrl", "value": "https://cctv-app.forth.co.th" },
     { "key": "apiBase", "value": "https://cctv-app.forth.co.th/api" },
-    { "key": "jobId", "value": "282" },
+    { "key": "minioBaseUrl", "value": "https://minio-it.forth.co.th" },
+    { "key": "jobId", "value": "251" },
     { "key": "emailOrUsername", "value": "admin" },
     { "key": "password", "value": "admin123" },
     { "key": "access_token", "value": "" }
@@ -23,7 +24,7 @@
           "raw": "{\n  \"email\": \"{{emailOrUsername}}\",\n  \"password\": \"{{password}}\"\n}"
         },
         "url": "{{apiBase}}/backend-auth/login",
-        "description": "ได้ JWT จาก backend-auth/login (กันชนกับ NextAuth)"
+        "description": "ได้ JWT จาก backend-auth/login (กันชนกับ NextAuth) — เก็บใน collection variable access_token"
       },
       "event": [
         {
@@ -45,25 +46,25 @@
         "method": "GET",
         "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
         "url": "{{apiBase}}/jobs/{{jobId}}",
-        "description": "ตรวจสถานะงาน ต้องเป็น RESOLVED เพื่อให้พิมพ์ได้"
+        "description": "ดู `images` / `fixImages` (URL เต็มไป MinIO) และ `status` ต้องเป็น RESOLVED เพื่อให้ print-jobs ส่ง JSON"
       }
     },
     {
-      "name": "03 - Get Issue Image 0 (Backend)",
+      "name": "03 - Get Issue Image 0 (Backend Nest)",
       "request": {
         "method": "GET",
         "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
         "url": "{{apiBase}}/jobs/{{jobId}}/image/issue/0",
-        "description": "ตรวจเส้นรูป issue ผ่าน backend/proxy (ควรได้ image/* หรือ 404 ถ้าไม่มีรูปช่องนี้)"
+        "description": "ช่อง 0 = องค์ประกอบแรกใน JSON `images` (ชื่อไฟล์ใน MinIO อาจเป็น 1.png ฯลฯ)\n- 200 + image/* = ผ่าน\n- 404 = ไม่มี URL ในช่องนี้\n- 502 = Nest โหลดจาก MinIO ไม่ได้ (เครือข่าย/TLS/403 object)\n- 401 = ไม่มี JWT"
       }
     },
     {
-      "name": "04 - Get Fix Image 0 (Backend)",
+      "name": "04 - Get Fix Image 0 (Backend Nest)",
       "request": {
         "method": "GET",
         "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
         "url": "{{apiBase}}/jobs/{{jobId}}/image/fix/0",
-        "description": "ตรวจเส้นรูป fix ผ่าน backend/proxy (ควรได้ image/* หรือ 404 ถ้าไม่มีรูปช่องนี้)"
+        "description": "เหมือน 03 แต่ `fixImages` · index 0–2"
       }
     },
     {
@@ -72,7 +73,7 @@
         "method": "GET",
         "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
         "url": "{{apiBase}}/print-jobs/{{jobId}}/data",
-        "description": "ต้องได้ JSON (job + prefetchedImages) ไม่ใช่ HTML"
+        "description": "ต้องได้ JSON `{ job, prefetchedImages }` ไม่ใช่ HTML\n- `prefetchedImages.issue/fix` เป็น null ทุกช่อง = เส้น Nest→MinIO ล้ม (เทียบกับ 03/04 และ 07)\n- NPM ต้องส่ง `/api/print-jobs` ไป Next ไม่ใช่ Nest"
       }
     },
     {
@@ -81,7 +82,34 @@
         "method": "GET",
         "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
         "url": "{{publicBaseUrl}}/print/jobs/{{jobId}}",
-        "description": "ตรวจหน้า print ว่าโหลดได้ (HTML) แล้ว client จะเรียก /api/print-jobs/:id/data ต่อ"
+        "description": "หน้า HTML — client เรียก `/api/print-jobs/:id/data` ต่อ (รูปใน PDF อาจใช้ `/job-images/...`)"
+      }
+    },
+    {
+      "name": "07 - MinIO object HEAD (direct, no JWT)",
+      "request": {
+        "method": "HEAD",
+        "header": [],
+        "url": "{{minioBaseUrl}}/cctv-app/jobs/{{jobId}}/issue/1.png",
+        "description": "ยิงตรงที่เก็บไฟล์ — ไม่ผ่านแอป · ไม่ใช้ login\n- ควรรันซ้ำจาก **เซิร์ฟเวอร์/container ที่รัน Nest** ด้วย (เทียบกับ PC)\n- ปรับ path `issue/1.png` ให้ตรงกับ URL ใน DB ของงานนั้น\n- Windows curl ถ้า TLS revocation error ใช้ `curl -I --ssl-no-revoke \"URL\"`"
+      }
+    },
+    {
+      "name": "08 - Next GET /job-images (ต้อง session cookie)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{publicBaseUrl}}/job-images/{{jobId}}/issue/0",
+        "description": "Next อ่าน JWT จาก **NextAuth cookie เท่านั้น** — ใน Postman มักได้ **401** จนกว่าจะแนบ Cookie จากเบราว์เซอร์หลังล็อกอิน\nใช้ยืนยันว่า path ไป Next แล้วไม่ 404 จาก Nest"
+      }
+    },
+    {
+      "name": "09 - Next GET /api/job-images (alias, ต้อง NPM → Next)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{apiBase}}/job-images/{{jobId}}/issue/0",
+        "description": "Alias ใต้ `/api` — ต้องตั้ง NPM แยกไป Next เหมือน `/api/print-jobs` · เช่นเดียวกับ 08 ต้องมี session cookie จาก NextAuth"
       }
     }
   ]
