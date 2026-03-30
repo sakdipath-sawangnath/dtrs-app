@@ -483,9 +483,14 @@ export default function JobsList({
       ? myPermissions.includes("job.deleteUnassigned")
       : ["ADMIN", "SUPERVISOR"].includes(userRoleUpper);
 
-  /** หน้า «กำลังแก้ไข» เท่านั้น — ADMIN ลบงาน IN_PROGRESS ได้ */
-  const canAdminDeleteInProgress =
-    userRoleUpper === "ADMIN" && statusFilter === "IN_PROGRESS";
+  /** หน้า «กำลังแก้ไข» — ลบ IN_PROGRESS ตามสิทธิ์ job.deleteInProgress (สอดคล้อง API) */
+  const canAdminDeleteInProgress = useMemo(() => {
+    if (statusFilter !== "IN_PROGRESS") return false;
+    if (myPermissions !== null) {
+      return myPermissions.includes("job.deleteInProgress");
+    }
+    return userRoleUpper === "ADMIN";
+  }, [statusFilter, myPermissions, userRoleUpper]);
 
   const fetchJobs = async () => {
     if (!token) return;

@@ -18,8 +18,8 @@ import type { Response } from 'express';
 import { UsersService } from './users.service';
 import { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { Permissions } from '../auth/permissions.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MinioService } from '../minio/minio.service';
 
@@ -30,9 +30,9 @@ export class UsersController {
         private readonly minioService: MinioService,
     ) { }
 
-    /** เฉพาะ ADMIN ดู/จัดการรายชื่อผู้ใช้ได้ (RBAC) */
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN')
+    /** จัดการผู้ใช้ — สิทธิ์ menu.users */
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @Permissions('menu.users')
     @Get()
     async findAll() {
         try {
@@ -49,9 +49,9 @@ export class UsersController {
         return this.usersService.findByRole('USER');
     }
 
-    /** รายชื่อเจ้าหน้าที่ที่มอบหมายงานได้ (STAFF/SUPERVISOR) */
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN', 'SUPERVISOR', 'STAFF')
+    /** รายชื่อเจ้าหน้าที่ที่มอบหมายงานได้ — อิง RBAC `job.assign` (สอดคล้อง PATCH /jobs/:id/assign และ JobsList) */
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @Permissions('job.assign')
     @Get('assignable')
     async findAssignable() {
         return this.usersService.findAssignable();
@@ -118,40 +118,40 @@ export class UsersController {
         res.send(buffer);
     }
 
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN')
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @Permissions('menu.users')
     @Get(':id')
     async findOne(@Param('id') id: string) {
         return this.usersService.findById(+id);
     }
 
-    /** สร้างผู้ใช้ - เฉพาะ ADMIN */
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN')
+    /** สร้างผู้ใช้ */
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @Permissions('menu.users')
     @Post()
     async create(@Body() createUserDto: Prisma.UserCreateInput) {
         return this.usersService.create(createUserDto);
     }
 
-    /** เปลี่ยนรหัสผ่าน - เฉพาะ ADMIN (ต้องอยู่ก่อน :id) */
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN')
+    /** เปลี่ยนรหัสผ่าน (ต้องอยู่ก่อน :id) */
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @Permissions('menu.users')
     @Patch(':id/password')
     async updatePassword(@Param('id') id: string, @Body() body: { password: string }) {
         return this.usersService.updatePassword(+id, body.password);
     }
 
-    /** รีเซ็ตรหัสผ่านเป็น Default Pass (เฉพาะ ADMIN) */
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN')
+    /** รีเซ็ตรหัสผ่านเป็น Default Pass */
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @Permissions('menu.users')
     @Post(':id/reset-password')
     async resetPasswordToDefault(@Param('id') id: string) {
         return this.usersService.resetPasswordToDefault(+id);
     }
 
-    /** แก้ไขผู้ใช้ (ชื่อ, อีเมล, เบอร์, ตำแหน่ง, role) - เฉพาะ ADMIN */
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN')
+    /** แก้ไขผู้ใช้ (ชื่อ, อีเมล, เบอร์, ตำแหน่ง, role) */
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @Permissions('menu.users')
     @Patch(':id')
     async update(
         @Req() req: { user: { id: number } },
@@ -162,9 +162,9 @@ export class UsersController {
         return this.usersService.update(+id, { ...body, ...roleUpdate } as any, req.user.id);
     }
 
-    /** อัปโหลดรูปโปรไฟล์ผู้ใช้ (ADMIN เท่านั้น) */
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN')
+    /** อัปโหลดรูปโปรไฟล์ผู้ใช้ */
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @Permissions('menu.users')
     @Patch(':id/avatar')
     @UseInterceptors(FileInterceptor('image'))
     async uploadUserAvatar(@Param('id') id: string, @UploadedFile() file?: Express.Multer.File) {
@@ -176,9 +176,9 @@ export class UsersController {
         return this.usersService.updateImage(userId, url);
     }
 
-    /** ลบผู้ใช้ - เฉพาะ ADMIN */
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN')
+    /** ลบผู้ใช้ */
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @Permissions('menu.users')
     @Delete(':id')
     async remove(@Param('id') id: string) {
         return this.usersService.remove(+id);

@@ -8,6 +8,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../prisma/prisma.service';
 import { PERMISSIONS_KEY } from './permissions.decorator';
+import { RBAC_ROLE_PERMISSION_CODES } from '../roles/roles.service';
 
 // Guard ตรวจสอบ Permission.code จากตาราง rolePermission/permission
 // ใช้ร่วมกับ JwtAuthGuard เพื่อกันไม่ให้ผู้ใช้เรียก CRUD โดยตรงแม้ซ่อนเมนูใน Sidebar
@@ -17,62 +18,6 @@ export class PermissionsGuard implements CanActivate {
     private readonly reflector: Reflector,
     private readonly prisma: PrismaService,
   ) {}
-
-  private readonly defaultCodesByEnumRole: Record<string, string[]> = {
-    ADMIN: [
-      'menu.profile',
-      'menu.report',
-      'menu.status',
-      'menu.dashboard',
-      'menu.pending',
-      'menu.myJobs',
-      'menu.inProgress',
-      'menu.all',
-      'menu.outOfContract',
-      'menu.users',
-      'menu.settings',
-      'menu.roles',
-      'menu.sites',
-      'job.assign',
-      'job.deleteUnassigned',
-      'job.fix.self',
-      'job.fix.any',
-      'job.reopen.self',
-      'job.reopen.any',
-      'site.create',
-      'site.update',
-      'site.delete',
-    ],
-    STAFF: [
-      'menu.dashboard',
-      'menu.pending',
-      'menu.myJobs',
-      'menu.inProgress',
-      'menu.all',
-      'menu.outOfContract',
-      'job.fix.self',
-      'job.reopen.self',
-    ],
-    USER: ['menu.profile', 'menu.report', 'menu.status'],
-    SUPERVISOR: [
-      'menu.dashboard',
-      'menu.pending',
-      'menu.myJobs',
-      'menu.inProgress',
-      'menu.all',
-      'menu.outOfContract',
-      'menu.sites',
-      'job.assign',
-      'job.deleteUnassigned',
-      'job.fix.self',
-      'job.fix.any',
-      'job.reopen.self',
-      'job.reopen.any',
-      'site.create',
-      'site.update',
-      'site.delete',
-    ],
-  };
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const required = this.reflector.getAllAndOverride<string[]>(
@@ -102,7 +47,7 @@ export class PermissionsGuard implements CanActivate {
       permissionCodes = rows.map((r) => r.permission.code);
     } else {
       const enumRole = dbUser.role ? String(dbUser.role).toUpperCase() : '';
-      permissionCodes = this.defaultCodesByEnumRole[enumRole] ?? [];
+      permissionCodes = RBAC_ROLE_PERMISSION_CODES[enumRole] ?? [];
     }
 
     // ต้องมีครบทุก permission ที่ประกาศ

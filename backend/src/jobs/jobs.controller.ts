@@ -1,11 +1,12 @@
 import { BadRequestException, Controller, Get, Post, Body, Param, Patch, Delete, UseGuards, Req, ForbiddenException, UseInterceptors, UploadedFiles, UsePipes, Query, ParseIntPipe, Res, StreamableFile } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { JobsService } from './jobs.service';
-import { UsersService } from '../users/users.service';
 import { JobsPdfService } from './jobs-pdf.service';
 import { MinioService } from '../minio/minio.service';
 import { EventsGateway } from '../events/events.gateway';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { Permissions } from '../auth/permissions.decorator';
 import { RolesService } from '../roles/roles.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import {
@@ -26,7 +27,6 @@ export class JobsController {
         private readonly jobsPdfService: JobsPdfService,
         private readonly minioService: MinioService,
         private readonly eventsGateway: EventsGateway,
-        private readonly usersService: UsersService,
         private readonly rolesService: RolesService,
     ) { }
 
@@ -127,17 +127,14 @@ export class JobsController {
         if (userId == null) {
             throw new ForbiddenException('ไม่มีสิทธิ์ลบงาน');
         }
-        // ใช้บทบาทจาก DB (roleRef.code) ไม่พึ่ง JWT อย่างเดียว — ให้ตรงกับ RBAC จริง
-        const role = (await this.usersService.getEffectiveRoleCode(userId)) ?? '';
-        // ADMIN: ลบงานกำลังแก้ไขได้ (หน้ารายการกำลังแก้ไข)
-        if (role === 'ADMIN') {
+        const codes = await this.rolesService.getPermissionsForUser(userId);
+        if (codes.includes('job.deleteInProgress')) {
             const deleted = await this.jobsService.tryDeleteInProgressJobByAdmin(id);
             if (deleted) {
                 this.eventsGateway.notifyJobUpdate({ id, deleted: true });
                 return { ok: true };
             }
         }
-        const codes = await this.rolesService.getPermissionsForUser(userId);
         if (!codes.includes('job.deleteUnassigned')) {
             throw new ForbiddenException('ไม่มีสิทธิ์ลบงานที่ยังไม่มีผู้รับผิดชอบ');
         }
@@ -147,7 +144,8 @@ export class JobsController {
         return result;
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @Permissions('job.updateStatus')
     @Patch(':id/status')
     async updateStatus(
         @Req() req: { headers: { authorization?: string } },

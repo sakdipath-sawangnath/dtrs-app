@@ -1,25 +1,25 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { RolesService } from './roles.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { Permissions } from '../auth/permissions.decorator';
 import { Req } from '@nestjs/common';
 
 @Controller('roles')
 export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
 
-  /** รายการบทบาททั้งหมด (ADMIN เท่านั้น) */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  /** รายการบทบาททั้งหมด — สิทธิ์ menu.roles */
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('menu.roles')
   @Get()
   async findAll() {
     return this.rolesService.findAllRoles();
   }
 
   /** รายการสิทธิ์ทั้งหมด (สำหรับเลือกใส่ให้บทบาท) */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('menu.roles')
   @Get('permissions')
   async findAllPermissions() {
     return this.rolesService.findAllPermissions();
@@ -34,48 +34,48 @@ export class RolesController {
   }
 
   /** ดูบทบาทตาม id พร้อมสิทธิ์ */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('menu.roles')
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.rolesService.findRoleById(+id);
   }
 
   /** สิทธิ์ของบทบาท (id ของ role) */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('menu.roles')
   @Get(':id/permissions')
   async getRolePermissions(@Param('id') id: string) {
     return this.rolesService.getRolePermissionIds(+id);
   }
 
   /** ตั้งค่าสิทธิ์ของบทบาท */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('menu.roles')
   @Patch(':id/permissions')
   async setRolePermissions(@Param('id') id: string, @Body() body: { permissionIds: number[] }) {
     return this.rolesService.setRolePermissions(+id, Array.isArray(body.permissionIds) ? body.permissionIds : []);
   }
 
   /** สร้างบทบาทใหม่ */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('menu.roles')
   @Post()
   async create(@Body() body: { code: string; name: string; description?: string }) {
     return this.rolesService.createRole(body);
   }
 
   /** แก้ไขบทบาท (ชื่อ, คำอธิบาย) */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('menu.roles')
   @Patch(':id')
   async update(@Param('id') id: string, @Body() body: { name?: string; description?: string }) {
     return this.rolesService.updateRole(+id, body);
   }
 
   /** ลบบทบาท (ต้องไม่มีผู้ใช้ผูกอยู่) */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('menu.roles')
   @Delete(':id')
   async remove(@Param('id') id: string) {
     return this.rolesService.deleteRole(+id);

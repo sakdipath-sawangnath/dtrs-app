@@ -17,6 +17,7 @@ import { SitesService } from '../sites/sites.service';
 import { UsersService } from '../users/users.service';
 import { MinioService } from '../minio/minio.service';
 import { JobEmailNotificationService } from './job-email-notification.service';
+import { RolesService } from '../roles/roles.service';
 import axios from 'axios';
 
 @Injectable()
@@ -29,6 +30,7 @@ export class JobsService {
         private usersService: UsersService,
         private minioService: MinioService,
         private jobEmailNotifications: JobEmailNotificationService,
+        private rolesService: RolesService,
     ) { }
 
     /** ปรับ URL รูปผู้ใช้ (avatar) ให้เบราว์เซอร์เข้าถึง MinIO ภายนอกได้ */
@@ -344,33 +346,9 @@ export class JobsService {
         });
     }
 
+    /** สิทธิ์ผู้ใช้ — ใช้ชุดเดียวกับ GET /roles/me/permissions และ PermissionsGuard */
     private async getPermissionCodesForUser(userId: number): Promise<string[]> {
-        const dbUser = await this.prisma.user.findUnique({
-            where: { id: userId },
-            select: { roleId: true, role: true },
-        });
-        if (!dbUser) return [];
-
-        if (dbUser.roleId != null) {
-            const rows = await this.prisma.rolePermission.findMany({
-                where: { roleId: dbUser.roleId },
-                include: { permission: { select: { code: true } } },
-            });
-            return rows.map((r) => r.permission.code);
-        }
-
-        // fallback legacy enum role: ใช้ชุด default เดียวกับ PermissionsGuard (ขั้นต่ำเพื่อไม่ให้ endpoint พัง)
-        const enumRole = dbUser.role ? String(dbUser.role).toUpperCase() : '';
-        if (enumRole === 'ADMIN') {
-            return ['job.fix.any', 'job.reopen.any'];
-        }
-        if (enumRole === 'SUPERVISOR') {
-            return ['job.fix.any', 'job.reopen.any'];
-        }
-        if (enumRole === 'STAFF') {
-            return ['job.fix.self', 'job.reopen.self'];
-        }
-        return [];
+        return this.rolesService.getPermissionsForUser(userId);
     }
 
     /**

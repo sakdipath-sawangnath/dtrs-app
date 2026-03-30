@@ -1,15 +1,15 @@
 import { Body, Controller, Get, Post, Put, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { Permissions } from '../auth/permissions.decorator';
 import { TestEmailSmtpDto, UpdateEmailSmtpDto } from './dto/email-smtp.dto';
 import { UpdateEmailTemplatesDto } from './dto/email-templates.dto';
 import { UpdateDefaultPassDto } from './dto/default-pass.dto';
 import { SettingsService } from './settings.service';
 
 @Controller('settings')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@Permissions('menu.settings')
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 

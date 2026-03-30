@@ -1,6 +1,8 @@
 # Project Status - ระบบแจ้งซ่อม CCTV
 
-**วันที่อัปเดตสถานะ:** 2026-03-28
+**วันที่อัปเดตสถานะ:** 2026-03-30
+
+**ดัชนีเอกสาร:** [`README.md`](README.md) (ตารางสรุป), [`docs/README.md`](docs/README.md), [`minio.md`](minio.md), [`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md)
 
 ---
 
@@ -21,8 +23,8 @@
    - **Login**: รองรับอีเมลหรือชื่อผู้ใช้ (`email` / `username`) + รหัสผ่าน คืนค่า `access_token` + `user` (id, name, username, role)
    - **User CRUD**: ADMIN ทำ CRUD ผู้ใช้ได้; STAFF เห็นรายชื่อผู้ใช้อย่างเดียว (read-only)
    - **โปรไฟล์ผู้ใช้**: `GET /users/me`, `PATCH /users/me` (ชื่อ, อีเมล, เบอร์, ตำแหน่ง, รูป), `PATCH /users/me/password` (เปลี่ยนรหัสผ่านต้องส่งรหัสเดิม)
-   - **มอบหมายงาน**: `GET /users/assignable` (ADMIN/SUPERVISOR/STAFF) รายชื่อเจ้าหน้าที่ที่มอบหมายได้; `PATCH /jobs/:id/assign` — ADMIN/SUPERVISOR ส่ง staffId ใครก็ได้, STAFF ส่งได้เฉพาะตัวเอง (รับงาน)
-   - **นอกสัญญา**: `PATCH /jobs/:id/out-of-contract` — ตั้ง `isOutOfContract=true` โดย “คงสถานะเป็น `PENDING`”
+   - **มอบหมายงาน**: `GET /users/assignable` — ต้องมีสิทธิ์ **`job.assign`** (`PermissionsGuard`); `PATCH /jobs/:id/assign` — อิง RBAC เหมือน `GET /roles/me/permissions`: มี **`job.assign`** → ส่ง `staffId` ใครก็ได้; ไม่มี `job.assign` แต่มี **`menu.pending`** และ `staffId` = ตัวเอง → รับงานเอง
+   - **นอกสัญญา**: `PATCH /jobs/:id/out-of-contract` — ตั้ง `isOutOfContract=true` โดย “คงสถานะเป็น `PENDING`”; ต้องมีสิทธิ์ **`job.assign`**
   - **บันทึกการแก้ไขงาน / ปิดงาน**: `PATCH /jobs/:id/fix` — คุมสิทธิ์ผ่าน RBAC:
     - `job.fix.any`: ทำได้ทุกงาน
     - `job.fix.self`: ทำได้เฉพาะงานที่เป็นผู้รับงาน (assignee)
@@ -36,7 +38,7 @@
    - **เทมเพลตอีเมลแจ้งงาน**: `GET/PUT /api/settings/email-templates` (ADMIN + JWT) — เก็บใน `Setting` คีย์ `email_templates` (โลโก้, `publicBaseUrl`, เทมเพลตแจ้งเหตุ/รับเรื่อง/ปิดงาน: เปิดปิด, `toExtra`, `cc`, `notifyRoleIds`); ส่งผ่าน `JobEmailNotificationService` — **สรุปผู้รับ To/CC เริ่มต้นและเหตุที่อาจได้รับเมล admin** ดู [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
    - **Jobs**: สร้างงานตรวจสอบ Site ว่าจังหวัด/อำเภอ/หน่วยงานมีในระบบก่อน (SitesService.existsByLocation); หลังสร้างงาน ถ้า `reporterPhone` ตรงกับผู้ใช้ในระบบจะ **เชื่อม `reporterId`** อัตโนมัติ (`UsersService.findByPhone`)
    - **รายการงาน (Dashboard)**: `GET /jobs/list` — ดึงรายการแจ้งซ่อม (JWT); ไม่มี `GET /api/jobs` แบบเปล่า — แยก path เพื่อไม่ให้สับสนกับ `POST /jobs` (แจ้งซ่อมสาธารณะ) เมื่อเปิด URL ในเบราว์เซอร์
-   - **ลบงาน `DELETE /jobs/:id`**: ถ้าเป็น **ADMIN** และงานสถานะ **IN_PROGRESS** จะลบได้ทันที; มิฉะนั้นใช้กับงาน **PENDING** ที่ยังไม่มอบหมายเท่านั้น (ต้องเป็น **ADMIN** หรือ **SUPERVISOR** ตาม logic เดิม)
+   - **ลบงาน `DELETE /jobs/:id`**: ถ้าเป็น **ADMIN** และงานสถานะ **IN_PROGRESS** จะลบได้ทันที; มิฉะนั้นใช้กับงาน **PENDING** ที่ยังไม่มอบหมายเท่านั้น — ต้องมีสิทธิ์ **`job.deleteUnassigned`** (อ่านจาก `RolesService.getPermissionsForUser`)
    - **Validation แจ้งซ่อม (Public POST)**: DTO + Zod (`create-job.dto`) รวมถึง `reporterEmail` preprocess/trim; `ZodValidationPipe` รวม error message เป็น array ชัดเจน
    - **MinIO**: ค่าเริ่มต้น **ไม่** ตั้ง public read บน bucket (`MINIO_ENSURE_PUBLIC_READ_POLICY` ปิด); เก็บ URL ใน DB ตามเดิม; Nest ดึง object ด้วย **SDK** ใน `getJobImageBuffer` / `getAvatarImageBuffer` + fallback HTTP; **`MINIO_SERVER_FETCH_BASE_URL`** ใช้เมื่อต้องโหลดภายใน LAN; **`GET /users/:id/avatar`**, **`GET /users/me/avatar`**
    - **พิมพ์รายงาน / รูปงาน / แดชบอร์ด**: หน้าพิมพ์ — **`/job-images/...`** → Nest; แดชบอร์ด/สถานะเจ้าหน้าที่ — รูปงานผ่าน **`dashboardJobImagePath`** (`/job-images/...`); รูปโปรไฟล์ผ่าน **`/user-images/:userId`**; เอกสาร NPM: `backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md`
@@ -52,7 +54,7 @@
      - **ระบบค้นหาสถานที่ (Select2)**: นำ `react-select` มาใช้งานในช่องสถานที่ ส่งผลให้ผู้ใช้สามารถพิมพ์ค้นหาชื่อ จังหวัด/อำเภอ/หน่วยงาน ได้สะดวกรวดเร็วกว่า Dropdown แบบเก่า
    - **Dashboard Layout**: Sidebar **ไม่เลื่อนตาม scroll** (sticky ใน flex container; หน้าใช้ `h-screen overflow-hidden`)
    - **Dashboard ภาพรวม**: กราฟสัดส่วนสถานะ (Pie), จำนวนแจ้งซ่อมตามจังหวัด Top 8 (Bar), **แนวโน้มรายวัน 14 วัน** = แจ้งในวันนั้น vs เสร็จในวันนั้น (ใช้ `fixDate` สำหรับเสร็จ); เมนูด่วนอ้างอิง RBAC (permission)
-   - **หน้ารอดำเนินการ**: ปุ่ม **ดูรายละเอียด** → ไปหน้าเต็ม `/dashboard/jobs/:id` (ไม่ใช้ modal), ปุ่ม **มอบหมายงาน** (เฉพาะ ADMIN/SUPERVISOR — modal ใช้ `react-select` เลือกเจ้าหน้าที่), ปุ่ม **รับงาน** (STAFF/SUPERVISOR รับงานตัวเอง)
+   - **หน้ารอดำเนินการ**: ปุ่ม **ดูรายละเอียด** → ไปหน้าเต็ม `/dashboard/jobs/:id` (ไม่ใช้ modal); ปุ่ม **มอบหมายงาน** และ **ย้ายนอกสัญญา** ตามสิทธิ์ **`job.assign`** (`/roles/me/permissions` + fallback บทบาท); ปุ่ม **รับงาน** (assign ตัวเองเมื่อ API อนุญาต); ปุ่ม **ลบงาน** ตาม **`job.deleteUnassigned`**
    - **งานที่รับผิดชอบ** (`/dashboard/my-jobs`): DataTable งานที่รับมอบหมายให้ผู้ใช้ปัจจุบัน พร้อม filter; ปุ่มดูรายละเอียดไปหน้า `/dashboard/jobs/:id`
   - **หน้ารายละเอียดงาน** (`/dashboard/jobs/:id`): แสดงเต็มพื้นที่ — การ์ดซ้าย "ข้อมูลการแจ้งข้อขัดข้อง", การ์ดขวา "ข้อมูลการแก้ไข" + ฟอร์มบันทึกการแก้ไข (ลำดับ: `fixEnvironment` → `brokenPartType`; ฟิลด์บังคับ: cause, fixMethod และรูปการแก้ไขอย่างน้อย 2 รูปแรก; หมายเหตุและ Serial ไม่บังคับ); **บันทึก/ปิดงาน และ Reopen คุมสิทธิ์ด้วย RBAC** (`job.fix.*`, `job.reopen.*`) ผ่าน `/dashboard/roles`; มีปุ่ม Reopen เมื่อ `RESOLVED` (ยืนยันก่อนเรียก API); สไตล์ Dark Glassmorphism; **พิมพ์/PDF รายงาน** ผ่านหน้า **`/print/jobs/[id]`** + `print.css` + เทมเพลต `JobMaintenancePdfTemplate`
    - **หน้าแจ้งซ่อม** (`/report`): ผู้ใช้ทั่วไปยังต้องกด **ตรวจสอบ** ให้พบผู้แจ้งในระบบก่อนเลือกสถานที่; **เจ้าหน้าที่ที่ล็อกอิน** (บทบาท STAFF / ADMIN / SUPERVISOR) ใช้ flow แยก — โหลด `GET /sites` ทันที, กรอกเบอร์ 10 หลักแล้วดำเนินการต่อได้โดยไม่บังคับพบจากระบบ (กรอกชื่อ-สกุลเองเมื่อไม่พบ), ส่ง `POST /jobs` พร้อม **`Authorization: Bearer`** เมื่อมี session, หลังสำเร็จ redirect ไป **`/dashboard/jobs`**; แสดงข้อความ error จาก API ชัดเจน (`extractApiErrorMessage`)
@@ -81,7 +83,7 @@
 | GET | `/users/me` | ✅ JWT | โปรไฟล์ผู้ใช้ที่ล็อกอินอยู่ |
 | PATCH | `/users/me` | ✅ JWT | แก้ไขโปรไฟล์ตัวเอง (ชื่อ, อีเมล, เบอร์, ตำแหน่ง, รูป) |
 | PATCH | `/users/me/password` | ✅ JWT | เปลี่ยนรหัสผ่านตัวเอง (currentPassword, newPassword) |
-| GET | `/users/assignable` | ✅ JWT (ADMIN, SUPERVISOR, STAFF) | รายชื่อผู้ที่มอบหมายได้ (ADMIN/STAFF/SUPERVISOR) |
+| GET | `/users/assignable` | ✅ JWT + **`job.assign`** | รายชื่อผู้ที่มอบหมายได้ (RBAC เดียวกับ modal มอบหมายในแดชบอร์ด) |
 | GET | `/users` | ✅ JWT (ADMIN) | รายชื่อผู้ใช้ทั้งหมด |
 | GET | `/users/:id` | ✅ JWT (ADMIN) | ดูข้อมูลผู้ใช้ |
 | POST | `/users` | ✅ JWT (ADMIN) | สร้างผู้ใช้ |
@@ -92,7 +94,7 @@
 | GET | `/jobs/list` | ✅ JWT | ดูรายการแจ้งซ่อมทั้งหมด (Dashboard / JobsList) |
 | GET | `/jobs/:id/image/:kind/:index` | ✅ JWT | สตรีมรูป (`kind`= issue \| fix, `index`=0–2) จาก URL ใน `Job.images` / `Job.fixImages` — proxy same-origin ให้ frontend ไม่ติด CORS |
 | GET | `/jobs/:id/report-pdf` | ✅ JWT | สร้างไฟล์ PDF รายงาน (โหลดหน้า `/print/jobs/:id` + Chromium) |
-| PATCH | `/jobs/:id/assign` | ✅ JWT | มอบหมายงาน: ADMIN/SUPERVISOR กำหนด staffId ใครก็ได้; STAFF ส่งได้เฉพาะ staffId = ตัวเอง |
+| PATCH | `/jobs/:id/assign` | ✅ JWT | มอบหมายงาน (RBAC): มี `job.assign` → `staffId` ใครก็ได้; ไม่มีแต่มี `menu.pending` และ `staffId` = ตัวเอง → รับงานเอง |
 | PATCH | `/jobs/:id/fix` | ✅ JWT | บันทึก/ปิดงาน (RBAC): `job.fix.any` ทำได้ทุกงาน, `job.fix.self` ทำได้เฉพาะ assignee; multipart ต้องมีรูปแก้ไขอย่างน้อย 2 รูปแรก; ตั้ง status=RESOLVED, fixDate อัตโนมัติ; ถ้ายัง `RESOLVED` ต้อง reopen ก่อน |
 | PATCH | `/jobs/:id/reopen` | ✅ JWT | Reopen (RBAC): `job.reopen.any` ทำได้ทุกงาน, `job.reopen.self` ทำได้เฉพาะ assignee; `RESOLVED` → `IN_PROGRESS`, ล้าง `fixDate`, ต่อท้ายเหตุผลใน `fixNote` |
 | GET | `/settings/email-smtp` | ✅ JWT (ADMIN) | อ่านการตั้งค่า SMTP (ไม่คืนรหัสผ่าน) |
@@ -100,8 +102,8 @@
 | POST | `/settings/email-smtp/test` | ✅ JWT (ADMIN) | ทดสอบส่งอีเมลด้วยค่าที่บันทึกแล้ว |
 | GET | `/settings/email-templates` | ✅ JWT (ADMIN) | อ่านเทมเพลตอีเมลแจ้งงาน (`email_templates`) |
 | PUT | `/settings/email-templates` | ✅ JWT (ADMIN) | บันทึกเทมเพลตอีเมล (รวม `publicBaseUrl`, `notifyRoleIds` ต่อเทมเพลต) |
-| PATCH | `/jobs/:id/out-of-contract` | ✅ JWT (ADMIN, STAFF, SUPERVISOR) | ย้ายนอกสัญญา: ตั้ง `isOutOfContract=true` โดย “คงสถานะเป็น PENDING” |
-| DELETE | `/jobs/:id` | ✅ JWT | **ADMIN**: ลบงาน **IN_PROGRESS** ได้; **ADMIN/SUPERVISOR**: ลบงาน **PENDING** ที่ยังไม่มีผู้รับผิดชอบ (`deleteUnassigned`) |
+| PATCH | `/jobs/:id/out-of-contract` | ✅ JWT | ย้ายนอกสัญญา: ต้องมี **`job.assign`**; ตั้ง `isOutOfContract=true` โดย “คงสถานะเป็น PENDING” |
+| DELETE | `/jobs/:id` | ✅ JWT | **ADMIN**: ลบงาน **IN_PROGRESS** ได้; ลบงาน **PENDING** ไม่มอบหมาย: ต้องมี **`job.deleteUnassigned`** |
 | GET | `/sites` | ❌ Public | ข้อมูลพื้นที่โครงการ (สำหรับหน้าแจ้งปัญหา) |
 | GET | `/areas` | ✅ JWT | ข้อมูลพื้นที่รับผิดชอบ |
 
@@ -111,7 +113,7 @@
 
 - **ADMIN**: เห็นทุกเมนูใน Dashboard รวมถึง **จัดการผู้ใช้**, **จัดการบทบาทและสิทธิ์**, **ตั้งค่าระบบ**; ทำ CRUD ผู้ใช้ได้; มอบหมายงานให้ใครก็ได้
 - **STAFF**: เห็น ภาพรวม, รอดำเนินการ, กำลังแก้ไข, ข้อขัดข้องทั้งหมด, นอกสัญญา; รับงานตัวเองได้ (ปุ่มรับงาน); ไม่เห็น จัดการผู้ใช้/ตั้งค่าระบบ
-- **SUPERVISOR (หัวหน้างาน)**: เห็นเมนูเทียบเท่า STAFF + **ปุ่มมอบหมายงาน** ในหน้ารอดำเนินการ (เลือกเจ้าหน้าที่จาก modal); เรียก `GET /users/assignable`, `PATCH /jobs/:id/assign`
+- **SUPERVISOR (หัวหน้างาน)**: เห็นเมนูเทียบเท่า STAFF + สิทธิ์ **`job.assign`** (มอบหมายงาน / ย้ายนอกสัญญา); เรียก `GET /users/assignable`, `PATCH /jobs/:id/assign` — บทบาทกำหนดเองใน `/dashboard/roles` ให้สิทธิ์เดียวกันได้โดยตั้ง **`job.assign`**
 - **USER**: ใช้สำหรับผู้แจ้งซ่อม (dropdown ในฟอร์มแจ้งปัญหา); เห็นเฉพาะ โปรไฟล์, แจ้งปัญหา, ตรวจสอบสถานะ
 
 ---
@@ -123,7 +125,7 @@
 | Path | คำอธิบาย |
 |------|----------|
 | `/dashboard` | ภาพรวม (KPI, กราฟสัดส่วน/จังหวัด/แนวโน้มรายวัน 14 วัน, เมนูด่วน) |
-| `/dashboard/pending` | รอดำเนินการ – DataTable + filter; ปุ่ม ดูรายละเอียด (ไป `/dashboard/jobs/:id`) / มอบหมายงาน (react-select) (ADMIN, SUPERVISOR) / รับงาน และมีปุ่ม “ย้ายนอกสัญญา” (ADMIN/SUPERVISOR/STAFF) |
+| `/dashboard/pending` | รอดำเนินการ – DataTable + filter; ปุ่ม ดูรายละเอียด (ไป `/dashboard/jobs/:id`) / มอบหมายงาน + ย้ายนอกสัญญา ตาม **`job.assign`** / รับงาน / ลบงานตาม **`job.deleteUnassigned`** |
 | `/dashboard/my-jobs` | **งานที่รับผิดชอบ** – งานที่รับมอบหมายให้ผู้ใช้ปัจจุบัน; DataTable + filter |
 | `/dashboard/jobs/:id` | รายละเอียดงานเต็มหน้า + ฟอร์มบันทึกการแก้ไข; พิมพ์รายงานเมื่อ Resolved ผ่าน **`/print/jobs/:id`** (ไม่ใช้ html2canvas บนหน้ารายละเอียด) |
 | `/print/jobs/:id` | หน้าพิมพ์รายงานบำรุงรักษา (layout 2 หน้า, ปุ่มพิมพ์) |
@@ -160,6 +162,7 @@ npx ts-node scripts/seed-roles-permissions.ts
 - **เทมเพลตอีเมลแจ้งงาน + Role (2026-03-24)**: `GET/PUT /settings/email-templates`, `JobEmailNotificationService`, HTML โทนสว่าง + badge สถานะ; เอกสาร flow: [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
 - **UI Modal + บทบาท (2026-03-24)**: `CrudModal` — portal, `z-100`, Dark Glass; `/dashboard/roles` — `form-input-glass` + modal กำหนดสิทธิ์ (`size="lg"`)
 - **Deploy / CI (2026-03-23)**: **GitLab CI** (`.gitlab-ci.yml`) + **`Dockerfile`** — build แยก frontend/backend ใน pipeline, image production รัน Nest + Next; พอร์ต host ตัวอย่าง **8309→3000**, **8310→4000**; ตัวแปร **`FRONTEND_BASE_URL`** แทน `FRONTEND_URL_PRD`; คู่มือ production โดเมนเดียว + `/api` + `/socket.io` และ `MINIO_PUBLIC_URL` สรุปใน `README.md`; (2026-03-28) pipeline ส่ง **`MINIO_SERVER_FETCH_BASE_URL`** เข้า backend ได้เมื่อตั้งใน GitLab Variables
+- **RBAC คิวงาน (2026-03-30)**: `PATCH /jobs/:id/assign`, `PATCH /jobs/:id/out-of-contract`, และลบ `PENDING` ไม่มอบหมายใน **`DELETE /jobs/:id`** ใช้ **`getPermissionsForUser`** สอดคล้อง `/dashboard/roles`; `JobsList` แสดงปุ่มมอบหมาย/ย้ายนอกสัญญาตาม **`job.assign`**
 - **พิมพ์ + รูปงานบน PRD (2026-03-28)**: รูปในเทมเพลตผ่าน **`/job-images/...`** บน Next; Nest **`MINIO_SERVER_FETCH_BASE_URL`** แก้กรณี backend โหลด MinIO ทาง public URL ไม่ได้ → **502** พร้อม log `getJobImageBuffer failed` ถ้ายังไม่ตั้งค่า
 - **Backend Docker entry (Nest + nodenext)**: image backend ใช้ **`node dist/src/main.js`** — ไม่ใช่ `dist/main.js`; สาเหตุเดิมของ error PRD `MODULE_NOT_FOUND` คือ path entry ไม่ตรงกับผล compile
 - **Frontend build (2026-03-23)**: `apiResponse.ts`; **`/public/report`** ใช้ `<Suspense>` รอบ `useSearchParams` เพื่อให้ `next build` ผ่าน

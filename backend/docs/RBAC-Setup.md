@@ -42,7 +42,9 @@
 | menu.settings | ตั้งค่าระบบ (หน้า `/dashboard/settings` — **SMTP**, **เทมเพลตอีเมลแจ้งงาน** (`email_templates`, รวม `publicBaseUrl` และแจ้งตาม Role); API ต้อง JWT + ADMIN — สรุป flow อีเมล: [`../../docs/Email-Notifications.md`](../../docs/Email-Notifications.md) |
 | menu.roles | จัดการบทบาทและสิทธิ์ |
 | menu.myJobs | งานที่รับผิดชอบ (รายการงานที่รับมอบหมาย) |
-| job.assign | มอบหมายงาน (ปุ่มมอบหมายงานในหน้ารอดำเนินการ) |
+| job.assign | มอบหมายงานให้ผู้อื่น (ปุ่ม «มอบหมายงาน») และ **ย้ายนอกสัญญา** (`PATCH /jobs/:id/out-of-contract`) — UI `JobsList` และ API อิงสิทธิ์เดียวกับที่กำหนดใน `/dashboard/roles` |
+| job.updateStatus | เปลี่ยนสถานะงาน (`PATCH /jobs/:id/status`) |
+| job.deleteInProgress | ลบงานสถานะ **กำลังแก้ไข** (ผู้ดูแล — เดิมเฉพาะรหัสบทบาท ADMIN) |
 | job.deleteUnassigned | ลบงานที่ยังไม่มีผู้รับผิดชอบ |
 | job.fix.self | บันทึก/ปิดงาน (เฉพาะงานที่รับผิดชอบ) |
 | job.fix.any | บันทึก/ปิดงาน (ทุกงาน) |
@@ -62,13 +64,17 @@
 
 ## การทำงาน
 
-- **Login / Session:** ยังใช้ `user.role` (enum) จาก JWT สำหรับ Guards ที่ตรวจบทบาท (เช่น ADMIN only)
+- **API แอดมินเมนู:** `roles` / `users` / `settings` ใช้ **`PermissionsGuard`** กับ `menu.roles`, `menu.users`, `menu.settings` (ไม่ใช้แค่ `@Roles('ADMIN')` บน JWT) — บทบาทกำหนดเองที่ได้รับสิทธิ์เมนูนั้นเรียก API ได้
+- **Login / Session:** JWT ยังมี `user.role` สำหรับการแสดงผลบางจุด — การตรวจสิทธิ์ API หลักอิง **Permission ใน DB** ตามด้านล่าง
+- **สิทธิ์ฝั่ง API (คิวงาน):** `PATCH /jobs/:id/assign`, `PATCH /jobs/:id/out-of-contract` และการลบงาน `PENDING` ที่ยังไม่มอบหมาย (ใน `DELETE /jobs/:id`) ใช้ **`RolesService.getPermissionsForUser(userId)`** ชุดเดียวกับ `GET /roles/me/permissions` (อ่านจาก `User.roleId` → `RolePermission`) เพื่อให้ตรงกับหน้า `/dashboard/roles`
+- **มอบหมายงาน (API):** มีสิทธิ์ `job.assign` → มอบหมาย `staffId` เป็นใครก็ได้; ไม่มี `job.assign` แต่มี `menu.pending` และ `staffId` = ตัวเอง → **รับงานเอง** (เดิมคือพฤติกรรม STAFF)
+- **รายชื่อผู้รับมอบหมาย:** `GET /users/assignable` ใช้ **`PermissionsGuard` + `job.assign`** (ไม่ใช้แค่ JWT role ADMIN/SUPERVISOR/STAFF) — ให้ตรงกับผู้ที่เปิด modal มอบหมายใน `JobsList`
 - **Sidebar:** เรียก `GET /roles/me/permissions` เพื่อดึงสิทธิ์ของ user แล้วแสดงเฉพาะเมนูที่ user มีสิทธิ์ — ฝั่ง `DashboardLayoutShell` ต้อง **แกะ `data` จาก body มาตรฐาน** (`{ success, data: { permissions } }`) เหมือนหน้าอื่นที่ใช้ `unwrapApiData`; ถ้ารายการสิทธิ์ที่ได้ **ไม่ตรงกับเมนูใน sidebar เลย** (เช่น มีแค่ `menu.profile`) ให้ **fallback ตามบทบาท** เพื่อไม่ให้เมนูว่าง
 - **หน้าจัดการบทบาท:** `/dashboard/roles` (เฉพาะ ADMIN ที่มีสิทธิ์ menu.roles) — สร้าง/แก้ไขบทบาท และกำหนดสิทธิ์ (checkbox) ให้แต่ละบทบาท; UI ใช้ **`CrudModal`** (portal + `z-100`) และฟิลด์ **`form-input-glass`** ตาม `frontend/src/app/globals.css` — ดูภาพรวม UI ที่ `README.md` / `STATUS.md`
 - **ผู้ใช้:** ตอนสร้าง/แก้ไข user เลือก role เป็น ADMIN/STAFF/USER/SUPERVISOR ได้ ระบบจะ map ไปที่ AppRole และ set User.roleId ให้
-- **มอบหมายงาน:** หน้ารอดำเนินการ (`/dashboard/pending`) แสดงปุ่ม "มอบหมายงาน" เฉพาะผู้ใช้ที่มีบทบาท ADMIN หรือ SUPERVISOR (หรือมีสิทธิ์ job.assign) ปุ่ม "รับงาน" ใช้สำหรับ STAFF รับงานตัวเอง
-- **ย้ายนอกสัญญา:** ปุ่ม “ย้ายนอกสัญญา” ในหน้ารอดำเนินการแสดง `alert ยืนยัน` ก่อนเรียก `PATCH /jobs/:id/out-of-contract` และระบบคงสถานะงานเดิมเป็น `PENDING`
-- **ลบงานที่ยังไม่มีผู้รับผิดชอบ:** ปุ่ม “ลบงาน” ใน `/dashboard/pending` จะขึ้นเมื่อ job.status เป็น `PENDING` และ `assignedToId = null` โดยต้องมี permission `job.deleteUnassigned` (หรือบทบาท ADMIN/SUPERVISOR ตาม fallback ในโค้ด)
+- **มอบหมายงาน (UI):** หน้ารอดำเนินการ (`/dashboard/pending`) แสดงปุ่ม «มอบหมายงาน» เมื่อมีสิทธิ์ **`job.assign`** (โหลดจาก `/roles/me/permissions` ใน `JobsList`; ระหว่างโหลดสิทธิ์จะ fallback ตามบทบาท ADMIN/SUPERVISOR ใน JWT) ปุ่ม «รับงาน» ยังแสดงสำหรับงาน `PENDING` และเรียก assign เป็นตัวเอง — สำเร็จได้เมื่อ API อนุญาตตามกติกาด้านบน
+- **ย้ายนอกสัญญา:** ปุ่ม «ย้ายนอกสัญญา» แสดงเมื่อมี **`job.assign`** (เดิมเทียบเท่า ADMIN/SUPERVISOR); ก่อนเรียก `PATCH /jobs/:id/out-of-contract` มี `alert` ยืนยัน; ระบบคงสถานะงานเป็น `PENDING`
+- **ลบงานที่ยังไม่มีผู้รับผิดชอบ:** ปุ่ม «ลบงาน» ใน `/dashboard/pending` จะขึ้นเมื่อ job.status เป็น `PENDING` และ `assignedToId = null` โดยต้องมี permission **`job.deleteUnassigned`** (ฝั่ง UI อ่านจาก `/roles/me/permissions`; ถ้ายังไม่โหลดให้ fallback ตามบทบาท ADMIN/SUPERVISOR)
 - **ลบงานกำลังแก้ไข (เฉพาะ ADMIN):** ที่หน้า `/dashboard/in-progress` ผู้ใช้บทบาท **ADMIN** เห็นปุ่ม “ลบงาน (ผู้ดูแลระบบ)” สำหรับงานสถานะ `IN_PROGRESS` — เรียก `DELETE /jobs/:id` (ฝั่ง backend แยก logic: ADMIN ลบ IN_PROGRESS ได้ก่อน แล้วจึง fallback ไปลบแบบ PENDING ไม่มอบหมาย) — **ไม่ใช้** permission code แยก แต่เช็ค `role === ADMIN` ใน API/UI
 - **สัญญา/นอกสัญญา Tabs:** หน้า `/dashboard/my-jobs`, `/dashboard/all`, และ `/dashboard/in-progress` แสดง segmented tabs “สัญญา/นอกสัญญา” โดยแยกตาม `Job.isOutOfContract` (ค่าเริ่มต้น = “สัญญา”) และมี **badge** จำนวนงานค้าง (ยังไม่ `RESOLVED`) ต่อแท็บ
 - **บันทึก/ปิดงาน (`PATCH /jobs/:id/fix`):**
@@ -79,3 +85,11 @@
   - `job.reopen.self` ทำได้เฉพาะงานที่เป็นผู้รับงาน (`assignedToId`)
 - **อัปเดตงานในกำลังแก้ไข (UI):** หน้า `/dashboard/in-progress` และหน้า `/dashboard/jobs/:id` จะเปิดปุ่มตาม permission ด้านบน (อิง `/roles/me/permissions`) ไม่ hardcode role
 - **Sidebar:** เมนู "โปรไฟล์" ไม่แสดงใน sidebar; เข้าได้จากเมนูผู้ใช้ (dropdown) เท่านั้น เมนู "งานที่รับผิดชอบ" (`menu.myJobs`) แสดงสำหรับ ADMIN, STAFF, SUPERVISOR
+
+---
+
+## หมายเหตุ: รูปโปรไฟล์และรูปงาน (ไม่ใช่ permission ในเมนู)
+
+- รูปโปรไฟล์ผู้ใช้ในแดชบอร์ดโหลดผ่าน **`GET /api/users/:id/avatar`** / **`GET /api/users/me/avatar`** (JWT) และฝั่ง Next ใช้ path **`/user-images/:userId`**
+- รูปประกอบงานโหลดผ่าน **`GET /api/jobs/:id/image/:kind/:index`** (JWT) และฝั่ง Next ใช้ **`/job-images/...`**
+- การตั้งค่า MinIO (bucket private, ตัวแปร env): [`../../minio.md`](../../minio.md), [`../../docs/Project-Plan-Private-MinIO-Images.md`](../../docs/Project-Plan-Private-MinIO-Images.md)

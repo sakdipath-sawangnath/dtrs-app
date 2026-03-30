@@ -10,10 +10,11 @@ import { EventsModule } from '../events/events.module';
 import { UsersModule } from '../users/users.module';
 import { SettingsModule } from '../settings/settings.module';
 import { RolesModule } from '../roles/roles.module';
+import { PermissionsGuard } from '../auth/permissions.guard';
 
 @Module({
     imports: [SitesModule, MinioModule, EventsModule, UsersModule, SettingsModule, RolesModule],
-    providers: [JobsService, JobsPdfService, JobEmailNotificationService],
+    providers: [JobsService, JobsPdfService, JobEmailNotificationService, PermissionsGuard],
     controllers: [JobsController, PublicJobsController],
     exports: [JobsService],
 })

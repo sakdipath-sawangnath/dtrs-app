@@ -26,6 +26,8 @@ const RBAC_MENU_PERMISSIONS = [
 const RBAC_ACTION_PERMISSIONS = [
   { code: 'job.assign', name: 'มอบหมายงาน', category: 'job' },
   { code: 'job.deleteUnassigned', name: 'ลบงานที่ยังไม่มีผู้รับผิดชอบ', category: 'job' },
+  { code: 'job.updateStatus', name: 'เปลี่ยนสถานะงาน', category: 'job' },
+  { code: 'job.deleteInProgress', name: 'ลบงานกำลังแก้ไข (ผู้ดูแล)', category: 'job' },
   { code: 'job.fix.self', name: 'บันทึก/ปิดงาน (เฉพาะงานที่รับผิดชอบ)', category: 'job' },
   { code: 'job.fix.any', name: 'บันทึก/ปิดงาน (ทุกงาน)', category: 'job' },
   { code: 'job.reopen.self', name: 'Reopen งาน (เฉพาะงานที่รับผิดชอบ)', category: 'job' },
@@ -34,6 +36,12 @@ const RBAC_ACTION_PERMISSIONS = [
   { code: 'site.update', name: 'แก้ไข Site', category: 'site' },
   { code: 'site.delete', name: 'ลบ Site', category: 'site' },
 ] as const;
+
+const RBAC_ACTION_CODES_ALL = RBAC_ACTION_PERMISSIONS.map((p) => p.code);
+/** SUPERVISOR ไม่ได้ลบงาน IN_PROGRESS แบบผู้ดูแล (เฉพาะ ADMIN) */
+const RBAC_ACTION_CODES_SUPERVISOR = RBAC_ACTION_CODES_ALL.filter(
+  (c) => c !== 'job.deleteInProgress',
+);
 
 const RBAC_ALL_PERMISSIONS = [...RBAC_MENU_PERMISSIONS, ...RBAC_ACTION_PERMISSIONS];
 
@@ -48,22 +56,17 @@ const RBAC_STAFF_MENU_CODES = RBAC_MENU_PERMISSIONS.map((p) => p.code).filter(
   (c) => !['menu.users', 'menu.settings', 'menu.roles', 'menu.sites'].includes(c),
 );
 
-const RBAC_ROLE_PERMISSION_CODES: Record<string, string[]> = {
-  ADMIN: [
-    ...RBAC_MENU_PERMISSIONS.map((p) => p.code),
-    ...RBAC_ACTION_PERMISSIONS.map((p) => p.code),
-  ],
+/** export ให้ PermissionsGuard ใช้ชุดเดียวกับ enum user (ไม่มี roleId) */
+export const RBAC_ROLE_PERMISSION_CODES: Record<string, string[]> = {
+  ADMIN: [...RBAC_MENU_PERMISSIONS.map((p) => p.code), ...RBAC_ACTION_CODES_ALL],
   STAFF: [
     ...RBAC_STAFF_MENU_CODES,
     'job.fix.self',
     'job.reopen.self',
+    'job.updateStatus',
   ],
   USER: ['menu.profile', 'menu.report', 'menu.status'],
-  SUPERVISOR: [
-    ...RBAC_STAFF_MENU_CODES,
-    'menu.sites',
-    ...RBAC_ACTION_PERMISSIONS.map((p) => p.code),
-  ],
+  SUPERVISOR: [...RBAC_STAFF_MENU_CODES, 'menu.sites', ...RBAC_ACTION_CODES_SUPERVISOR],
 };
 
 @Injectable()
@@ -326,52 +329,7 @@ export class RolesService implements OnModuleInit {
       // สิทธิ์ตามที่กำหนดใน DB เท่านั้น (หน้า /dashboard/roles) — ไม่บังคับเมนูจากโค้ด
       return rolePerms.map((rp) => rp.permission.code);
     }
-    // Fallback: ใช้ enum role (ค่าเริ่มต้นก่อน migrate)
-    const defaultCodes: Record<string, string[]> = {
-      ADMIN: [
-        'menu.profile',
-        'menu.report',
-        'menu.status',
-        'menu.dashboard',
-        'menu.pending',
-        'menu.myJobs',
-        'menu.inProgress',
-        'menu.all',
-        'menu.outOfContract',
-        'menu.users',
-        'menu.settings',
-        'menu.roles',
-        'menu.sites',
-        'job.assign',
-        'job.deleteUnassigned',
-        'site.create',
-        'site.update',
-        'site.delete',
-      ],
-      STAFF: [
-        'menu.dashboard',
-        'menu.pending',
-        'menu.myJobs',
-        'menu.inProgress',
-        'menu.all',
-        'menu.outOfContract',
-      ],
-      USER: ['menu.profile', 'menu.report', 'menu.status'],
-      SUPERVISOR: [
-        'menu.dashboard',
-        'menu.pending',
-        'menu.myJobs',
-        'menu.inProgress',
-        'menu.all',
-        'menu.outOfContract',
-        'menu.sites',
-        'job.assign',
-        'job.deleteUnassigned',
-        'site.create',
-        'site.update',
-        'site.delete',
-      ],
-    };
-    return defaultCodes[user.role] ?? [];
+    const roleKey = user.role != null ? String(user.role).toUpperCase() : '';
+    return RBAC_ROLE_PERMISSION_CODES[roleKey] ?? [];
   }
 }
