@@ -382,9 +382,7 @@ export default function JobsList({
   const [myPermissions, setMyPermissions] = useState<string[] | null>(null);
   const { data: session } = useSession();
   const userRole = (session?.user as { role?: string })?.role ?? "";
-  const canAssignJob = userRole === "SUPERVISOR" || userRole === "ADMIN";
-  // ย้ายนอกสัญญาให้จัดการได้เฉพาะ manager/admin เท่านั้น
-  const canMoveOutOfContract = ["ADMIN", "SUPERVISOR"].includes(userRole);
+  const userRoleUpper = String(userRole).toUpperCase();
   const [movingOutOfContractJobId, setMovingOutOfContractJobId] = useState<number | null>(null);
 
   // ---- Update Fix Info Modal (IN_PROGRESS) ----
@@ -465,14 +463,29 @@ export default function JobsList({
     run();
   }, [token, API]);
 
+  /** สิทธิ์จากหน้า /dashboard/roles — ถ้ายังไม่โหลดให้ fallback ตาม role ใน JWT */
+  const canAssignJob = useMemo(() => {
+    if (myPermissions !== null) {
+      return myPermissions.includes("job.assign");
+    }
+    return userRoleUpper === "SUPERVISOR" || userRoleUpper === "ADMIN";
+  }, [myPermissions, userRoleUpper]);
+
+  const canMoveOutOfContract = useMemo(() => {
+    if (myPermissions !== null) {
+      return myPermissions.includes("job.assign");
+    }
+    return userRoleUpper === "ADMIN" || userRoleUpper === "SUPERVISOR";
+  }, [myPermissions, userRoleUpper]);
+
   const canDeleteUnassigned =
     myPermissions != null
       ? myPermissions.includes("job.deleteUnassigned")
-      : ["ADMIN", "SUPERVISOR"].includes(userRole);
+      : ["ADMIN", "SUPERVISOR"].includes(userRoleUpper);
 
   /** หน้า «กำลังแก้ไข» เท่านั้น — ADMIN ลบงาน IN_PROGRESS ได้ */
   const canAdminDeleteInProgress =
-    userRole === "ADMIN" && statusFilter === "IN_PROGRESS";
+    userRoleUpper === "ADMIN" && statusFilter === "IN_PROGRESS";
 
   const fetchJobs = async () => {
     if (!token) return;

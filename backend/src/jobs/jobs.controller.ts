@@ -6,6 +6,7 @@ import { JobsPdfService } from './jobs-pdf.service';
 import { MinioService } from '../minio/minio.service';
 import { EventsGateway } from '../events/events.gateway';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesService } from '../roles/roles.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import {
     UpdateJobStatusSchema,
@@ -26,6 +27,7 @@ export class JobsController {
         private readonly minioService: MinioService,
         private readonly eventsGateway: EventsGateway,
         private readonly usersService: UsersService,
+        private readonly rolesService: RolesService,
     ) { }
 
     /**
@@ -135,8 +137,8 @@ export class JobsController {
                 return { ok: true };
             }
         }
-        // ลบงาน PENDING ที่ยังไม่มอบหมาย — เฉพาะ ADMIN / SUPERVISOR
-        if (!['ADMIN', 'SUPERVISOR'].includes(role)) {
+        const codes = await this.rolesService.getPermissionsForUser(userId);
+        if (!codes.includes('job.deleteUnassigned')) {
             throw new ForbiddenException('ไม่มีสิทธิ์ลบงานที่ยังไม่มีผู้รับผิดชอบ');
         }
 
@@ -234,13 +236,14 @@ export class JobsController {
         @Param('id') id: string,
         @Body(new ZodValidationPipe(AssignStaffSchema)) body: { staffId: number },
     ) {
-        const role = req.user?.role;
-        const canAssignAny = role === 'ADMIN' || role === 'SUPERVISOR';
-        if (!canAssignAny && role === 'STAFF') {
-            if (body.staffId !== req.user.id) {
-                throw new ForbiddenException('เจ้าหน้าที่สามารถรับงานตัวเองเท่านั้น');
-            }
-        } else if (!canAssignAny) {
+        const userId = req.user.id;
+        const codes = await this.rolesService.getPermissionsForUser(userId);
+        const targetStaffId = Number(body.staffId);
+        if (codes.includes('job.assign')) {
+            // มอบหมายให้ผู้อื่นได้
+        } else if (targetStaffId === Number(userId) && codes.includes('menu.pending')) {
+            // รับงานเอง (เช่น STAFF ที่มีเมนูรอดำเนินการ แต่ไม่มี job.assign)
+        } else {
             throw new ForbiddenException('ไม่มีสิทธิ์มอบหมายงาน');
         }
         const updated = await this.jobsService.assignStaff(+id, body.staffId);
@@ -258,9 +261,9 @@ export class JobsController {
         @Param('id') id: string,
         @Body(new ZodValidationPipe(UpdateOutOfContractSchema)) body: { isOutOfContract: boolean },
     ) {
-        const role = req.user?.role;
-        // ย้ายนอกสัญญาให้จัดการได้เฉพาะ manager/admin เท่านั้น
-        if (!['ADMIN', 'SUPERVISOR'].includes(role)) {
+        const codes = await this.rolesService.getPermissionsForUser(req.user.id);
+        // ให้สอดคล้องกับหน้าจัดการสิทธิ์: ใช้ job.assign (ระดับเดียวกับมอบหมายงานคิว)
+        if (!codes.includes('job.assign')) {
             throw new ForbiddenException('ไม่มีสิทธิ์ย้ายนอกสัญญา');
         }
 

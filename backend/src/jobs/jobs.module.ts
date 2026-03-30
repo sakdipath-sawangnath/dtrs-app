@@ -9,9 +9,10 @@ import { MinioModule } from '../minio/minio.module';
 import { EventsModule } from '../events/events.module';
 import { UsersModule } from '../users/users.module';
 import { SettingsModule } from '../settings/settings.module';
+import { RolesModule } from '../roles/roles.module';
 
 @Module({
-    imports: [SitesModule, MinioModule, EventsModule, UsersModule, SettingsModule],
+    imports: [SitesModule, MinioModule, EventsModule, UsersModule, SettingsModule, RolesModule],
     providers: [JobsService, JobsPdfService, JobEmailNotificationService],
     controllers: [JobsController, PublicJobsController],
     exports: [JobsService],
