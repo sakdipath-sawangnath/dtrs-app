@@ -131,8 +131,9 @@ python .agents/skills/ui-ux-pro-max/scripts/search.py "accessibility" --domain u
 ## เอกสารโปรเจกต์ (อ้างอิงฟีเจอร์/API)
 
 - ภาพรวมและตาราง endpoint: `README.md` (บันทึกการอัปเดตล่าสุดที่ส่วนต้นไฟล์), `STATUS.md`
-- แผน/งาน: `PLAN.md`, `TASK.md` (Phase 6.4 = SMTP… · **6.7 = เทมเพลตอีเมล** · **6.8 = `CrudModal` (portal/z-100) + หน้า `/dashboard/roles` (`form-input-glass`)** · **6.9 = `/job-images`, `MINIO_SERVER_FETCH_BASE_URL`, 502 รูป**)
-- พิมพ์รายงาน + reverse proxy (NPM): `backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md` — รูปหน้าพิมพ์ที่ **`/job-images/*`**; ตัวอย่าง MinIO env: `minio.md`
+- แผน/งาน: `PLAN.md`, `TASK.md` (Phase 6.4 = SMTP… · **6.7 = เทมเพลตอีเมล** · **6.8 = `CrudModal` (portal/z-100) + หน้า `/dashboard/roles` (`form-input-glass`)** · **6.9 = `/job-images`, `MINIO_SERVER_FETCH_BASE_URL`, 502 รูป** · **Private MinIO = `/user-images`, avatar API, `MINIO_ENSURE_PUBLIC_READ_POLICY` default false** — สรุปใน `docs/Project-Plan-Private-MinIO-Images.md`)
+- พิมพ์รายงาน + reverse proxy (NPM): `backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md` — รูปงาน **`/job-images/*`**, รูปโปรไฟล์ **`/user-images/*`** บน Next; ตัวแปร MinIO: `minio.md`
+- ดัชนีโฟลเดอร์เอกสาร: `docs/README.md`
 - อีเมลแจ้งงาน (To/CC, `publicBaseUrl`, Role): `docs/Email-Notifications.md`
 - RBAC: `backend/docs/RBAC-Setup.md`
 - สรุป API เป็น JSON: `backend/docs/api-endpoints.json`

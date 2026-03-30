@@ -244,7 +244,7 @@ export class JobsController {
         } else {
             throw new ForbiddenException('ไม่มีสิทธิ์มอบหมายงาน');
         }
-        const updated = await this.jobsService.assignStaff(+id, body.staffId);
+        const updated = await this.jobsService.assignStaff(+id, body.staffId, userId);
         this.eventsGateway.notifyJobUpdate(updated);
         return updated;
     }

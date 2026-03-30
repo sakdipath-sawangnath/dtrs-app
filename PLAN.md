@@ -6,6 +6,7 @@
 
 ## 1. บริบทจากเอกสาร Project
 
+- **ดัชนีเอกสารใน `docs/`**: [`docs/README.md`](docs/README.md) · ตัวแปร MinIO: [`minio.md`](minio.md)
 - **TASK.md / STATUS.md**: ระบบย้ายจาก AppSheet มา Next.js + NestJS แล้ว Phase 2–3 เสร็จ
 - **ข้อมูลพื้นที่**: Backend มีตาราง `Site` (จังหวัด, อำเภอ, หน่วยงาน) และ `Area` (อำเภอ, Site Engineer); การสร้าง Job ตรวจสอบ Site ก่อน (existsByLocation)
 - **Seed Script**: `backend/scripts/seed-from-excel.ts` (Excel), `backend/scripts/seed-from-csv.ts` (CSV), `backend/scripts/seed-admin.ts` (สร้าง admin ครั้งแรก)
@@ -64,11 +65,11 @@
   ชื่อ "ข้อขัดข้อง", filter จังหวัด, จำนวนต่อหน้า 15/30/50/ทั้งหมด, pagination
 
 - [x] **บทบาท SUPERVISOR (หัวหน้างาน) + ปุ่มมอบหมายงาน**  
-  Role SUPERVISOR เห็นเมนูเทียบเท่า STAFF; สิทธิ์ `job.assign`; ปุ่ม "มอบหมายงาน" ในหน้ารอดำเนินการ (modal เลือกเจ้าหน้าที่ด้วย react-select); API `GET /users/assignable`, `PATCH /jobs/:id/assign` (ADMIN/SUPERVISOR มอบหมายได้, STAFF รับงานตัวเองเท่านั้น)
+  Role SUPERVISOR เห็นเมนูเทียบเท่า STAFF; สิทธิ์ `job.assign`; ปุ่ม "มอบหมายงาน" ในหน้ารอดำเนินการ (modal เลือกเจ้าหน้าที่ด้วย react-select); API `GET /users/assignable`, `PATCH /jobs/:id/assign` — **อัปเดต 2026-03-30:** คุมสิทธิ์ด้วย RBAC (`job.assign` / `menu.pending` สำหรับรับงานเอง) สอดคล้อง `/dashboard/roles`
 
 - [x] **นอกสัญญา (คงสถานะ PENDING) + ปุ่มย้ายนอกสัญญา**
   - หน้า `/dashboard/out-of-contract` แสดงเฉพาะงาน `PENDING` ที่ `isOutOfContract=true` (โครงสร้างเหมือน `/dashboard/pending`)
-  - เพิ่มปุ่ม "ย้ายนอกสัญญา" ในหน้ารอดำเนินการให้ Role `ADMIN/SUPERVISOR/STAFF` กดย้ายงาน `pending → out-of-contract` โดย “คงสถานะเป็น PENDING”
+  - ปุ่ม "ย้ายนอกสัญญา" ในหน้ารอดำเนินการ — **อัปเดต 2026-03-30:** ต้องมีสิทธิ์ **`job.assign`**; ย้ายงาน `pending → out-of-contract` โดย “คงสถานะเป็น PENDING”
   - Backend มี endpoint `PATCH /jobs/:id/out-of-contract` เพื่อตั้ง `isOutOfContract=true`
 ---
 
@@ -117,8 +118,8 @@
 - [x] **แท็บสัญญา/นอกสัญญา** — `SegmentedTabs` แสดง **badge** จำนวนงานค้าง (สถานะไม่ใช่ `RESOLVED`) ต่อแท็บ; ปรับกล่อง glass ให้พอดีเนื้อหา (มือถือเต็มความกว้าง / จอใหญ่ `w-fit`)
 - [x] **Modal ข้อมูลการแก้ไข** ใน `JobsList` — ธีม **Dark Glassmorphism** (`AGENTS.md`)
 - [x] **`/dashboard/users`** — คลิกรูปโปรไฟล์ในตารางเปิด **lightbox** ดูรูปใหญ่
-- [x] **`DELETE /jobs/:id`** — **ADMIN** ลบงาน **IN_PROGRESS** ได้ (`JobsService.tryDeleteInProgressJobByAdmin`); กรณีอื่นใช้การลบ PENDING ไม่มอบหมายแบบเดิม
-- [x] **หน้า `/dashboard/in-progress`** — ปุ่ม **ลบงาน (ผู้ดูแลระบบ)** สำหรับ ADMIN เมื่อ `statusFilter === IN_PROGRESS`
+- [x] **`DELETE /jobs/:id`** — ลบงาน **IN_PROGRESS** ต้องมี **`job.deleteInProgress`**; ลบ **PENDING** ไม่มอบหมายต้องมี **`job.deleteUnassigned`** — **อัปเดต 2026-03-31:** สอดคล้อง `RolesService.getPermissionsForUser` / หน้า `/dashboard/roles`
+- [x] **หน้า `/dashboard/in-progress`** — ปุ่ม **ลบงาน (ผู้ดูแลระบบ)** เมื่อ `statusFilter === IN_PROGRESS` ตามสิทธิ์ **`job.deleteInProgress`**
 
 ## 4.4 SMTP, Reopen, assignee-only fix & tooling (2026-03-22)
 
@@ -168,6 +169,7 @@
 - [x] Frontend: **`/user-images/[userId]`**, **`dashboardJobImageUrl`**, job detail + JobsList + status staff; **`PersonAvatar`**, auth, users, profile
 - [x] Infra default: **`MINIO_ENSURE_PUBLIC_READ_POLICY=false`** — ลบ policy public เดิมบน MinIO ด้วยมือถ้าเคยเปิดไว้
 - [ ] ทดสอบ PRD ตาม checklist ใน **[`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md)**
+- [x] เอกสารประกอบ — `docs/README.md`, อัปเดต `README.md` / `AGENTS.md` / `AGENT_INSTRUCTIONS.md` / Postman / RBAC / Email-Notifications / CSV mapping
 
 ---
 

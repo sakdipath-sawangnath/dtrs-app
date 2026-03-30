@@ -1,6 +1,6 @@
 # Project Status - ระบบแจ้งซ่อม CCTV
 
-**วันที่อัปเดตสถานะ:** 2026-03-30
+**วันที่อัปเดตสถานะ:** 2026-03-31
 
 **ดัชนีเอกสาร:** [`README.md`](README.md) (ตารางสรุป), [`docs/README.md`](docs/README.md), [`minio.md`](minio.md), [`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md)
 
@@ -19,9 +19,9 @@
 
 2. ⚙️ **Backend API (NestJS): `🟢 พร้อมใช้งาน`**
    - Endpoint `/api/users/reporters` สำหรับดึงรายชื่อผู้แจ้งซ่อมในหน้ารายงาน
-   - ระบบ Authentication และ JWT Guard + **RolesGuard** (RBAC) ทำงานสมบูรณ์
+   - ระบบ Authentication: **JwtAuthGuard** + **`PermissionsGuard`** ตาม `Permission.code` จาก DB (สอดคล้องหน้า `/dashboard/roles`); `RolesGuard` ยังมีใน `AuthModule` แต่ endpoint หลักของ roles/users/settings ใช้ permission แทนการเทียบสตริง role ใน JWT อย่างเดียว
    - **Login**: รองรับอีเมลหรือชื่อผู้ใช้ (`email` / `username`) + รหัสผ่าน คืนค่า `access_token` + `user` (id, name, username, role)
-   - **User CRUD**: ADMIN ทำ CRUD ผู้ใช้ได้; STAFF เห็นรายชื่อผู้ใช้อย่างเดียว (read-only)
+   - **User CRUD**: ผู้ที่มีสิทธิ์ **`menu.users`** เรียก `GET/POST/PATCH/DELETE /users` (และที่เกี่ยวข้อง) ได้ — บทบาทกำหนดเองที่ได้รับเมนูนี้ใช้งานได้เหมือน “แอดมินผู้ใช้” โดยไม่จำเป็นต้องเป็นรหัส `ADMIN` ใน JWT
    - **โปรไฟล์ผู้ใช้**: `GET /users/me`, `PATCH /users/me` (ชื่อ, อีเมล, เบอร์, ตำแหน่ง, รูป), `PATCH /users/me/password` (เปลี่ยนรหัสผ่านต้องส่งรหัสเดิม)
    - **มอบหมายงาน**: `GET /users/assignable` — ต้องมีสิทธิ์ **`job.assign`** (`PermissionsGuard`); `PATCH /jobs/:id/assign` — อิง RBAC เหมือน `GET /roles/me/permissions`: มี **`job.assign`** → ส่ง `staffId` ใครก็ได้; ไม่มี `job.assign` แต่มี **`menu.pending`** และ `staffId` = ตัวเอง → รับงานเอง
    - **นอกสัญญา**: `PATCH /jobs/:id/out-of-contract` — ตั้ง `isOutOfContract=true` โดย “คงสถานะเป็น `PENDING`”; ต้องมีสิทธิ์ **`job.assign`**
@@ -34,11 +34,13 @@
     - `job.reopen.any`: ทำได้ทุกงาน
     - `job.reopen.self`: ทำได้เฉพาะผู้รับงาน
     - `RESOLVED` → `IN_PROGRESS`, ล้าง `fixDate`, ต่อท้ายเหตุผลใน `fixNote`
-   - **ตั้งค่าอีเมล (SMTP)**: `GET/PUT /api/settings/email-smtp`, `POST /api/settings/email-smtp/test` (ADMIN + JWT) — เก็บใน `Setting` คีย์ `email_smtp` ด้วย **nodemailer**; รองรับ `tlsRejectUnauthorized` และ env `SMTP_TLS_REJECT_UNAUTHORIZED`
-   - **เทมเพลตอีเมลแจ้งงาน**: `GET/PUT /api/settings/email-templates` (ADMIN + JWT) — เก็บใน `Setting` คีย์ `email_templates` (โลโก้, `publicBaseUrl`, เทมเพลตแจ้งเหตุ/รับเรื่อง/ปิดงาน: เปิดปิด, `toExtra`, `cc`, `notifyRoleIds`); ส่งผ่าน `JobEmailNotificationService` — **สรุปผู้รับ To/CC เริ่มต้นและเหตุที่อาจได้รับเมล admin** ดู [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
+   - **ตั้งค่าระบบ (`/settings/*`)**: ทุกเส้นต้อง JWT + สิทธิ์ **`menu.settings`** — รวม **SMTP** (`GET/PUT /settings/email-smtp`, `POST /settings/email-smtp/test`), **เทมเพลตอีเมล** (`GET/PUT /settings/email-templates`), **รหัสผ่านเริ่มต้น** (`GET/PUT /settings/default-pass`) — เก็บใน `Setting`; nodemailer + `tlsRejectUnauthorized` / env `SMTP_TLS_REJECT_UNAUTHORIZED`; flow อีเมล [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
    - **Jobs**: สร้างงานตรวจสอบ Site ว่าจังหวัด/อำเภอ/หน่วยงานมีในระบบก่อน (SitesService.existsByLocation); หลังสร้างงาน ถ้า `reporterPhone` ตรงกับผู้ใช้ในระบบจะ **เชื่อม `reporterId`** อัตโนมัติ (`UsersService.findByPhone`)
    - **รายการงาน (Dashboard)**: `GET /jobs/list` — ดึงรายการแจ้งซ่อม (JWT); ไม่มี `GET /api/jobs` แบบเปล่า — แยก path เพื่อไม่ให้สับสนกับ `POST /jobs` (แจ้งซ่อมสาธารณะ) เมื่อเปิด URL ในเบราว์เซอร์
-   - **ลบงาน `DELETE /jobs/:id`**: ถ้าเป็น **ADMIN** และงานสถานะ **IN_PROGRESS** จะลบได้ทันที; มิฉะนั้นใช้กับงาน **PENDING** ที่ยังไม่มอบหมายเท่านั้น — ต้องมีสิทธิ์ **`job.deleteUnassigned`** (อ่านจาก `RolesService.getPermissionsForUser`)
+   - **เปลี่ยนสถานะงาน**: `PATCH /jobs/:id/status` — ต้องมีสิทธิ์ **`job.updateStatus`**
+   - **ลบงาน `DELETE /jobs/:id`**: ถ้ามีสิทธิ์ **`job.deleteInProgress`** และงานเป็น **IN_PROGRESS** จะลบได้ก่อน; มิฉะนั้นลบได้เฉพาะงาน **PENDING** ที่ยังไม่มอบหมาย — ต้องมี **`job.deleteUnassigned`** (อ่านจาก `RolesService.getPermissionsForUser`)
+   - **จัดการบทบาท**: `GET/POST/PATCH/DELETE /roles/*` (ยกเว้น **`GET /roles/me/permissions`**) ต้องมี **`menu.roles`**
+   - **พื้นที่ (`areas`)**: `POST /areas` ต้องมี **`site.create`** (สอดคล้องจัดการ Site)
    - **Validation แจ้งซ่อม (Public POST)**: DTO + Zod (`create-job.dto`) รวมถึง `reporterEmail` preprocess/trim; `ZodValidationPipe` รวม error message เป็น array ชัดเจน
    - **MinIO**: ค่าเริ่มต้น **ไม่** ตั้ง public read บน bucket (`MINIO_ENSURE_PUBLIC_READ_POLICY` ปิด); เก็บ URL ใน DB ตามเดิม; Nest ดึง object ด้วย **SDK** ใน `getJobImageBuffer` / `getAvatarImageBuffer` + fallback HTTP; **`MINIO_SERVER_FETCH_BASE_URL`** ใช้เมื่อต้องโหลดภายใน LAN; **`GET /users/:id/avatar`**, **`GET /users/me/avatar`**
    - **พิมพ์รายงาน / รูปงาน / แดชบอร์ด**: หน้าพิมพ์ — **`/job-images/...`** → Nest; แดชบอร์ด/สถานะเจ้าหน้าที่ — รูปงานผ่าน **`dashboardJobImagePath`** (`/job-images/...`); รูปโปรไฟล์ผ่าน **`/user-images/:userId`**; เอกสาร NPM: `backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md`
@@ -69,7 +71,7 @@
      - ซ่อนคอลัมน์ “ผู้รับผิดชอบ” ใน `/dashboard/pending`
      - จัดลำดับปุ่มในคอลัมน์ “จัดการ” ให้ “ลบงาน” (`ลบงาน`) อยู่ท้ายสุด
      - ปุ่ม “ย้ายนอกสัญญา” แสดง `alert ยืนยัน` ก่อนย้าย และคงสถานะเดิมเป็น `PENDING`
-   - **In-progress Update UX**: ปุ่ม “อัปเดต” ใน `/dashboard/in-progress` เปิด modal “ข้อมูลการแก้ไข” พร้อมฟอร์มและการอัปโหลดรูป (สูงสุด 3 รูป) คล้ายกับการ์ดฟอร์มใน `/dashboard/jobs/:id` และมีส่วน Reopen เมื่อทำงานเป็น Resolved แล้ว
+   - **In-progress Update UX**: ปุ่ม “อัปเดต” ใน `/dashboard/in-progress` เปิด modal “ข้อมูลการแก้ไข” พร้อมฟอร์มและการอัปโหลดรูป (สูงสุด 3 รูป) คล้ายกับการ์ดฟอร์มใน `/dashboard/jobs/:id` และมีส่วน Reopen เมื่อทำงานเป็น Resolved แล้ว; ปุ่ม **ลบงาน (ผู้ดูแลระบบ)** แสดงตามสิทธิ์ **`job.deleteInProgress`** (`/roles/me/permissions`)
    - **Header Avatar**: header แสดงรูปโปรไฟล์เมื่อมี `session.user.image` และ fallback เป็น initials เมื่อไม่มีรูปหรือโหลดรูปไม่สำเร็จ
 
 ---
@@ -84,12 +86,21 @@
 | PATCH | `/users/me` | ✅ JWT | แก้ไขโปรไฟล์ตัวเอง (ชื่อ, อีเมล, เบอร์, ตำแหน่ง, รูป) |
 | PATCH | `/users/me/password` | ✅ JWT | เปลี่ยนรหัสผ่านตัวเอง (currentPassword, newPassword) |
 | GET | `/users/assignable` | ✅ JWT + **`job.assign`** | รายชื่อผู้ที่มอบหมายได้ (RBAC เดียวกับ modal มอบหมายในแดชบอร์ด) |
-| GET | `/users` | ✅ JWT (ADMIN) | รายชื่อผู้ใช้ทั้งหมด |
-| GET | `/users/:id` | ✅ JWT (ADMIN) | ดูข้อมูลผู้ใช้ |
-| POST | `/users` | ✅ JWT (ADMIN) | สร้างผู้ใช้ |
-| PATCH | `/users/:id` | ✅ JWT (ADMIN) | แก้ไขผู้ใช้ (ชื่อ, อีเมล, เบอร์, ตำแหน่ง, role, image) |
-| PATCH | `/users/:id/password` | ✅ JWT (ADMIN) | เปลี่ยนรหัสผ่านผู้ใช้ |
-| DELETE | `/users/:id` | ✅ JWT (ADMIN) | ลบผู้ใช้ |
+| GET | `/users` | ✅ JWT + **`menu.users`** | รายชื่อผู้ใช้ทั้งหมด |
+| GET | `/users/:id` | ✅ JWT + **`menu.users`** | ดูข้อมูลผู้ใช้ |
+| POST | `/users` | ✅ JWT + **`menu.users`** | สร้างผู้ใช้ |
+| PATCH | `/users/:id` | ✅ JWT + **`menu.users`** | แก้ไขผู้ใช้ (ชื่อ, อีเมล, เบอร์, ตำแหน่ง, role, image) |
+| PATCH | `/users/:id/password` | ✅ JWT + **`menu.users`** | เปลี่ยนรหัสผ่านผู้ใช้ |
+| DELETE | `/users/:id` | ✅ JWT + **`menu.users`** | ลบผู้ใช้ |
+| GET | `/roles/me/permissions` | ✅ JWT | สิทธิ์ของผู้ใช้ปัจจุบัน (sidebar / UI) |
+| GET | `/roles` | ✅ JWT + **`menu.roles`** | รายการบทบาท (จัดการ roles) |
+| GET | `/roles/permissions` | ✅ JWT + **`menu.roles`** | แคตตาล็อก permission ทั้งหมด |
+| GET | `/roles/:id` | ✅ JWT + **`menu.roles`** | ดูบทบาทตาม id |
+| GET | `/roles/:id/permissions` | ✅ JWT + **`menu.roles`** | id ของ permission ที่ผูกกับบทบาท |
+| PATCH | `/roles/:id/permissions` | ✅ JWT + **`menu.roles`** | ตั้งสิทธิ์บทบาท |
+| POST | `/roles` | ✅ JWT + **`menu.roles`** | สร้างบทบาท |
+| PATCH | `/roles/:id` | ✅ JWT + **`menu.roles`** | แก้ไขบทบาท |
+| DELETE | `/roles/:id` | ✅ JWT + **`menu.roles`** | ลบบทบาท |
 | POST | `/jobs` | ❌ (อนุญาต Bearer แบบเสริมได้) | แจ้งซ่อมใหม่ (สาธารณะ; ตรวจสอบ Site ก่อนสร้าง; ฝั่งเจ้าหน้าที่อาจส่ง JWT เพื่อ audit / เชื่อม reporter จากเบอร์) |
 | GET | `/jobs/list` | ✅ JWT | ดูรายการแจ้งซ่อมทั้งหมด (Dashboard / JobsList) |
 | GET | `/jobs/:id/image/:kind/:index` | ✅ JWT | สตรีมรูป (`kind`= issue \| fix, `index`=0–2) จาก URL ใน `Job.images` / `Job.fixImages` — proxy same-origin ให้ frontend ไม่ติด CORS |
@@ -97,23 +108,27 @@
 | PATCH | `/jobs/:id/assign` | ✅ JWT | มอบหมายงาน (RBAC): มี `job.assign` → `staffId` ใครก็ได้; ไม่มีแต่มี `menu.pending` และ `staffId` = ตัวเอง → รับงานเอง |
 | PATCH | `/jobs/:id/fix` | ✅ JWT | บันทึก/ปิดงาน (RBAC): `job.fix.any` ทำได้ทุกงาน, `job.fix.self` ทำได้เฉพาะ assignee; multipart ต้องมีรูปแก้ไขอย่างน้อย 2 รูปแรก; ตั้ง status=RESOLVED, fixDate อัตโนมัติ; ถ้ายัง `RESOLVED` ต้อง reopen ก่อน |
 | PATCH | `/jobs/:id/reopen` | ✅ JWT | Reopen (RBAC): `job.reopen.any` ทำได้ทุกงาน, `job.reopen.self` ทำได้เฉพาะ assignee; `RESOLVED` → `IN_PROGRESS`, ล้าง `fixDate`, ต่อท้ายเหตุผลใน `fixNote` |
-| GET | `/settings/email-smtp` | ✅ JWT (ADMIN) | อ่านการตั้งค่า SMTP (ไม่คืนรหัสผ่าน) |
-| PUT | `/settings/email-smtp` | ✅ JWT (ADMIN) | บันทึกการตั้งค่า SMTP (รหัสผ่านเข้ารหัสใน DB) |
-| POST | `/settings/email-smtp/test` | ✅ JWT (ADMIN) | ทดสอบส่งอีเมลด้วยค่าที่บันทึกแล้ว |
-| GET | `/settings/email-templates` | ✅ JWT (ADMIN) | อ่านเทมเพลตอีเมลแจ้งงาน (`email_templates`) |
-| PUT | `/settings/email-templates` | ✅ JWT (ADMIN) | บันทึกเทมเพลตอีเมล (รวม `publicBaseUrl`, `notifyRoleIds` ต่อเทมเพลต) |
+| PATCH | `/jobs/:id/status` | ✅ JWT + **`job.updateStatus`** | เปลี่ยนสถานะงาน |
+| GET | `/settings/email-smtp` | ✅ JWT + **`menu.settings`** | อ่านการตั้งค่า SMTP (ไม่คืนรหัสผ่าน) |
+| PUT | `/settings/email-smtp` | ✅ JWT + **`menu.settings`** | บันทึกการตั้งค่า SMTP (รหัสผ่านเข้ารหัสใน DB) |
+| POST | `/settings/email-smtp/test` | ✅ JWT + **`menu.settings`** | ทดสอบส่งอีเมลด้วยค่าที่บันทึกแล้ว |
+| GET | `/settings/email-templates` | ✅ JWT + **`menu.settings`** | อ่านเทมเพลตอีเมลแจ้งงาน (`email_templates`) |
+| PUT | `/settings/email-templates` | ✅ JWT + **`menu.settings`** | บันทึกเทมเพลตอีเมล (รวม `publicBaseUrl`, `notifyRoleIds` ต่อเทมเพลต) |
+| GET | `/settings/default-pass` | ✅ JWT + **`menu.settings`** | คืนค่า `{ passwordSet }` เท่านั้น (ไม่คืนรหัสผ่านจริง) |
+| PUT | `/settings/default-pass` | ✅ JWT + **`menu.settings`** | ตั้งรหัสผ่านเริ่มต้น |
 | PATCH | `/jobs/:id/out-of-contract` | ✅ JWT | ย้ายนอกสัญญา: ต้องมี **`job.assign`**; ตั้ง `isOutOfContract=true` โดย “คงสถานะเป็น PENDING” |
-| DELETE | `/jobs/:id` | ✅ JWT | **ADMIN**: ลบงาน **IN_PROGRESS** ได้; ลบงาน **PENDING** ไม่มอบหมาย: ต้องมี **`job.deleteUnassigned`** |
+| DELETE | `/jobs/:id` | ✅ JWT | ลบ **IN_PROGRESS**: ต้องมี **`job.deleteInProgress`**; ลบ **PENDING** ไม่มอบหมาย: **`job.deleteUnassigned`** |
 | GET | `/sites` | ❌ Public | ข้อมูลพื้นที่โครงการ (สำหรับหน้าแจ้งปัญหา) |
 | GET | `/areas` | ✅ JWT | ข้อมูลพื้นที่รับผิดชอบ |
+| POST | `/areas` | ✅ JWT + **`site.create`** | สร้างพื้นที่รับผิดชอบ |
 
 ---
 
 ## 👤 User & Role (Role-based menu & RBAC)
 
-- **ADMIN**: เห็นทุกเมนูใน Dashboard รวมถึง **จัดการผู้ใช้**, **จัดการบทบาทและสิทธิ์**, **ตั้งค่าระบบ**; ทำ CRUD ผู้ใช้ได้; มอบหมายงานให้ใครก็ได้
-- **STAFF**: เห็น ภาพรวม, รอดำเนินการ, กำลังแก้ไข, ข้อขัดข้องทั้งหมด, นอกสัญญา; รับงานตัวเองได้ (ปุ่มรับงาน); ไม่เห็น จัดการผู้ใช้/ตั้งค่าระบบ
-- **SUPERVISOR (หัวหน้างาน)**: เห็นเมนูเทียบเท่า STAFF + สิทธิ์ **`job.assign`** (มอบหมายงาน / ย้ายนอกสัญญา); เรียก `GET /users/assignable`, `PATCH /jobs/:id/assign` — บทบาทกำหนดเองใน `/dashboard/roles` ให้สิทธิ์เดียวกันได้โดยตั้ง **`job.assign`**
+- **ADMIN** (มาตรฐาน): เห็นทุกเมนู + ทุก permission ใน seed — รวม **`menu.users`**, **`menu.roles`**, **`menu.settings`**, **`job.deleteInProgress`**, **`job.updateStatus`**
+- **STAFF** (มาตรฐาน): เห็นเมนูคิวงาน + **`job.updateStatus`** + fix/reopen แบบ self — ไม่มีเมนูผู้ใช้/roles/ตั้งค่า และไม่มี **`job.deleteInProgress`**
+- **SUPERVISOR (หัวหน้างาน, มาตรฐาน)**: เทียบเท่า STAFF + **`menu.sites`** + action งาน/site ครบยกเว้น **`job.deleteInProgress`** — มอบหมายงาน / ย้ายนอกสัญญา / ลบ PENDING ไม่มอบหมายได้ตามสิทธิ์ที่ติ๊กใน `/dashboard/roles`
 - **USER**: ใช้สำหรับผู้แจ้งซ่อม (dropdown ในฟอร์มแจ้งปัญหา); เห็นเฉพาะ โปรไฟล์, แจ้งปัญหา, ตรวจสอบสถานะ
 
 ---
@@ -129,12 +144,12 @@
 | `/dashboard/my-jobs` | **งานที่รับผิดชอบ** – งานที่รับมอบหมายให้ผู้ใช้ปัจจุบัน; DataTable + filter |
 | `/dashboard/jobs/:id` | รายละเอียดงานเต็มหน้า + ฟอร์มบันทึกการแก้ไข; พิมพ์รายงานเมื่อ Resolved ผ่าน **`/print/jobs/:id`** (ไม่ใช้ html2canvas บนหน้ารายละเอียด) |
 | `/print/jobs/:id` | หน้าพิมพ์รายงานบำรุงรักษา (layout 2 หน้า, ปุ่มพิมพ์) |
-| `/dashboard/in-progress` | กำลังแก้ไข – DataTable + filter; แท็บสัญญา/นอกสัญญา + badge งานค้าง; **ADMIN** ลบงาน IN_PROGRESS ได้ |
+| `/dashboard/in-progress` | กำลังแก้ไข – DataTable + filter; แท็บสัญญา/นอกสัญญา + badge งานค้าง; ลบงาน IN_PROGRESS ตาม **`job.deleteInProgress`** |
 | `/dashboard/all` | **ข้อขัดข้อง** – ประวัติทั้งหมด; filter จังหวัด + จำนวนต่อหน้า (15/30/50/ทั้งหมด) + pagination |
 | `/dashboard/out-of-contract` | นอกสัญญา – DataTable + filter |
-| `/dashboard/users` | จัดการผู้ใช้ – DataTable + filter; ADMIN ทำ CRUD ได้ (Modal + Toast); เลือกบทบาทได้ ADMIN/STAFF/SUPERVISOR/USER |
+| `/dashboard/users` | จัดการผู้ใช้ – DataTable + filter; ต้องมีเมนู **`menu.users`**; CRUD (Modal + Toast); เลือกบทบาทได้ ADMIN/STAFF/SUPERVISOR/USER |
 | `/dashboard/profile` | โปรไฟล์ – แก้ไขข้อมูลผู้ใช้ / เปลี่ยนรหัสผ่าน (เข้าได้จากเมนูผู้ใช้ dropdown; ไม่แสดงใน sidebar) |
-| `/dashboard/settings` | ตั้งค่าระบบ (ADMIN) — **SMTP** + **เทมเพลตอีเมลแจ้งงาน** (โลโก้, `publicBaseUrl`, แจ้งเหตุ/รับเรื่อง/ปิดงาน, CC/To เพิ่มเติม, แจ้งตาม Role); layout เนื้อหาแบบหน้า `/dashboard` (ไม่ใช้ `DashboardPageShell` เป็นห่อหลัก) — flow อีเมล: [`docs/Email-Notifications.md`](docs/Email-Notifications.md) |
+| `/dashboard/settings` | ตั้งค่าระบบ — สิทธิ์ **`menu.settings`**; **SMTP** + **เทมเพลตอีเมลแจ้งงาน** + default pass; layout เนื้อหาแบบหน้า `/dashboard` — flow อีเมล: [`docs/Email-Notifications.md`](docs/Email-Notifications.md) |
 
 **หมายเหตุ:** `/dashboard/staff` ถูกลบแล้ว; redirect ไป `/dashboard/users`
 
@@ -142,7 +157,7 @@
 
 ---
 
-สร้าง user admin ครั้งแรก และ seed บทบาท/สิทธิ์ (รวม SUPERVISOR + job.assign):
+สร้าง user admin ครั้งแรก และ seed บทบาท/สิทธิ์ (รวม SUPERVISOR, `job.assign`, `job.updateStatus`, `job.deleteInProgress` ฯลฯ — หรือให้ backend สตาร์ทเพื่อ `ensurePermissionCatalogSynced`):
 ```bash
 cd backend && npx ts-node scripts/seed-admin.ts
 npx ts-node scripts/seed-roles-permissions.ts
@@ -163,6 +178,7 @@ npx ts-node scripts/seed-roles-permissions.ts
 - **UI Modal + บทบาท (2026-03-24)**: `CrudModal` — portal, `z-100`, Dark Glass; `/dashboard/roles` — `form-input-glass` + modal กำหนดสิทธิ์ (`size="lg"`)
 - **Deploy / CI (2026-03-23)**: **GitLab CI** (`.gitlab-ci.yml`) + **`Dockerfile`** — build แยก frontend/backend ใน pipeline, image production รัน Nest + Next; พอร์ต host ตัวอย่าง **8309→3000**, **8310→4000**; ตัวแปร **`FRONTEND_BASE_URL`** แทน `FRONTEND_URL_PRD`; คู่มือ production โดเมนเดียว + `/api` + `/socket.io` และ `MINIO_PUBLIC_URL` สรุปใน `README.md`; (2026-03-28) pipeline ส่ง **`MINIO_SERVER_FETCH_BASE_URL`** เข้า backend ได้เมื่อตั้งใน GitLab Variables
 - **RBAC คิวงาน (2026-03-30)**: `PATCH /jobs/:id/assign`, `PATCH /jobs/:id/out-of-contract`, และลบ `PENDING` ไม่มอบหมายใน **`DELETE /jobs/:id`** ใช้ **`getPermissionsForUser`** สอดคล้อง `/dashboard/roles`; `JobsList` แสดงปุ่มมอบหมาย/ย้ายนอกสัญญาตาม **`job.assign`**
+- **RBAC API เต็มชุด (2026-03-31)**: `roles` / `users` / `settings` → **`menu.roles`**, **`menu.users`**, **`menu.settings`**; `PATCH /jobs/:id/status` → **`job.updateStatus`**; ลบ IN_PROGRESS → **`job.deleteInProgress`**; `POST /areas` → **`site.create`**; `RBAC_ROLE_PERMISSION_CODES` ร่วมกับ `PermissionsGuard`; `JobsService` ใช้ `RolesService.getPermissionsForUser`
 - **พิมพ์ + รูปงานบน PRD (2026-03-28)**: รูปในเทมเพลตผ่าน **`/job-images/...`** บน Next; Nest **`MINIO_SERVER_FETCH_BASE_URL`** แก้กรณี backend โหลด MinIO ทาง public URL ไม่ได้ → **502** พร้อม log `getJobImageBuffer failed` ถ้ายังไม่ตั้งค่า
 - **Backend Docker entry (Nest + nodenext)**: image backend ใช้ **`node dist/src/main.js`** — ไม่ใช่ `dist/main.js`; สาเหตุเดิมของ error PRD `MODULE_NOT_FOUND` คือ path entry ไม่ตรงกับผล compile
 - **Frontend build (2026-03-23)**: `apiResponse.ts`; **`/public/report`** ใช้ `<Suspense>` รอบ `useSearchParams` เพื่อให้ `next build` ผ่าน

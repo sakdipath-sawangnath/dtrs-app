@@ -2,7 +2,12 @@
 
 ระบบแจ้งปัญหาและระบบจัดการการซ่อมบำรุงกล้องวงจรปิด (CCTV) ซึ่งพัฒนาต่อเนื่องมาจากการใช้งานผ่าน AppSheet
 
-## บันทึกการอัปเดตล่าสุด (2026-03-28)
+## บันทึกการอัปเดตล่าสุด (2026-03-30)
+
+- **RBAC คิวงาน (หน้ารอดำเนินการ + API)** — ปุ่ม «มอบหมายงาน» / «ย้ายนอกสัญญา» ใน `JobsList` อิงสิทธิ์ **`job.assign`** จาก `GET /roles/me/permissions` (สอดคล้อง `/dashboard/roles`); `PATCH /jobs/:id/assign` และ `PATCH /jobs/:id/out-of-contract` และการลบงาน `PENDING` ไม่มอบหมายใน `DELETE /jobs/:id` ใช้ **`RolesService.getPermissionsForUser`** ฝั่ง Nest (`JobsModule` import `RolesModule`) — รับงานเองได้เมื่อมี `menu.pending` และเลือกตัวเอง; สรุปเชิงลึกที่ [`backend/docs/RBAC-Setup.md`](backend/docs/RBAC-Setup.md)
+- **RBAC API สอดคล้องหน้า `/dashboard/roles` (ต่อ)** — `GET /users/assignable` ใช้ **`job.assign`** (`PermissionsGuard`); CRUD **`/roles/*`** (ยกเว้น `me/permissions`) ใช้ **`menu.roles`**; CRUD **`/users/*`** (ยกเว้น `me`, `reporters`, `assignable`) ใช้ **`menu.users`**; **`/settings/*`** ใช้ **`menu.settings`**; **`PATCH /jobs/:id/status`** ใช้ **`job.updateStatus`**; ลบงาน **IN_PROGRESS** ใช้ **`job.deleteInProgress`** (บทบาทมาตรฐาน **SUPERVISOR** ไม่ได้สิทธิ์นี้); **`POST /areas`** ใช้ **`site.create`**; `PermissionsGuard` กับ user แบบ enum ใช้ map **`RBAC_ROLE_PERMISSION_CODES`** เดียวกับ `RolesService` — หลัง deploy ให้สตาร์ท backend เพื่อ sync permission ใหม่ หรือรัน `seed-roles-permissions.ts`
+
+## บันทึกการอัปเดต (2026-03-28)
 
 - **พิมพ์รายงานบน PRD** — รูปใน PDF โหลดทาง **`/job-images/:jobId/:kind/:index`** บน Next (ไม่อยู่ใต้ `/api` จึงไม่ต้องแยก NPM location เพิ่ม); **`/api/print-jobs/:id/data`** ยังต้องส่งไป Next; รายละเอียด NPM ดู [`backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md`](backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md)
 - **DevTools** — เมื่อ Nest ตอบ error ระหว่าง proxy รูป Next ส่ง **JSON สั้นๆ** ใน response (แทน body ว่าง) เพื่ออ่านในแท็บ Preview; ดู [`frontend/src/lib/jobImageProxy.ts`](frontend/src/lib/jobImageProxy.ts)
@@ -14,7 +19,7 @@
 ## บันทึกการอัปเดต (2026-03-24)
 
 - **อีเมลแจ้งงาน (เทมเพลต + Role)** — เก็บใน `Setting` คีย์ `email_templates`; หน้า **`/dashboard/settings`** (ADMIN): โลโก้, **`publicBaseUrl`** สำหรับลิงก์ในอีเมล, เทมเพลต **แจ้งเหตุ / รับเรื่อง / ปิดงาน** (เปิดปิด, To เพิ่มเติม, CC, **แจ้งตามบทบาท** `notifyRoleIds`); HTML อีเมลโทนสว่าง สถานะเป็น badge — **flow ผู้รับ To/CC เริ่มต้น** ดู [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
-- **API:** `GET/PUT /api/settings/email-templates` (ADMIN)
+- **API:** `GET/PUT /api/settings/email-templates` (JWT + สิทธิ์ **`menu.settings`**)
 - **CC อีเมล** — CC มาจากช่องตั้งค่า + บทบาทที่เลือกเท่านั้น (ไม่แทรกผู้รับงานเป็น CC อัตโนมัติเมื่อปิดงาน) — สรุปใน [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
 - **Modal แดชบอร์ด (`CrudModal`)** — แสดงด้วย **`createPortal` → `document.body`**, **`z-100`** ให้อยู่เหนือ `SiteHeader`/`sidebar` (`z-50`); โทน **Dark Glassmorphism** (backdrop, `ring-1 ring-white/5`, พร็อพ **`size`**: `md` | `lg`); ล็อก scroll `body` ขณะเปิด
 - **หน้า `/dashboard/roles`** — modal เพิ่ม/แก้ไขบทบาทและกำหนดสิทธิ์: ฟิลด์ใช้ **`form-input-glass`** (`globals.css`); รายการสิทธิ์ในกล่องแก้ว + checkbox สไตล์ dark
@@ -36,7 +41,7 @@
 - **Production โดเมนเดียว (ตัวอย่าง)** — เว็บ `https://cctv-app.forth.co.th` + API ที่ **`/api`**: ตั้ง `NEXT_PUBLIC_API_BASE_URL=https://cctv-app.forth.co.th/api`, `NEXTAUTH_URL`, `ALLOWED_ORIGINS`, `FRONTEND_BASE_URL` ให้สอดคล้อง origin จริง; reverse proxy ต้องส่งต่อ **`/socket.io`** ไป backend (Socket.IO ไม่อยู่ใต้ `/api`); รายละเอียด path **Nginx Proxy Manager** (แยก `/api/auth`, `/api/print-jobs` → Next **8309**; `/api/` + `/socket.io` → Nest **8310**) ดู `backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md` — รูปหน้าพิมพ์ใช้ **`/job-images/...`** บน Next (ไม่อยู่ใต้ `/api`) จึงไม่ต้องแยก NPM เพิ่ม; ถ้าต้องการ alias ใต้ `/api` ค่อยแยก **`/api/job-images`**
 - **MINIO_PUBLIC_URL (ตัวอย่าง)** — เช่น `https://minio-it.forth.co.th` สำหรับ URL รูปที่ browser โหลดได้ (ค่าจริงใส่เฉพาะ `.env` / GitLab Variables)
 - **MINIO_SERVER_FETCH_BASE_URL (ถ้าจำเป็น)** — เช่น `http://192.168.0.71:9000` ให้ **Nest โหลดรูปจาก MinIO ภายใน LAN** เมื่อ DNS ภายในชี้ `MINIO_PUBLIC_URL` ไป IP ที่ไม่มี HTTPS :443 แต่ MinIO รับที่ :9000 (แก้ 502 ที่ `/jobs/.../image/...` บน PRD)
-- **Git** — `.gitignore` ที่ root กำหนดขอบเขตขึ้น repo: `backend/`, `frontend/`, `docs/`, `README.md`, `PLAN.md`, `TASK.md`, `STATUS.md`, `AGENTS.md`, `AGENT_INSTRUCTIONS.md`, `.gitlab-ci.yml`, `docker-compose.yml`, `.dockerignore`, `docker/`
+- **Git** — `.gitignore` ที่ root กำหนดขอบเขตขึ้น repo: `backend/`, `frontend/`, `docs/`, `README.md`, `minio.md`, `PLAN.md`, `TASK.md`, `STATUS.md`, `AGENTS.md`, `AGENT_INSTRUCTIONS.md`, `.gitlab-ci.yml`, `docker-compose.yml`, `.dockerignore`, `docker/`
 - **Frontend `npm run build`** — `src/lib/apiResponse.ts` รวม **`unwrapApiData`** (แกะ `{ data }` จาก backend) + ฟังก์ชันช่วย assignable/error; หน้า **`/public/report`**: ห่อ `useSearchParams` ด้วย `<Suspense>` ตาม Next.js 15
 
 ### ย้อนหลัง (2026-03-22)
@@ -53,6 +58,20 @@
 - **UI รายการงาน**: แท็บ **สัญญา / นอกสัญญา** — เอา **card/glass ห่อชั้นนอก**ออก เหลือเฉพาะกล่องควบคุมใน `SegmentedTabs`
 
 รายละเอียดเชิงลึกและตาราง API อัปเดตใน `STATUS.md`, `TASK.md`, `PLAN.md`
+
+### ดัชนีเอกสารหลัก
+
+| เอกสาร | เนื้อหา |
+|--------|---------|
+| [`STATUS.md`](STATUS.md) | สถานะระบบและสรุป API |
+| [`PLAN.md`](PLAN.md), [`TASK.md`](TASK.md) | แผนและงาน |
+| [`docs/README.md`](docs/README.md) | ดัชนีโฟลเดอร์ `docs/` |
+| [`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md) | Private MinIO + proxy รูป + checklist QA |
+| [`minio.md`](minio.md) | ตัวแปร MinIO และหมายเหตุ bucket |
+| [`docs/Email-Notifications.md`](docs/Email-Notifications.md) | Flow อีเมลแจ้งงาน |
+| [`docs/CSV-vs-System-Mapping.md`](docs/CSV-vs-System-Mapping.md) | เทียบ CSV กับ schema |
+| [`backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md`](backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md) | Nginx Proxy Manager / path |
+| [`backend/docs/RBAC-Setup.md`](backend/docs/RBAC-Setup.md) | RBAC |
 
 ---
 
@@ -146,10 +165,10 @@
    - สำหรับเจ้าหน้าที่/ผู้ดูแล (กรอกอีเมลหรือชื่อผู้ใช้ + รหัสผ่าน); การ์ดจัดกลาง
 4. **ระบบจัดการแดชบอร์ด (Dashboard):** `http://localhost:3000/dashboard`
    - ภาพรวม (สถิติ, กราฟสัดส่วน/จังหวัด/แนวโน้มรายวัน, เมนูด่วนตาม RBAC)
-   - รอดำเนินการ (ปุ่ม ดูรายละเอียด → ไปหน้า `/dashboard/jobs/:id` / มอบหมายงาน Select2 สำหรับ ADMIN·SUPERVISOR / รับงาน / ย้ายนอกสัญญา สำหรับ ADMIN/SUPERVISOR/STAFF (คงสถานะ PENDING))
+   - รอดำเนินการ (ปุ่ม ดูรายละเอียด → ไปหน้า `/dashboard/jobs/:id` / **มอบหมายงาน** และ **ย้ายนอกสัญญา** ตามสิทธิ์ **`job.assign`** จาก RBAC; **รับงาน** = assign เป็นตัวเองเมื่อมี `menu.pending` แต่ไม่มี `job.assign`; **ลบงาน** เมื่อมี **`job.deleteUnassigned`**; ย้ายนอกสัญญาคงสถานะ `PENDING`)
    - รายละเอียดงาน (`/dashboard/jobs/:id`): พิมพ์รายงานได้เมื่องานมีสถานะเสร็จสิ้น (Resolved) ผ่านหน้า **`/print/jobs/:id`** (เทมเพลต `JobMaintenancePdfTemplate` + `print.css`; พิมพ์จากเบราว์เซอร์)
    - **งานที่รับผิดชอบ** — รายการงานที่รับมอบหมาย (filter + datatable)
-   - กำลังแก้ไข (`/dashboard/in-progress`): แท็บสัญญา/นอกสัญญา + badge งานค้าง; ปุ่มอัปเดต (ผู้รับผิดชอบ); **ADMIN ลบงาน IN_PROGRESS ได้** (ปุ่มลบผู้ดูแลระบบ); ข้อขัดข้องทั้งหมด, นอกสัญญา (แสดงเฉพาะ PENDING ที่ `isOutOfContract=true`)
+   - กำลังแก้ไข (`/dashboard/in-progress`): แท็บสัญญา/นอกสัญญา + badge งานค้าง; ปุ่มอัปเดต (ผู้รับผิดชอบ); ปุ่มลบงาน IN_PROGRESS ตามสิทธิ์ **`job.deleteInProgress`** (UI `JobsList` + API `DELETE /jobs/:id`); ข้อขัดข้องทั้งหมด, นอกสัญญา (แสดงเฉพาะ PENDING ที่ `isOutOfContract=true`)
    - จัดการผู้ใช้ (ADMIN: CRUD; บทบาท: ADMIN, STAFF, หัวหน้างาน, ผู้แจ้งซ่อม) — คลิกรูปโปรไฟล์ในตารางเปิด modal ดูรูปขนาดใหญ่
    - จัดการบทบาทและสิทธิ์ (ADMIN), **ตั้งค่าระบบ** (`/dashboard/settings`, ADMIN) — กำหนด SMTP, ทดสอบส่งอีเมล, ตัวเลือก TLS, เทมเพลตอีเมลแจ้งงาน (รวม `publicBaseUrl`, แจ้งตาม Role); สรุป flow การส่งอีเมล: [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
    - โปรไฟล์เข้าได้จากเมนูผู้ใช้ (dropdown) ไม่แสดงใน sidebar

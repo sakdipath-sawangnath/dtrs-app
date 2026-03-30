@@ -12,7 +12,7 @@ Next.js 15 (App Router) สำหรับระบบแจ้งปัญห�
 ## โครงสร้างหลัก
 
 - `src/app/` — หน้าและ layout (report, status, login, dashboard)
-- `src/components/` — SiteHeader, SiteFooter, PublicLayoutShell, DashboardPageShell, DashboardFilterBar, **`CrudModal`** (portal → `document.body`, **`z-100`**, Dark Glass, พร็อพ `size` md/lg — ใช้ที่ `/dashboard/users`, `/dashboard/roles` ฯลฯ), UserMenuDropdown, SegmentedTabs, JobsList (ตารางงาน + แท็บสัญญา/นอกสัญญา **ไม่ห่อ glass ชั้นนอก** + badge งานค้าง + modal อัปเดตการแก้ไขแบบ Dark Glass + ดูรายละเอียด full page `/dashboard/jobs/:id` + มอบหมายงาน react-select / รับงาน; รองรับ `assignedToMe` สำหรับงานที่รับผิดชอบ; ADMIN ลบ IN_PROGRESS ได้ที่หน้า `/dashboard/in-progress`)
+- `src/components/` — SiteHeader, SiteFooter, PublicLayoutShell, DashboardPageShell, DashboardFilterBar, **`CrudModal`** (portal → `document.body`, **`z-100`**, Dark Glass, พร็อพ `size` md/lg — ใช้ที่ `/dashboard/users`, `/dashboard/roles` ฯลฯ), UserMenuDropdown, SegmentedTabs, JobsList (ตารางงาน + แท็บสัญญา/นอกสัญญา **ไม่ห่อ glass ชั้นนอก** + badge งานค้าง + modal อัปเดตการแก้ไขแบบ Dark Glass + ดูรายละเอียด full page `/dashboard/jobs/:id` + มอบหมายงาน react-select / รับงาน — ปุ่มมอบหมายและย้ายนอกสัญญาอิงสิทธิ์ **`job.assign`** จาก `/roles/me/permissions`; ลบงาน PENDING ไม่มอบหมายอิง **`job.deleteUnassigned`**; รองรับ `assignedToMe` สำหรับงานที่รับผิดชอบ; ลบงาน IN_PROGRESS ที่หน้า `/dashboard/in-progress` อิง **`job.deleteInProgress`**)
 - `src/app/globals.css` — class **`form-input-glass`** สำหรับ input/textarea บนพื้นหลังแดชบอร์ดเข้ม (แยกจาก `.form-input` ที่ใช้บนฟอร์มสว่าง)
 - `src/lib/` — auth.ts (NextAuth; รูปผู้ใช้ใน session ใช้ path **`/user-images/:id`** เมื่อมีรูปในระบบ), toast.ts, **apiResponse.ts**, **`jobImageProxy.ts`** + route **`/job-images/...`**, **`userImageProxy.ts`** + route **`/user-images/[userId]`**, **`dashboardJobImageUrl.ts`** — helper path รูปงานสำหรับ `<img>` บนแดชบอร์ด
 
@@ -37,15 +37,15 @@ Next.js 15 (App Router) สำหรับระบบแจ้งปัญห�
 
 - **รูปโปรไฟล์ (แดชบอร์ด)** — **`/user-images/:userId`** (Next proxy → **`GET /api/users/:id/avatar`**) ใช้ใน `PersonAvatar`, หน้า users, header; path ไม่อยู่ใต้ `/api` เหมือน `/job-images`
 
-- **/dashboard/settings** (ADMIN)
+- **/dashboard/settings** (สิทธิ์ **`menu.settings`**)
   - ตั้งค่า **SMTP** — โหลด/บันทึก/ทดสอบส่งอีเมล (`GET/PUT /api/settings/email-smtp`, `POST /api/settings/email-smtp/test`); ตัวเลือก TLS / self-signed
   - **เทมเพลตอีเมลแจ้งงาน** — `GET/PUT /api/settings/email-templates`: โลโก้, **`publicBaseUrl`** (ลิงก์ในอีเมลบน production), เทมเพลต **แจ้งเหตุ / รับเรื่อง / ปิดงาน** (เปิดปิด, To เพิ่มเติม, CC, **แจ้งตามบทบาท**); flow ผู้รับเริ่มต้น: [../docs/Email-Notifications.md](../docs/Email-Notifications.md)
   - โครง layout เนื้อหาแบบหน้า `/dashboard`
 
-- **/dashboard/users** (ADMIN)
+- **/dashboard/users** (สิทธิ์ **`menu.users`**)
   - จัดการผู้ใช้ — คลิกรูปโปรไฟล์ในตารางเพื่อดูรูปขนาดใหญ่ (lightbox); modal CRUD ผ่าน **`CrudModal`** (portal + z-index เหนือ header)
 
-- **/dashboard/roles** (ADMIN)
+- **/dashboard/roles** (สิทธิ์ **`menu.roles`**)
   - จัดการบทบาทและสิทธิ์ — modal เพิ่ม/แก้ไข/กำหนดสิทธิ์: **`form-input-glass`**, รายการ permission ในกล่อง Dark Glass; `CrudModal` ใช้ `size="lg"` ในโหมดกำหนดสิทธิ์
 
 - **`/public/report`**
@@ -70,4 +70,7 @@ npm run dev
 
 ## เอกสารเพิ่มเติม
 
-- สถานะโปรเจกต์และ API: ดูที่ root [STATUS.md](../STATUS.md) และ [README.md](../README.md)
+- สถานะโปรเจกต์และ API: root [STATUS.md](../STATUS.md), [README.md](../README.md) (ดัชนีเอกสาร)
+- Private MinIO + proxy รูป: [../docs/Project-Plan-Private-MinIO-Images.md](../docs/Project-Plan-Private-MinIO-Images.md), [../minio.md](../minio.md)
+- Reverse proxy (NPM): [../backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md](../backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md)
+- ดัชนีโฟลเดอร์ `docs/`: [../docs/README.md](../docs/README.md)

@@ -56,11 +56,11 @@
 - [x] ข้อขัดข้อง (/dashboard/all): filter จังหวัด, page limit 15/30/50/ทั้งหมด, pagination
 - [x] Component ร่วม: DashboardPageShell, DashboardFilterBar, CrudModal, Toast (success 1.2s, error, confirm)
 - [x] ลบ /dashboard/staff; รวมการจัดการที่ /dashboard/users (ADMIN CRUD, STAFF read-only)
-- [x] บทบาท SUPERVISOR (หัวหน้างาน) + สิทธิ์ job.assign; ปุ่มมอบหมายงานในหน้ารอดำเนินการ (modal เลือกเจ้าหน้าที่); GET /users/assignable, PATCH /jobs/:id/assign (ADMIN/SUPERVISOR มอบหมายได้, STAFF รับงานตัวเอง)
+- [x] บทบาท SUPERVISOR (หัวหน้างาน) + สิทธิ์ job.assign; ปุ่มมอบหมายงานในหน้ารอดำเนินการ (modal เลือกเจ้าหน้าที่); GET /users/assignable, PATCH /jobs/:id/assign — **อัปเดต 2026-03-30:** API/UI อิง RBAC (`job.assign`, `menu.pending` สำหรับรับงานเอง) สอดคล้อง `/dashboard/roles`
 - [x] หน้ารอดำเนินการ: ปุ่มดูรายละเอียด → ไปหน้า `/dashboard/jobs/:id` (full page); ปุ่มมอบหมายงานใช้ react-select
 - [x] นอกสัญญา (คงสถานะ PENDING) + ย้ายนอกสัญญา
   - `/dashboard/out-of-contract` แสดงเฉพาะงาน `PENDING` ที่ `isOutOfContract=true` (โครงสร้างเหมือน `/dashboard/pending`)
-  - เพิ่มปุ่ม "ย้ายนอกสัญญา" ให้ Role `ADMIN/SUPERVISOR/STAFF` บนหน้ารอดำเนินการ เพื่อย้ายงาน `pending → out-of-contract` โดย “คงสถานะเป็น PENDING”
+  - ปุ่ม "ย้ายนอกสัญญา" บนหน้ารอดำเนินการ — **อัปเดต 2026-03-30:** แสดงและเรียก API ได้เมื่อมีสิทธิ์ **`job.assign`** (เดิมเทียบเท่า ADMIN/SUPERVISOR); คงสถานะ `PENDING`
   - Backend มี endpoint `PATCH /jobs/:id/out-of-contract` เพื่อย้ายนอกสัญญา
 - [x] Sidebar: เพิ่ม "งานที่รับผิดชอบ" (`/dashboard/my-jobs`); ไม่แสดงเมนู โปรไฟล์ (เข้าได้จาก dropdown)
 - [x] หน้ารายละเอียดงาน (`/dashboard/jobs/:id`): การ์ดแจ้งข้อขัดข้อง + การ์ดข้อมูลการแก้ไข + ฟอร์มบันทึกการแก้ไข (ลำดับ: fixEnvironment (Indoor/Outdoor) ก่อน แล้วค่อย brokenPartType (Hardware/Software); ฟิลด์บังคับ: cause, fixMethod และรูปการแก้ไข “อย่างน้อย 2 รูปแรก”; หมายเหตุ/Serial ไม่บังคับ); PATCH /jobs/:id/fix; พิมพ์/PDF — หน้า `/print/jobs/:id` + เทมเพลต (อัปเดต: ไม่ใช้ html2canvas บนหน้ารายละเอียด; มี `GET /jobs/:id/report-pdf` สำหรับไฟล์ PDF)
@@ -117,15 +117,24 @@
 ## 13. Phase 6.3 — Jobs UI, Users lightbox, Admin delete IN_PROGRESS (2026-03-21)
 
 ### Backend
-- [x] **`DELETE /jobs/:id`** — ถ้า JWT เป็น **ADMIN** และงานเป็น **IN_PROGRESS** ให้ลบได้; ไม่ใช่กรณีนั้น fallback ไป `deleteUnassignedJob` (PENDING + ไม่มีผู้รับผิดชอบ) สำหรับ ADMIN/SUPERVISOR
+- [x] **`DELETE /jobs/:id`** — ลบ **IN_PROGRESS** เมื่อมี **`job.deleteInProgress`**; มิฉะนั้นลบ **PENDING** ไม่มอบหมายด้วย **`job.deleteUnassigned`** — **อัปเดต 2026-03-31**
 
 ### Frontend
 - [x] **`SegmentedTabs`** — รองรับ `badgeCount`; แท็บสัญญา/นอกสัญญาแสดงจำนวนงานค้าง; ปรับ layout กล่องให้พอดี
-- [x] **`JobsList`** — modal อัปเดตข้อมูลการแก้ไข = Dark Glass (แสดงกลางจอผ่าน portal เพื่อลดปัญหา header ทับ); **ADMIN** ที่หน้ากำลังแก้ไขเห็นปุ่มลบงาน IN_PROGRESS
+- [x] **`JobsList`** — modal อัปเดตข้อมูลการแก้ไข = Dark Glass (แสดงกลางจอผ่าน portal เพื่อลดปัญหา header ทับ); หน้ากำลังแก้ไขแสดงปุ่มลบงาน IN_PROGRESS ตาม **`job.deleteInProgress`**
 - [x] **`/dashboard/users`** — คลิกรูปโปรไฟล์เปิด modal ดูรูปใหญ่
 
 ### เอกสาร
 - [x] อัปเดต `README.md`, `STATUS.md`, `PLAN.md`, `TASK.md`, `backend/docs/RBAC-Setup.md`, `backend/postman/README.md`, `frontend/README.md`, `backend/docs/api-endpoints.json`
+
+## 14b. RBAC คิวงาน — assign / out-of-contract / delete unassigned (2026-03-30)
+
+- [x] `JobsController` + `JobsList`: มอบหมายงาน, ย้ายนอกสัญญา, ลบงาน PENDING ไม่มอบหมาย — สอดคล้อง `GET /roles/me/permissions` / `RolesService.getPermissionsForUser` — เอกสาร `README.md`, `STATUS.md`, `backend/docs/RBAC-Setup.md`, `PLAN.md`
+
+## 14c. RBAC API เต็มชุด — menu.* / job.updateStatus / job.deleteInProgress / site.create (2026-03-31)
+
+- [x] `roles` / `users` / `settings` controllers — `PermissionsGuard` + `menu.roles` / `menu.users` / `menu.settings`; `GET /users/assignable` — `job.assign`; `PATCH /jobs/:id/status` — `job.updateStatus`; `DELETE /jobs/:id` — `job.deleteInProgress` + `job.deleteUnassigned`; `POST /areas` — `site.create`; `RBAC_ROLE_PERMISSION_CODES` + `PermissionsGuard` enum fallback; seed/sync permission
+- [x] เอกสาร: `README.md`, `STATUS.md`, `PLAN.md`, `TASK.md`, `backend/README.md`, `backend/docs/RBAC-Setup.md`, `backend/postman/README.md`, `frontend/README.md`
 
 ## 14. Phase 6.4 — SMTP, Reopen, assignee-only fix, Nest CLI v11, JobsList tabs (2026-03-22)
 
@@ -206,12 +215,12 @@
 
 ## 20. Private MinIO + รูปผ่านสิทธิ์ (2026-03-28) — implement แล้ว
 
-สรุป: **[`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md)**
+สรุป: **[`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md)** · ดัชนีเอกสาร: [`docs/README.md`](docs/README.md), [`minio.md`](minio.md)
 
 - [x] Phase 1: Nest SDK + `getJobImageBuffer`
 - [x] Phase 2: `/job-images` + `dashboardJobImagePath` — job detail, JobsList, status เจ้าหน้าที่
 - [x] Phase 3: `GET /users/:id/avatar`, `/user-images`, `PersonAvatar`, auth session, users/profile
 - [x] Phase 4: default `MINIO_ENSURE_PUBLIC_READ_POLICY=false` (ลบ policy public เดิมที่ MinIO ด้วยมือถ้ามี)
 - [ ] Phase 5: ทดสอบ manual ตาม checklist ในเอกสารแผน
-- [x] Phase 6: README, STATUS, api-endpoints, Reverse-Proxy, minio.md, PLAN §4.10
+- [x] Phase 6: README, STATUS, api-endpoints, Reverse-Proxy, minio.md, `docs/README.md`, PLAN §4.10
 

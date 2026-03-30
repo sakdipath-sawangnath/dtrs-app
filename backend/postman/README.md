@@ -30,9 +30,9 @@
 ## โฟลเดอร์ใน Collection
 
 - **Auth** – Login (สาธารณะ)
-- **Users** – ผู้ใช้ (reporters สาธารณะ — `GET /public/users/reporter-by-phone` ไม่ส่ง `image` URL; **me**; **`GET /users/me/avatar`**, **`GET /users/:id/avatar`** สตรีมรูปโปรไฟล์ JWT; **`GET /users/assignable`** ต้องมีสิทธิ์ **`job.assign`** (PermissionsGuard); CRUD ต้อง JWT/ADMIN)
-- **Jobs** – งานแจ้งซ่อม (สร้าง/สถานะสาธารณะ, อื่นๆ ต้อง JWT; **PATCH :id/assign**: RBAC — `job.assign` มอบหมายใครก็ได้ / `menu.pending` + ตัวเอง = รับงาน; **PATCH :id/out-of-contract**: ต้อง **`job.assign`**; **PATCH :id/fix** / **PATCH :id/reopen**: RBAC `job.fix.*` / `job.reopen.*`; อัปโหลดรูปการแก้ไข; **DELETE :id**: ADMIN ลบงาน **IN_PROGRESS** ได้; ลบ **PENDING** ไม่มอบหมายต้อง **`job.deleteUnassigned`**) — ดูรายละเอียดใน `../docs/api-endpoints.json` และ [`RBAC-Setup.md`](RBAC-Setup.md)
-- **Settings** – ตั้งค่าระบบ (ADMIN): **GET/PUT** `settings/email-smtp`, **POST** `settings/email-smtp/test` (ทดสอบส่งอีเมล); **GET/PUT** `settings/email-templates` (เทมเพลตแจ้งเหตุ/รับเรื่อง/ปิดงาน, `publicBaseUrl`, `notifyRoleIds` ฯลฯ) — สรุปการส่งอีเมล: [`../../docs/Email-Notifications.md`](../../docs/Email-Notifications.md)
+- **Users** – ผู้ใช้ (reporters สาธารณะ — `GET /public/users/reporter-by-phone` ไม่ส่ง `image` URL; **me**; **`GET /users/me/avatar`**, **`GET /users/:id/avatar`** สตรีมรูปโปรไฟล์ JWT; **`GET /users/assignable`** ต้องมีสิทธิ์ **`job.assign`** (PermissionsGuard); CRUD (`GET/POST/PATCH/DELETE /users` ฯลฯ) ต้อง JWT + **`menu.users`**)
+- **Jobs** – งานแจ้งซ่อม (สร้าง/สถานะสาธารณะ, อื่นๆ ต้อง JWT; **PATCH :id/assign**: RBAC — `job.assign` มอบหมายใครก็ได้ / `menu.pending` + ตัวเอง = รับงาน; **PATCH :id/out-of-contract**: ต้อง **`job.assign`**; **PATCH :id/status**: **`job.updateStatus`**; **PATCH :id/fix** / **PATCH :id/reopen**: RBAC `job.fix.*` / `job.reopen.*`; อัปโหลดรูปการแก้ไข; **DELETE :id**: ลบ **IN_PROGRESS** ต้อง **`job.deleteInProgress`**; ลบ **PENDING** ไม่มอบหมายต้อง **`job.deleteUnassigned`**) — ดูรายละเอียดใน `../docs/api-endpoints.json` และ [`RBAC-Setup.md`](RBAC-Setup.md)
+- **Settings** – ตั้งค่าระบบ (JWT + **`menu.settings`**): **GET/PUT** `settings/email-smtp`, **POST** `settings/email-smtp/test`; **GET/PUT** `settings/email-templates`; **GET/PUT** `settings/default-pass` — สรุปการส่งอีเมล: [`../../docs/Email-Notifications.md`](../../docs/Email-Notifications.md)
 - **Sites** – พื้นที่โครงการ (GET สาธารณะ, POST ต้อง JWT)
 - **Areas** – พื้นที่รับผิดชอบ (ต้อง JWT)
 - **Health** – Hello (health check)

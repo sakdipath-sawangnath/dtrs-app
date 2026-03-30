@@ -31,7 +31,8 @@
 1. **`/api/jobs/...` ไป Nest โดยตรง**  
    API หลักของงาน (`GET /api/jobs/:id`, list ฯลฯ) ไป Nest ถูกต้อง  
    **รูปใน `<img>` หน้าพิมพ์** ใช้ **`/job-images/:id/:kind/:index`** บน Next (8309) — path ไม่อยู่ใต้ `/api` จึงโดน forward ไป Next ตามปกติแม้ NPM ไม่ได้แยก `/api/job-images` (ถ้าแยกไป Nest จะได้ **404**) — route แนบ Bearer จาก session cookie แล้วค่อยดึงจาก Nest ภายใน ถ้าเบราว์เซอร์เรียก `GET /api/jobs/.../image/...` ไปชน Nest โดยตรงจะได้ **401** เพราะแท็ก `<img>` ไม่ส่ง header `Authorization`  
-   *(ทางเลือก)* **`/api/job-images/...`** ทำงานเหมือนกัน แต่ต้องตั้ง NPM แยกไป Next เหมือน `/api/print-jobs`
+   *(ทางเลือก)* **`/api/job-images/...`** ทำงานเหมือนกัน แต่ต้องตั้ง NPM แยกไป Next เหมือน `/api/print-jobs`  
+   **`/user-images/*`** — โหลดรูปโปรไฟล์แดชบอร์ดบน Next เช่นเดียวกับ `/job-images/*` (แนบ session cookie → proxy ไป Nest `GET /api/users/.../avatar`) — ถ้า forward ทั้งโดเมนหลักไป Next สำหรับ path ที่ไม่ใช่ `/api` อยู่แล้ว มักไม่ต้องแยก location พิเศษ
 
 2. **WebSocket**  
    ที่ Proxy Host หลักควรเปิด **Websockets Support** (ถ้ามี) และ location `/socket.io` ต้องชี้ไป backend

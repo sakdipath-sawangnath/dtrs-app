@@ -1,7 +1,7 @@
 # แผนโครงการ: ปิดการเข้าถึงรูป MinIO แบบสาธารณะ (Private Object + โหลดผ่านสิทธิ์)
 
 **สถานะ:** ดำเนินการในโค้ดแล้ว (2026-03-28) — ทดสอบบน PRD / ลบ policy เก่าที่ MinIO เป็นหน้าที่ ops  
-**อ้างอิง:** `docs/Project-Plan-Private-MinIO-Images.md` (ไฟล์นี้)
+**Ops MinIO Console:** bucket → แท็บ **Anonymous** ควรไม่มี rule; **Access Policy** ใช้ **Private** หรือ Custom ที่ไม่เปิด `GetObject` ให้ทุกคน — สรุป env: [`../minio.md`](../minio.md)
 
 ---
 
@@ -15,7 +15,7 @@
 | 3 | `GET /users/me/avatar`, `GET /users/:id/avatar`; `userImageProxy` + `/user-images/[userId]`; `PersonAvatar`; auth session ใช้ `/user-images/:id`; users page / profile |
 | 4 | ค่าเริ่มต้น **`MINIO_ENSURE_PUBLIC_READ_POLICY=false`**; ลบ policy public เดิมบน MinIO ด้วยมือถ้ามี |
 | 5 | Checklist ทดสอบด้านล่าง (manual) |
-| 6 | เอกสาร: README, STATUS, PLAN, TASK, api-endpoints.json, Reverse-Proxy, minio.md |
+| 6 | เอกสาร: README, STATUS, PLAN, TASK, api-endpoints.json, Reverse-Proxy, minio.md, `docs/README.md` |
 
 ---
 

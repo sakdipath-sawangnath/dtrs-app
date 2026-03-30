@@ -31,8 +31,10 @@
 - **Testing** (เมื่อ scope เอื้อ): service tests, e2e ด้วย supertest, mock external services
 
 ## ไฟล์/เอกสารที่ควรรู้
-- ภาพรวมระบบ: `README.md`
+- ภาพรวมระบบ: `README.md` (มีตารางดัชนีเอกสารหลัก)
 - สถานะ/แผน/งาน: `STATUS.md`, `PLAN.md`, `TASK.md` (รวม Phase 6.5–6.8: …, **เทมเพลตอีเมล**, **CrudModal + `/dashboard/roles` Dark Glass**)
+- ดัชนี `docs/`: `docs/README.md`
+- Private MinIO + รูปผ่านสิทธิ์: `docs/Project-Plan-Private-MinIO-Images.md`, `minio.md`
 - การแจ้งเตือนอีเมล (To/CC เริ่มต้น, `publicBaseUrl`, Role): `docs/Email-Notifications.md`
 - Mapping ข้อมูล CSV: `docs/CSV-vs-System-Mapping.md`
 - RBAC: `backend/docs/RBAC-Setup.md`

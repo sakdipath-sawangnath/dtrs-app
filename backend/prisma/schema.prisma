@@ -65,7 +65,8 @@ model User {
   isLocked     Boolean  @default(false) // ล็อกการเข้าสู่ระบบ (ADMIN ตั้งได้)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  jobs         Job[]    @relation("AssignedJobs")
+  jobs          Job[]    @relation("AssignedJobs")
+  jobsAssignedBy Job[]   @relation("AssignedJobsBy")
   reportedJobs Job[]    @relation("ReportedJobs")
   areas        Area[] // พื้นที่รับผิดชอบ
 }
@@ -139,6 +140,9 @@ model Job {
 
   assignedToId Int?
   assignedTo   User?   @relation("AssignedJobs", fields: [assignedToId], references: [id])
+  // ผู้ใช้ที่กดมอบหมาย/รับงาน (JWT) — แยก มอบหมาย vs รับงานเอง เทียบกับ assignedTo
+  assignedById Int?
+  assignedBy   User?   @relation("AssignedJobsBy", fields: [assignedById], references: [id], onDelete: SetNull)
   fixerPhone   String? // เบอร์โทรผู้แก้ไข
   fixerEmail   String? // Email ผู้แก้ไข
 

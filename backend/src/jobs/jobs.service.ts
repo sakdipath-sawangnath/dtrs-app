@@ -45,12 +45,14 @@ export class JobsService {
     private mapJobForClient<
         T extends {
             assignedTo?: { image?: string | null } | null;
+            assignedBy?: { image?: string | null } | null;
             reporter?: { image?: string | null } | null;
         },
     >(job: T): T {
         return {
             ...job,
             assignedTo: job.assignedTo ? this.mapUserImage(job.assignedTo) : job.assignedTo,
+            assignedBy: job.assignedBy ? this.mapUserImage(job.assignedBy) : job.assignedBy,
             reporter: job.reporter ? this.mapUserImage(job.reporter) : job.reporter,
         };
     }
@@ -158,6 +160,9 @@ export class JobsService {
             where: { id },
             include: {
                 assignedTo: {
+                    select: { id: true, name: true, image: true },
+                },
+                assignedBy: {
                     select: { id: true, name: true, image: true },
                 },
                 reporter: {
@@ -508,14 +513,18 @@ export class JobsService {
         return closed;
     }
 
-    async assignStaff(id: number, staffId: number) {
+    async assignStaff(id: number, staffId: number, assignedByUserId: number) {
         const before = await this.prisma.job.findUnique({
             where: { id },
             select: { assignedToId: true },
         });
         const updated = await this.prisma.job.update({
             where: { id },
-            data: { assignedToId: staffId, status: 'IN_PROGRESS' },
+            data: {
+                assignedToId: staffId,
+                assignedById: assignedByUserId,
+                status: 'IN_PROGRESS',
+            },
         });
         if (before?.assignedToId !== staffId) {
             void this.jobEmailNotifications.notifyAssigned(updated.id);

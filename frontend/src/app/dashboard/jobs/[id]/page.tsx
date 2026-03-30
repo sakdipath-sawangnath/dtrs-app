@@ -22,6 +22,7 @@ import {
   Loader2,
 } from "lucide-react";
 import DashboardPageShell from "@/components/DashboardPageShell";
+import JobTimelineCard from "@/components/JobTimelineCard";
 import PersonAvatar from "@/components/PersonAvatar";
 import { confirmDialog, toastError, toastSuccess } from "@/lib/toast";
 import Select from "react-select";
@@ -46,6 +47,8 @@ interface JobDetail {
   images?: string[] | null;
   reporter?: { id?: number; image?: string | null } | null;
   assignedTo?: { id: number; name: string; image?: string | null } | null;
+  /** ผู้ใช้ที่กดมอบหมาย/รับงาน (จาก API หลังอัปเดตระบบ) */
+  assignedBy?: { id: number; name: string; image?: string | null } | null;
   fixDate?: string | null;
   brokenPart?: string | null;
   cause?: string | null;
@@ -559,6 +562,10 @@ export default function JobDetailPage() {
           >
             <ArrowLeft size={16} /> กลับไปหน้ารายการ
           </button>
+
+          {!loading && !error && job ? (
+            <JobTimelineCard job={job} />
+          ) : null}
 
           <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
             {/* คอลัมน์ซ้าย — No-Card: แยก Glass หลายก้อน */}

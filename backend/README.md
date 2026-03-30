@@ -25,13 +25,13 @@
 
 Backend API สำหรับ **ระบบแจ้งซ่อม CCTV** — NestJS + Prisma + MySQL
 
-- **Auth:** JWT + RolesGuard (ADMIN, STAFF, USER, SUPERVISOR)
+- **Auth:** JWT; จุดที่ต้องสิทธิ์ละเอียดใช้ **`PermissionsGuard`** + `Permission.code` (สอดคล้อง `/dashboard/roles`) — ยังมี `RolesGuard` ในบางจุด; enum บทบาทใน JWT ใช้ fallback ร่วมกับ **`RBAC_ROLE_PERMISSION_CODES`**
 - **Modules:** Auth, Users, Jobs, Sites, Areas, Settings, **Roles** (dynamic RBAC: AppRole, Permission, RolePermission)
-- **API หลัก:** `GET /users/assignable` (ADMIN/SUPERVISOR) รายชื่อเจ้าหน้าที่มอบหมายได้; `PATCH /jobs/:id/assign` มอบหมายงาน (ADMIN/SUPERVISOR ใครก็ได้, STAFF รับงานตัวเอง); `PATCH /jobs/:id/fix` บันทึกการแก้ไขงาน (brokenPartType, cause, fixMethod, note, serial numbers, fixImages → MinIO) ตั้ง status=RESOLVED; `GET /jobs/status/:ticketNo` ตรวจสอบสถานะจากเลขที่ใบแจ้งซ่อม
+- **API หลัก:** `GET /users/assignable` (**`job.assign`**) รายชื่อเจ้าหน้าที่มอบหมายได้; `PATCH /jobs/:id/assign` — RBAC: มี `job.assign` มอบหมายใครก็ได้ / `menu.pending` + ตัวเอง = รับงาน; `PATCH /jobs/:id/status` (**`job.updateStatus`**); `DELETE /jobs/:id` — **`job.deleteInProgress`** (IN_PROGRESS) หรือ **`job.deleteUnassigned`** (PENDING ไม่มอบหมาย); `PATCH /jobs/:id/fix` บันทึกการแก้ไขงาน (RBAC `job.fix.*`; multipart → MinIO) ตั้ง status=RESOLVED; `GET /jobs/status/:ticketNo` ตรวจสอบสถานะจากเลขที่ใบแจ้งซ่อม; `POST /areas` (**`site.create`**); `/settings/*` (**`menu.settings`**); CRUD roles (**`menu.roles`**); CRUD users หลัก (**`menu.users`**)
 - **Jobs Flow:** `POST /jobs` รับฟอร์มแจ้งซ่อมจากหน้า `/report` (multipart/form-data) อัปโหลดรูปไป MinIO ผ่าน `MinioService.uploadFile()` เก็บ URL ลง `Job.images` และถ้าไม่ส่ง `ticketNo` มาด้วย ระบบจะสร้างรหัสใหม่เป็น hex 8 ตัว ไม่ซ้ำ (ให้รูปแบบใกล้เคียงกับข้อมูลเดิมใน CSV)
-- **MinIO:** รองรับ `MINIO_PUBLIC_URL` ใน `.env` (ลิงก์ใน DB / อีเมล); **`MINIO_SERVER_FETCH_BASE_URL`** ให้ Nest โหลด object ทาง HTTP ภายในเมื่อจำเป็น; ค่าเริ่มต้น **`MINIO_ENSURE_PUBLIC_READ_POLICY=false`** — ไม่เปิด public read บน bucket ตอนสตาร์ท; รูปงานผ่าน `GET /jobs/:id/image/...` (SDK + fallback); รูปโปรไฟล์ผ่าน **`GET /users/:id/avatar`** / **`GET /users/me/avatar`**
+- **MinIO:** รองรับ `MINIO_PUBLIC_URL` ใน `.env` (ลิงก์ใน DB); **`MINIO_SERVER_FETCH_BASE_URL`** ให้ Nest โหลด object ทาง HTTP ภายในเมื่อจำเป็น; ค่าเริ่มต้น **`MINIO_ENSURE_PUBLIC_READ_POLICY=false`** — ไม่เปิด public read บน bucket ตอนสตาร์ท; รูปงานผ่าน `GET /jobs/:id/image/...` (SDK + fallback); รูปโปรไฟล์ผ่าน **`GET /users/:id/avatar`** / **`GET /users/me/avatar`**; แผน private bucket + checklist: [../docs/Project-Plan-Private-MinIO-Images.md](../docs/Project-Plan-Private-MinIO-Images.md); ตัวแปร env: [../minio.md](../minio.md)
 - **Scripts:** `scripts/seed-admin.ts`, `scripts/seed-roles-permissions.ts` (บทบาท+สิทธิ์ รวม SUPERVISOR, job.assign), `scripts/seed-from-excel.ts`, `scripts/seed-from-csv.ts`, `scripts/migrate-appsheet-images-to-minio.ts`, `scripts/import-appsheet-employees.ts`
-- **อีเมลแจ้งงาน:** `JobEmailNotificationService` + `GET/PUT /settings/email-templates` (เก็บ `email_templates`); สรุปผู้รับ To/CC — [../docs/Email-Notifications.md](../docs/Email-Notifications.md)
+- **อีเมลแจ้งงาน:** `JobEmailNotificationService` + `GET/PUT /settings/email-templates` (JWT + **`menu.settings`**; เก็บ `email_templates`); สรุปผู้รับ To/CC — [../docs/Email-Notifications.md](../docs/Email-Notifications.md)
 
 รายละเอียด API และสถานะโปรเจกต์: ดูที่ root [STATUS.md](../STATUS.md) และ [README.md](../README.md).
 

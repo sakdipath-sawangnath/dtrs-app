@@ -39,12 +39,12 @@
 | menu.all | ประวัติทั้งหมด |
 | menu.outOfContract | นอกสัญญา |
 | menu.users | จัดการผู้ใช้ |
-| menu.settings | ตั้งค่าระบบ (หน้า `/dashboard/settings` — **SMTP**, **เทมเพลตอีเมลแจ้งงาน** (`email_templates`, รวม `publicBaseUrl` และแจ้งตาม Role); API ต้อง JWT + ADMIN — สรุป flow อีเมล: [`../../docs/Email-Notifications.md`](../../docs/Email-Notifications.md) |
+| menu.settings | ตั้งค่าระบบ (หน้า `/dashboard/settings` — **SMTP**, **เทมเพลตอีเมลแจ้งงาน**, **รหัสผ่านเริ่มต้น**); API `GET/PUT /settings/*` ต้อง JWT + สิทธิ์นี้ — สรุป flow อีเมล: [`../../docs/Email-Notifications.md`](../../docs/Email-Notifications.md) |
 | menu.roles | จัดการบทบาทและสิทธิ์ |
 | menu.myJobs | งานที่รับผิดชอบ (รายการงานที่รับมอบหมาย) |
 | job.assign | มอบหมายงานให้ผู้อื่น (ปุ่ม «มอบหมายงาน») และ **ย้ายนอกสัญญา** (`PATCH /jobs/:id/out-of-contract`) — UI `JobsList` และ API อิงสิทธิ์เดียวกับที่กำหนดใน `/dashboard/roles` |
 | job.updateStatus | เปลี่ยนสถานะงาน (`PATCH /jobs/:id/status`) |
-| job.deleteInProgress | ลบงานสถานะ **กำลังแก้ไข** (ผู้ดูแล — เดิมเฉพาะรหัสบทบาท ADMIN) |
+| job.deleteInProgress | ลบงานสถานะ **กำลังแก้ไข** (`DELETE /jobs/:id` เมื่อ `IN_PROGRESS`) — UI `JobsList` หน้า `/dashboard/in-progress` |
 | job.deleteUnassigned | ลบงานที่ยังไม่มีผู้รับผิดชอบ |
 | job.fix.self | บันทึก/ปิดงาน (เฉพาะงานที่รับผิดชอบ) |
 | job.fix.any | บันทึก/ปิดงาน (ทุกงาน) |
@@ -66,7 +66,7 @@
 
 - **API แอดมินเมนู:** `roles` / `users` / `settings` ใช้ **`PermissionsGuard`** กับ `menu.roles`, `menu.users`, `menu.settings` (ไม่ใช้แค่ `@Roles('ADMIN')` บน JWT) — บทบาทกำหนดเองที่ได้รับสิทธิ์เมนูนั้นเรียก API ได้
 - **Login / Session:** JWT ยังมี `user.role` สำหรับการแสดงผลบางจุด — การตรวจสิทธิ์ API หลักอิง **Permission ใน DB** ตามด้านล่าง
-- **สิทธิ์ฝั่ง API (คิวงาน):** `PATCH /jobs/:id/assign`, `PATCH /jobs/:id/out-of-contract` และการลบงาน `PENDING` ที่ยังไม่มอบหมาย (ใน `DELETE /jobs/:id`) ใช้ **`RolesService.getPermissionsForUser(userId)`** ชุดเดียวกับ `GET /roles/me/permissions` (อ่านจาก `User.roleId` → `RolePermission`) เพื่อให้ตรงกับหน้า `/dashboard/roles`
+- **สิทธิ์ฝั่ง API (คิวงาน):** `PATCH /jobs/:id/assign`, `PATCH /jobs/:id/out-of-contract`, `PATCH /jobs/:id/status` (ผ่าน `PermissionsGuard` + `job.updateStatus`), การลบ **IN_PROGRESS** (`job.deleteInProgress`) และการลบงาน `PENDING` ที่ยังไม่มอบหมาย (`job.deleteUnassigned` ใน `DELETE /jobs/:id`) ใช้ **`RolesService.getPermissionsForUser(userId)`** ชุดเดียวกับ `GET /roles/me/permissions` (อ่านจาก `User.roleId` → `RolePermission`) เพื่อให้ตรงกับหน้า `/dashboard/roles`; ผู้ใช้ที่ยังไม่มี `roleId` ใน DB ให้ **`PermissionsGuard`** fallback ตาม enum JWT ผ่าน **`RBAC_ROLE_PERMISSION_CODES`** เดียวกับ `RolesService`
 - **มอบหมายงาน (API):** มีสิทธิ์ `job.assign` → มอบหมาย `staffId` เป็นใครก็ได้; ไม่มี `job.assign` แต่มี `menu.pending` และ `staffId` = ตัวเอง → **รับงานเอง** (เดิมคือพฤติกรรม STAFF)
 - **รายชื่อผู้รับมอบหมาย:** `GET /users/assignable` ใช้ **`PermissionsGuard` + `job.assign`** (ไม่ใช้แค่ JWT role ADMIN/SUPERVISOR/STAFF) — ให้ตรงกับผู้ที่เปิด modal มอบหมายใน `JobsList`
 - **Sidebar:** เรียก `GET /roles/me/permissions` เพื่อดึงสิทธิ์ของ user แล้วแสดงเฉพาะเมนูที่ user มีสิทธิ์ — ฝั่ง `DashboardLayoutShell` ต้อง **แกะ `data` จาก body มาตรฐาน** (`{ success, data: { permissions } }`) เหมือนหน้าอื่นที่ใช้ `unwrapApiData`; ถ้ารายการสิทธิ์ที่ได้ **ไม่ตรงกับเมนูใน sidebar เลย** (เช่น มีแค่ `menu.profile`) ให้ **fallback ตามบทบาท** เพื่อไม่ให้เมนูว่าง
@@ -75,7 +75,7 @@
 - **มอบหมายงาน (UI):** หน้ารอดำเนินการ (`/dashboard/pending`) แสดงปุ่ม «มอบหมายงาน» เมื่อมีสิทธิ์ **`job.assign`** (โหลดจาก `/roles/me/permissions` ใน `JobsList`; ระหว่างโหลดสิทธิ์จะ fallback ตามบทบาท ADMIN/SUPERVISOR ใน JWT) ปุ่ม «รับงาน» ยังแสดงสำหรับงาน `PENDING` และเรียก assign เป็นตัวเอง — สำเร็จได้เมื่อ API อนุญาตตามกติกาด้านบน
 - **ย้ายนอกสัญญา:** ปุ่ม «ย้ายนอกสัญญา» แสดงเมื่อมี **`job.assign`** (เดิมเทียบเท่า ADMIN/SUPERVISOR); ก่อนเรียก `PATCH /jobs/:id/out-of-contract` มี `alert` ยืนยัน; ระบบคงสถานะงานเป็น `PENDING`
 - **ลบงานที่ยังไม่มีผู้รับผิดชอบ:** ปุ่ม «ลบงาน» ใน `/dashboard/pending` จะขึ้นเมื่อ job.status เป็น `PENDING` และ `assignedToId = null` โดยต้องมี permission **`job.deleteUnassigned`** (ฝั่ง UI อ่านจาก `/roles/me/permissions`; ถ้ายังไม่โหลดให้ fallback ตามบทบาท ADMIN/SUPERVISOR)
-- **ลบงานกำลังแก้ไข (เฉพาะ ADMIN):** ที่หน้า `/dashboard/in-progress` ผู้ใช้บทบาท **ADMIN** เห็นปุ่ม “ลบงาน (ผู้ดูแลระบบ)” สำหรับงานสถานะ `IN_PROGRESS` — เรียก `DELETE /jobs/:id` (ฝั่ง backend แยก logic: ADMIN ลบ IN_PROGRESS ได้ก่อน แล้วจึง fallback ไปลบแบบ PENDING ไม่มอบหมาย) — **ไม่ใช้** permission code แยก แต่เช็ค `role === ADMIN` ใน API/UI
+- **ลบงานกำลังแก้ไข:** ที่หน้า `/dashboard/in-progress` แสดงปุ่ม “ลบงาน (ผู้ดูแลระบบ)” เมื่อมีสิทธิ์ **`job.deleteInProgress`** (อ่านจาก `/roles/me/permissions`) — เรียก `DELETE /jobs/:id`; backend ลบ **IN_PROGRESS** เมื่อมีสิทธิ์นี้ก่อน แล้วจึง fallback ไปลบแบบ PENDING ไม่มอบหมาย (`job.deleteUnassigned`)
 - **สัญญา/นอกสัญญา Tabs:** หน้า `/dashboard/my-jobs`, `/dashboard/all`, และ `/dashboard/in-progress` แสดง segmented tabs “สัญญา/นอกสัญญา” โดยแยกตาม `Job.isOutOfContract` (ค่าเริ่มต้น = “สัญญา”) และมี **badge** จำนวนงานค้าง (ยังไม่ `RESOLVED`) ต่อแท็บ
 - **บันทึก/ปิดงาน (`PATCH /jobs/:id/fix`):**
   - `job.fix.any` ทำได้ทุกงาน

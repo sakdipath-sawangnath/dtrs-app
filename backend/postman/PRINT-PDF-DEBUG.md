@@ -28,8 +28,8 @@
 4. `04 - Get Fix Image 0 (Backend)`
 5. `05 - Print Data Route (Next API)`
 6. `06 - Open Print Page (HTML)`
-7. *(ถ้าต้องการ)* `07 - MinIO object HEAD` — ตรวจว่า object โหลดได้โดยตรง (ไม่ใช้ JWT; ปรับ path ให้ตรง URL ใน DB)
-8. *(ถ้าต้องการ)* `08` / `09` — ทดสอบ Next `/job-images` และ `/api/job-images` (มักต้องแนบ Cookie จากเบราว์เซอร์ใน Postman)
+7. *(ถ้าต้องการ)* `07 - MinIO object HEAD` — ตรวจว่า object โหลดได้โดยตรง (ไม่ใช้ JWT; ปรับ path ให้ตรง URL ใน DB) — **ถ้า bucket เป็น private ควรได้ 403/401** ซึ่งเป็นพฤติกรรมที่คาดหวัง; รูปในแอปยังใช้ได้ผ่าน **`03`/`04`** (Nest + credential) และ Next **`/job-images`**
+8. *(ถ้าต้องการ)* `08` / `09` — ทดสอบ Next `/job-images` และ `/api/job-images` (มักต้องแนบ Cookie จากเบราว์เซอร์ใน Postman); รูปโปรไฟล์ทดสอบที่ **`/user-images/:userId`** ในเบราว์เซอร์เมื่อล็อกอินแล้ว
 
 > Request แรกจะพยายาม set `access_token` ให้อัตโนมัติใน collection variable
 
