@@ -20,6 +20,7 @@ import {
   X,
   AlertTriangle,
   Loader2,
+  Clock3,
 } from "lucide-react";
 import DashboardPageShell from "@/components/DashboardPageShell";
 import JobTimelineCard from "@/components/JobTimelineCard";
@@ -101,6 +102,19 @@ const GLASS_FIELD =
 /** No-Card: แยกเป็น Glass ย่อยหลายก้อน (AGENTS.md) */
 const GLASS_SECTION =
   "rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl p-4 sm:p-5";
+
+function toDateTimeLocalInputValue(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const year = d.getFullYear();
+  const month = pad(d.getMonth() + 1);
+  const day = pad(d.getDate());
+  const hour = pad(d.getHours());
+  const minute = pad(d.getMinutes());
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
 
 export default function JobDetailPage() {
   const params = useParams<{ id: string }>();
@@ -185,6 +199,10 @@ export default function JobDetailPage() {
           setNote(data.fixNote ?? "");
           setOldSerial(normalizeSerialNumberInput(data.oldSerialNumber ?? ""));
           setNewSerial(normalizeSerialNumberInput(data.newSerialNumber ?? ""));
+          setBackfillReportDate(
+            toDateTimeLocalInputValue(data.reportDate ?? data.createdAt),
+          );
+          setBackfillFixDate(toDateTimeLocalInputValue(data.fixDate ?? null));
         }
       })
       .catch(() => setError("ไม่พบข้อมูลใบแจ้งซ่อมนี้"))
@@ -209,6 +227,8 @@ export default function JobDetailPage() {
   const canFixSelf = Array.isArray(permissions) && permissions.includes("job.fix.self");
   const canReopenAny = Array.isArray(permissions) && permissions.includes("job.reopen.any");
   const canReopenSelf = Array.isArray(permissions) && permissions.includes("job.reopen.self");
+  const canBackfillDate =
+    Array.isArray(permissions) && permissions.includes("job.backfillDate");
 
   /** ผู้รับงาน (Owner) = ผู้ที่ถูกมอบหมายในงาน (assignedTo) — Reopen/บันทึกแก้ไขได้เฉพาะคนนี้ */
   const isAssignee =
@@ -218,6 +238,9 @@ export default function JobDetailPage() {
 
   const [reopenReason, setReopenReason] = useState("");
   const [reopening, setReopening] = useState(false);
+  const [backfillReportDate, setBackfillReportDate] = useState("");
+  const [backfillFixDate, setBackfillFixDate] = useState("");
+  const [backfillSaving, setBackfillSaving] = useState(false);
 
   /** แก้ไข/บันทึกได้เมื่อยังไม่ปิดงาน — หลังปิดต้อง Reopen (API) ให้เป็นกำลังแก้ไขก่อน */
   const canEditFix =
@@ -361,11 +384,70 @@ export default function JobDetailPage() {
         setNote(data.fixNote ?? "");
         setOldSerial(normalizeSerialNumberInput(data.oldSerialNumber ?? ""));
         setNewSerial(normalizeSerialNumberInput(data.newSerialNumber ?? ""));
+        setBackfillReportDate(toDateTimeLocalInputValue(data.reportDate ?? data.createdAt));
+        setBackfillFixDate(toDateTimeLocalInputValue(data.fixDate ?? null));
       }
     } catch {
       setError("ไม่พบข้อมูลใบแจ้งซ่อมนี้");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBackfillDates = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!job || !token) return;
+    if (!canBackfillDate) {
+      toastError("สิทธิ์ไม่เพียงพอ", "คุณไม่มีสิทธิ์แก้ไขวันเวลาย้อนหลัง");
+      return;
+    }
+
+    const reportLocal = backfillReportDate.trim();
+    const fixLocal = backfillFixDate.trim();
+    if (!reportLocal && !fixLocal) {
+      toastError("ข้อมูลไม่ครบ", "กรุณาระบุวันที่แจ้งย้อนหลังหรือวันที่ปิดย้อนหลังอย่างน้อย 1 ค่า");
+      return;
+    }
+
+    if (fixLocal && job.status !== "RESOLVED") {
+      toastError("ทำรายการไม่ได้", "ตั้งวันที่ปิดย้อนหลังได้เฉพาะงานสถานะเสร็จสิ้น (RESOLVED)");
+      return;
+    }
+
+    if (reportLocal && fixLocal) {
+      const reportDt = new Date(reportLocal);
+      const fixDt = new Date(fixLocal);
+      if (Number.isNaN(reportDt.getTime()) || Number.isNaN(fixDt.getTime())) {
+        toastError("รูปแบบเวลาไม่ถูกต้อง", "กรุณาตรวจสอบรูปแบบวันที่และเวลา");
+        return;
+      }
+      if (fixDt.getTime() < reportDt.getTime()) {
+        toastError("ข้อมูลไม่ถูกต้อง", "วันที่ปิดย้อนหลังต้องไม่น้อยกว่าวันที่แจ้งย้อนหลัง");
+        return;
+      }
+    }
+
+    const payload: { reportDate?: string; fixDate?: string } = {};
+    if (reportLocal) payload.reportDate = new Date(reportLocal).toISOString();
+    if (fixLocal) payload.fixDate = new Date(fixLocal).toISOString();
+
+    setBackfillSaving(true);
+    try {
+      await axios.patch(`${API}/jobs/${job.id}/backfill-dates`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toastSuccess("บันทึกวันเวลาย้อนหลังเรียบร้อยแล้ว", 1400);
+      await reloadJob();
+    } catch (err: unknown) {
+      const payloadErr = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data;
+      const msg =
+        payloadErr?.error?.message ??
+        (typeof payloadErr === "object" && payloadErr && "message" in payloadErr
+          ? String((payloadErr as { message?: string }).message)
+          : null);
+      toastError("บันทึกไม่สำเร็จ", msg?.trim() || "ไม่สามารถบันทึกวันเวลาย้อนหลังได้");
+    } finally {
+      setBackfillSaving(false);
     }
   };
 
@@ -894,6 +976,67 @@ export default function JobDetailPage() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {job && canBackfillDate && (
+                <div className={`${GLASS_SECTION} space-y-4`}>
+                  <div className="flex items-start gap-2.5">
+                    <div className="mt-0.5 rounded-lg border border-cyan-500/25 bg-cyan-950/25 p-2 text-cyan-300">
+                      <Clock3 size={15} aria-hidden />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-semibold text-slate-100">
+                        ลงข้อมูลย้อนหลัง (Backfill วันที่)
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                        ใช้สำหรับเคสเก่า: แก้ไขวันที่แจ้ง/วันที่ปิดให้ตรงข้อมูลจริงตามเอกสารอ้างอิง
+                      </p>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleBackfillDates} className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className={GLASS_LABEL} htmlFor="job-backfill-report-date">
+                          วันที่แจ้งย้อนหลัง
+                        </label>
+                        <input
+                          id="job-backfill-report-date"
+                          type="datetime-local"
+                          className={GLASS_FIELD}
+                          value={backfillReportDate}
+                          onChange={(e) => setBackfillReportDate(e.target.value)}
+                          disabled={backfillSaving}
+                        />
+                      </div>
+                      <div>
+                        <label className={GLASS_LABEL} htmlFor="job-backfill-fix-date">
+                          วันที่ปิดย้อนหลัง
+                        </label>
+                        <input
+                          id="job-backfill-fix-date"
+                          type="datetime-local"
+                          className={GLASS_FIELD}
+                          value={backfillFixDate}
+                          onChange={(e) => setBackfillFixDate(e.target.value)}
+                          disabled={backfillSaving}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      หมายเหตุ: วันที่ปิดย้อนหลังตั้งได้เฉพาะงานสถานะ{" "}
+                      <span className="text-slate-300 font-medium">เสร็จสิ้น (RESOLVED)</span>{" "}
+                      และต้องไม่น้อยกว่าวันที่แจ้งย้อนหลัง
+                    </p>
+                    <button
+                      type="submit"
+                      disabled={backfillSaving}
+                      className="min-h-[44px] px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-cyan-100 bg-cyan-900/40 border border-cyan-500/35 hover:bg-cyan-800/45 disabled:opacity-60 transition-all shadow-lg active:scale-95 focus:ring-2 focus:ring-cyan-500/40 outline-none cursor-pointer"
+                    >
+                      {backfillSaving ? "กำลังบันทึกวันเวลาย้อนหลัง..." : "บันทึกวันเวลาย้อนหลัง"}
+                    </button>
+                  </form>
                 </div>
               )}
 

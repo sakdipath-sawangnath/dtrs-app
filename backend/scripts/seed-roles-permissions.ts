@@ -29,6 +29,7 @@ const ACTION_PERMISSIONS = [
   { code: 'job.assign', name: 'มอบหมายงาน', category: 'job' },
   { code: 'job.deleteUnassigned', name: 'ลบงานที่ยังไม่มีผู้รับผิดชอบ', category: 'job' },
   { code: 'job.updateStatus', name: 'เปลี่ยนสถานะงาน', category: 'job' },
+  { code: 'job.backfillDate', name: 'แก้ไขวันเวลาย้อนหลังของงาน', category: 'job' },
   { code: 'job.deleteInProgress', name: 'ลบงานกำลังแก้ไข (ผู้ดูแล)', category: 'job' },
   { code: 'job.fix.self', name: 'บันทึก/ปิดงาน (เฉพาะงานที่รับผิดชอบ)', category: 'job' },
   { code: 'job.fix.any', name: 'บันทึก/ปิดงาน (ทุกงาน)', category: 'job' },
@@ -40,7 +41,9 @@ const ACTION_PERMISSIONS = [
 ] as const;
 
 const ACTION_CODES_ALL = ACTION_PERMISSIONS.map((p) => p.code);
-const ACTION_CODES_SUPERVISOR = ACTION_CODES_ALL.filter((c) => c !== 'job.deleteInProgress');
+const ACTION_CODES_SUPERVISOR = ACTION_CODES_ALL.filter(
+  (c) => c !== 'job.deleteInProgress' && c !== 'job.backfillDate',
+);
 
 const ALL_PERMISSIONS = [...MENU_PERMISSIONS, ...ACTION_PERMISSIONS];
 

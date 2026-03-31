@@ -120,3 +120,22 @@ export const AssignStaffSchema = z.object({
 });
 
 export type AssignStaffDto = z.infer<typeof AssignStaffSchema>;
+
+/**
+ * Backfill วันที่ย้อนหลังของงาน
+ * - รับเป็น string (ISO/parse ได้) แล้วแปลงใน service เพื่อควบคุม validation เพิ่มเติม
+ * - ต้องส่งอย่างน้อย 1 ฟิลด์
+ */
+export const BackfillJobDatesSchema = z
+  .object({
+    reportDate: z.string().trim().optional(),
+    fixDate: z.string().trim().optional(),
+  })
+  .refine(
+    (v) =>
+      (typeof v.reportDate === 'string' && v.reportDate.length > 0) ||
+      (typeof v.fixDate === 'string' && v.fixDate.length > 0),
+    { message: 'กรุณาระบุ reportDate หรือ fixDate อย่างน้อย 1 ค่า' },
+  );
+
+export type BackfillJobDatesDto = z.infer<typeof BackfillJobDatesSchema>;

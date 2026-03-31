@@ -15,7 +15,9 @@ import {
     AssignStaffSchema,
     UpdateOutOfContractSchema,
     ReopenJobSchema,
+    BackfillJobDatesSchema,
 } from './dto/create-job.dto';
+import type { BackfillJobDatesDto } from './dto/create-job.dto';
 import type { Response } from 'express';
 
 type ReqUser = { user: { id: number; role: string } };
@@ -157,6 +159,23 @@ export class JobsController {
             ? raw.slice(7).trim()
             : '';
         const updated = await this.jobsService.updateStatus(+id, body.status, jwt);
+        this.eventsGateway.notifyJobUpdate(updated);
+        return updated;
+    }
+
+    /**
+     * Backfill วันที่ย้อนหลังของงาน (ใช้ตอนลงข้อมูลเคสเก่า)
+     * - reportDate: วันที่แจ้ง
+     * - fixDate: วันที่ปิดงาน (อนุญาตเฉพาะงาน RESOLVED)
+     */
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @Permissions('job.backfillDate')
+    @Patch(':id/backfill-dates')
+    async backfillDates(
+        @Param('id', new ParseIntPipe({ errorHttpStatusCode: 400 })) id: number,
+        @Body(new ZodValidationPipe(BackfillJobDatesSchema)) body: BackfillJobDatesDto,
+    ) {
+        const updated = await this.jobsService.backfillDates(id, body);
         this.eventsGateway.notifyJobUpdate(updated);
         return updated;
     }

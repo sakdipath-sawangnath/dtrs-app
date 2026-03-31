@@ -344,6 +344,72 @@ export class JobsService {
         return updated;
     }
 
+    /**
+     * Backfill วันเวลาให้เคสย้อนหลัง
+     * - reportDate: วันที่แจ้ง
+     * - fixDate: วันที่ปิดงาน (อนุญาตเฉพาะงานที่สถานะ RESOLVED)
+     */
+    async backfillDates(
+        id: number,
+        payload: {
+            reportDate?: string;
+            fixDate?: string;
+        },
+    ) {
+        const row = await this.prisma.job.findUnique({
+            where: { id },
+            select: { id: true, status: true, reportDate: true, fixDate: true },
+        });
+        if (!row) {
+            throw new NotFoundException(`ไม่พบงาน id=${id}`);
+        }
+
+        const data: Prisma.JobUpdateInput = {};
+        let nextReportDate: Date | null = row.reportDate ?? null;
+        let nextFixDate: Date | null = row.fixDate ?? null;
+
+        if (payload.reportDate !== undefined && payload.reportDate.trim() !== '') {
+            const parsed = this.parseBackfillDate(payload.reportDate, 'reportDate');
+            data.reportDate = parsed;
+            nextReportDate = parsed;
+        }
+
+        if (payload.fixDate !== undefined && payload.fixDate.trim() !== '') {
+            const parsed = this.parseBackfillDate(payload.fixDate, 'fixDate');
+            data.fixDate = parsed;
+            nextFixDate = parsed;
+        }
+
+        if (Object.keys(data).length === 0) {
+            throw new BadRequestException('กรุณาระบุ reportDate หรือ fixDate อย่างน้อย 1 ค่า');
+        }
+
+        if (nextFixDate && row.status !== JobStatus.RESOLVED) {
+            throw new BadRequestException('อนุญาตให้ตั้ง fixDate ได้เฉพาะงานสถานะ RESOLVED เท่านั้น');
+        }
+
+        if (nextReportDate && nextFixDate && nextFixDate.getTime() < nextReportDate.getTime()) {
+            throw new BadRequestException('fixDate ต้องไม่น้อยกว่า reportDate');
+        }
+
+        const updated = await this.prisma.job.update({
+            where: { id },
+            data,
+            include: {
+                assignedTo: {
+                    select: { id: true, name: true, image: true },
+                },
+                assignedBy: {
+                    select: { id: true, name: true, image: true },
+                },
+                reporter: {
+                    select: { id: true, image: true },
+                },
+            },
+        });
+        return this.mapJobForClient(updated);
+    }
+
     async updateImages(id: number, images: string[]) {
         return this.prisma.job.update({
             where: { id },
@@ -601,5 +667,18 @@ export class JobsService {
             }
         }
         throw new Error('ไม่สามารถสร้างเลขที่ใบแจ้งซ่อมได้ กรุณาลองใหม่อีกครั้ง');
+    }
+
+    /** แปลงสตริงวันเวลา (ISO หรือ datetime-local) ให้เป็น Date */
+    private parseBackfillDate(input: string, fieldName: 'reportDate' | 'fixDate'): Date {
+        const raw = input.trim();
+        if (!raw) {
+            throw new BadRequestException(`${fieldName} ต้องไม่เป็นค่าว่าง`);
+        }
+        const d = new Date(raw);
+        if (Number.isNaN(d.getTime())) {
+            throw new BadRequestException(`${fieldName} ไม่ใช่รูปแบบวันเวลาที่ถูกต้อง`);
+        }
+        return d;
     }
 }

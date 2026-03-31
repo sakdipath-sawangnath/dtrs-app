@@ -27,6 +27,7 @@ const RBAC_ACTION_PERMISSIONS = [
   { code: 'job.assign', name: 'มอบหมายงาน', category: 'job' },
   { code: 'job.deleteUnassigned', name: 'ลบงานที่ยังไม่มีผู้รับผิดชอบ', category: 'job' },
   { code: 'job.updateStatus', name: 'เปลี่ยนสถานะงาน', category: 'job' },
+  { code: 'job.backfillDate', name: 'แก้ไขวันเวลาย้อนหลังของงาน', category: 'job' },
   { code: 'job.deleteInProgress', name: 'ลบงานกำลังแก้ไข (ผู้ดูแล)', category: 'job' },
   { code: 'job.fix.self', name: 'บันทึก/ปิดงาน (เฉพาะงานที่รับผิดชอบ)', category: 'job' },
   { code: 'job.fix.any', name: 'บันทึก/ปิดงาน (ทุกงาน)', category: 'job' },
@@ -40,7 +41,7 @@ const RBAC_ACTION_PERMISSIONS = [
 const RBAC_ACTION_CODES_ALL = RBAC_ACTION_PERMISSIONS.map((p) => p.code);
 /** SUPERVISOR ไม่ได้ลบงาน IN_PROGRESS แบบผู้ดูแล (เฉพาะ ADMIN) */
 const RBAC_ACTION_CODES_SUPERVISOR = RBAC_ACTION_CODES_ALL.filter(
-  (c) => c !== 'job.deleteInProgress',
+  (c) => c !== 'job.deleteInProgress' && c !== 'job.backfillDate',
 );
 
 const RBAC_ALL_PERMISSIONS = [...RBAC_MENU_PERMISSIONS, ...RBAC_ACTION_PERMISSIONS];
