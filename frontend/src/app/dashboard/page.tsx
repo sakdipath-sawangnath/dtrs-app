@@ -4,7 +4,17 @@ import { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { format, subDays, startOfDay } from "date-fns";
+import { createPortal } from "react-dom";
+import {
+  format,
+  subDays,
+  startOfDay,
+  startOfMonth,
+  endOfMonth,
+  startOfYear,
+  endOfYear,
+  parseISO,
+} from "date-fns";
 import { th } from "date-fns/locale";
 import {
   AlertCircle,
@@ -26,7 +36,11 @@ import {
   UserX,
   FileWarning,
   Timer,
-  Lightbulb,
+  FileDown,
+  Building2,
+  Target,
+  X,
+  ChevronDown,
 } from "lucide-react";
 import {
   PieChart,
@@ -43,6 +57,7 @@ import {
   Area,
   CartesianGrid,
 } from "recharts";
+import { toastError, toastWarning } from "@/lib/toast";
 
 interface Job {
   id: number;
@@ -83,6 +98,45 @@ const STATUS_LABELS: Record<string, string> = {
   RESOLVED: "เสร็จสิ้น",
 };
 
+const TH_MONTHS = [
+  "มกราคม",
+  "กุมภาพันธ์",
+  "มีนาคม",
+  "เมษายน",
+  "พฤษภาคม",
+  "มิถุนายน",
+  "กรกฎาคม",
+  "สิงหาคม",
+  "กันยายน",
+  "ตุลาคม",
+  "พฤศจิกายน",
+  "ธันวาคม",
+] as const;
+
+/** ความสูงเดียวกับปุ่ม (44px) — ปรับ line-height / padding ให้ข้อความอยู่กลางดีทั้งบน Windows / macOS */
+const FILTER_SELECT_CLASS =
+  "h-11 min-h-11 box-border w-full max-w-full appearance-none rounded-xl border border-white/15 bg-slate-900/50 pl-4 pr-10 py-[6px] text-sm leading-5 text-slate-100 ring-1 ring-inset ring-white/10 transition-colors [color-scheme:dark] cursor-pointer";
+const FILTER_INPUT_CLASS =
+  "h-11 min-h-11 box-border w-full max-w-full rounded-xl border border-white/10 bg-slate-900/50 px-3 py-[6px] text-sm leading-5 text-slate-100 shadow-inner shadow-black/20 transition-colors [color-scheme:dark]";
+const FILTER_DATE_INPUT_CLASS =
+  `${FILTER_INPUT_CLASS} pr-9 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:brightness-0 [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:contrast-200 [&::-webkit-calendar-picker-indicator]:opacity-90 hover:[&::-webkit-calendar-picker-indicator]:opacity-100`;
+
+type DashboardFilterMode = "all" | "year" | "month" | "last7" | "last30" | "custom";
+
+type ReportApiQuery =
+  | { periodType: "year"; year: string }
+  | { periodType: "month"; month: string }
+  | { periodType: "range"; start: string; end: string };
+
+function jobReportTimeMs(j: Job): number {
+  return new Date(j.reportDate || j.createdAt).getTime();
+}
+
+function toDateTimeLocalInputValue(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 /** เมนูด่วน — อ้างอิงสิทธิ์ RBAC (permission) หรือ role */
 const QUICK_LINKS = [
   { label: "ข้อขัดข้องทั้งหมด", href: "/dashboard/all", desc: "ประวัติการแจ้งข้อขัดข้องและ filter", permission: "menu.all", roles: ["ADMIN", "STAFF"], icon: ClipboardList },
@@ -99,9 +153,106 @@ export default function DashboardPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [permissions, setPermissions] = useState<string[] | null>(null);
+  const [filterMode, setFilterMode] = useState<DashboardFilterMode>("all");
+  const [reportMonth, setReportMonth] = useState(() => format(new Date(), "yyyy-MM"));
+  const [reportYear, setReportYear] = useState(() => format(new Date(), "yyyy"));
+  const [rangeStart, setRangeStart] = useState(() => toDateTimeLocalInputValue(subDays(new Date(), 30)));
+  const [rangeEnd, setRangeEnd] = useState(() => toDateTimeLocalInputValue(new Date()));
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportPrintBusy, setReportPrintBusy] = useState(false);
+  const [portalReady, setPortalReady] = useState(false);
   const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
   const token = (session as { accessToken?: string })?.accessToken;
   const userRole = (session?.user as { role?: string })?.role ?? "USER";
+
+  const monthYear = useMemo(() => {
+    const m = String(reportMonth || "");
+    const match = m.match(/^(\d{4})-(\d{2})$/);
+    if (!match) {
+      const now = new Date();
+      return { year: now.getFullYear(), month: now.getMonth() + 1 };
+    }
+    const year = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+      const now = new Date();
+      return { year: now.getFullYear(), month: now.getMonth() + 1 };
+    }
+    return { year, month };
+  }, [reportMonth]);
+
+  const activeRange = useMemo((): null | { start: Date; end: Date; labelTh: string; api: ReportApiQuery } => {
+    const now = new Date();
+    if (filterMode === "all") {
+      const sortedTimes = jobs
+        .map((j) => jobReportTimeMs(j))
+        .filter((t) => Number.isFinite(t))
+        .sort((a, b) => a - b);
+      const firstTime = sortedTimes.length > 0 ? sortedTimes[0] : now.getTime();
+      const lastTime = sortedTimes.length > 0 ? sortedTimes[sortedTimes.length - 1] : now.getTime();
+      const start = startOfDay(new Date(firstTime));
+      const end = new Date(Math.max(now.getTime(), lastTime));
+      return {
+        start,
+        end,
+        labelTh: "ทั้งหมด (ถึงปัจจุบัน)",
+        api: { periodType: "range", start: start.toISOString(), end: end.toISOString() },
+      };
+    }
+    if (filterMode === "year") {
+      const y = parseInt(reportYear, 10);
+      if (!Number.isFinite(y) || y < 1990 || y > 2100) return null;
+      const d = new Date(y, 0, 15);
+      return {
+        start: startOfYear(d),
+        end: endOfYear(d),
+        labelTh: `ปี ${y}`,
+        api: { periodType: "year", year: String(y) },
+      };
+    }
+    if (filterMode === "month") {
+      const d = parseISO(`${reportMonth}-01T12:00:00`);
+      if (Number.isNaN(d.getTime())) return null;
+      const start = startOfMonth(d);
+      const end = endOfMonth(d);
+      return {
+        start,
+        end,
+        labelTh: `เดือน ${format(start, "MMMM yyyy", { locale: th })}`,
+        api: { periodType: "month", month: reportMonth },
+      };
+    }
+    if (filterMode === "last7" || filterMode === "last30") {
+      const days = filterMode === "last7" ? 7 : 30;
+      const end = now;
+      const start = subDays(now, days);
+      return {
+        start,
+        end,
+        labelTh: `${days} วันล่าสุด`,
+        api: { periodType: "range", start: start.toISOString(), end: end.toISOString() },
+      };
+    }
+    const s = new Date(rangeStart);
+    const e = new Date(rangeEnd);
+    if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime()) || s > e) return null;
+    return {
+      start: s,
+      end: e,
+      labelTh: `${format(s, "dd/MM/yyyy HH:mm", { locale: th })} – ${format(e, "dd/MM/yyyy HH:mm", { locale: th })}`,
+      api: { periodType: "range", start: s.toISOString(), end: e.toISOString() },
+    };
+  }, [filterMode, reportYear, reportMonth, rangeStart, rangeEnd, jobs]);
+
+  const filteredJobs = useMemo(() => {
+    if (!activeRange) return [];
+    const a = activeRange.start.getTime();
+    const b = activeRange.end.getTime();
+    return jobs.filter((j) => {
+      const t = jobReportTimeMs(j);
+      return t >= a && t <= b;
+    });
+  }, [jobs, activeRange]);
 
   useEffect(() => {
     if (!token || !session?.user) {
@@ -130,12 +281,16 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, [session, API]);
 
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
+
   const stats: Stats = useMemo(() => ({
-    pending: jobs.filter((j) => j.status === "PENDING").length,
-    in_progress: jobs.filter((j) => j.status === "IN_PROGRESS").length,
-    resolved: jobs.filter((j) => j.status === "RESOLVED").length,
-    total: jobs.length,
-  }), [jobs]);
+    pending: filteredJobs.filter((j) => j.status === "PENDING").length,
+    in_progress: filteredJobs.filter((j) => j.status === "IN_PROGRESS").length,
+    resolved: filteredJobs.filter((j) => j.status === "RESOLVED").length,
+    total: filteredJobs.length,
+  }), [filteredJobs]);
 
   const pieData = useMemo(() => [
     { name: STATUS_LABELS.PENDING, value: stats.pending, color: STATUS_COLORS.PENDING },
@@ -145,7 +300,7 @@ export default function DashboardPage() {
 
   const provinceData = useMemo(() => {
     const count: Record<string, number> = {};
-    jobs.forEach((j) => {
+    filteredJobs.forEach((j) => {
       const p = j.province?.trim() || "ไม่ระบุ";
       count[p] = (count[p] || 0) + 1;
     });
@@ -153,72 +308,110 @@ export default function DashboardPage() {
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 8);
-  }, [jobs]);
+  }, [filteredJobs]);
 
-  const trendDays = 14;
-  const trendData = useMemo(() => {
-    const days: { date: string; แจ้งในวันนั้น: number; เสร็จในวันนั้น: number }[] = [];
-    const now = new Date();
-    for (let i = trendDays - 1; i >= 0; i--) {
-      const d = startOfDay(subDays(now, i));
-      const dateStr = format(d, "dd/MM", { locale: th });
-      const dayStart = d.getTime();
-      const dayEnd = dayStart + 24 * 60 * 60 * 1000;
-      const reportedThatDay = jobs.filter((j) => {
-        const t = new Date(j.reportDate || j.createdAt).getTime();
-        return t >= dayStart && t < dayEnd;
-      });
-      const resolvedThatDay = jobs.filter((j) => {
-        const fd = j.fixDate ? new Date(j.fixDate).getTime() : null;
-        return fd != null && fd >= dayStart && fd < dayEnd;
-      });
-      days.push({ date: dateStr, แจ้งในวันนั้น: reportedThatDay.length, เสร็จในวันนั้น: resolvedThatDay.length });
+  const trendMeta = useMemo(() => {
+    if (!activeRange) {
+      return {
+        label: "แนวโน้ม",
+        data: [] as Array<{ date: string; แจ้งในช่วง: number; ปิดในช่วง: number }>,
+      };
     }
-    return days;
-  }, [jobs]);
+    const ms = activeRange.end.getTime() - activeRange.start.getTime();
+    const days = Math.max(1, Math.ceil(ms / 86_400_000));
+    const isDaily = days <= 45;
+    const data: Array<{ date: string; แจ้งในช่วง: number; ปิดในช่วง: number }> = [];
 
-  /** สรุปตัวเลขจากชุด 14 วันเดียวกับกราฟ */
-  const trendSummary14 = useMemo(() => {
-    const reported = trendData.reduce((a, d) => a + d.แจ้งในวันนั้น, 0);
-    const resolved = trendData.reduce((a, d) => a + d.เสร็จในวันนั้น, 0);
+    if (isDaily) {
+      for (let i = 0; i < days; i++) {
+        const d = startOfDay(subDays(activeRange.end, days - 1 - i));
+        const dateStr = format(d, "dd/MM", { locale: th });
+        const dayStart = d.getTime();
+        const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+        const reportedThatDay = filteredJobs.filter((j) => {
+          const t = new Date(j.reportDate || j.createdAt).getTime();
+          return t >= dayStart && t < dayEnd;
+        }).length;
+        const resolvedThatDay = filteredJobs.filter((j) => {
+          const fd = j.fixDate ? new Date(j.fixDate).getTime() : null;
+          return fd != null && fd >= dayStart && fd < dayEnd;
+        }).length;
+        data.push({ date: dateStr, แจ้งในช่วง: reportedThatDay, ปิดในช่วง: resolvedThatDay });
+      }
+      return { label: "แนวโน้มรายวัน", data };
+    }
+
+    const start = new Date(activeRange.start);
+    start.setDate(1);
+    start.setHours(0, 0, 0, 0);
+    let cursor = start;
+    let safety = 0;
+    while (cursor.getTime() <= activeRange.end.getTime() && safety < 24) {
+      const monthStart = new Date(cursor);
+      const monthEnd = endOfMonth(monthStart);
+      const a = monthStart.getTime();
+      const b = Math.min(monthEnd.getTime(), activeRange.end.getTime());
+      const reported = filteredJobs.filter((j) => {
+        const t = new Date(j.reportDate || j.createdAt).getTime();
+        return t >= a && t <= b;
+      }).length;
+      const resolved = filteredJobs.filter((j) => {
+        const fd = j.fixDate ? new Date(j.fixDate).getTime() : null;
+        return fd != null && fd >= a && fd <= b;
+      }).length;
+      data.push({
+        date: format(monthStart, "MMM yy", { locale: th }),
+        แจ้งในช่วง: reported,
+        ปิดในช่วง: resolved,
+      });
+      cursor = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
+      safety++;
+    }
+    return { label: "แนวโน้มรายเดือน", data };
+  }, [activeRange, filteredJobs]);
+
+  /** สรุปตัวเลขจากชุดข้อมูลในกราฟ */
+  const trendSummary = useMemo(() => {
+    const reported = trendMeta.data.reduce((a, d) => a + d.แจ้งในช่วง, 0);
+    const resolved = trendMeta.data.reduce((a, d) => a + d.ปิดในช่วง, 0);
     const net = reported - resolved;
-    const peakReported = trendData.reduce(
-      (best, d) => (d.แจ้งในวันนั้น > best.v ? { date: d.date, v: d.แจ้งในวันนั้น } : best),
+    const peakReported = trendMeta.data.reduce(
+      (best, d) => (d.แจ้งในช่วง > best.v ? { date: d.date, v: d.แจ้งในช่วง } : best),
       { date: "–", v: 0 },
     );
-    const peakResolved = trendData.reduce(
-      (best, d) => (d.เสร็จในวันนั้น > best.v ? { date: d.date, v: d.เสร็จในวันนั้น } : best),
+    const peakResolved = trendMeta.data.reduce(
+      (best, d) => (d.ปิดในช่วง > best.v ? { date: d.date, v: d.ปิดในช่วง } : best),
       { date: "–", v: 0 },
     );
     return {
       reported,
       resolved,
       net,
-      avgReported: reported / trendDays,
-      avgResolved: resolved / trendDays,
+      avgReported: trendMeta.data.length ? reported / trendMeta.data.length : 0,
+      avgResolved: trendMeta.data.length ? resolved / trendMeta.data.length : 0,
       peakReported,
       peakResolved,
     };
-  }, [trendData, trendDays]);
+  }, [trendMeta]);
 
   /** งาน PENDING ที่ยังไม่มีผู้รับผิดชอบ */
   const pendingUnassigned = useMemo(
-    () => jobs.filter((j) => j.status === "PENDING" && !j.assignedTo).length,
-    [jobs],
+    () => filteredJobs.filter((j) => j.status === "PENDING" && !j.assignedTo).length,
+    [filteredJobs],
   );
 
   /** งานนอกสัญญาที่ยังไม่ปิด */
   const openOutOfContract = useMemo(
     () =>
-      jobs.filter(
+      filteredJobs.filter(
         (j) => j.isOutOfContract === true && (j.status === "PENDING" || j.status === "IN_PROGRESS"),
       ).length,
-    [jobs],
+    [filteredJobs],
   );
 
   /** เวลาแก้เฉลี่ย (วัน) สำหรับงานที่ปิดแล้วและมี fixDate */
   const avgResolutionDays = useMemo(() => {
-    const resolved = jobs.filter(
+    const resolved = filteredJobs.filter(
       (j) => j.status === "RESOLVED" && j.fixDate && (j.reportDate || j.createdAt),
     );
     if (resolved.length === 0) return null;
@@ -229,12 +422,12 @@ export default function DashboardPage() {
       sum += Math.max(0, (end - start) / 86_400_000);
     }
     return sum / resolved.length;
-  }, [jobs]);
+  }, [filteredJobs]);
 
   /** Top อำเภอ (จากข้อมูลงานทั้งหมด) */
   const districtTop5 = useMemo(() => {
     const count: Record<string, number> = {};
-    jobs.forEach((j) => {
+    filteredJobs.forEach((j) => {
       const prov = j.province?.trim() || "ไม่ระบุ";
       const dist = j.district?.trim() || "ไม่ระบุ";
       const key = `${prov} · ${dist}`;
@@ -244,7 +437,9 @@ export default function DashboardPage() {
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
-  }, [jobs]);
+  }, [filteredJobs]);
+
+  const reportStats = stats;
 
   const cards = [
     { label: "ทั้งหมด", value: stats.total, icon: TrendingUp, color: "#94a3b8", bg: "rgba(71,85,105,0.15)", border: "rgba(255,255,255,0.1)", href: "/dashboard/all" },
@@ -253,16 +448,218 @@ export default function DashboardPage() {
     { label: "เสร็จสิ้น", value: stats.resolved, icon: CheckCircle2, color: "#4ade80", bg: "rgba(46,125,50,0.12)", border: "rgba(74,222,128,0.25)", href: "/dashboard/all" },
   ];
 
+  const runExportReportPdf = () => {
+    if (!activeRange) {
+      toastWarning("ช่วงวันที่ไม่ถูกต้อง", "กรุณาตรวจสอบวันที่หรือช่วงเวลาที่เลือก");
+      return;
+    }
+    if (!token) {
+      toastError("ไม่พบสิทธิ์เข้าใช้งาน", "กรุณาเข้าสู่ระบบใหม่ก่อนส่งออกรายงาน");
+      return;
+    }
+    setReportPrintBusy(true);
+    const params = new URLSearchParams();
+    params.set("periodType", activeRange.api.periodType);
+    if (activeRange.api.periodType === "month") {
+      params.set("month", activeRange.api.month);
+    } else if (activeRange.api.periodType === "year") {
+      params.set("year", activeRange.api.year);
+    } else {
+      params.set("start", activeRange.api.start);
+      params.set("end", activeRange.api.end);
+    }
+
+    axios.get(`${API}/jobs/reports/summary-pdf?${params.toString()}`, {
+      responseType: "blob",
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        const blob = new Blob([res.data], { type: "application/pdf" });
+        const disposition = res.headers["content-disposition"] as string | undefined;
+        const fallbackName = `dashboard-summary-${format(new Date(), "yyyyMMdd-HHmmss")}.pdf`;
+        const filenameMatch = disposition?.match(/filename="?([^"]+)"?/i);
+        const filename = filenameMatch?.[1] || fallbackName;
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      })
+      .catch((err: unknown) => {
+        const message = axios.isAxiosError(err)
+          ? (typeof err.response?.data === "string"
+            ? err.response.data
+            : (err.response?.data as { message?: string })?.message) || "ไม่สามารถส่งออก PDF ได้ในขณะนี้"
+          : "ไม่สามารถส่งออก PDF ได้ในขณะนี้";
+        toastError("ส่งออก PDF ไม่สำเร็จ", message);
+      })
+      .finally(() => setReportPrintBusy(false));
+  };
+
+  const handleViewReport = () => {
+    if (!activeRange) {
+      toastWarning("ช่วงวันที่ไม่ถูกต้อง", "กรุณาตรวจสอบวันที่หรือช่วงเวลาที่เลือก");
+      return;
+    }
+    setReportDialogOpen(true);
+  };
+
   return (
-    <div className="animate-fade-up w-full min-w-0 space-y-6">
-      {/* หัวข้อ */}
-      <div className="min-w-0">
-        <h1 className="text-lg sm:text-xl font-bold truncate text-white">
-          สวัสดี, {session?.user?.name || "เจ้าหน้าที่"}
-        </h1>
-        <p className="text-sm mt-0.5 text-slate-400">
-          ภาพรวมงานแจ้งซ่อม CCTV · สรุปผลและแนวโน้ม
-        </p>
+    <div className="animate-fade-up w-full min-w-0 max-w-[1600px] mx-auto space-y-6">
+      {/* หัวข้อ + สรุปรายงาน — หลีกเลี่ยง w-full บนแถบขวาในโหมดแถว (กัน flex บีบคอลัมน์ซ้ายจนแคบเกินไป) */}
+      <div className="flex flex-col gap-4 min-w-0 xl:flex-row xl:items-start xl:justify-between xl:gap-6">
+        <div className="min-w-0 w-full xl:flex-1 xl:min-w-[min(100%,18rem)] xl:max-w-2xl">
+          <h1 className="text-lg sm:text-xl font-bold text-white wrap-break-word">
+            สวัสดี, {session?.user?.name || "เจ้าหน้าที่"}
+          </h1>
+          <p className="text-sm mt-0.5 text-slate-400 wrap-break-word leading-relaxed">
+            ภาพรวมงานแจ้งซ่อม CCTV · สรุปผลและแนวโน้ม
+          </p>
+        </div>
+        <div
+          className="w-full shrink-0 rounded-xl border border-white/10 bg-slate-900/30 p-2 sm:p-3 xl:w-auto xl:max-w-none xl:border-0 xl:bg-transparent xl:p-0"
+          role="region"
+          aria-label="สรุปรายงานและส่งออก PDF"
+        >
+          <div className="min-w-max overflow-x-auto pb-1 flex flex-wrap items-end gap-x-2 gap-y-3 sm:gap-3 xl:flex-nowrap xl:justify-end">
+            <label className="relative flex flex-col gap-1 w-[176px] shrink-0">
+              <span className="text-[11px] font-medium text-slate-500">ช่วงสรุป</span>
+              <select
+                value={filterMode}
+                onChange={(e) => setFilterMode(e.target.value as DashboardFilterMode)}
+                className={FILTER_SELECT_CLASS}
+                aria-label="เลือกช่วงสรุปรายงาน"
+              >
+                <option value="all">ทั้งหมด (ค่าเริ่มต้น)</option>
+                <option value="year">รายปี</option>
+                <option value="month">รายเดือน</option>
+                <option value="last30">30 วันล่าสุด</option>
+                <option value="last7">7 วันล่าสุด</option>
+                <option value="custom">กำหนดช่วง</option>
+              </select>
+              <ChevronDown
+                size={16}
+                className="pointer-events-none absolute right-3 top-[33px] text-slate-400"
+                aria-hidden="true"
+              />
+            </label>
+            {filterMode === "month" && (
+              <>
+                <label className="relative flex flex-col gap-1 w-[150px] shrink-0">
+                  <span className="text-[11px] font-medium text-slate-500">เดือน</span>
+                  <select
+                    value={monthYear.month}
+                    onChange={(e) => {
+                      const nextMonth = parseInt(e.target.value, 10);
+                      const mm = String(nextMonth).padStart(2, "0");
+                      setReportMonth(`${monthYear.year}-${mm}`);
+                    }}
+                    className={FILTER_SELECT_CLASS}
+                    aria-label="เลือกเดือนสำหรับรายงาน"
+                  >
+                    {TH_MONTHS.map((label, idx) => (
+                      <option key={label} value={idx + 1}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={16}
+                    className="pointer-events-none absolute right-3 top-[33px] text-slate-400"
+                    aria-hidden="true"
+                  />
+                </label>
+                <label className="relative flex flex-col gap-1 w-[120px] shrink-0">
+                  <span className="text-[11px] font-medium text-slate-500">ปี (ค.ศ.)</span>
+                  <select
+                    value={monthYear.year}
+                    onChange={(e) => {
+                      const nextYear = parseInt(e.target.value, 10);
+                      const mm = String(monthYear.month).padStart(2, "0");
+                      setReportMonth(`${nextYear}-${mm}`);
+                    }}
+                    className={`${FILTER_SELECT_CLASS} tabular-nums`}
+                    aria-label="เลือกปีสำหรับรายงานรายเดือน"
+                  >
+                    {Array.from({ length: 8 }).map((_, i) => {
+                      const y = new Date().getFullYear() - 5 + i;
+                      return (
+                        <option key={y} value={y}>
+                          {y}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <ChevronDown
+                    size={16}
+                    className="pointer-events-none absolute right-3 top-[33px] text-slate-400"
+                    aria-hidden="true"
+                  />
+                </label>
+              </>
+            )}
+            {filterMode === "year" && (
+              <label className="flex flex-col gap-1 w-[110px] shrink-0">
+                <span className="text-[11px] font-medium text-slate-500">ปี (ค.ศ.)</span>
+                <input
+                  type="number"
+                  min={1990}
+                  max={2100}
+                  value={reportYear}
+                  onChange={(e) => setReportYear(e.target.value)}
+                  className={`${FILTER_INPUT_CLASS} tabular-nums`}
+                  aria-label="เลือกปีสำหรับรายงาน"
+                />
+              </label>
+            )}
+            {filterMode === "custom" && (
+              <>
+                <label className="flex flex-col gap-1 w-[190px] shrink-0">
+                  <span className="text-[11px] font-medium text-slate-500">เริ่ม</span>
+                  <input
+                    type="datetime-local"
+                    value={rangeStart}
+                    onChange={(e) => setRangeStart(e.target.value)}
+                    className={FILTER_DATE_INPUT_CLASS}
+                    aria-label="วันเวลาเริ่มต้นช่วงรายงาน"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 w-[190px] shrink-0">
+                  <span className="text-[11px] font-medium text-slate-500">สิ้นสุด</span>
+                  <input
+                    type="datetime-local"
+                    value={rangeEnd}
+                    onChange={(e) => setRangeEnd(e.target.value)}
+                    className={FILTER_DATE_INPUT_CLASS}
+                    aria-label="วันเวลาสิ้นสุดช่วงรายงาน"
+                  />
+                </label>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={handleViewReport}
+              disabled={loading}
+              className="inline-flex h-11 min-h-11 min-w-[120px] shrink-0 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-medium text-white shadow-lg transition-all hover:bg-blue-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+            >
+              ดูรายงาน
+            </button>
+            <button
+              type="button"
+              onClick={runExportReportPdf}
+              disabled={loading || reportPrintBusy}
+              className="inline-flex h-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-slate-800/80 text-slate-200 shadow-lg transition-all hover:border-blue-500/30 hover:bg-slate-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500/45"
+              aria-label="ส่งออก PDF จากเซิร์ฟเวอร์"
+              title="ส่งออก PDF"
+            >
+              <FileDown size={20} className="shrink-0" aria-hidden />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* การ์ดสรุป KPI */}
@@ -384,7 +781,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2">
             <BarChart3 size={18} className="text-slate-400" />
             <h3 className="font-bold text-sm text-slate-200">
-              แนวโน้มรายวัน (14 วันล่าสุด)
+              {trendMeta.label} (ตามช่วงที่เลือก)
             </h3>
           </div>
           <p className="text-xs text-slate-500 leading-relaxed">
@@ -399,7 +796,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+              <AreaChart data={trendMeta.data} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
                 <defs>
                   <linearGradient id="dashTrendReport" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#64748b" stopOpacity={0.45} />
@@ -415,11 +812,11 @@ export default function DashboardPage() {
                 <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} stroke="rgba(255,255,255,0.1)" allowDecimals={false} domain={[0, "auto"]} />
                 <Tooltip
                   contentStyle={{ borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "#1e293b", color: "#e2e8f0" }}
-                  formatter={(value: number, name: string) => [value, name === "แจ้งในวันนั้น" ? "แจ้งในวันนั้น (รายการ)" : "เสร็จในวันนั้น (รายการ)"]}
+                  formatter={(value: number, name: string) => [value, name === "แจ้งในช่วง" ? "แจ้งในช่วง (รายการ)" : "ปิดในช่วง (รายการ)"]}
                 />
                 <Legend />
-                <Area type="monotone" dataKey="แจ้งในวันนั้น" stroke="#94a3b8" fillOpacity={1} fill="url(#dashTrendReport)" strokeWidth={2} />
-                <Area type="monotone" dataKey="เสร็จในวันนั้น" stroke="#4ade80" fillOpacity={1} fill="url(#dashTrendResolved)" strokeWidth={2} />
+                <Area type="monotone" dataKey="แจ้งในช่วง" stroke="#94a3b8" fillOpacity={1} fill="url(#dashTrendReport)" strokeWidth={2} />
+                <Area type="monotone" dataKey="ปิดในช่วง" stroke="#4ade80" fillOpacity={1} fill="url(#dashTrendResolved)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           )}
@@ -428,27 +825,27 @@ export default function DashboardPage() {
           <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 shrink-0">
             <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5">
               <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">แจ้งรวม 14 วัน</p>
-              <p className="text-lg font-bold text-slate-200 tabular-nums">{trendSummary14.reported}</p>
-              <p className="text-[11px] text-slate-500">เฉลี่ย {trendSummary14.avgReported.toFixed(1)} ใบ/วัน</p>
+              <p className="text-lg font-bold text-slate-200 tabular-nums">{trendSummary.reported}</p>
+              <p className="text-[11px] text-slate-500">เฉลี่ย {trendSummary.avgReported.toFixed(1)} ต่อจุด</p>
             </div>
             <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5">
               <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">ปิดรวม 14 วัน</p>
-              <p className="text-lg font-bold text-emerald-300 tabular-nums">{trendSummary14.resolved}</p>
-              <p className="text-[11px] text-slate-500">เฉลี่ย {trendSummary14.avgResolved.toFixed(1)} ใบ/วัน</p>
+              <p className="text-lg font-bold text-emerald-300 tabular-nums">{trendSummary.resolved}</p>
+              <p className="text-[11px] text-slate-500">เฉลี่ย {trendSummary.avgResolved.toFixed(1)} ต่อจุด</p>
             </div>
             <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5 col-span-2 sm:col-span-1 lg:col-span-1">
               <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">สุทธิใน 14 วัน (เข้า − ปิด)</p>
-              <p className={`text-lg font-bold tabular-nums flex items-center gap-1.5 ${trendSummary14.net > 0 ? "text-amber-300" : trendSummary14.net < 0 ? "text-sky-300" : "text-slate-200"}`}>
-                {trendSummary14.net > 0 ? <TrendingUp size={18} className="shrink-0 opacity-90" aria-hidden /> : null}
-                {trendSummary14.net < 0 ? <TrendingDown size={18} className="shrink-0 opacity-90" aria-hidden /> : null}
-                {trendSummary14.net === 0 ? <Minus size={18} className="shrink-0 text-slate-500" aria-hidden /> : null}
-                {trendSummary14.net > 0 ? "+" : ""}
-                {trendSummary14.net}
+              <p className={`text-lg font-bold tabular-nums flex items-center gap-1.5 ${trendSummary.net > 0 ? "text-amber-300" : trendSummary.net < 0 ? "text-sky-300" : "text-slate-200"}`}>
+                {trendSummary.net > 0 ? <TrendingUp size={18} className="shrink-0 opacity-90" aria-hidden /> : null}
+                {trendSummary.net < 0 ? <TrendingDown size={18} className="shrink-0 opacity-90" aria-hidden /> : null}
+                {trendSummary.net === 0 ? <Minus size={18} className="shrink-0 text-slate-500" aria-hidden /> : null}
+                {trendSummary.net > 0 ? "+" : ""}
+                {trendSummary.net}
               </p>
               <p className="text-[11px] text-slate-500">
-                {trendSummary14.net > 0
+                {trendSummary.net > 0
                   ? "งานเข้ามากกว่าปิดในช่วงนี้"
-                  : trendSummary14.net < 0
+                  : trendSummary.net < 0
                     ? "ปิดได้มากกว่างานเข้าใหม่"
                     : "เข้าและปิดเท่ากัน"}
               </p>
@@ -456,11 +853,11 @@ export default function DashboardPage() {
             <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5 col-span-2 lg:col-span-2">
               <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">จุดสูงสุดในกราฟ 14 วัน</p>
               <p className="text-xs text-slate-300 mt-1 leading-snug">
-                แจ้งสูงสุด <span className="font-semibold text-slate-100">{trendSummary14.peakReported.v}</span> ใบ วันที่{" "}
-                {trendSummary14.peakReported.date}
+                แจ้งสูงสุด <span className="font-semibold text-slate-100">{trendSummary.peakReported.v}</span> ใบ วันที่{" "}
+                {trendSummary.peakReported.date}
                 <span className="text-slate-500"> · </span>
-                ปิดสูงสุด <span className="font-semibold text-emerald-200/90">{trendSummary14.peakResolved.v}</span> ใบ วันที่{" "}
-                {trendSummary14.peakResolved.date}
+                ปิดสูงสุด <span className="font-semibold text-emerald-200/90">{trendSummary.peakResolved.v}</span> ใบ วันที่{" "}
+                {trendSummary.peakResolved.date}
               </p>
             </div>
           </div>
@@ -527,19 +924,79 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-white/10 p-4 sm:p-5 bg-slate-900/40 backdrop-blur-sm">
-          <div className="flex items-start gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-300 border border-violet-500/20">
-              <Lightbulb size={18} aria-hidden />
-            </span>
-            <div className="min-w-0 text-xs text-slate-400 leading-relaxed space-y-2">
-              <p className="font-semibold text-slate-300 text-sm">แนวทางขยายวิเคราะห์ในอนาคต (จากข้อมูลเดิมในระบบ)</p>
-              <ul className="list-disc pl-4 space-y-1 marker:text-slate-600">
-                <li>ภาระงานต่อเจ้าหน้าที่ (นับจากผู้รับผิดชอบ + งานค้าง)</li>
-                <li>สัดส่วนใน / นอกสัญญา และแนวโน้มรายเดือน</li>
-                <li>กราฟเวลาแก้ตามจังหวัดหรือตามประเภทสถานที่ (Site)</li>
-                <li>เป้า SLA ถ้ามีกำหนดวันปิดในนโยบาย — เปรียบเทียบกับวันจริงที่ปิด</li>
-              </ul>
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-200 tracking-tight">
+              แนวทางขยายวิเคราะห์ในอนาคต (จากข้อมูลเดิมในระบบ)
+            </h3>
+            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+              เตรียมพื้นที่แสดงผลเมื่อระบบพร้อมส่งมอบรายงานเชิงลึกจากข้อมูลเดิม (เช่น คิวงาน สัญญา พื้นที่ SLA)
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 border border-amber-500/25 text-amber-300">
+                  <Users size={20} aria-hidden />
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-white/10 bg-slate-800/80 px-2 py-0.5 text-slate-400">
+                  เร็วๆ นี้
+                </span>
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-200 leading-snug">ภาระงานต่อเจ้าหน้าที่</p>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  นับจากผู้รับผิดชอบและงานค้าง เพื่อดูความหนาแน่นต่อคน
+                </p>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 border border-violet-500/25 text-violet-300">
+                  <PieChartIcon size={20} aria-hidden />
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-white/10 bg-slate-800/80 px-2 py-0.5 text-slate-400">
+                  เร็วๆ นี้
+                </span>
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-200 leading-snug">ใน / นอกสัญญา · รายเดือน</p>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  สัดส่วนและแนวโน้มรายเดือนจากข้อมูลสัญญาในระบบ
+                </p>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 border border-sky-500/25 text-sky-300">
+                  <Building2 size={20} aria-hidden />
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-white/10 bg-slate-800/80 px-2 py-0.5 text-slate-400">
+                  เร็วๆ นี้
+                </span>
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-200 leading-snug">เวลาแก้ตามจังหวัด / Site</p>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  เปรียบเทียบระยะเวลาแก้ตามพื้นที่หรือประเภทสถานที่
+                </p>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/25 text-emerald-300">
+                  <Target size={20} aria-hidden />
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-white/10 bg-slate-800/80 px-2 py-0.5 text-slate-400">
+                  เร็วๆ นี้
+                </span>
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-200 leading-snug">เป้า SLA vs วันปิดจริง</p>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  เปรียบเทียบนโยบายวันปิดกับวันที่บันทึกแก้ไขเสร็จจริง
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -580,6 +1037,80 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
+
+      {portalReady && reportDialogOpen && activeRange && createPortal(
+        <div
+          className="fixed inset-0 z-100 flex items-start justify-center p-4 pt-16 sm:pt-20"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="dashboard-report-dialog-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60 backdrop-blur-[2px] cursor-pointer"
+            aria-label="ปิดหน้าต่างรายงาน"
+            onClick={() => setReportDialogOpen(false)}
+          />
+          <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-slate-900/95 backdrop-blur-md shadow-2xl p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <h2 id="dashboard-report-dialog-title" className="text-base font-bold text-white pr-2">
+                สรุปรายงานในช่วงที่เลือก
+              </h2>
+              <button
+                type="button"
+                onClick={() => setReportDialogOpen(false)}
+                className="min-h-11 min-w-11 shrink-0 inline-flex items-center justify-center rounded-xl border border-white/10 bg-slate-800/80 text-slate-300 hover:bg-slate-800 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                aria-label="ปิด"
+              >
+                <X size={18} aria-hidden />
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 mb-4 leading-relaxed">{activeRange.labelTh}</p>
+            <div className="grid grid-cols-2 gap-2 mb-6">
+              <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5">
+                <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">ทั้งหมด</p>
+                <p className="text-lg font-bold text-slate-100 tabular-nums">{reportStats.total}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5">
+                <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{STATUS_LABELS.PENDING}</p>
+                <p className="text-lg font-bold text-amber-300 tabular-nums">{reportStats.pending}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5">
+                <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{STATUS_LABELS.IN_PROGRESS}</p>
+                <p className="text-lg font-bold text-sky-300 tabular-nums">{reportStats.in_progress}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5">
+                <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{STATUS_LABELS.RESOLVED}</p>
+                <p className="text-lg font-bold text-emerald-300 tabular-nums">{reportStats.resolved}</p>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-500 mb-4 leading-relaxed">
+              นับจากวันที่แจ้ง (หรือวันที่สร้างใบ) ให้ตรงกับช่วงที่เลือก — ใช้ปุ่มด้านล่างเพื่อดาวน์โหลดไฟล์ PDF ที่สร้างจากเซิร์ฟเวอร์
+            </p>
+            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setReportDialogOpen(false)}
+                className="min-h-11 rounded-xl border border-white/10 bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-200 transition-all hover:bg-slate-700 active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              >
+                ปิด
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  runExportReportPdf();
+                }}
+                disabled={reportPrintBusy}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg transition-all hover:bg-blue-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+              >
+                <FileDown size={18} className="shrink-0" aria-hidden />
+                พิมพ์ / บันทึกเป็น PDF
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

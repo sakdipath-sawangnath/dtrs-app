@@ -139,3 +139,52 @@ export const BackfillJobDatesSchema = z
   );
 
 export type BackfillJobDatesDto = z.infer<typeof BackfillJobDatesSchema>;
+
+export const DashboardSummaryPdfQuerySchema = z
+  .object({
+    periodType: z.enum(['month', 'year', 'range']),
+    month: z.string().trim().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
+    year: z
+      .string()
+      .trim()
+      .regex(/^\d{4}$/)
+      .optional(),
+    start: z.string().trim().optional(),
+    end: z.string().trim().optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.periodType === 'month' && !v.month) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['month'],
+        message: 'กรุณาระบุ month เมื่อ periodType=month',
+      });
+    }
+    if (v.periodType === 'year' && !v.year) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['year'],
+        message: 'กรุณาระบุ year เมื่อ periodType=year',
+      });
+    }
+    if (v.periodType === 'range') {
+      if (!v.start) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['start'],
+          message: 'กรุณาระบุ start เมื่อ periodType=range',
+        });
+      }
+      if (!v.end) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['end'],
+          message: 'กรุณาระบุ end เมื่อ periodType=range',
+        });
+      }
+    }
+  });
+
+export type DashboardSummaryPdfQueryDto = z.infer<
+  typeof DashboardSummaryPdfQuerySchema
+>;

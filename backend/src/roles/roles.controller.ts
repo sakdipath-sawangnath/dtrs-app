@@ -25,6 +25,13 @@ export class RolesController {
     return this.rolesService.findAllPermissions();
   }
 
+  /** สี badge ของบทบาท (ให้ผู้ใช้ที่ login แล้วทุกบทบาทอ่านได้) */
+  @UseGuards(JwtAuthGuard)
+  @Get('public-styles')
+  async getPublicRoleStyles() {
+    return this.rolesService.findPublicRoleStyles();
+  }
+
   /** สิทธิ์ของตัวเอง (สำหรับแสดงเมนูตามสิทธิ์) */
   @UseGuards(JwtAuthGuard)
   @Get('me/permissions')
@@ -61,7 +68,16 @@ export class RolesController {
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions('menu.roles')
   @Post()
-  async create(@Body() body: { code: string; name: string; description?: string }) {
+  async create(
+    @Body()
+    body: {
+      code: string;
+      name: string;
+      description?: string;
+      badgeTextColor?: string;
+      badgeBgColor?: string;
+    },
+  ) {
     return this.rolesService.createRole(body);
   }
 
@@ -69,7 +85,10 @@ export class RolesController {
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions('menu.roles')
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() body: { name?: string; description?: string }) {
+  async update(
+    @Param('id') id: string,
+    @Body() body: { name?: string; description?: string; badgeTextColor?: string; badgeBgColor?: string },
+  ) {
     return this.rolesService.updateRole(+id, body);
   }
 

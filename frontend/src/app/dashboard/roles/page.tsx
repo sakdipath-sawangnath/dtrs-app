@@ -7,13 +7,21 @@ import { Shield, Plus, Pencil, Trash2 } from "lucide-react";
 import DashboardPageShell from "@/components/DashboardPageShell";
 import DashboardFilterBar from "@/components/DashboardFilterBar";
 import CrudModal from "@/components/CrudModal";
+import RoleBadge from "@/components/RoleBadge";
 import { toastSuccess, toastError, confirmDialog } from "@/lib/toast";
+import {
+  buildRoleBadgeStyleMap,
+  normalizeHexColorOrNull,
+  resolveRoleBadgePalette,
+} from "@/lib/roleBadge";
 
 interface AppRole {
   id: number;
   code: string;
   name: string;
   description: string | null;
+  badgeTextColor?: string | null;
+  badgeBgColor?: string | null;
   _count?: { users: number; permissions: number };
 }
 
@@ -45,7 +53,13 @@ export default function RolesPage() {
   const [modalMode, setModalMode] = useState<"create" | "edit" | "permissions">("create");
   const [editingRole, setEditingRole] = useState<AppRole | null>(null);
   const [rolePermissionIds, setRolePermissionIds] = useState<number[]>([]);
-  const [form, setForm] = useState({ code: "", name: "", description: "" });
+  const [form, setForm] = useState({
+    code: "",
+    name: "",
+    description: "",
+    badgeTextColor: "#E2E8F0",
+    badgeBgColor: "#334155",
+  });
   const [saving, setSaving] = useState(false);
 
   const fetchRoles = () => {
@@ -97,14 +111,37 @@ export default function RolesPage() {
   }, [token]);
 
   const openCreate = () => {
-    setForm({ code: "", name: "", description: "" });
+    const initial = resolveRoleBadgePalette("USER");
+    setForm({
+      code: "",
+      name: "",
+      description: "",
+      badgeTextColor: initial.textColor,
+      badgeBgColor: initial.bgColor,
+    });
     setModalMode("create");
     setEditingRole(null);
     setModalOpen(true);
   };
 
   const openEdit = (role: AppRole) => {
-    setForm({ code: role.code, name: role.name, description: role.description || "" });
+    const palette = resolveRoleBadgePalette(
+      role.code,
+      buildRoleBadgeStyleMap([
+        {
+          code: role.code,
+          badgeTextColor: role.badgeTextColor ?? null,
+          badgeBgColor: role.badgeBgColor ?? null,
+        },
+      ]),
+    );
+    setForm({
+      code: role.code,
+      name: role.name,
+      description: role.description || "",
+      badgeTextColor: palette.textColor,
+      badgeBgColor: palette.bgColor,
+    });
     setModalMode("edit");
     setEditingRole(role);
     setModalOpen(true);
@@ -144,14 +181,25 @@ export default function RolesPage() {
       if (modalMode === "create") {
         await axios.post(
           `${API}/roles`,
-          { code: form.code.trim().toUpperCase(), name: form.name.trim(), description: form.description.trim() || undefined },
+          {
+            code: form.code.trim().toUpperCase(),
+            name: form.name.trim(),
+            description: form.description.trim() || undefined,
+            badgeTextColor: normalizeHexColorOrNull(form.badgeTextColor) ?? undefined,
+            badgeBgColor: normalizeHexColorOrNull(form.badgeBgColor) ?? undefined,
+          },
           { headers: { Authorization: `Bearer ${token}` } }
         );
         toastSuccess("สร้างบทบาทสำเร็จ", 1200);
       } else if (editingRole && modalMode === "edit") {
         await axios.patch(
           `${API}/roles/${editingRole.id}`,
-          { name: form.name.trim(), description: form.description.trim() || undefined },
+          {
+            name: form.name.trim(),
+            description: form.description.trim() || undefined,
+            badgeTextColor: normalizeHexColorOrNull(form.badgeTextColor) ?? undefined,
+            badgeBgColor: normalizeHexColorOrNull(form.badgeBgColor) ?? undefined,
+          },
           { headers: { Authorization: `Bearer ${token}` } }
         );
         toastSuccess("บันทึกสำเร็จ", 1200);
@@ -206,6 +254,14 @@ export default function RolesPage() {
   };
 
   const rolePerms = permissions;
+  const roleStyleMap = buildRoleBadgeStyleMap(
+    roles.map((r) => ({
+      code: r.code,
+      name: r.name,
+      badgeTextColor: r.badgeTextColor ?? null,
+      badgeBgColor: r.badgeBgColor ?? null,
+    })),
+  );
 
   return (
     <DashboardPageShell
@@ -252,7 +308,12 @@ export default function RolesPage() {
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="font-bold text-slate-200">{role.name}</p>
+                    <RoleBadge
+                      roleCode={role.code}
+                      label={role.name}
+                      styleMap={roleStyleMap}
+                      className="min-w-[112px] justify-center"
+                    />
                     <p className="text-xs font-mono mt-0.5 text-slate-400">{role.code}</p>
                     {role.description && (
                       <p className="text-xs mt-1 line-clamp-2 text-slate-500">{role.description}</p>
@@ -381,6 +442,68 @@ export default function RolesPage() {
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="อธิบายบทบาทนี้"
                 rows={3}
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1.5 text-slate-200" htmlFor="role-badge-bg">
+                  สีพื้น Badge
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="role-badge-bg"
+                    type="color"
+                    className="h-11 w-14 rounded-lg border border-white/10 bg-slate-900/40 cursor-pointer"
+                    value={normalizeHexColorOrNull(form.badgeBgColor) ?? "#334155"}
+                    onChange={(e) => setForm({ ...form, badgeBgColor: e.target.value.toUpperCase() })}
+                    aria-label="เลือกสีพื้น Badge"
+                  />
+                  <input
+                    type="text"
+                    className="form-input-glass"
+                    value={form.badgeBgColor}
+                    onChange={(e) => setForm({ ...form, badgeBgColor: e.target.value })}
+                    placeholder="#334155"
+                    autoComplete="off"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5 text-slate-200" htmlFor="role-badge-text">
+                  สีตัวอักษร Badge
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="role-badge-text"
+                    type="color"
+                    className="h-11 w-14 rounded-lg border border-white/10 bg-slate-900/40 cursor-pointer"
+                    value={normalizeHexColorOrNull(form.badgeTextColor) ?? "#E2E8F0"}
+                    onChange={(e) => setForm({ ...form, badgeTextColor: e.target.value.toUpperCase() })}
+                    aria-label="เลือกสีตัวอักษร Badge"
+                  />
+                  <input
+                    type="text"
+                    className="form-input-glass"
+                    value={form.badgeTextColor}
+                    onChange={(e) => setForm({ ...form, badgeTextColor: e.target.value })}
+                    placeholder="#E2E8F0"
+                    autoComplete="off"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-slate-900/30 p-3">
+              <p className="mb-2 text-xs text-slate-400">ตัวอย่าง Badge</p>
+              <RoleBadge
+                roleCode={form.code || "CUSTOM"}
+                label={form.name || (form.code || "บทบาทตัวอย่าง")}
+                styleMap={buildRoleBadgeStyleMap([
+                  {
+                    code: form.code || "CUSTOM",
+                    badgeTextColor: normalizeHexColorOrNull(form.badgeTextColor),
+                    badgeBgColor: normalizeHexColorOrNull(form.badgeBgColor),
+                  },
+                ])}
               />
             </div>
           </>

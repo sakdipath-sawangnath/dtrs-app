@@ -209,7 +209,7 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
 
         <aside
           className={`
-            w-64 shrink-0 bg-slate-900/60 backdrop-blur-xl border-r border-white/10 shadow-2xl flex flex-col z-50
+            w-64 xl:w-72 shrink-0 bg-slate-900/60 backdrop-blur-xl border-r border-white/10 shadow-2xl flex flex-col z-50
             fixed md:sticky left-0 top-[62px] md:top-0 transform transition-transform duration-300 ease-out
             h-[calc(100vh-62px)] md:h-full md:self-stretch
             ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}

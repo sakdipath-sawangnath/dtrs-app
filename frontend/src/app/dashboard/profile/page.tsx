@@ -5,8 +5,10 @@ import axios from "axios";
 import { useSession } from "next-auth/react";
 import { User, Lock, Loader2, Eye, EyeOff, Camera } from "lucide-react";
 import SegmentedTabs from "@/components/SegmentedTabs";
+import RoleBadge from "@/components/RoleBadge";
 import { toastSuccess, toastError } from "@/lib/toast";
 import { unwrapApiData } from "@/lib/apiResponse";
+import { buildRoleBadgeStyleMap, type RoleBadgeStyleMap } from "@/lib/roleBadge";
 
 interface Profile {
   id: number;
@@ -40,6 +42,7 @@ export default function ProfilePage() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarObjectUrl, setAvatarObjectUrl] = useState<string | null>(null);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+  const [roleStyleMap, setRoleStyleMap] = useState<RoleBadgeStyleMap>({});
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -104,9 +107,26 @@ export default function ProfilePage() {
       .finally(() => setLoading(false));
   }, [token, API]);
 
+  const fetchRoleStyles = useCallback(() => {
+    if (!token) return;
+    axios
+      .get(`${API}/roles/public-styles`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((res) => {
+        const rows = unwrapApiData<Array<{ code: string; badgeTextColor?: string | null; badgeBgColor?: string | null }>>(res.data);
+        setRoleStyleMap(buildRoleBadgeStyleMap(Array.isArray(rows) ? rows : []));
+      })
+      .catch(() => setRoleStyleMap({}));
+  }, [token, API]);
+
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
+
+  useEffect(() => {
+    fetchRoleStyles();
+  }, [fetchRoleStyles]);
 
   const avatarFallbackText = useMemo(() => {
     const email = profile?.email ?? form.email ?? "";
@@ -348,11 +368,7 @@ export default function ProfilePage() {
                     </div>
                   </div>
                   {profile?.role && (
-                    <span
-                      className="badge bg-blue-500/15 text-blue-400 border border-blue-500/25"
-                    >
-                      {profile.role}
-                    </span>
+                    <RoleBadge roleCode={profile.role} styleMap={roleStyleMap} />
                   )}
                 </div>
 

@@ -16,8 +16,12 @@ import {
     UpdateOutOfContractSchema,
     ReopenJobSchema,
     BackfillJobDatesSchema,
+    DashboardSummaryPdfQuerySchema,
 } from './dto/create-job.dto';
-import type { BackfillJobDatesDto } from './dto/create-job.dto';
+import type {
+    BackfillJobDatesDto,
+    DashboardSummaryPdfQueryDto,
+} from './dto/create-job.dto';
 import type { Response } from 'express';
 
 type ReqUser = { user: { id: number; role: string } };
@@ -55,6 +59,28 @@ export class JobsController {
     async getNotifications(@Query('limit') limit?: string) {
         const n = limit ? Math.max(1, Math.min(50, parseInt(limit, 10) || 20)) : 20;
         return this.jobsService.findRecentPending(n);
+    }
+
+    /**
+     * สรุปรายงานสำหรับ Dashboard (ไฟล์ PDF จากเซิร์ฟเวอร์)
+     * Query:
+     * - periodType=month&month=YYYY-MM
+     * - periodType=year&year=YYYY
+     * - periodType=range&start=ISO&end=ISO
+     */
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @Permissions('menu.dashboard')
+    @Get('reports/summary-pdf')
+    async dashboardSummaryPdf(
+        @Query(new ZodValidationPipe(DashboardSummaryPdfQuerySchema))
+        query: DashboardSummaryPdfQueryDto,
+    ): Promise<StreamableFile> {
+        const { buffer, filename } =
+            await this.jobsPdfService.generateDashboardSummaryPdf(query);
+        return new StreamableFile(buffer, {
+            type: 'application/pdf',
+            disposition: `attachment; filename="${filename}"`,
+        });
     }
 
     /**

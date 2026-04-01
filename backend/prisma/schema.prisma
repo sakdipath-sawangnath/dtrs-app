@@ -25,6 +25,8 @@ model AppRole {
   code        String   @unique // ADMIN, STAFF, USER หรือชื่อที่กำหนดเอง
   name        String   // ชื่อแสดง เช่น ผู้ดูแลระบบ
   description String?  @db.Text
+  badgeTextColor String? @db.VarChar(7) // เช่น #E2E8F0
+  badgeBgColor   String? @db.VarChar(7) // เช่น #1E3A8A
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   users       User[]   @relation("UserRole")

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -47,10 +48,34 @@ const RBAC_ACTION_CODES_SUPERVISOR = RBAC_ACTION_CODES_ALL.filter(
 const RBAC_ALL_PERMISSIONS = [...RBAC_MENU_PERMISSIONS, ...RBAC_ACTION_PERMISSIONS];
 
 const RBAC_DEFAULT_ROLES = [
-  { code: 'ADMIN', name: 'ผู้ดูแลระบบ', description: 'เข้าถึงทุกเมนู รวมจัดการผู้ใช้และตั้งค่าระบบ' },
-  { code: 'STAFF', name: 'ช่างเทคนิค', description: 'ภาพรวม, รอดำเนินการ, กำลังแก้ไข, ประวัติ, นอกสัญญา' },
-  { code: 'USER', name: 'ผู้แจ้งซ่อม', description: 'เฉพาะ โปรไฟล์, แจ้งปัญหา, ตรวจสอบสถานะ' },
-  { code: 'SUPERVISOR', name: 'หัวหน้างาน', description: 'เทียบเท่าเจ้าหน้าที่ แต่สามารถมอบหมายงานให้เจ้าหน้าที่ได้' },
+  {
+    code: 'ADMIN',
+    name: 'ผู้ดูแลระบบ',
+    description: 'เข้าถึงทุกเมนู รวมจัดการผู้ใช้และตั้งค่าระบบ',
+    badgeTextColor: '#DBEAFE',
+    badgeBgColor: '#1E3A8A',
+  },
+  {
+    code: 'STAFF',
+    name: 'ช่างเทคนิค',
+    description: 'ภาพรวม, รอดำเนินการ, กำลังแก้ไข, ประวัติ, นอกสัญญา',
+    badgeTextColor: '#DCFCE7',
+    badgeBgColor: '#166534',
+  },
+  {
+    code: 'USER',
+    name: 'ผู้แจ้งซ่อม',
+    description: 'เฉพาะ โปรไฟล์, แจ้งปัญหา, ตรวจสอบสถานะ',
+    badgeTextColor: '#FFEDD5',
+    badgeBgColor: '#9A3412',
+  },
+  {
+    code: 'SUPERVISOR',
+    name: 'หัวหน้างาน',
+    description: 'เทียบเท่าเจ้าหน้าที่ แต่สามารถมอบหมายงานให้เจ้าหน้าที่ได้',
+    badgeTextColor: '#E0E7FF',
+    badgeBgColor: '#3730A3',
+  },
 ] as const;
 
 const RBAC_STAFF_MENU_CODES = RBAC_MENU_PERMISSIONS.map((p) => p.code).filter(
@@ -77,6 +102,17 @@ export class RolesService implements OnModuleInit {
   // กันปัญหา seed ซ้อนจาก concurrent requests (เช่น /roles และ /roles/permissions เรียกพร้อมกัน)
   private static rbacSeedInFlight: Promise<void> | null = null;
   private static permissionCatalogSyncInFlight: Promise<void> | null = null;
+
+  private normalizeHexColorOrNull(input?: string): string | null {
+    if (input == null) return null;
+    const v = String(input).trim();
+    if (!v) return null;
+    const hex = v.startsWith('#') ? v : `#${v}`;
+    if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+      throw new BadRequestException('รูปแบบสีไม่ถูกต้อง (ต้องเป็น #RRGGBB)');
+    }
+    return hex.toUpperCase();
+  }
 
   async onModuleInit() {
     await this.ensurePermissionCatalogSynced();
@@ -195,8 +231,19 @@ export class RolesService implements OnModuleInit {
       for (const r of RBAC_DEFAULT_ROLES) {
         const role = await this.prisma.appRole.upsert({
           where: { code: r.code },
-          create: { code: r.code, name: r.name, description: r.description },
-          update: { name: r.name, description: r.description },
+          create: {
+            code: r.code,
+            name: r.name,
+            description: r.description,
+            badgeTextColor: r.badgeTextColor,
+            badgeBgColor: r.badgeBgColor,
+          },
+          update: {
+            name: r.name,
+            description: r.description,
+            badgeTextColor: r.badgeTextColor,
+            badgeBgColor: r.badgeBgColor,
+          },
         });
         roleIds[r.code] = role.id;
       }
@@ -277,24 +324,52 @@ export class RolesService implements OnModuleInit {
     return this.getRolePermissionIds(roleId);
   }
 
-  async createRole(data: { code: string; name: string; description?: string }) {
+  async createRole(data: {
+    code: string;
+    name: string;
+    description?: string;
+    badgeTextColor?: string;
+    badgeBgColor?: string;
+  }) {
     const code = data.code.trim().toUpperCase();
     const existing = await this.prisma.appRole.findUnique({ where: { code } });
     if (existing) throw new ConflictException('รหัสบทบาทนี้มีแล้ว');
+    const badgeTextColor = this.normalizeHexColorOrNull(data.badgeTextColor);
+    const badgeBgColor = this.normalizeHexColorOrNull(data.badgeBgColor);
     return this.prisma.appRole.create({
-      data: { code, name: data.name.trim(), description: data.description?.trim() || null },
+      data: {
+        code,
+        name: data.name.trim(),
+        description: data.description?.trim() || null,
+        badgeTextColor,
+        badgeBgColor,
+      },
     });
   }
 
-  async updateRole(id: number, data: { name?: string; description?: string }) {
+  async updateRole(
+    id: number,
+    data: { name?: string; description?: string; badgeTextColor?: string; badgeBgColor?: string },
+  ) {
     const role = await this.prisma.appRole.findUnique({ where: { id } });
     if (!role) throw new NotFoundException('ไม่พบบทบาทนี้');
+    const updateData: {
+      name?: string;
+      description?: string;
+      badgeTextColor?: string | null;
+      badgeBgColor?: string | null;
+    } = {};
+    if (data.name !== undefined) updateData.name = data.name.trim();
+    if (data.description !== undefined) updateData.description = data.description.trim();
+    if (data.badgeTextColor !== undefined) {
+      updateData.badgeTextColor = this.normalizeHexColorOrNull(data.badgeTextColor);
+    }
+    if (data.badgeBgColor !== undefined) {
+      updateData.badgeBgColor = this.normalizeHexColorOrNull(data.badgeBgColor);
+    }
     return this.prisma.appRole.update({
       where: { id },
-      data: {
-        name: data.name?.trim(),
-        description: data.description?.trim(),
-      },
+      data: updateData,
     });
   }
 
@@ -312,6 +387,24 @@ export class RolesService implements OnModuleInit {
     return this.prisma.permission.findMany({
       orderBy: [{ category: 'asc' }, { code: 'asc' }],
     });
+  }
+
+  async findPublicRoleStyles() {
+    const rows = await this.prisma.appRole.findMany({
+      orderBy: { id: 'asc' },
+      select: {
+        code: true,
+        name: true,
+        badgeTextColor: true,
+        badgeBgColor: true,
+      },
+    });
+    return rows.map((r) => ({
+      code: String(r.code || '').toUpperCase(),
+      name: r.name,
+      badgeTextColor: this.normalizeHexColorOrNull(r.badgeTextColor ?? undefined),
+      badgeBgColor: this.normalizeHexColorOrNull(r.badgeBgColor ?? undefined),
+    }));
   }
 
   /** สิทธิ์ของ user ตาม roleId (หรือตาม enum role ถ้าไม่มี roleId) */

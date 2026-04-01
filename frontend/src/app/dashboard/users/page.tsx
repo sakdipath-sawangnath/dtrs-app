@@ -20,8 +20,10 @@ import {
 import DashboardPageShell from "@/components/DashboardPageShell";
 import DashboardFilterBar from "@/components/DashboardFilterBar";
 import CrudModal from "@/components/CrudModal";
+import RoleBadge from "@/components/RoleBadge";
 import { toastSuccess, toastError, toastWarning, confirmDialog } from "@/lib/toast";
 import DataTablePagination, { DataTablePageSize } from "@/components/DataTablePagination";
+import { buildRoleBadgeStyleMap, type RoleBadgeStyleMap } from "@/lib/roleBadge";
 
 interface UserRow {
   id: number;
@@ -194,6 +196,7 @@ export default function UsersPage() {
   const isAdmin = userRole === "ADMIN";
   const [roles, setRoles] = useState<Array<{ id: number; code: string; name: string }>>([]);
   const [rolesLoading, setRolesLoading] = useState(false);
+  const [roleStyleMap, setRoleStyleMap] = useState<RoleBadgeStyleMap>({});
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [resettingUserId, setResettingUserId] = useState<number | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -218,10 +221,35 @@ export default function UsersPage() {
       .finally(() => setRolesLoading(false));
   };
 
+  const fetchRoleStyles = () => {
+    if (!token) return;
+    axios
+      .get<Array<{ code: string; badgeTextColor?: string | null; badgeBgColor?: string | null }>>(
+        `${API}/roles/public-styles`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      )
+      .then((r) => {
+        const payload = unwrapApiData<unknown>(r?.data);
+        setRoleStyleMap(
+          buildRoleBadgeStyleMap(
+            Array.isArray(payload)
+              ? (payload as Array<{ code: string; badgeTextColor?: string | null; badgeBgColor?: string | null }>)
+              : [],
+          ),
+        );
+      })
+      .catch(() => setRoleStyleMap({}));
+  };
+
   useEffect(() => {
     fetchRoles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, isAdmin]);
+
+  useEffect(() => {
+    fetchRoleStyles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const allRoleOptions = useMemo(() => {
     const map = new Map<string, { value: string; label: string }>();
@@ -721,9 +749,12 @@ export default function UsersPage() {
                       {u.position && <span className="mt-0.5 flex items-center gap-1"><Briefcase size={10} /> {u.position}</span>}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`badge justify-center min-w-[88px] ${u.role === "ADMIN" ? "badge-resolved" : u.role === "USER" ? "badge-pending" : "badge-progress"}`}>
-                        {roleLabelByCode[u.role] || u.role}
-                      </span>
+                      <RoleBadge
+                        roleCode={u.role}
+                        label={roleLabelByCode[u.role] || u.role}
+                        styleMap={roleStyleMap}
+                        className="justify-center"
+                      />
                     </td>
                     <td className="px-4 py-3 text-center align-middle">
                       {u.isLocked ? (
@@ -1024,9 +1055,14 @@ export default function UsersPage() {
             </div>
             <div className="rounded-2xl p-4 text-xs space-y-2 bg-slate-900/40 backdrop-blur-sm border border-white/10 text-slate-400 shadow-inner">
               <p className="font-semibold text-slate-300">สิทธิ์ตามบทบาท (RBAC)</p>
-              <p className="text-slate-300">
-                {roleLabelByCode[form.role] || form.role}: {getRoleSummaryText(form.role)}
-              </p>
+              <div className="flex items-center gap-2">
+                <RoleBadge
+                  roleCode={form.role}
+                  label={roleLabelByCode[form.role] || form.role}
+                  styleMap={roleStyleMap}
+                />
+                <p className="text-slate-300">{getRoleSummaryText(form.role)}</p>
+              </div>
               <p className="text-slate-400/90">รายละเอียดสิทธิ์แต่ละเมนูดูได้ที่หน้าจัดการบทบาทและสิทธิ์</p>
             </div>
           </div>

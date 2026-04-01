@@ -330,13 +330,27 @@ export class JobsService {
     async updateStatus(id: number, status: any, jwtForEmailPdf?: string) {
         const prev = await this.prisma.job.findUnique({
             where: { id },
-            select: { status: true },
+            select: { status: true, assignedToId: true },
         });
+        if (!prev) {
+            throw new NotFoundException(`ไม่พบงาน id=${id}`);
+        }
+        const nextSt = String(status ?? '').toUpperCase();
+        if (nextSt === String(JobStatus.RESOLVED)) {
+            if (prev.assignedToId == null) {
+                throw new BadRequestException('ปิดงานไม่ได้: ต้องมีผู้รับผิดชอบงานก่อน');
+            }
+            if (prev.status === JobStatus.PENDING) {
+                throw new BadRequestException('ปิดงานไม่ได้: งานสถานะรอดำเนินการ (PENDING) ต้องมอบหมายและเปลี่ยนเป็นกำลังแก้ไขก่อน');
+            }
+            if (prev.status !== JobStatus.IN_PROGRESS) {
+                throw new BadRequestException('ปิดงานได้เฉพาะงานสถานะกำลังแก้ไข (IN_PROGRESS) เท่านั้น');
+            }
+        }
         const updated = await this.prisma.job.update({
             where: { id },
             data: { status },
         });
-        const nextSt = String(status ?? '').toUpperCase();
         const wasResolved = prev?.status === JobStatus.RESOLVED;
         if (nextSt === 'RESOLVED' && !wasResolved) {
             void this.jobEmailNotifications.notifyClosed(updated.id, jwtForEmailPdf);
@@ -530,7 +544,7 @@ export class JobsService {
     ) {
         const current = await this.prisma.job.findUnique({
             where: { id },
-            select: { status: true },
+            select: { status: true, assignedToId: true },
         });
         if (!current) {
             throw new NotFoundException(`ไม่พบงาน id=${id}`);
@@ -539,6 +553,15 @@ export class JobsService {
             throw new BadRequestException(
                 'งานปิดแล้ว หากต้องการแก้ไขโปรด Reopen เพื่อเปลี่ยนสถานะเป็นกำลังแก้ไขก่อน',
             );
+        }
+        if (current.assignedToId == null) {
+            throw new BadRequestException('ปิดงานไม่ได้: ต้องมีผู้รับผิดชอบงานก่อน');
+        }
+        if (current.status === JobStatus.PENDING) {
+            throw new BadRequestException('ปิดงานไม่ได้: งานสถานะรอดำเนินการ (PENDING) ต้องมอบหมายและเปลี่ยนเป็นกำลังแก้ไขก่อน');
+        }
+        if (current.status !== JobStatus.IN_PROGRESS) {
+            throw new BadRequestException('ปิดงานได้เฉพาะงานสถานะกำลังแก้ไข (IN_PROGRESS) เท่านั้น');
         }
 
         const data: Prisma.JobUpdateInput = {

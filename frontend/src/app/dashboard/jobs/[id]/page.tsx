@@ -244,7 +244,10 @@ export default function JobDetailPage() {
 
   /** แก้ไข/บันทึกได้เมื่อยังไม่ปิดงาน — หลังปิดต้อง Reopen (API) ให้เป็นกำลังแก้ไขก่อน */
   const canEditFix =
-    !!job && !isResolved && (canFixAny || (canFixSelf && isAssignee));
+    !!job &&
+    job.status === "IN_PROGRESS" &&
+    !!job.assignedTo &&
+    (canFixAny || (canFixSelf && isAssignee));
 
   const isReadOnlyFix = !!job && !canEditFix;
 
@@ -1303,6 +1306,10 @@ export default function JobDetailPage() {
                     ) : isResolved ? (
                       <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-white/15 text-slate-400 bg-slate-800/40 backdrop-blur-sm">
                         งานนี้ปิดแล้ว — ข้อมูลการแก้ไขเป็นโหมดอ่านอย่างเดียว — หากต้องการแก้ไข ให้ติดต่อผู้รับงานหรือผู้ดูแลระบบ
+                      </div>
+                    ) : job && job.status === "PENDING" ? (
+                      <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-amber-500/25 text-amber-100/90 bg-amber-950/20 backdrop-blur-sm">
+                        งานสถานะรอดำเนินการ (PENDING) ยังปิดงานไม่ได้ — กรุณามอบหมายงานก่อนเพื่อเปลี่ยนเป็นกำลังแก้ไข
                       </div>
                     ) : job && !job.assignedTo ? (
                       <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-amber-500/25 text-amber-100/90 bg-amber-950/20 backdrop-blur-sm">
