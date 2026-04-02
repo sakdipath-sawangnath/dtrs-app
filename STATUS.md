@@ -1,8 +1,8 @@
 # Project Status - ระบบแจ้งซ่อม CCTV
 
-**วันที่อัปเดตสถานะ:** 2026-03-31
+**วันที่อัปเดตสถานะ:** 2026-04-02
 
-**ดัชนีเอกสาร:** [`README.md`](README.md) (ตารางสรุป), [`docs/README.md`](docs/README.md), [`minio.md`](minio.md), [`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md)
+**ดัชนีเอกสาร:** [`README.md`](README.md) (ตารางสรุป), [`docs/README.md`](docs/README.md), [`minio.md`](minio.md), [`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md), [`docs/Job-Serial-Multi-Row.md`](docs/Job-Serial-Multi-Row.md), [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md)
 
 ---
 
@@ -29,12 +29,12 @@
     - `job.fix.any`: ทำได้ทุกงาน
     - `job.fix.self`: ทำได้เฉพาะงานที่เป็นผู้รับงาน (assignee)
     - ถ้างานมีสถานะ `RESOLVED` ต้อง **`PATCH /jobs/:id/reopen`** ก่อน
-    - ต้องส่ง `fixEnvironment` (INDOOR/OUTDOOR), `brokenPartType` (Hardware/Software), `cause`, `fixMethod` และ `fixImages` อย่างน้อย 2 รูปแรก; `note` และ `oldSerialNumber/newSerialNumber` เป็นฟิลด์ไม่บังคับ; ระบบตั้ง status = RESOLVED และ fixDate อัตโนมัติ
+    - ต้องส่ง `fixEnvironment` (INDOOR/OUTDOOR), `brokenPartType` (Hardware/Software), `cause`, `fixMethod` และ `fixImages` อย่างน้อย 2 รูปแรก; `note` และ `oldSerialNumber` / `newSerialNumber` เป็นฟิลด์ไม่บังคับ — รองรับ **หลายอุปกรณ์ (สูงสุด 4 แถว)** โดยเก็บ JSON ใน `oldSerialNumber` ตาม [`docs/Job-Serial-Multi-Row.md`](docs/Job-Serial-Multi-Row.md); ระบบตั้ง status = RESOLVED และ fixDate อัตโนมัติ
   - **เปิดงานใหม่หลังปิด (Reopen)**: `PATCH /jobs/:id/reopen` — คุมสิทธิ์ผ่าน RBAC:
     - `job.reopen.any`: ทำได้ทุกงาน
     - `job.reopen.self`: ทำได้เฉพาะผู้รับงาน
     - `RESOLVED` → `IN_PROGRESS`, ล้าง `fixDate`, ต่อท้ายเหตุผลใน `fixNote`
-   - **ตั้งค่าระบบ (`/settings/*`)**: ทุกเส้นต้อง JWT + สิทธิ์ **`menu.settings`** — รวม **SMTP** (`GET/PUT /settings/email-smtp`, `POST /settings/email-smtp/test`), **เทมเพลตอีเมล** (`GET/PUT /settings/email-templates`), **รหัสผ่านเริ่มต้น** (`GET/PUT /settings/default-pass`) — เก็บใน `Setting`; nodemailer + `tlsRejectUnauthorized` / env `SMTP_TLS_REJECT_UNAUTHORIZED`; flow อีเมล [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
+   - **ตั้งค่าระบบ (`/settings/*`)**: ทุกเส้นต้อง JWT + สิทธิ์ **`menu.settings`** — รวม **SMTP** (`GET/PUT /settings/email-smtp`, `POST /settings/email-smtp/test`), **เทมเพลตอีเมล** (`GET/PUT /settings/email-templates`), **รหัสผ่านเริ่มต้น** (`GET/PUT /settings/default-pass`; `GET` คืนค่า `passwordSet` + `password` ให้หน้า settings แสดงรหัสปัจจุบัน), **MinIO orphan** (`POST /settings/minio/orphans/scan`, `POST /settings/minio/orphans/delete`) — เก็บใน `Setting`; nodemailer + `tlsRejectUnauthorized` / env `SMTP_TLS_REJECT_UNAUTHORIZED`; flow อีเมล [`docs/Email-Notifications.md`](docs/Email-Notifications.md); orphan: [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md)
    - **Jobs**: สร้างงานตรวจสอบ Site ว่าจังหวัด/อำเภอ/หน่วยงานมีในระบบก่อน (SitesService.existsByLocation); หลังสร้างงาน ถ้า `reporterPhone` ตรงกับผู้ใช้ในระบบจะ **เชื่อม `reporterId`** อัตโนมัติ (`UsersService.findByPhone`)
    - **รายการงาน (Dashboard)**: `GET /jobs/list` — ดึงรายการแจ้งซ่อม (JWT); ไม่มี `GET /api/jobs` แบบเปล่า — แยก path เพื่อไม่ให้สับสนกับ `POST /jobs` (แจ้งซ่อมสาธารณะ) เมื่อเปิด URL ในเบราว์เซอร์
    - **เปลี่ยนสถานะงาน**: `PATCH /jobs/:id/status` — ต้องมีสิทธิ์ **`job.updateStatus`**
@@ -114,8 +114,10 @@
 | POST | `/settings/email-smtp/test` | ✅ JWT + **`menu.settings`** | ทดสอบส่งอีเมลด้วยค่าที่บันทึกแล้ว |
 | GET | `/settings/email-templates` | ✅ JWT + **`menu.settings`** | อ่านเทมเพลตอีเมลแจ้งงาน (`email_templates`) |
 | PUT | `/settings/email-templates` | ✅ JWT + **`menu.settings`** | บันทึกเทมเพลตอีเมล (รวม `publicBaseUrl`, `notifyRoleIds` ต่อเทมเพลต) |
-| GET | `/settings/default-pass` | ✅ JWT + **`menu.settings`** | คืนค่า `{ passwordSet }` เท่านั้น (ไม่คืนรหัสผ่านจริง) |
+| GET | `/settings/default-pass` | ✅ JWT + **`menu.settings`** | คืนค่า `{ passwordSet, password }` ให้หน้าตั้งค่าแสดงรหัสปัจจุบัน (สิทธิ์ `menu.settings` เท่านั้น) |
 | PUT | `/settings/default-pass` | ✅ JWT + **`menu.settings`** | ตั้งรหัสผ่านเริ่มต้น |
+| POST | `/settings/minio/orphans/scan` | ✅ JWT + **`menu.settings`** | สแกน object ใน MinIO ที่ไม่อ้างอิงจาก DB (pagination + กรองอายุขั้นต่ำ) — [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md) |
+| POST | `/settings/minio/orphans/delete` | ✅ JWT + **`menu.settings`** | ลบ key ที่เลือก พร้อมยืนยัน — [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md) |
 | PATCH | `/jobs/:id/out-of-contract` | ✅ JWT | ย้ายนอกสัญญา: ต้องมี **`job.assign`**; ตั้ง `isOutOfContract=true` โดย “คงสถานะเป็น PENDING” |
 | DELETE | `/jobs/:id` | ✅ JWT | ลบ **IN_PROGRESS**: ต้องมี **`job.deleteInProgress`**; ลบ **PENDING** ไม่มอบหมาย: **`job.deleteUnassigned`** |
 | GET | `/sites` | ❌ Public | ข้อมูลพื้นที่โครงการ (สำหรับหน้าแจ้งปัญหา) |
@@ -149,7 +151,7 @@
 | `/dashboard/out-of-contract` | นอกสัญญา – DataTable + filter |
 | `/dashboard/users` | จัดการผู้ใช้ – DataTable + filter; ต้องมีเมนู **`menu.users`**; CRUD (Modal + Toast); เลือกบทบาทได้ ADMIN/STAFF/SUPERVISOR/USER |
 | `/dashboard/profile` | โปรไฟล์ – แก้ไขข้อมูลผู้ใช้ / เปลี่ยนรหัสผ่าน (เข้าได้จากเมนูผู้ใช้ dropdown; ไม่แสดงใน sidebar) |
-| `/dashboard/settings` | ตั้งค่าระบบ — สิทธิ์ **`menu.settings`**; **SMTP** + **เทมเพลตอีเมลแจ้งงาน** + default pass; layout เนื้อหาแบบหน้า `/dashboard` — flow อีเมล: [`docs/Email-Notifications.md`](docs/Email-Notifications.md) |
+| `/dashboard/settings` | ตั้งค่าระบบ — สิทธิ์ **`menu.settings`**; **SMTP** + **เทมเพลตอีเมลแจ้งงาน** + รหัสผ่านเริ่มต้น + **MinIO orphan** (สแกน/ลบไฟล์ค้าง); layout เนื้อหาแบบหน้า `/dashboard` — flow อีเมล: [`docs/Email-Notifications.md`](docs/Email-Notifications.md) · serial หลายแถว: [`docs/Job-Serial-Multi-Row.md`](docs/Job-Serial-Multi-Row.md) · orphan: [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md) |
 
 **หมายเหตุ:** `/dashboard/staff` ถูกลบแล้ว; redirect ไป `/dashboard/users`
 
@@ -179,6 +181,7 @@ npx ts-node scripts/seed-roles-permissions.ts
 - **Deploy / CI (2026-03-23)**: **GitLab CI** (`.gitlab-ci.yml`) + **`Dockerfile`** — build แยก frontend/backend ใน pipeline, image production รัน Nest + Next; พอร์ต host ตัวอย่าง **8309→3000**, **8310→4000**; ตัวแปร **`FRONTEND_BASE_URL`** แทน `FRONTEND_URL_PRD`; คู่มือ production โดเมนเดียว + `/api` + `/socket.io` และ `MINIO_PUBLIC_URL` สรุปใน `README.md`; (2026-03-28) pipeline ส่ง **`MINIO_SERVER_FETCH_BASE_URL`** เข้า backend ได้เมื่อตั้งใน GitLab Variables
 - **RBAC คิวงาน (2026-03-30)**: `PATCH /jobs/:id/assign`, `PATCH /jobs/:id/out-of-contract`, และลบ `PENDING` ไม่มอบหมายใน **`DELETE /jobs/:id`** ใช้ **`getPermissionsForUser`** สอดคล้อง `/dashboard/roles`; `JobsList` แสดงปุ่มมอบหมาย/ย้ายนอกสัญญาตาม **`job.assign`**
 - **RBAC API เต็มชุด (2026-03-31)**: `roles` / `users` / `settings` → **`menu.roles`**, **`menu.users`**, **`menu.settings`**; `PATCH /jobs/:id/status` → **`job.updateStatus`**; ลบ IN_PROGRESS → **`job.deleteInProgress`**; `POST /areas` → **`site.create`**; `RBAC_ROLE_PERMISSION_CODES` ร่วมกับ `PermissionsGuard`; `JobsService` ใช้ `RolesService.getPermissionsForUser`
+- **Serial หลายอุปกรณ์ + MinIO orphan + พิมพ์ (2026-04-02)**: `oldSerialNumber`/`newSerialNumber` รองรับ JSON หลายแถว (สูงสุด 4) + migration `TEXT`; หน้า settings — `POST /settings/minio/orphans/scan|delete`, retention 7 วัน; PDF — หัวข้อรายการอุปกรณ์แยกบรรทัดจากแถวแรก; `GET /settings/default-pass` คืน `password` ให้หน้า settings — เอกสาร [`docs/Job-Serial-Multi-Row.md`](docs/Job-Serial-Multi-Row.md), [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md)
 - **พิมพ์ + รูปงานบน PRD (2026-03-28)**: รูปในเทมเพลตผ่าน **`/job-images/...`** บน Next; Nest **`MINIO_SERVER_FETCH_BASE_URL`** แก้กรณี backend โหลด MinIO ทาง public URL ไม่ได้ → **502** พร้อม log `getJobImageBuffer failed` ถ้ายังไม่ตั้งค่า
 - **Backend Docker entry (Nest + nodenext)**: image backend ใช้ **`node dist/src/main.js`** — ไม่ใช่ `dist/main.js`; สาเหตุเดิมของ error PRD `MODULE_NOT_FOUND` คือ path entry ไม่ตรงกับผล compile
 - **Frontend build (2026-03-23)**: `apiResponse.ts`; **`/public/report`** ใช้ `<Suspense>` รอบ `useSearchParams` เพื่อให้ `next build` ผ่าน

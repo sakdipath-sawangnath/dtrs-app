@@ -46,4 +46,5 @@
 
 - `backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md` — `/job-images`, `/user-images`
 - `minio.md` — env
+- [`MinIO-Orphan-Cleanup.md`](./MinIO-Orphan-Cleanup.md) — สแกน/ลบไฟล์ค้างใน bucket (หน้า settings)
 - `PLAN.md` §4.10

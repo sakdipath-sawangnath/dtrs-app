@@ -4,6 +4,8 @@
 
 แผนรูปแบบ private bucket + proxy: [`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md)
 
+การสแกนและลบ object ที่ไม่อ้างอิงจาก DB (orphan): [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md)
+
 ---
 
 ## พฤติกรรมใน production

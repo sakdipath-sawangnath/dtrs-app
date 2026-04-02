@@ -224,3 +224,17 @@
 - [ ] Phase 5: ทดสอบ manual ตาม checklist ในเอกสารแผน
 - [x] Phase 6: README, STATUS, api-endpoints, Reverse-Proxy, minio.md, `docs/README.md`, PLAN §4.10
 
+## 21. Phase 6.10 — Serial หลายแถว, migration TEXT, MinIO orphan, พิมพ์ PDF (2026-04-02)
+
+### Backend
+- [x] Validation serial หลายแถว (`UpdateFixInfoSchema`, `job-serial-rows.schema.ts`); migration `oldSerialNumber` / `newSerialNumber` → `TEXT`
+- [x] `POST /settings/minio/orphans/scan`, `POST /settings/minio/orphans/delete` — สแกนเทียบอ้างอิงจาก `Job`/`User`, retention 7 วัน, ยืนยันก่อนลบ
+
+### Frontend
+- [x] `/dashboard/jobs/:id` + modal `JobsList` — แถว serial สูงสุด 4; `jobSerialRows.ts`
+- [x] `/dashboard/settings` — MinIO Orphan Manager (สแกน, เลือก, CSV, ลบ); แสดงรหัสผ่านเริ่มต้นจาก `GET /settings/default-pass`
+- [x] `JobMaintenancePdfTemplate` — รายการอุปกรณ์หลายแถว (หัวข้อแยกจากบรรทัดแรก)
+
+### เอกสาร
+- [x] `README.md`, `STATUS.md`, `TASK.md`, `docs/README.md`, `minio.md`, `docs/Project-Plan-Private-MinIO-Images.md`, [`docs/Job-Serial-Multi-Row.md`](docs/Job-Serial-Multi-Row.md), [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md)
+

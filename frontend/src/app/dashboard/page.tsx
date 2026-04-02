@@ -38,6 +38,7 @@ import {
   Timer,
   FileDown,
   Building2,
+  Cpu,
   Target,
   X,
   ChevronDown,
@@ -58,6 +59,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { toastError, toastWarning } from "@/lib/toast";
+import { countJobBreakdowns } from "@/lib/jobBreakdownCounts";
 
 interface Job {
   id: number;
@@ -69,6 +71,8 @@ interface Job {
   district?: string | null;
   isOutOfContract?: boolean;
   assignedTo?: { id: number; name: string } | null;
+  fixEnvironment?: string | null;
+  brokenPart?: string | null;
 }
 
 interface Stats {
@@ -291,6 +295,11 @@ export default function DashboardPage() {
     resolved: filteredJobs.filter((j) => j.status === "RESOLVED").length,
     total: filteredJobs.length,
   }), [filteredJobs]);
+
+  const jobBreakdown = useMemo(
+    () => countJobBreakdowns(filteredJobs),
+    [filteredJobs],
+  );
 
   const pieData = useMemo(() => [
     { name: STATUS_LABELS.PENDING, value: stats.pending, color: STATUS_COLORS.PENDING },
@@ -689,6 +698,78 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      {/* สรุปแยกประเภท (ตรงกับ PDF summary-pdf) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <section
+          className="rounded-xl border border-white/10 p-4 sm:p-5 bg-slate-900/50 backdrop-blur-sm"
+          aria-labelledby="dash-breakdown-env-title"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <Building2 size={18} className="text-slate-400 shrink-0" aria-hidden />
+            <h3 id="dash-breakdown-env-title" className="font-bold text-sm text-slate-200">
+              แยกตามสภาพแวดล้อมการแก้ไข
+            </h3>
+          </div>
+          <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+            จากฟิลด์สถานที่ติดตั้งตอนปิดงาน — งานที่ยังไม่ปิดหรือยังไม่บันทึกจะอยู่ใน &quot;ไม่ระบุ&quot;
+          </p>
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between gap-3 border-b border-white/5 pb-2">
+              <dt className="text-slate-400">ภายใน (ในอาคาร)</dt>
+              <dd className="tabular-nums font-semibold text-slate-100">
+                {loading ? "–" : jobBreakdown.env.INDOOR}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3 border-b border-white/5 pb-2">
+              <dt className="text-slate-400">ภายนอก (นอกอาคาร)</dt>
+              <dd className="tabular-nums font-semibold text-slate-100">
+                {loading ? "–" : jobBreakdown.env.OUTDOOR}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-slate-400">ไม่ระบุ</dt>
+              <dd className="tabular-nums font-semibold text-slate-100">
+                {loading ? "–" : jobBreakdown.env.UNKNOWN}
+              </dd>
+            </div>
+          </dl>
+        </section>
+        <section
+          className="rounded-xl border border-white/10 p-4 sm:p-5 bg-slate-900/50 backdrop-blur-sm"
+          aria-labelledby="dash-breakdown-part-title"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <Cpu size={18} className="text-slate-400 shrink-0" aria-hidden />
+            <h3 id="dash-breakdown-part-title" className="font-bold text-sm text-slate-200">
+              แยกตามประเภทงาน (Hardware / Software)
+            </h3>
+          </div>
+          <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+            จากฟิลด์ประเภทงานตอนปิดงาน — งานที่ยังไม่ปิดหรือยังไม่บันทึกจะอยู่ใน &quot;ไม่ระบุ&quot;
+          </p>
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between gap-3 border-b border-white/5 pb-2">
+              <dt className="text-slate-400">Hardware (ฮาร์ดแวร์)</dt>
+              <dd className="tabular-nums font-semibold text-slate-100">
+                {loading ? "–" : jobBreakdown.part.Hardware}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3 border-b border-white/5 pb-2">
+              <dt className="text-slate-400">Software (ซอฟต์แวร์)</dt>
+              <dd className="tabular-nums font-semibold text-slate-100">
+                {loading ? "–" : jobBreakdown.part.Software}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-slate-400">ไม่ระบุ</dt>
+              <dd className="tabular-nums font-semibold text-slate-100">
+                {loading ? "–" : jobBreakdown.part.UNKNOWN}
+              </dd>
+            </div>
+          </dl>
+        </section>
+      </div>
+
       {/* แถวกราฟ: สัดส่วนสถานะ + แยกตามจังหวัด */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* กราฟวง – สัดส่วนตามสถานะ */}
@@ -1084,6 +1165,50 @@ export default function DashboardPage() {
                 <p className="text-lg font-bold text-emerald-300 tabular-nums">{reportStats.resolved}</p>
               </div>
             </div>
+
+            <div className="space-y-3 mb-4" aria-label="สรุปแยกประเภทตามช่วงที่เลือก">
+              <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-3">
+                <p className="text-xs font-semibold text-slate-300 mb-2">แยกตามสภาพแวดล้อมการแก้ไข</p>
+                <p className="text-[11px] text-slate-500 mb-2 leading-relaxed">
+                  จากฟิลด์ตอนปิดงาน — ยังไม่ปิดหรือยังไม่บันทึกจะอยู่ใน &quot;ไม่ระบุ&quot;
+                </p>
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-400">ภายใน (ในอาคาร)</span>
+                    <span className="tabular-nums font-medium text-slate-100">{jobBreakdown.env.INDOOR}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-400">ภายนอก (นอกอาคาร)</span>
+                    <span className="tabular-nums font-medium text-slate-100">{jobBreakdown.env.OUTDOOR}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-400">ไม่ระบุ</span>
+                    <span className="tabular-nums font-medium text-slate-100">{jobBreakdown.env.UNKNOWN}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-3">
+                <p className="text-xs font-semibold text-slate-300 mb-2">แยกตามประเภทงาน (Hardware / Software)</p>
+                <p className="text-[11px] text-slate-500 mb-2 leading-relaxed">
+                  จากฟิลด์ตอนปิดงาน — ยังไม่ปิดหรือยังไม่บันทึกจะอยู่ใน &quot;ไม่ระบุ&quot;
+                </p>
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-400">Hardware (ฮาร์ดแวร์)</span>
+                    <span className="tabular-nums font-medium text-slate-100">{jobBreakdown.part.Hardware}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-400">Software (ซอฟต์แวร์)</span>
+                    <span className="tabular-nums font-medium text-slate-100">{jobBreakdown.part.Software}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-400">ไม่ระบุ</span>
+                    <span className="tabular-nums font-medium text-slate-100">{jobBreakdown.part.UNKNOWN}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <p className="text-[11px] text-slate-500 mb-4 leading-relaxed">
               นับจากวันที่แจ้ง (หรือวันที่สร้างใบ) ให้ตรงกับช่วงที่เลือก — ใช้ปุ่มด้านล่างเพื่อดาวน์โหลดไฟล์ PDF ที่สร้างจากเซิร์ฟเวอร์
             </p>

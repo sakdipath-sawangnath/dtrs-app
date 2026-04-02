@@ -262,6 +262,25 @@ export class JobsPdfService {
     }).format(date);
   }
 
+  /** นับงานในช่วงตามฟิลด์บันทึกการแก้ไข — งานที่ยังไม่มีข้อมูลจะเป็น UNKNOWN */
+  private normalizeFixEnvironment(
+    v: string | null | undefined,
+  ): 'INDOOR' | 'OUTDOOR' | 'UNKNOWN' {
+    const u = (v ?? '').trim().toUpperCase();
+    if (u === 'INDOOR') return 'INDOOR';
+    if (u === 'OUTDOOR') return 'OUTDOOR';
+    return 'UNKNOWN';
+  }
+
+  private normalizeBrokenPart(
+    v: string | null | undefined,
+  ): 'Hardware' | 'Software' | 'UNKNOWN' {
+    const lower = (v ?? '').trim().toLowerCase();
+    if (lower === 'hardware') return 'Hardware';
+    if (lower === 'software') return 'Software';
+    return 'UNKNOWN';
+  }
+
   private htmlEscape(input: string): string {
     return input
       .replace(/&/g, '&amp;')
@@ -293,8 +312,39 @@ export class JobsPdfService {
         fixDate: true,
         province: true,
         assignedToId: true,
+        fixEnvironment: true,
+        brokenPart: true,
       },
     });
+
+    const envCounts = { INDOOR: 0, OUTDOOR: 0, UNKNOWN: 0 };
+    const partCounts = { Hardware: 0, Software: 0, UNKNOWN: 0 };
+    rows.forEach((j) => {
+      envCounts[this.normalizeFixEnvironment(j.fixEnvironment)]++;
+      partCounts[this.normalizeBrokenPart(j.brokenPart)]++;
+    });
+
+    const envRows = [
+      ['ภายใน (ในอาคาร)', envCounts.INDOOR],
+      ['ภายนอก (นอกอาคาร)', envCounts.OUTDOOR],
+      ['ไม่ระบุ', envCounts.UNKNOWN],
+    ]
+      .map(
+        ([label, n]) =>
+          `<tr><td>${this.htmlEscape(String(label))}</td><td class="num">${n}</td></tr>`,
+      )
+      .join('');
+
+    const partRows = [
+      ['Hardware (ฮาร์ดแวร์)', partCounts.Hardware],
+      ['Software (ซอฟต์แวร์)', partCounts.Software],
+      ['ไม่ระบุ', partCounts.UNKNOWN],
+    ]
+      .map(
+        ([label, n]) =>
+          `<tr><td>${this.htmlEscape(String(label))}</td><td class="num">${n}</td></tr>`,
+      )
+      .join('');
 
     const total = rows.length;
     const pending = rows.filter((j) => j.status === 'PENDING').length;
@@ -353,6 +403,7 @@ export class JobsPdfService {
     th { background:#f1f5f9; }
     .num { text-align:right; font-variant-numeric: tabular-nums; }
     .section-title { margin-top: 18px; margin-bottom: 6px; font-weight:700; font-size: 15px; }
+    .note { color:#64748b; font-size:12px; margin: 4px 0 8px; line-height: 1.35; }
   </style>
 </head>
 <body>
@@ -367,6 +418,24 @@ export class JobsPdfService {
     <div class="kpi"><div class="label">นอกสัญญา</div><div class="value">${outOfContract}</div></div>
     <div class="kpi"><div class="label">รอและยังไม่มอบหมาย</div><div class="value">${pendingUnassigned}</div></div>
   </div>
+
+  <div class="section-title">แยกตามสภาพแวดล้อมการแก้ไข (ภายใน / ภายนอก)</div>
+  <p class="note">นับจากฟิลด์สถานที่ติดตั้งตอนแก้ไข — งานที่ยังไม่ปิดหรือยังไม่บันทึกจะอยู่ใน &quot;ไม่ระบุ&quot;</p>
+  <table>
+    <thead><tr><th>ประเภท</th><th class="num">จำนวน (รายการ)</th></tr></thead>
+    <tbody>
+      ${envRows}
+    </tbody>
+  </table>
+
+  <div class="section-title">แยกตามประเภทงาน (Hardware / Software)</div>
+  <p class="note">นับจากฟิลด์ประเภทงานตอนปิดงาน — งานที่ยังไม่ปิดหรือยังไม่บันทึกจะอยู่ใน &quot;ไม่ระบุ&quot;</p>
+  <table>
+    <thead><tr><th>ประเภท</th><th class="num">จำนวน (รายการ)</th></tr></thead>
+    <tbody>
+      ${partRows}
+    </tbody>
+  </table>
 
   <div class="section-title">สรุปตัวชี้วัดเพิ่มเติม</div>
   <table>

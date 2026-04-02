@@ -8,6 +8,7 @@ export default function AllJobsPage() {
   return (
     <JobsList
       showContractTabs
+      enableAllBreakdownFilters
       showOutOfContract={tab === "out"}
       onShowOutOfContractChange={(v) => setTab(v ? "out" : "contract")}
       noCard={true}

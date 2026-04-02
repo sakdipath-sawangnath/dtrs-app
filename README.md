@@ -2,7 +2,14 @@
 
 ระบบแจ้งปัญหาและระบบจัดการการซ่อมบำรุงกล้องวงจรปิด (CCTV) ซึ่งพัฒนาต่อเนื่องมาจากการใช้งานผ่าน AppSheet
 
-## บันทึกการอัปเดตล่าสุด (2026-03-30)
+## บันทึกการอัปเดตล่าสุด (2026-04-02)
+
+- **Serial หลายอุปกรณ์ (งานแก้ไข)** — รองรับได้สูงสุด 4 แถว (ชื่ออุปกรณ์ + S/N เดิม/ใหม่); โหมดหลายแถวเก็บ JSON ใน `Job.oldSerialNumber` (migration คอลัมน์เป็น `TEXT`); รายละเอียด [`docs/Job-Serial-Multi-Row.md`](docs/Job-Serial-Multi-Row.md)
+- **MinIO Orphan Manager** — หน้า `/dashboard/settings`: สแกน object ใน bucket ที่ไม่อ้างอิงจาก `Job` / `User` แล้วเลือกลบ (มี retention + ยืนยันก่อนลบ); [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md)
+- **รายงานพิมพ์** — ส่วน «รายการอุปกรณ์» กับ serial หลายแถวจัด layout ให้หัวข้อกับบรรทัดแรกของรายการไม่ปิดอยู่บรรทัดเดียวกัน
+- **รหัสผ่านเริ่มต้น** — `GET /settings/default-pass` คืนค่า `{ passwordSet, password }` ให้หน้าตั้งค่าแสดงรหัสปัจจุบัน (สิทธิ์ `menu.settings` เท่านั้น; อย่า log หรือแชร์ค่าที่ได้)
+
+## บันทึกการอัปเดต (2026-03-30)
 
 - **RBAC คิวงาน (หน้ารอดำเนินการ + API)** — ปุ่ม «มอบหมายงาน» / «ย้ายนอกสัญญา» ใน `JobsList` อิงสิทธิ์ **`job.assign`** จาก `GET /roles/me/permissions` (สอดคล้อง `/dashboard/roles`); `PATCH /jobs/:id/assign` และ `PATCH /jobs/:id/out-of-contract` และการลบงาน `PENDING` ไม่มอบหมายใน `DELETE /jobs/:id` ใช้ **`RolesService.getPermissionsForUser`** ฝั่ง Nest (`JobsModule` import `RolesModule`) — รับงานเองได้เมื่อมี `menu.pending` และเลือกตัวเอง; ทุกครั้งที่มอบหมาย/รับงาน ระบบจะบันทึก `assignedById` เพื่อให้ UI แยก **มอบหมายงาน** vs **รับงานเอง** บนหน้า `/dashboard/jobs/:id`; สรุปเชิงลึกที่ [`backend/docs/RBAC-Setup.md`](backend/docs/RBAC-Setup.md)
 - **RBAC API สอดคล้องหน้า `/dashboard/roles` (ต่อ)** — `GET /users/assignable` ใช้ **`job.assign`** (`PermissionsGuard`); CRUD **`/roles/*`** (ยกเว้น `me/permissions`) ใช้ **`menu.roles`**; CRUD **`/users/*`** (ยกเว้น `me`, `reporters`, `assignable`) ใช้ **`menu.users`**; **`/settings/*`** ใช้ **`menu.settings`**; **`PATCH /jobs/:id/status`** ใช้ **`job.updateStatus`**; ลบงาน **IN_PROGRESS** ใช้ **`job.deleteInProgress`** (บทบาทมาตรฐาน **SUPERVISOR** ไม่ได้สิทธิ์นี้); **`POST /areas`** ใช้ **`site.create`**; `PermissionsGuard` กับ user แบบ enum ใช้ map **`RBAC_ROLE_PERMISSION_CODES`** เดียวกับ `RolesService` — หลัง deploy ให้สตาร์ท backend เพื่อ sync permission ใหม่ หรือรัน `seed-roles-permissions.ts`
@@ -170,5 +177,5 @@
    - **งานที่รับผิดชอบ** — รายการงานที่รับมอบหมาย (filter + datatable)
    - กำลังแก้ไข (`/dashboard/in-progress`): แท็บสัญญา/นอกสัญญา + badge งานค้าง; ปุ่มอัปเดต (ผู้รับผิดชอบ); ปุ่มลบงาน IN_PROGRESS ตามสิทธิ์ **`job.deleteInProgress`** (UI `JobsList` + API `DELETE /jobs/:id`); ข้อขัดข้องทั้งหมด, นอกสัญญา (แสดงเฉพาะ PENDING ที่ `isOutOfContract=true`)
    - จัดการผู้ใช้ (ADMIN: CRUD; บทบาท: ADMIN, STAFF, หัวหน้างาน, ผู้แจ้งซ่อม) — คลิกรูปโปรไฟล์ในตารางเปิด modal ดูรูปขนาดใหญ่
-   - จัดการบทบาทและสิทธิ์ (ADMIN), **ตั้งค่าระบบ** (`/dashboard/settings`, ADMIN) — กำหนด SMTP, ทดสอบส่งอีเมล, ตัวเลือก TLS, เทมเพลตอีเมลแจ้งงาน (รวม `publicBaseUrl`, แจ้งตาม Role); สรุป flow การส่งอีเมล: [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
+   - จัดการบทบาทและสิทธิ์ (ADMIN), **ตั้งค่าระบบ** (`/dashboard/settings`, ADMIN) — กำหนด SMTP, ทดสอบส่งอีเมล, ตัวเลือก TLS, เทมเพลตอีเมลแจ้งงาน (รวม `publicBaseUrl`, แจ้งตาม Role), รหัสผ่านเริ่มต้น, **สแกน/ลบไฟล์ MinIO ค้าง**; สรุป flow การส่งอีเมล: [`docs/Email-Notifications.md`](docs/Email-Notifications.md) · orphan: [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md)
    - โปรไฟล์เข้าได้จากเมนูผู้ใช้ (dropdown) ไม่แสดงใน sidebar

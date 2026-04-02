@@ -53,6 +53,11 @@ import {
   serializeJobSerialRowsToFormFields,
   type JobSerialRowForm,
 } from "@/lib/jobSerialRows";
+import {
+  countJobBreakdowns,
+  normalizeBrokenPart,
+  normalizeFixEnvironment,
+} from "@/lib/jobBreakdownCounts";
 
 function ActionIconButton({
   label,
@@ -350,6 +355,7 @@ export default function JobsList({
   title: customTitle,
   subtitle: customSubtitle,
   noCard = false,
+  enableAllBreakdownFilters = false,
 }: {
   statusFilter?: string;
   showOutOfContract?: boolean;
@@ -359,6 +365,13 @@ export default function JobsList({
   title?: string;
   subtitle?: string;
   noCard?: boolean;
+  /**
+   * เฉพาะหน้า `/dashboard/all`:
+   * - เพิ่ม Filter Select: ประเภทสถานที่ (fixEnvironment), ประเภทงาน (brokenPart), สถานะ
+   * - เพิ่ม Card quick filter ที่ทำให้ข้อมูลเปลี่ยนตามค่า
+   * - เพิ่มคอลัมน์ในตารางสำหรับ fixEnvironment / brokenPart
+   */
+  enableAllBreakdownFilters?: boolean;
 }) {
   const { title: derivedTitle, subtitle: derivedSubtitle } = getPageTitle(
     statusFilter,
@@ -375,6 +388,10 @@ export default function JobsList({
   const [search, setSearch] = useState("");
   const [provinceFilter, setProvinceFilter] = useState("");
   const [districtFilter, setDistrictFilter] = useState("");
+  // เฉพาะหน้า `/dashboard/all`: แยกตามประเภทสถานที่ (fixEnvironment), ประเภทงาน (brokenPart), และสถานะ
+  const [statusSelect, setStatusSelect] = useState<string>("");
+  const [fixEnvironmentSelect, setFixEnvironmentSelect] = useState<string>("");
+  const [brokenPartSelect, setBrokenPartSelect] = useState<string>("");
   const [pageSize, setPageSize] = useState<DataTablePageSize>(15);
   const [page, setPage] = useState(1);
   const [detailJob, setDetailJob] = useState<Job | null>(null);
@@ -587,7 +604,7 @@ export default function JobsList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, API, statusFilter, showOutOfContract, assignedToMe]);
 
-  const filteredJobs = useMemo(() => {
+  const baseFilteredJobs = useMemo(() => {
     let list = jobs;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -605,6 +622,28 @@ export default function JobsList({
     if (districtFilter) list = list.filter((j) => (j.district ?? "") === districtFilter);
     return list;
   }, [jobs, search, provinceFilter, districtFilter]);
+
+  const filteredJobs = useMemo(() => {
+    let list = baseFilteredJobs;
+    if (enableAllBreakdownFilters) {
+      if (statusSelect) list = list.filter((j) => j.status === statusSelect);
+      if (fixEnvironmentSelect)
+        list = list.filter(
+          (j) => normalizeFixEnvironment(j.fixEnvironment) === fixEnvironmentSelect
+        );
+      if (brokenPartSelect)
+        list = list.filter(
+          (j) => normalizeBrokenPart(j.brokenPart) === brokenPartSelect
+        );
+    }
+    return list;
+  }, [
+    baseFilteredJobs,
+    enableAllBreakdownFilters,
+    statusSelect,
+    fixEnvironmentSelect,
+    brokenPartSelect,
+  ]);
 
   const provinces = useMemo(() => {
     const set = new Set<string>();
@@ -669,6 +708,42 @@ export default function JobsList({
 
   const filterBarChildren = (
     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+      {enableAllBreakdownFilters && (
+        <>
+          <select
+            className="select-native-glass w-full sm:w-44 md:min-w-[160px]"
+            value={statusSelect}
+            onChange={(e) => setStatusSelect(e.target.value)}
+          >
+            <option value="">ทุกสถานะ</option>
+            <option value="PENDING">{STATUS_CONFIG.PENDING.label}</option>
+            <option value="IN_PROGRESS">{STATUS_CONFIG.IN_PROGRESS.label}</option>
+            <option value="RESOLVED">{STATUS_CONFIG.RESOLVED.label}</option>
+          </select>
+
+          <select
+            className="select-native-glass w-full sm:w-44 md:min-w-[160px]"
+            value={fixEnvironmentSelect}
+            onChange={(e) => setFixEnvironmentSelect(e.target.value)}
+          >
+            <option value="">ทุกประเภทสถานที่</option>
+            <option value="INDOOR">Indoor (ในอาคาร)</option>
+            <option value="OUTDOOR">Outdoor (นอกอาคาร)</option>
+            <option value="UNKNOWN">ไม่ระบุ</option>
+          </select>
+
+          <select
+            className="select-native-glass w-full sm:w-44 md:min-w-[160px]"
+            value={brokenPartSelect}
+            onChange={(e) => setBrokenPartSelect(e.target.value)}
+          >
+            <option value="">ทุกประเภทงาน</option>
+            <option value="Hardware">Hardware (ฮาร์ดแวร์)</option>
+            <option value="Software">Software (ซอฟต์แวร์)</option>
+            <option value="UNKNOWN">ไม่ระบุ</option>
+          </select>
+        </>
+      )}
       <select
         className="select-native-glass w-full sm:w-44 md:min-w-[160px]"
         value={provinceFilter}
@@ -715,9 +790,233 @@ export default function JobsList({
     children: filterBarChildren,
   } as const;
 
+  const jobsForEnvCardCounts = useMemo(() => {
+    if (!enableAllBreakdownFilters) return baseFilteredJobs;
+    let list = baseFilteredJobs;
+    if (statusSelect) list = list.filter((j) => j.status === statusSelect);
+    if (brokenPartSelect) {
+      list = list.filter(
+        (j) => normalizeBrokenPart(j.brokenPart) === brokenPartSelect
+      );
+    }
+    return list;
+  }, [
+    enableAllBreakdownFilters,
+    baseFilteredJobs,
+    statusSelect,
+    brokenPartSelect,
+  ]);
+
+  const jobsForStatusCardCounts = useMemo(() => {
+    if (!enableAllBreakdownFilters) return baseFilteredJobs;
+    let list = baseFilteredJobs;
+    if (fixEnvironmentSelect) {
+      list = list.filter(
+        (j) => normalizeFixEnvironment(j.fixEnvironment) === fixEnvironmentSelect
+      );
+    }
+    if (brokenPartSelect) {
+      list = list.filter(
+        (j) => normalizeBrokenPart(j.brokenPart) === brokenPartSelect
+      );
+    }
+    return list;
+  }, [
+    enableAllBreakdownFilters,
+    baseFilteredJobs,
+    fixEnvironmentSelect,
+    brokenPartSelect,
+  ]);
+
+  const jobsForPartCardCounts = useMemo(() => {
+    if (!enableAllBreakdownFilters) return baseFilteredJobs;
+    let list = baseFilteredJobs;
+    if (statusSelect) list = list.filter((j) => j.status === statusSelect);
+    if (fixEnvironmentSelect) {
+      list = list.filter(
+        (j) => normalizeFixEnvironment(j.fixEnvironment) === fixEnvironmentSelect
+      );
+    }
+    return list;
+  }, [enableAllBreakdownFilters, baseFilteredJobs, statusSelect, fixEnvironmentSelect]);
+
+  const envCounts = useMemo(() => {
+    if (!enableAllBreakdownFilters) return { INDOOR: 0, OUTDOOR: 0, UNKNOWN: 0 };
+    return countJobBreakdowns(jobsForEnvCardCounts).env;
+  }, [enableAllBreakdownFilters, jobsForEnvCardCounts]);
+
+  const statusCardCounts = useMemo(() => {
+    if (!enableAllBreakdownFilters) {
+      return { total: 0, pending: 0, inProgress: 0, resolved: 0 };
+    }
+    const total = jobsForStatusCardCounts.length;
+    const pending = jobsForStatusCardCounts.filter(
+      (j) => j.status === "PENDING"
+    ).length;
+    const inProgress = jobsForStatusCardCounts.filter(
+      (j) => j.status === "IN_PROGRESS"
+    ).length;
+    const resolved = jobsForStatusCardCounts.filter(
+      (j) => j.status === "RESOLVED"
+    ).length;
+    return { total, pending, inProgress, resolved };
+  }, [enableAllBreakdownFilters, jobsForStatusCardCounts]);
+
+  const partCounts = useMemo(() => {
+    if (!enableAllBreakdownFilters)
+      return { Hardware: 0, Software: 0, UNKNOWN: 0 };
+    return countJobBreakdowns(jobsForPartCardCounts).part;
+  }, [enableAllBreakdownFilters, jobsForPartCardCounts]);
+
+  const breakdownCards = enableAllBreakdownFilters ? (
+    <div className="space-y-3 mb-2" aria-label="การกรองแบบการ์ด">
+      <div>
+        <p className="text-xs font-semibold text-slate-300 mb-2">สถานะ</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[
+            { value: "", label: "ทั้งหมด", count: statusCardCounts.total },
+            {
+              value: "PENDING",
+              label: STATUS_CONFIG.PENDING.label,
+              count: statusCardCounts.pending,
+            },
+            {
+              value: "IN_PROGRESS",
+              label: STATUS_CONFIG.IN_PROGRESS.label,
+              count: statusCardCounts.inProgress,
+            },
+            {
+              value: "RESOLVED",
+              label: STATUS_CONFIG.RESOLVED.label,
+              count: statusCardCounts.resolved,
+            },
+          ].map((it) => {
+            const active = statusSelect === it.value;
+            return (
+              <button
+                key={it.value || "ALL"}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setStatusSelect(it.value)}
+                className={[
+                  "rounded-xl border px-3 py-2.5 text-left transition-all active:scale-95 min-h-[44px]",
+                  active
+                    ? "border-blue-500/50 bg-blue-500/10"
+                    : "border-white/10 bg-slate-800/30 hover:border-blue-500/30",
+                ].join(" ")}
+              >
+                <div className="text-[11px] font-semibold text-slate-300 truncate">
+                  {it.label}
+                </div>
+                <div className="text-lg font-bold tabular-nums text-slate-100 mt-0.5">
+                  {it.count}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-slate-300 mb-2">ประเภทสถานที่</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[
+            { value: "", label: "ทั้งหมด", count: jobsForEnvCardCounts.length },
+            {
+              value: "INDOOR",
+              label: "ภายใน (ในอาคาร)",
+              count: envCounts.INDOOR,
+            },
+            {
+              value: "OUTDOOR",
+              label: "ภายนอก (นอกอาคาร)",
+              count: envCounts.OUTDOOR,
+            },
+            { value: "UNKNOWN", label: "ไม่ระบุ", count: envCounts.UNKNOWN },
+          ].map((it) => {
+            const active = fixEnvironmentSelect === it.value;
+            return (
+              <button
+                key={it.value || "ALL"}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setFixEnvironmentSelect(it.value)}
+                className={[
+                  "rounded-xl border px-3 py-2.5 text-left transition-all active:scale-95 min-h-[44px]",
+                  active
+                    ? "border-blue-500/50 bg-blue-500/10"
+                    : "border-white/10 bg-slate-800/30 hover:border-blue-500/30",
+                ].join(" ")}
+              >
+                <div className="text-[11px] font-semibold text-slate-300 truncate">
+                  {it.label}
+                </div>
+                <div className="text-lg font-bold tabular-nums text-slate-100 mt-0.5">
+                  {it.count}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-slate-300 mb-2">ประเภทงาน</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[
+            { value: "", label: "ทั้งหมด", count: jobsForPartCardCounts.length },
+            {
+              value: "Hardware",
+              label: "Hardware (ฮาร์ดแวร์)",
+              count: partCounts.Hardware,
+            },
+            {
+              value: "Software",
+              label: "Software (ซอฟต์แวร์)",
+              count: partCounts.Software,
+            },
+            { value: "UNKNOWN", label: "ไม่ระบุ", count: partCounts.UNKNOWN },
+          ].map((it) => {
+            const active = brokenPartSelect === it.value;
+            return (
+              <button
+                key={it.value || "ALL"}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setBrokenPartSelect(it.value)}
+                className={[
+                  "rounded-xl border px-3 py-2.5 text-left transition-all active:scale-95 min-h-[44px]",
+                  active
+                    ? "border-blue-500/50 bg-blue-500/10"
+                    : "border-white/10 bg-slate-800/30 hover:border-blue-500/30",
+                ].join(" ")}
+              >
+                <div className="text-[11px] font-semibold text-slate-300 truncate">
+                  {it.label}
+                </div>
+                <div className="text-lg font-bold tabular-nums text-slate-100 mt-0.5">
+                  {it.count}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   useEffect(() => {
     setPage(1);
-  }, [provinceFilter, districtFilter, search, pageSize, showOutOfContract]);
+  }, [
+    provinceFilter,
+    districtFilter,
+    search,
+    pageSize,
+    showOutOfContract,
+    statusSelect,
+    fixEnvironmentSelect,
+    brokenPartSelect,
+  ]);
 
   useEffect(() => {
     setPortalMounted(true);
@@ -1270,6 +1569,16 @@ export default function JobsList({
               <th className="px-2.5 py-2.5 border-b border-white/10 whitespace-nowrap w-24">วันที่</th>
               <th className="px-2.5 py-2.5 border-b border-white/10 whitespace-nowrap w-52">ผู้แจ้ง</th>
               <th className="px-2.5 py-2.5 border-b border-white/10 whitespace-nowrap w-64">สถานที่</th>
+              {enableAllBreakdownFilters && (
+                <>
+                  <th className="px-2.5 py-2.5 border-b border-white/10 whitespace-nowrap w-40">
+                    ประเภทสถานที่
+                  </th>
+                  <th className="px-2.5 py-2.5 border-b border-white/10 whitespace-nowrap w-40">
+                    ประเภทงาน
+                  </th>
+                </>
+              )}
               <th className="px-2.5 py-2.5 border-b border-white/10 whitespace-nowrap">รายละเอียดปัญหา</th>
               <th className="px-2.5 py-2.5 border-b border-white/10 whitespace-nowrap w-28">สถานะ</th>
               {showAssignedToColumn && (
@@ -1293,6 +1602,34 @@ export default function JobsList({
                 .join(" › ");
               const descRaw = (job.description || job.title || "–") as string;
               const desc = limitText(descRaw, 20);
+              const envBucket = normalizeFixEnvironment(job.fixEnvironment);
+              const partBucket = normalizeBrokenPart(job.brokenPart);
+
+              const envLabel =
+                envBucket === "INDOOR"
+                  ? "ภายใน (ในอาคาร)"
+                  : envBucket === "OUTDOOR"
+                    ? "ภายนอก (นอกอาคาร)"
+                    : "ไม่ระบุ";
+              const envBadgeCls =
+                envBucket === "INDOOR"
+                  ? "bg-sky-500/10 text-sky-300 border border-sky-500/20"
+                  : envBucket === "OUTDOOR"
+                    ? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
+                    : "bg-slate-700/30 text-slate-300 border border-white/10";
+
+              const partLabel =
+                partBucket === "Hardware"
+                  ? "Hardware (ฮาร์ดแวร์)"
+                  : partBucket === "Software"
+                    ? "Software (ซอฟต์แวร์)"
+                    : "ไม่ระบุ";
+              const partBadgeCls =
+                partBucket === "Hardware"
+                  ? "bg-fuchsia-500/10 text-fuchsia-300 border border-fuchsia-500/20"
+                  : partBucket === "Software"
+                    ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
+                    : "bg-slate-700/30 text-slate-300 border border-white/10";
               return (
                 <tr
                   key={job.id}
@@ -1324,6 +1661,16 @@ export default function JobsList({
                     </div>
                   </td>
                   <td className="px-2.5 py-2.5 truncate text-sm text-slate-400" title={location || undefined}>{location || "–"}</td>
+                  {enableAllBreakdownFilters && (
+                    <>
+                      <td className="px-2.5 py-2.5">
+                        <span className={`badge ${envBadgeCls}`}>{envLabel}</span>
+                      </td>
+                      <td className="px-2.5 py-2.5">
+                        <span className={`badge ${partBadgeCls}`}>{partLabel}</span>
+                      </td>
+                    </>
+                  )}
                   <td className="px-2.5 py-2.5 truncate text-sm text-slate-300">
                     {desc.clipped && desc.full ? (
                       <TextHoverTooltip text={desc.full}>
@@ -1449,7 +1796,13 @@ export default function JobsList({
         totalPages={totalPages}
         pageSize={pageSize}
         filteredCount={filteredJobs.length}
-        showExtraTotal={!!search.trim() || !!provinceFilter || !!districtFilter}
+        showExtraTotal={
+          !!search.trim() ||
+          !!provinceFilter ||
+          !!districtFilter ||
+          (enableAllBreakdownFilters &&
+            (!!statusSelect || !!fixEnvironmentSelect || !!brokenPartSelect))
+        }
         extraTotalCount={jobs.length}
         onPageChange={setPage}
       />
@@ -1485,6 +1838,7 @@ export default function JobsList({
         {noCard ? (
           <>
             <div className={`${GLASS_SECTION} shrink-0`}>
+              {breakdownCards}
               <DashboardFilterBar {...filterBarProps} className="border-b-0" />
             </div>
             <div
@@ -1495,6 +1849,7 @@ export default function JobsList({
           </>
         ) : (
           <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            {breakdownCards}
             <DashboardFilterBar {...filterBarProps} />
             {tableAndPagination}
           </div>
