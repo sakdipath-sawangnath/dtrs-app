@@ -21,6 +21,8 @@ import {
   AlertTriangle,
   Loader2,
   Clock3,
+  Plus,
+  Minus,
 } from "lucide-react";
 import DashboardPageShell from "@/components/DashboardPageShell";
 import JobTimelineCard from "@/components/JobTimelineCard";
@@ -30,6 +32,14 @@ import Select from "react-select";
 import { reactSelectGlassStyles } from "@/lib/reactSelectGlassStyles";
 import { extractAssignableArray, unwrapApiData } from "@/lib/apiResponse";
 import { dashboardJobImagePath } from "@/lib/dashboardJobImageUrl";
+import {
+  JOB_SERIAL_ROWS_MAX,
+  emptyJobSerialRow,
+  normalizeSerialNumberInput,
+  parseJobSerialRowsFromDb,
+  serializeJobSerialRowsToFormFields,
+  type JobSerialRowForm,
+} from "@/lib/jobSerialRows";
 
 interface JobDetail {
   id: number;
@@ -90,11 +100,6 @@ const FIX_CATEGORY_OPTIONS = [
   { value: "Software", label: "Software (ซอฟต์แวร์)" },
 ] as const;
 
-/** Serial Number: รองรับ 0–9 / A–Z / '-' — ตัดอักขระอื่น และแปลงตัวพิมพ์เล็กเป็นตัวใหญ่อัตโนมัติ */
-function normalizeSerialNumberInput(raw: string): string {
-  return raw.replace(/[^a-zA-Z0-9-]/g, "").toUpperCase();
-}
-
 /** Dark Glassmorphism — ฟิลด์ฟอร์ม (AGENTS.md: inputs) */
 const GLASS_LABEL = "block text-xs font-semibold mb-1 text-slate-200";
 const GLASS_FIELD =
@@ -153,8 +158,7 @@ export default function JobDetailPage() {
   const [cause, setCause] = useState<string>("");
   const [fixMethod, setFixMethod] = useState<string>("");
   const [note, setNote] = useState<string>("");
-  const [oldSerial, setOldSerial] = useState<string>("");
-  const [newSerial, setNewSerial] = useState<string>("");
+  const [serialRows, setSerialRows] = useState<JobSerialRowForm[]>([emptyJobSerialRow()]);
   const [fixImages, setFixImages] = useState<(File | null)[]>([null, null, null]);
   const [fixPreviews, setFixPreviews] = useState<(string | null)[]>([null, null, null]);
   const fixFileRefs = [
@@ -197,8 +201,9 @@ export default function JobDetailPage() {
           setCause(data.cause ?? "");
           setFixMethod(data.fixMethod ?? "");
           setNote(data.fixNote ?? "");
-          setOldSerial(normalizeSerialNumberInput(data.oldSerialNumber ?? ""));
-          setNewSerial(normalizeSerialNumberInput(data.newSerialNumber ?? ""));
+          setSerialRows(
+            parseJobSerialRowsFromDb(data.oldSerialNumber, data.newSerialNumber),
+          );
           setBackfillReportDate(
             toDateTimeLocalInputValue(data.reportDate ?? data.createdAt),
           );
@@ -302,6 +307,27 @@ export default function JobDetailPage() {
     setFixPreviews(pv);
   };
 
+  const updateSerialRow = (index: number, patch: Partial<JobSerialRowForm>) => {
+    setSerialRows((prev) => {
+      const next = [...prev];
+      if (!next[index]) return prev;
+      next[index] = { ...next[index], ...patch };
+      return next;
+    });
+  };
+
+  const addSerialRow = () => {
+    setSerialRows((prev) =>
+      prev.length >= JOB_SERIAL_ROWS_MAX ? prev : [...prev, emptyJobSerialRow()],
+    );
+  };
+
+  const removeSerialRow = (index: number) => {
+    setSerialRows((prev) =>
+      prev.length <= 1 ? prev : prev.filter((_, i) => i !== index),
+    );
+  };
+
   const handleSubmitFix = async (e: FormEvent) => {
     e.preventDefault();
     if (!job || !token) return;
@@ -340,8 +366,9 @@ export default function JobDetailPage() {
       form.append("cause", cause);
       form.append("fixMethod", fixMethod);
       form.append("note", note);
-      form.append("oldSerialNumber", oldSerial);
-      form.append("newSerialNumber", newSerial);
+      const ser = serializeJobSerialRowsToFormFields(serialRows);
+      form.append("oldSerialNumber", ser.oldSerialNumber);
+      form.append("newSerialNumber", ser.newSerialNumber);
       const filesToUpload = fixImages.filter(
         (f): f is File => f instanceof File,
       );
@@ -359,6 +386,11 @@ export default function JobDetailPage() {
       const payload = unwrapApiData<unknown>(res?.data);
       const data = isJobDetail(payload) ? payload : null;
       setJob(data);
+      if (data) {
+        setSerialRows(
+          parseJobSerialRowsFromDb(data.oldSerialNumber, data.newSerialNumber),
+        );
+      }
     } catch {
       toastError("ข้อผิดพลาด", "ไม่สามารถบันทึกข้อมูลการแก้ไขได้");
     } finally {
@@ -385,8 +417,9 @@ export default function JobDetailPage() {
         setCause(data.cause ?? "");
         setFixMethod(data.fixMethod ?? "");
         setNote(data.fixNote ?? "");
-        setOldSerial(normalizeSerialNumberInput(data.oldSerialNumber ?? ""));
-        setNewSerial(normalizeSerialNumberInput(data.newSerialNumber ?? ""));
+        setSerialRows(
+          parseJobSerialRowsFromDb(data.oldSerialNumber, data.newSerialNumber),
+        );
         setBackfillReportDate(toDateTimeLocalInputValue(data.reportDate ?? data.createdAt));
         setBackfillFixDate(toDateTimeLocalInputValue(data.fixDate ?? null));
       }
@@ -1173,55 +1206,130 @@ export default function JobDetailPage() {
                         disabled={isReadOnlyFix}
                       />
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <p
-                        id="job-serial-hint"
-                        className="text-xs text-slate-500 leading-relaxed sm:col-span-2 -mb-0.5"
-                      >
-                        รับเฉพาะตัวอักษร A–Z / ตัวเลข 0–9 / - เท่านั้น (ตัวพิมพ์เล็กจะถูกแปลงเป็นตัวใหญ่อัตโนมัติ
-                        อักขระอื่นจะถูกตัดออก)
-                      </p>
-                      <div>
-                        <label className={GLASS_LABEL} htmlFor="job-serial-old">
-                          Serial Number อุปกรณ์เดิม
-                        </label>
-                        <input
-                          id="job-serial-old"
-                          type="text"
-                          inputMode="text"
-                          autoComplete="off"
-                          spellCheck={false}
-                          className={`${GLASS_FIELD} font-mono tracking-wide uppercase`}
-                          value={oldSerial}
-                          onChange={(e) =>
-                            setOldSerial(
-                              normalizeSerialNumberInput(e.target.value),
-                            )
-                          }
-                          disabled={isReadOnlyFix}
-                          aria-describedby="job-serial-hint"
-                        />
+                    <div className="space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+                        <p
+                          id="job-serial-hint"
+                          className="text-xs text-slate-500 leading-relaxed flex-1"
+                        >
+                          <span className="text-slate-400 font-medium">S/N:</span>{" "}
+                          รับเฉพาะ A–Z / 0–9 / - (ตัวพิมพ์เล็กเป็นตัวใหญ่อัตโนมัติ อักขระอื่นถูกตัด)
+                          — เพิ่มได้สูงสุด {JOB_SERIAL_ROWS_MAX} แถว
+                        </p>
+                        {!isReadOnlyFix && (
+                          <button
+                            type="button"
+                            onClick={addSerialRow}
+                            disabled={serialRows.length >= JOB_SERIAL_ROWS_MAX}
+                            className="inline-flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] sm:min-w-0 px-3 rounded-xl border border-white/15 bg-slate-800/80 text-slate-200 text-xs font-semibold hover:bg-slate-700/90 transition-all active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer shrink-0"
+                            aria-label="เพิ่มแถว Serial Number"
+                          >
+                            <Plus size={16} aria-hidden />
+                            เพิ่มอุปกรณ์
+                          </button>
+                        )}
                       </div>
-                      <div>
-                        <label className={GLASS_LABEL} htmlFor="job-serial-new">
-                          Serial Number อุปกรณ์ใหม่
-                        </label>
-                        <input
-                          id="job-serial-new"
-                          type="text"
-                          inputMode="text"
-                          autoComplete="off"
-                          spellCheck={false}
-                          className={`${GLASS_FIELD} font-mono tracking-wide uppercase`}
-                          value={newSerial}
-                          onChange={(e) =>
-                            setNewSerial(
-                              normalizeSerialNumberInput(e.target.value),
-                            )
-                          }
-                          disabled={isReadOnlyFix}
-                          aria-describedby="job-serial-hint"
-                        />
+                      <div className="space-y-3">
+                        {serialRows.map((row, idx) => (
+                          <div
+                            key={idx}
+                            className="rounded-xl border border-white/10 bg-slate-950/35 p-3 sm:p-4 space-y-3"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                อุปกรณ์ {idx + 1}
+                              </span>
+                              {!isReadOnlyFix && serialRows.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeSerialRow(idx)}
+                                  className="inline-flex items-center justify-center min-h-10 min-w-10 rounded-lg border border-white/10 text-slate-400 hover:text-red-300 hover:border-red-500/30 hover:bg-red-950/20 transition-colors cursor-pointer"
+                                  aria-label={`ลบแถวอุปกรณ์ ${idx + 1}`}
+                                >
+                                  <Minus size={18} aria-hidden />
+                                </button>
+                              )}
+                            </div>
+                            <div>
+                              <label
+                                className={GLASS_LABEL}
+                                htmlFor={`job-serial-name-${idx}`}
+                              >
+                                ชื่ออุปกรณ์
+                              </label>
+                              <input
+                                id={`job-serial-name-${idx}`}
+                                type="text"
+                                maxLength={200}
+                                autoComplete="off"
+                                className={GLASS_FIELD}
+                                value={row.deviceName}
+                                onChange={(e) =>
+                                  updateSerialRow(idx, {
+                                    deviceName: e.target.value.slice(0, 200),
+                                  })
+                                }
+                                disabled={isReadOnlyFix}
+                                placeholder="เช่น DVR / กล้องหน้าประตู"
+                                aria-describedby="job-serial-hint"
+                              />
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label
+                                  className={GLASS_LABEL}
+                                  htmlFor={`job-serial-old-${idx}`}
+                                >
+                                  S/N เดิม
+                                </label>
+                                <input
+                                  id={`job-serial-old-${idx}`}
+                                  type="text"
+                                  inputMode="text"
+                                  autoComplete="off"
+                                  spellCheck={false}
+                                  className={`${GLASS_FIELD} font-mono tracking-wide uppercase`}
+                                  value={row.oldSerial}
+                                  onChange={(e) =>
+                                    updateSerialRow(idx, {
+                                      oldSerial: normalizeSerialNumberInput(
+                                        e.target.value,
+                                      ),
+                                    })
+                                  }
+                                  disabled={isReadOnlyFix}
+                                  aria-describedby="job-serial-hint"
+                                />
+                              </div>
+                              <div>
+                                <label
+                                  className={GLASS_LABEL}
+                                  htmlFor={`job-serial-new-${idx}`}
+                                >
+                                  S/N ใหม่
+                                </label>
+                                <input
+                                  id={`job-serial-new-${idx}`}
+                                  type="text"
+                                  inputMode="text"
+                                  autoComplete="off"
+                                  spellCheck={false}
+                                  className={`${GLASS_FIELD} font-mono tracking-wide uppercase`}
+                                  value={row.newSerial}
+                                  onChange={(e) =>
+                                    updateSerialRow(idx, {
+                                      newSerial: normalizeSerialNumberInput(
+                                        e.target.value,
+                                      ),
+                                    })
+                                  }
+                                  disabled={isReadOnlyFix}
+                                  aria-describedby="job-serial-hint"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                     {!isReadOnlyFix && (

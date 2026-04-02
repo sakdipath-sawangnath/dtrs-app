@@ -4,9 +4,10 @@ import { MailService } from './mail.service';
 import { SettingsController } from './settings.controller';
 import { SettingsService } from './settings.service';
 import { PermissionsGuard } from '../auth/permissions.guard';
+import { MinioModule } from '../minio/minio.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, MinioModule],
   controllers: [SettingsController],
   providers: [SettingsService, MailService, PermissionsGuard],
   exports: [SettingsService, MailService],

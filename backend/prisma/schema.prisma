@@ -153,8 +153,8 @@ model Job {
   cause      String? @db.Text // สาเหตุ
   fixMethod  String? @db.Text // วิธีแก้ไข
 
-  oldSerialNumber String? // Serial Number อุปกรณ์เดิม
-  newSerialNumber String? // Serial Number อุปกรณ์ใหม่
+  oldSerialNumber String? @db.Text // S/N เดิม หรือ JSON หลายอุปกรณ์ (v1 rows)
+  newSerialNumber String? @db.Text // S/N ใหม่ (legacy แถวเดียว) — หลายแถวใช้ JSON ใน oldSerialNumber เท่านั้น
 
   fixImages    Json? // 1.รูปการแก้ไข, 2, 3
   fixNote      String? @db.Text // หมายเหตุการแก้ไข

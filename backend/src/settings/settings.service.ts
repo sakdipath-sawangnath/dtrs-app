@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { MinioService } from '../minio/minio.service';
 import { TestEmailSmtpDto, UpdateEmailSmtpDto } from './dto/email-smtp.dto';
 import { UpdateEmailTemplatesDto } from './dto/email-templates.dto';
 import {
@@ -26,13 +27,17 @@ export type EmailSmtpPublic = {
 
 export type DefaultPassPublic = {
   passwordSet: boolean;
+  password: string;
 };
 
 @Injectable()
 export class SettingsService {
+  private static readonly orphanRetentionDays = 7;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
+    private readonly minioService: MinioService,
   ) {}
 
   private parseStored(raw: Prisma.JsonValue | null): EmailSmtpConfig | null {
@@ -89,12 +94,18 @@ export class SettingsService {
       where: { key: DEFAULT_PASS_SETTING_KEY },
     });
     const parsed = this.parseDefaultPassStored(row?.value ?? null);
-    return { passwordSet: !!parsed?.password };
+    const fallbackPassword = 'F0rth2026@';
+    return {
+      passwordSet: !!parsed?.password,
+      password: parsed?.password || fallbackPassword,
+    };
   }
 
   async updateDefaultPass(dto: { password: string }): Promise<DefaultPassPublic> {
     const pwd = dto.password?.trim();
-    if (!pwd) return { passwordSet: false };
+    if (!pwd) {
+      return { passwordSet: false, password: 'F0rth2026@' };
+    }
 
     await this.prisma.setting.upsert({
       where: { key: DEFAULT_PASS_SETTING_KEY },
@@ -107,7 +118,7 @@ export class SettingsService {
       },
     });
 
-    return { passwordSet: true };
+    return { passwordSet: true, password: pwd };
   }
 
   private async getStoredInternal(): Promise<EmailSmtpConfig | null> {
@@ -316,5 +327,237 @@ export class SettingsService {
       },
     });
     return next;
+  }
+
+  private normalizeObjectKeyInput(raw: string): string | null {
+    const trimmed = String(raw || '').trim().replace(/^\/+/, '');
+    if (!trimmed) return null;
+    if (trimmed.includes('\\') || trimmed.includes('..')) return null;
+    const segments = trimmed.split('/');
+    if (segments.some((s) => !s || s === '.' || s === '..')) return null;
+    return trimmed;
+  }
+
+  private addReferenceFromString(value: string, output: Set<string>) {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const parsed = this.minioService.tryParseBucketObjectKeyFromUrl(trimmed);
+    if (parsed) {
+      output.add(parsed);
+      return;
+    }
+    const fromRaw = this.normalizeObjectKeyInput(trimmed);
+    if (fromRaw) output.add(fromRaw);
+  }
+
+  private addReferenceFromUnknown(value: unknown, output: Set<string>) {
+    if (typeof value === 'string') {
+      this.addReferenceFromString(value, output);
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((v) => this.addReferenceFromUnknown(v, output));
+    }
+  }
+
+  private async buildReferencedObjectKeySet(): Promise<Set<string>> {
+    const refs = new Set<string>();
+    const [jobs, users] = await Promise.all([
+      this.prisma.job.findMany({
+        select: {
+          images: true,
+          fixImages: true,
+        },
+      }),
+      this.prisma.user.findMany({
+        select: {
+          image: true,
+        },
+      }),
+    ]);
+
+    jobs.forEach((j) => {
+      this.addReferenceFromUnknown(j.images, refs);
+      this.addReferenceFromUnknown(j.fixImages, refs);
+    });
+    users.forEach((u) => this.addReferenceFromUnknown(u.image, refs));
+    return refs;
+  }
+
+  private isOlderThanRetention(lastModified: string | null): boolean {
+    if (!lastModified) return false;
+    const t = Date.parse(lastModified);
+    if (!Number.isFinite(t)) return false;
+    const cutoff =
+      Date.now() - SettingsService.orphanRetentionDays * 24 * 60 * 60 * 1000;
+    return t <= cutoff;
+  }
+
+  private isOlderThanDays(lastModified: string | null, days: number): boolean {
+    if (!lastModified) return false;
+    const t = Date.parse(lastModified);
+    if (!Number.isFinite(t)) return false;
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    return t <= cutoff;
+  }
+
+  async scanMinioOrphans(dto: {
+    prefix?: string;
+    limit?: number;
+    continuationToken?: string;
+    olderThanDays?: number;
+  }) {
+    const prefix = this.normalizeObjectKeyInput(dto.prefix ?? '') ?? '';
+    const limit = Number.isFinite(dto.limit) ? Number(dto.limit) : 200;
+    const cappedLimit = Math.max(1, Math.min(1000, limit));
+    const olderThanDays = Math.max(
+      SettingsService.orphanRetentionDays,
+      Number.isFinite(dto.olderThanDays) ? Number(dto.olderThanDays) : SettingsService.orphanRetentionDays,
+    );
+    const continuationToken = dto.continuationToken
+      ? this.normalizeObjectKeyInput(dto.continuationToken)
+      : null;
+
+    const [objects, references] = await Promise.all([
+      this.minioService.listObjectsRecursive(prefix),
+      this.buildReferencedObjectKeySet(),
+    ]);
+
+    const eligible: Array<{
+      key: string;
+      size: number;
+      lastModified: string | null;
+      ageDays: number | null;
+    }> = [];
+    let referencedCount = 0;
+    let skippedByRetention = 0;
+
+    for (const obj of objects) {
+      if (references.has(obj.key)) {
+        referencedCount++;
+        continue;
+      }
+      const older = this.isOlderThanDays(obj.lastModified, olderThanDays);
+      if (!older) {
+        skippedByRetention++;
+        continue;
+      }
+      const ageDays = obj.lastModified
+        ? Math.floor((Date.now() - Date.parse(obj.lastModified)) / 86_400_000)
+        : null;
+      eligible.push({
+        key: obj.key,
+        size: obj.size,
+        lastModified: obj.lastModified,
+        ageDays: Number.isFinite(ageDays as number) ? ageDays : null,
+      });
+    }
+
+    eligible.sort((a, b) => {
+      const ta = a.lastModified ? Date.parse(a.lastModified) : 0;
+      const tb = b.lastModified ? Date.parse(b.lastModified) : 0;
+      return ta - tb;
+    });
+
+    let startIndex = 0;
+    if (continuationToken) {
+      const tokenIndex = eligible.findIndex((x) => x.key === continuationToken);
+      if (tokenIndex < 0) {
+        throw new BadRequestException('continuationToken ไม่ถูกต้องหรือหมดอายุ');
+      }
+      startIndex = tokenIndex + 1;
+    }
+    const pageItems = eligible.slice(startIndex, startIndex + cappedLimit);
+    const nextContinuationToken =
+      startIndex + cappedLimit < eligible.length && pageItems.length > 0
+        ? pageItems[pageItems.length - 1].key
+        : null;
+
+    return {
+      retentionDays: SettingsService.orphanRetentionDays,
+      stats: {
+        totalObjects: objects.length,
+        referencedObjects: referencedCount,
+        orphanCandidates: eligible.length,
+        skippedByRetention,
+      },
+      items: pageItems,
+      meta: {
+        prefix,
+        olderThanDays,
+        limit: cappedLimit,
+        continuationToken,
+        nextContinuationToken,
+        hasMore: nextContinuationToken != null,
+      },
+    };
+  }
+
+  async deleteSelectedOrphans(dto: { keys: string[]; confirmText: string }) {
+    if (dto.confirmText.trim().toUpperCase() !== 'DELETE') {
+      throw new BadRequestException('กรุณาพิมพ์ DELETE เพื่อยืนยันการลบ');
+    }
+
+    const selectedKeys = Array.from(
+      new Set(
+        dto.keys
+          .map((k) => this.normalizeObjectKeyInput(k))
+          .filter((k): k is string => k != null),
+      ),
+    );
+    if (selectedKeys.length === 0) {
+      throw new BadRequestException('ไม่พบรายการไฟล์ที่พร้อมลบ');
+    }
+
+    const [references, objects] = await Promise.all([
+      this.buildReferencedObjectKeySet(),
+      this.minioService.listObjectsRecursive(''),
+    ]);
+    const objectMap = new Map(objects.map((o) => [o.key, o]));
+
+    let deleted = 0;
+    let skippedMissing = 0;
+    let skippedStillReferenced = 0;
+    let skippedByRetention = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const key of selectedKeys) {
+      const obj = objectMap.get(key);
+      if (!obj) {
+        skippedMissing++;
+        continue;
+      }
+      if (references.has(key)) {
+        skippedStillReferenced++;
+        continue;
+      }
+      if (!this.isOlderThanRetention(obj.lastModified)) {
+        skippedByRetention++;
+        continue;
+      }
+      try {
+        await this.minioService.removeObjectByKey(key);
+        deleted++;
+      } catch (err: unknown) {
+        failed++;
+        const msg =
+          (err as { message?: string })?.message || 'unknown remove error';
+        errors.push(`${key}: ${msg}`);
+      }
+    }
+
+    return {
+      retentionDays: SettingsService.orphanRetentionDays,
+      summary: {
+        requested: selectedKeys.length,
+        deleted,
+        skippedMissing,
+        skippedStillReferenced,
+        skippedByRetention,
+        failed,
+      },
+      errors: errors.slice(0, 20),
+    };
   }
 }

@@ -92,6 +92,46 @@ const pdfFieldLabel: CSSProperties = {
   color: "#000000",
 };
 
+/** รองรับ legacy สองฟิลด์ + JSON หลายแถวใน oldSerialNumber */
+function formatEquipmentSerialForPdf(
+  oldSerialNumber: string | null | undefined,
+  newSerialNumber: string | null | undefined,
+): string {
+  const o = (oldSerialNumber ?? "").trim();
+  if (o.startsWith("{")) {
+    try {
+      const j = JSON.parse(o) as {
+        v?: number;
+        rows?: Array<{ n?: string; o?: string; x?: string }>;
+      };
+      if (j?.v === 1 && Array.isArray(j.rows) && j.rows.length > 0) {
+        const lines = j.rows
+          .map((r, i) => {
+            const name = String(r.n ?? "").trim();
+            const os = String(r.o ?? "").trim();
+            const xs = String(r.x ?? "").trim();
+            const bits: string[] = [];
+            bits.push(name ? `${i + 1}. ${name}` : `${i + 1}.`);
+            if (os) bits.push(`S/N เดิม: ${os}`);
+            if (xs) bits.push(`S/N ใหม่: ${xs}`);
+            return bits.join(" — ");
+          })
+          .filter((line) => line.length > 1);
+        return lines.length ? lines.join("\n") : "–";
+      }
+    } catch {
+      /* fallthrough */
+    }
+  }
+  const legacy = [
+    o && `Serial เดิม: ${o}`,
+    (newSerialNumber ?? "").trim() && `Serial ใหม่: ${(newSerialNumber ?? "").trim()}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return legacy || "–";
+}
+
 function fmtDate(d: string | null | undefined): string {
   if (!d) return "–";
   const dt = new Date(d);
@@ -224,13 +264,10 @@ export function JobMaintenancePdfTemplate({
   const causeLine = job.cause?.trim() || "–";
   const fixParts =
     [job.fixMethod?.trim(), job.fixNote?.trim()].filter(Boolean).join("\n\n") || "–";
-  const equipLines =
-    [
-      job.oldSerialNumber && `Serial เดิม: ${job.oldSerialNumber}`,
-      job.newSerialNumber && `Serial ใหม่: ${job.newSerialNumber}`,
-    ]
-      .filter(Boolean)
-      .join("\n") || "–";
+  const equipLines = formatEquipmentSerialForPdf(
+    job.oldSerialNumber,
+    job.newSerialNumber,
+  );
   const statusLine = job.systemStatus?.trim() || "แล้วเสร็จ";
 
   const issueImgs = padImages(job.images as string[] | null, 3);
@@ -384,7 +421,7 @@ export function JobMaintenancePdfTemplate({
             <FullRow label="ข้อขัดข้อง" body={issueLine} />
             <FullRow label="สาเหตุ" body={causeLine} />
             <FullRow label="วิธีแก้ไข" body={fixParts} tall />
-            <FullRow label="รายการอุปกรณ์" body={equipLines} tall />
+            <FullRow label="รายการอุปกรณ์" body={equipLines} tall stackLabel />
             <FullRow label="สถานะระบบ" body={statusLine} />
           </tbody>
         </table>
@@ -499,11 +536,35 @@ function FullRow({
   label,
   body,
   tall,
+  stackLabel,
 }: {
   label: string;
   body: string;
   tall?: boolean;
+  /** true = หัวข้อบรรทัดแรก เนื้อหาเริ่มบรรทัดถัดไป (กันรายการหลายบรรทัดชนกับหัวข้อ) */
+  stackLabel?: boolean;
 }) {
+  if (stackLabel) {
+    return (
+      <tr>
+        <td colSpan={2} style={{ ...cell, verticalAlign: "top" }}>
+          <div style={{ color: "#000000" }}>
+            <div style={{ marginBottom: 6 }}>
+              <span style={pdfFieldLabel}>{label}:</span>
+            </div>
+            <div
+              style={{
+                whiteSpace: "pre-wrap",
+                minHeight: tall ? 72 : 28,
+              }}
+            >
+              {body}
+            </div>
+          </div>
+        </td>
+      </tr>
+    );
+  }
   return (
     <tr>
       <td colSpan={2} style={{ ...cell, verticalAlign: "top" }}>

@@ -24,6 +24,8 @@ import {
   UserPlus,
   Trash2,
   Loader2,
+  Plus,
+  Minus,
 } from "lucide-react";
 import { toastSuccess, toastError, confirmDialog } from "@/lib/toast";
 import DashboardPageShell from "./DashboardPageShell";
@@ -43,6 +45,14 @@ import {
 } from "@/lib/apiResponse";
 import PersonAvatar from "@/components/PersonAvatar";
 import { dashboardJobImagePath } from "@/lib/dashboardJobImageUrl";
+import {
+  JOB_SERIAL_ROWS_MAX,
+  emptyJobSerialRow,
+  normalizeSerialNumberInput,
+  parseJobSerialRowsFromDb,
+  serializeJobSerialRowsToFormFields,
+  type JobSerialRowForm,
+} from "@/lib/jobSerialRows";
 
 function ActionIconButton({
   label,
@@ -214,10 +224,6 @@ const FIX_CATEGORY_OPTIONS = [
   { value: "Hardware", label: "Hardware (ฮาร์ดแวร์)" },
   { value: "Software", label: "Software (ซอฟต์แวร์)" },
 ] as const;
-
-function normalizeSerialNumberInput(raw: string): string {
-  return raw.replace(/[^a-zA-Z0-9-]/g, "").toUpperCase();
-}
 
 const GLASS_MODAL_LABEL =
   "block text-xs font-semibold mb-1 text-slate-200";
@@ -395,8 +401,9 @@ export default function JobsList({
   const [updateCause, setUpdateCause] = useState<string>("");
   const [updateFixMethod, setUpdateFixMethod] = useState<string>("");
   const [updateNote, setUpdateNote] = useState<string>("");
-  const [updateOldSerial, setUpdateOldSerial] = useState<string>("");
-  const [updateNewSerial, setUpdateNewSerial] = useState<string>("");
+  const [updateSerialRows, setUpdateSerialRows] = useState<JobSerialRowForm[]>([
+    emptyJobSerialRow(),
+  ]);
   const [updateFixImages, setUpdateFixImages] = useState<(File | null)[]>([
     null,
     null,
@@ -427,6 +434,27 @@ export default function JobsList({
       FIX_CATEGORY_OPTIONS.find((o) => o.value === updateBrokenPartType) ?? null
     );
   }, [updateBrokenPartType]);
+
+  const updateModalSerialRow = (index: number, patch: Partial<JobSerialRowForm>) => {
+    setUpdateSerialRows((prev) => {
+      const next = [...prev];
+      if (!next[index]) return prev;
+      next[index] = { ...next[index], ...patch };
+      return next;
+    });
+  };
+
+  const addModalSerialRow = () => {
+    setUpdateSerialRows((prev) =>
+      prev.length >= JOB_SERIAL_ROWS_MAX ? prev : [...prev, emptyJobSerialRow()],
+    );
+  };
+
+  const removeModalSerialRow = (index: number) => {
+    setUpdateSerialRows((prev) =>
+      prev.length <= 1 ? prev : prev.filter((_, i) => i !== index),
+    );
+  };
 
   const [updateReopenReason, setUpdateReopenReason] = useState("");
   const [updateFixReopening, setUpdateFixReopening] = useState(false);
@@ -767,8 +795,9 @@ export default function JobsList({
       setUpdateCause((job.cause ?? "") as string);
       setUpdateFixMethod((job.fixMethod ?? "") as string);
       setUpdateNote((job.fixNote ?? "") as string);
-      setUpdateOldSerial(normalizeSerialNumberInput((job.oldSerialNumber ?? "") as string));
-      setUpdateNewSerial(normalizeSerialNumberInput((job.newSerialNumber ?? "") as string));
+      setUpdateSerialRows(
+        parseJobSerialRowsFromDb(job.oldSerialNumber, job.newSerialNumber),
+      );
     } catch {
       toastError("โหลดข้อมูลไม่สำเร็จ", "ไม่สามารถโหลดข้อมูลใบแจ้งซ่อมได้");
     } finally {
@@ -810,8 +839,9 @@ export default function JobsList({
         setUpdateCause((j.cause ?? "") as string);
         setUpdateFixMethod((j.fixMethod ?? "") as string);
         setUpdateNote((j.fixNote ?? "") as string);
-        setUpdateOldSerial(normalizeSerialNumberInput((j.oldSerialNumber ?? "") as string));
-        setUpdateNewSerial(normalizeSerialNumberInput((j.newSerialNumber ?? "") as string));
+        setUpdateSerialRows(
+          parseJobSerialRowsFromDb(j.oldSerialNumber, j.newSerialNumber),
+        );
       }
       await fetchJobs();
     } catch (err: unknown) {
@@ -883,8 +913,9 @@ export default function JobsList({
       form.append("cause", updateCause);
       form.append("fixMethod", updateFixMethod);
       form.append("note", updateNote);
-      form.append("oldSerialNumber", normalizeSerialNumberInput(updateOldSerial));
-      form.append("newSerialNumber", normalizeSerialNumberInput(updateNewSerial));
+      const ser = serializeJobSerialRowsToFormFields(updateSerialRows);
+      form.append("oldSerialNumber", ser.oldSerialNumber);
+      form.append("newSerialNumber", ser.newSerialNumber);
 
       const filesToUpload = updateFixImages.filter(
         (f): f is File => f instanceof File,
@@ -1996,55 +2027,133 @@ export default function JobsList({
                               />
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <p
-                                id="modal-update-serial-hint"
-                                className="text-xs text-slate-500 leading-relaxed sm:col-span-2 -mb-0.5"
-                              >
-                                รับเฉพาะตัวอักษร A–Z / ตัวเลข 0–9 / - เท่านั้น (ตัวพิมพ์เล็กจะถูกแปลงเป็นตัวใหญ่อัตโนมัติ
-                                อักขระอื่นจะถูกตัดออก)
-                              </p>
-                              <div>
-                                <label className={GLASS_MODAL_LABEL} htmlFor="modal-update-serial-old">
-                                  Serial Number อุปกรณ์เดิม
-                                </label>
-                                <input
-                                  id="modal-update-serial-old"
-                                  type="text"
-                                  inputMode="text"
-                                  autoComplete="off"
-                                  spellCheck={false}
-                                  className={`${GLASS_MODAL_FIELD} font-mono tracking-wide uppercase`}
-                                  value={updateOldSerial}
-                                  onChange={(e) =>
-                                    setUpdateOldSerial(
-                                      normalizeSerialNumberInput(e.target.value),
-                                    )
-                                  }
-                                  disabled={updateFixSaving || updateIsReadOnlyFix}
-                                  aria-describedby="modal-update-serial-hint"
-                                />
+                            <div className="space-y-3">
+                              <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+                                <p
+                                  id="modal-update-serial-hint"
+                                  className="text-xs text-slate-500 leading-relaxed flex-1"
+                                >
+                                  <span className="text-slate-400 font-medium">S/N:</span>{" "}
+                                  A–Z / 0–9 / - เท่านั้น — สูงสุด {JOB_SERIAL_ROWS_MAX} แถว
+                                </p>
+                                {!updateIsReadOnlyFix && (
+                                  <button
+                                    type="button"
+                                    onClick={addModalSerialRow}
+                                    disabled={
+                                      updateFixSaving ||
+                                      updateSerialRows.length >= JOB_SERIAL_ROWS_MAX
+                                    }
+                                    className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded-xl border border-white/15 bg-slate-800/80 text-slate-200 text-xs font-semibold hover:bg-slate-700/90 transition-all active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer shrink-0"
+                                    aria-label="เพิ่มแถว Serial Number"
+                                  >
+                                    <Plus size={16} aria-hidden />
+                                    เพิ่มอุปกรณ์
+                                  </button>
+                                )}
                               </div>
-                              <div>
-                                <label className={GLASS_MODAL_LABEL} htmlFor="modal-update-serial-new">
-                                  Serial Number อุปกรณ์ใหม่
-                                </label>
-                                <input
-                                  id="modal-update-serial-new"
-                                  type="text"
-                                  inputMode="text"
-                                  autoComplete="off"
-                                  spellCheck={false}
-                                  className={`${GLASS_MODAL_FIELD} font-mono tracking-wide uppercase`}
-                                  value={updateNewSerial}
-                                  onChange={(e) =>
-                                    setUpdateNewSerial(
-                                      normalizeSerialNumberInput(e.target.value),
-                                    )
-                                  }
-                                  disabled={updateFixSaving || updateIsReadOnlyFix}
-                                  aria-describedby="modal-update-serial-hint"
-                                />
+                              <div className="space-y-3">
+                                {updateSerialRows.map((row, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="rounded-xl border border-white/10 bg-slate-950/35 p-3 space-y-3"
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                        อุปกรณ์ {idx + 1}
+                                      </span>
+                                      {!updateIsReadOnlyFix && updateSerialRows.length > 1 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => removeModalSerialRow(idx)}
+                                          disabled={updateFixSaving}
+                                          className="inline-flex items-center justify-center min-h-10 min-w-10 rounded-lg border border-white/10 text-slate-400 hover:text-red-300 hover:border-red-500/30 hover:bg-red-950/20 transition-colors cursor-pointer disabled:opacity-50"
+                                          aria-label={`ลบแถวอุปกรณ์ ${idx + 1}`}
+                                        >
+                                          <Minus size={18} aria-hidden />
+                                        </button>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <label
+                                        className={GLASS_MODAL_LABEL}
+                                        htmlFor={`modal-serial-name-${idx}`}
+                                      >
+                                        ชื่ออุปกรณ์
+                                      </label>
+                                      <input
+                                        id={`modal-serial-name-${idx}`}
+                                        type="text"
+                                        maxLength={200}
+                                        autoComplete="off"
+                                        className={GLASS_MODAL_FIELD}
+                                        value={row.deviceName}
+                                        onChange={(e) =>
+                                          updateModalSerialRow(idx, {
+                                            deviceName: e.target.value.slice(0, 200),
+                                          })
+                                        }
+                                        disabled={updateFixSaving || updateIsReadOnlyFix}
+                                        placeholder="เช่น DVR / กล้อง"
+                                        aria-describedby="modal-update-serial-hint"
+                                      />
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                      <div>
+                                        <label
+                                          className={GLASS_MODAL_LABEL}
+                                          htmlFor={`modal-serial-old-${idx}`}
+                                        >
+                                          S/N เดิม
+                                        </label>
+                                        <input
+                                          id={`modal-serial-old-${idx}`}
+                                          type="text"
+                                          inputMode="text"
+                                          autoComplete="off"
+                                          spellCheck={false}
+                                          className={`${GLASS_MODAL_FIELD} font-mono tracking-wide uppercase`}
+                                          value={row.oldSerial}
+                                          onChange={(e) =>
+                                            updateModalSerialRow(idx, {
+                                              oldSerial: normalizeSerialNumberInput(
+                                                e.target.value,
+                                              ),
+                                            })
+                                          }
+                                          disabled={updateFixSaving || updateIsReadOnlyFix}
+                                          aria-describedby="modal-update-serial-hint"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label
+                                          className={GLASS_MODAL_LABEL}
+                                          htmlFor={`modal-serial-new-${idx}`}
+                                        >
+                                          S/N ใหม่
+                                        </label>
+                                        <input
+                                          id={`modal-serial-new-${idx}`}
+                                          type="text"
+                                          inputMode="text"
+                                          autoComplete="off"
+                                          spellCheck={false}
+                                          className={`${GLASS_MODAL_FIELD} font-mono tracking-wide uppercase`}
+                                          value={row.newSerial}
+                                          onChange={(e) =>
+                                            updateModalSerialRow(idx, {
+                                              newSerial: normalizeSerialNumberInput(
+                                                e.target.value,
+                                              ),
+                                            })
+                                          }
+                                          disabled={updateFixSaving || updateIsReadOnlyFix}
+                                          aria-describedby="modal-update-serial-hint"
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             </div>
 

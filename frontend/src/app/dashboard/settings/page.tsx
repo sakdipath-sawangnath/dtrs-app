@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
-import { Loader2, Save, Info, Send, Settings, Eye, EyeOff, Mail } from "lucide-react";
+import { Loader2, Save, Info, Send, Settings, Eye, EyeOff, Mail, Search, Trash2, ChevronDown, Download } from "lucide-react";
 import { toastSuccess, toastError } from "@/lib/toast";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
@@ -28,6 +28,7 @@ type EmailSmtpResponse = {
 
 type DefaultPassResponse = {
   passwordSet: boolean;
+  password: string;
 };
 
 type EmailTemplateBlockResponse = {
@@ -44,6 +45,32 @@ type EmailTemplatesResponse = {
   onReported: EmailTemplateBlockResponse;
   onAssigned: EmailTemplateBlockResponse;
   onClosed: EmailTemplateBlockResponse;
+};
+
+type MinioOrphanItem = {
+  key: string;
+  size: number;
+  lastModified: string | null;
+  ageDays: number | null;
+};
+
+type MinioOrphanScanResponse = {
+  retentionDays: number;
+  stats: {
+    totalObjects: number;
+    referencedObjects: number;
+    orphanCandidates: number;
+    skippedByRetention: number;
+  };
+  items: MinioOrphanItem[];
+  meta: {
+    prefix: string;
+    olderThanDays: number;
+    limit: number;
+    continuationToken: string | null;
+    nextContinuationToken: string | null;
+    hasMore: boolean;
+  };
 };
 
 type TemplateBlockForm = {
@@ -108,6 +135,15 @@ export default function SettingsPage() {
     onAssigned: { enabled: true, toExtra: "", cc: "", notifyRoleIds: [] },
     onClosed: { enabled: true, toExtra: "", cc: "", notifyRoleIds: [] },
   });
+  const [orphanPrefix, setOrphanPrefix] = useState("jobs/");
+  const [olderThanDays, setOlderThanDays] = useState(7);
+  const [orphanScan, setOrphanScan] = useState<MinioOrphanScanResponse | null>(null);
+  const [orphanContinuationToken, setOrphanContinuationToken] = useState<string | null>(null);
+  const [orphanTokenHistory, setOrphanTokenHistory] = useState<Array<string | null>>([]);
+  const [selectedOrphanKeys, setSelectedOrphanKeys] = useState<string[]>([]);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   const loadSettings = useCallback(async () => {
     if (!token) return;
@@ -144,6 +180,7 @@ export default function SettingsPage() {
 
       const dp = unwrapApiData<DefaultPassResponse>(defaultPassRes.data);
       setDefaultPassSet(!!dp?.passwordSet);
+      setDefaultPassForm({ password: dp?.password ?? "" });
 
       const et = unwrapApiData<EmailTemplatesResponse>(templatesRes.data);
       if (et) {
@@ -230,7 +267,7 @@ export default function SettingsPage() {
       );
       const updated = unwrapApiData<DefaultPassResponse>(res.data);
       setDefaultPassSet(!!updated?.passwordSet);
-      setDefaultPassForm({ password: "" });
+      setDefaultPassForm({ password: updated?.password ?? pwd });
       toastSuccess("บันทึก Default Pass สำเร็จ");
     } catch (err: unknown) {
       toastError("บันทึก Default Pass ไม่สำเร็จ", apiErrorMessage(err));
@@ -367,6 +404,133 @@ export default function SettingsPage() {
     }
   };
 
+  const handleScanOrphans = async (opts?: { continuationToken?: string | null; resetSelection?: boolean }) => {
+    if (!token) {
+      toastError("กรุณาเข้าสู่ระบบใหม่");
+      return;
+    }
+    setScanLoading(true);
+    try {
+      const continuationToken = opts?.continuationToken ?? null;
+      const res = await axios.post(
+        `${API}/settings/minio/orphans/scan`,
+        {
+          prefix: orphanPrefix.trim(),
+          olderThanDays,
+          limit: 300,
+          continuationToken: continuationToken ?? undefined,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const payload = unwrapApiData<MinioOrphanScanResponse>(res.data);
+      setOrphanScan(payload);
+      setOrphanContinuationToken(payload?.meta?.continuationToken ?? null);
+      if (opts?.resetSelection !== false) {
+        setSelectedOrphanKeys([]);
+      }
+      toastSuccess("สแกนไฟล์ค้างสำเร็จ");
+    } catch (err: unknown) {
+      toastError("สแกนไฟล์ค้างไม่สำเร็จ", apiErrorMessage(err));
+    } finally {
+      setScanLoading(false);
+    }
+  };
+
+  const toggleOrphanKey = (key: string, checked: boolean) => {
+    setSelectedOrphanKeys((prev) => {
+      if (checked) return [...new Set([...prev, key])];
+      return prev.filter((k) => k !== key);
+    });
+  };
+
+  const handleNextOrphanPage = async () => {
+    const next = orphanScan?.meta?.nextContinuationToken ?? null;
+    if (!next) return;
+    setOrphanTokenHistory((prev) => [...prev, orphanContinuationToken]);
+    await handleScanOrphans({ continuationToken: next });
+  };
+
+  const handlePrevOrphanPage = async () => {
+    if (orphanTokenHistory.length === 0) return;
+    const prevToken = orphanTokenHistory[orphanTokenHistory.length - 1] ?? null;
+    setOrphanTokenHistory((prev) => prev.slice(0, -1));
+    await handleScanOrphans({ continuationToken: prevToken });
+  };
+
+  const handleExportOrphansCsv = () => {
+    if (!orphanScan || orphanScan.items.length === 0) {
+      toastError("ยังไม่มีข้อมูลสำหรับส่งออก CSV");
+      return;
+    }
+    const selectedSet = new Set(selectedOrphanKeys);
+    const rows =
+      selectedSet.size > 0
+        ? orphanScan.items.filter((x) => selectedSet.has(x.key))
+        : orphanScan.items;
+    if (rows.length === 0) {
+      toastError("ไม่พบรายการที่เลือกสำหรับส่งออก CSV");
+      return;
+    }
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const header = ["key", "size", "lastModified", "ageDays"];
+    const lines = [
+      header.join(","),
+      ...rows.map((r) =>
+        [esc(r.key), esc(r.size), esc(r.lastModified ?? ""), esc(r.ageDays ?? "")]
+          .join(","),
+      ),
+    ];
+    const blob = new Blob([`\uFEFF${lines.join("\n")}`], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const now = new Date();
+    const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
+    a.href = url;
+    a.download = `minio-orphans-${ts}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toastSuccess(`ส่งออก CSV สำเร็จ (${rows.length} รายการ)`);
+  };
+
+  const handleDeleteSelectedOrphans = async () => {
+    if (!token) {
+      toastError("กรุณาเข้าสู่ระบบใหม่");
+      return;
+    }
+    if (selectedOrphanKeys.length === 0) {
+      toastError("กรุณาเลือกไฟล์ที่ต้องการลบ");
+      return;
+    }
+    if (deleteConfirmText.trim().toUpperCase() !== "DELETE") {
+      toastError("กรุณาพิมพ์ DELETE เพื่อยืนยันการลบ");
+      return;
+    }
+    setDeleteLoading(true);
+    try {
+      const res = await axios.post(
+        `${API}/settings/minio/orphans/delete`,
+        { keys: selectedOrphanKeys, confirmText: deleteConfirmText.trim() },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const result = unwrapApiData<{
+        summary?: { deleted?: number; skippedStillReferenced?: number; skippedByRetention?: number; failed?: number };
+      }>(res.data);
+      const summary = result?.summary;
+      toastSuccess(
+        `ลบสำเร็จ ${summary?.deleted ?? 0} ไฟล์` +
+          ` (ข้าม referenced ${summary?.skippedStillReferenced ?? 0}, retention ${summary?.skippedByRetention ?? 0}, fail ${summary?.failed ?? 0})`,
+      );
+      setDeleteConfirmText("");
+      await handleScanOrphans();
+    } catch (err: unknown) {
+      toastError("ลบไฟล์ค้างไม่สำเร็จ", apiErrorMessage(err));
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const disabledForm = loadingSettings || sessionStatus !== "authenticated" || !token;
 
   return (
@@ -380,13 +544,15 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="rounded-xl border border-white/10 p-4 sm:p-5 w-full bg-slate-900/50 backdrop-blur-sm">
-        <div className="flex items-center gap-2 mb-4 shrink-0">
+      <details className="group rounded-xl border border-white/10 p-4 sm:p-5 w-full bg-slate-900/50 backdrop-blur-sm">
+        <summary className="list-none flex items-center gap-2 mb-4 shrink-0 cursor-pointer">
           <Settings size={18} className="text-slate-400 shrink-0" aria-hidden />
-          <h2 className="font-bold text-sm text-slate-200">
+          <h2 className="font-bold text-sm text-slate-200 flex-1">
             จัดการการส่งอีเมล (SMTP)
           </h2>
-        </div>
+          <span className="text-xs text-slate-400 hidden sm:inline">ย่อ/ขยาย</span>
+          <ChevronDown size={16} className="text-slate-400 transition-transform group-open:rotate-180" />
+        </summary>
 
           {loadingSettings ? (
             <div className="flex items-center justify-center py-16 text-slate-400 gap-2">
@@ -561,13 +727,15 @@ export default function SettingsPage() {
               </div>
             </form>
           )}
-      </div>
+      </details>
 
-      <div className="rounded-xl border border-white/10 p-4 sm:p-5 w-full bg-slate-900/50 backdrop-blur-sm">
-        <div className="flex items-center gap-2 mb-4 shrink-0">
+      <details className="group rounded-xl border border-white/10 p-4 sm:p-5 w-full bg-slate-900/50 backdrop-blur-sm">
+        <summary className="list-none flex items-center gap-2 mb-4 shrink-0 cursor-pointer">
           <Mail size={18} className="text-slate-400 shrink-0" aria-hidden />
-          <h2 className="font-bold text-sm text-slate-200">เทมเพลตอีเมลแจ้งงาน (HTML)</h2>
-        </div>
+          <h2 className="font-bold text-sm text-slate-200 flex-1">เทมเพลตอีเมลแจ้งงาน (HTML)</h2>
+          <span className="text-xs text-slate-400 hidden sm:inline">ย่อ/ขยาย</span>
+          <ChevronDown size={16} className="text-slate-400 transition-transform group-open:rotate-180" />
+        </summary>
 
         <p className="text-xs text-slate-400 mb-4 leading-relaxed" role="note">
           Flow อัตโนมัติ: <span className="text-slate-300">แจ้งเหตุ</span> (หลังบันทึกคำร้อง) →{" "}
@@ -786,13 +954,15 @@ export default function SettingsPage() {
             </div>
           </form>
         )}
-      </div>
+      </details>
 
-      <div className="rounded-xl border border-white/10 p-4 sm:p-5 w-full bg-slate-900/50 backdrop-blur-sm">
-        <div className="flex items-center gap-2 mb-4 shrink-0">
+      <details className="group rounded-xl border border-white/10 p-4 sm:p-5 w-full bg-slate-900/50 backdrop-blur-sm">
+        <summary className="list-none flex items-center gap-2 mb-4 shrink-0 cursor-pointer">
           <Settings size={18} className="text-slate-400 shrink-0" aria-hidden />
-          <h2 className="font-bold text-sm text-slate-200">Default Pass สำหรับ Reset Password</h2>
-        </div>
+          <h2 className="font-bold text-sm text-slate-200 flex-1">Default Pass สำหรับ Reset Password</h2>
+          <span className="text-xs text-slate-400 hidden sm:inline">ย่อ/ขยาย</span>
+          <ChevronDown size={16} className="text-slate-400 transition-transform group-open:rotate-180" />
+        </summary>
 
         {loadingSettings ? (
           <div className="flex items-center justify-center py-16 text-slate-400 gap-2">
@@ -864,7 +1034,196 @@ export default function SettingsPage() {
             </div>
           </form>
         )}
-      </div>
+      </details>
+
+      <details className="group rounded-xl border border-white/10 p-4 sm:p-5 w-full bg-slate-900/50 backdrop-blur-sm space-y-4">
+        <summary className="list-none flex items-center gap-2 cursor-pointer">
+          <Settings size={18} className="text-slate-400 shrink-0" aria-hidden />
+          <h2 className="font-bold text-sm text-slate-200 flex-1">จัดการไฟล์ค้าง MinIO (Orphan Files)</h2>
+          <span className="text-xs text-slate-400 hidden sm:inline">ย่อ/ขยาย</span>
+          <ChevronDown size={16} className="text-slate-400 transition-transform group-open:rotate-180" />
+        </summary>
+
+        <p className="text-xs text-slate-400 leading-relaxed">
+          สแกนไฟล์ใน MinIO ที่ไม่ถูกอ้างอิงในฐานข้อมูล (Job.images, Job.fixImages, User.image) และมีอายุเกิน 7 วัน
+          จากนั้นเลือกเฉพาะไฟล์ที่ต้องการลบเพื่อความปลอดภัย
+        </p>
+
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+          <div className="w-full sm:max-w-[300px]">
+            <label className="block text-sm font-medium mb-1.5 text-slate-300" htmlFor="orphan-prefix">
+              Prefix ที่ต้องการสแกน
+            </label>
+            <input
+              id="orphan-prefix"
+              type="text"
+              className="form-input-glass"
+              value={orphanPrefix}
+              onChange={(e) => setOrphanPrefix(e.target.value)}
+              placeholder="เช่น jobs/ หรือ users/"
+              disabled={disabledForm || scanLoading || deleteLoading}
+            />
+          </div>
+          <div className="w-full sm:max-w-[180px]">
+            <label className="block text-sm font-medium mb-1.5 text-slate-300" htmlFor="older-than-days">
+              แสดงอายุเกิน (วัน)
+            </label>
+            <select
+              id="older-than-days"
+              className="select-native-glass w-full"
+              value={olderThanDays}
+              onChange={(e) => setOlderThanDays(Number.parseInt(e.target.value, 10))}
+              disabled={disabledForm || scanLoading || deleteLoading}
+            >
+              {[7, 14, 30, 60, 90, 180, 365].map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setOrphanTokenHistory([]);
+              void handleScanOrphans({ continuationToken: null });
+            }}
+            disabled={disabledForm || scanLoading || deleteLoading}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium transition-all active:scale-95 shadow-lg shadow-black/20 disabled:opacity-50 disabled:active:scale-100 cursor-pointer min-h-[44px]"
+          >
+            {scanLoading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
+            สแกนไฟล์ค้าง
+          </button>
+          <button
+            type="button"
+            onClick={handleExportOrphansCsv}
+            disabled={disabledForm || scanLoading || deleteLoading || !orphanScan || orphanScan.items.length === 0}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-700/60 hover:bg-blue-600/70 text-white font-medium transition-all active:scale-95 shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:active:scale-100 cursor-pointer min-h-[44px]"
+          >
+            <Download size={18} />
+            Export CSV
+          </button>
+        </div>
+
+        {orphanScan ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+              <div className="rounded-lg border border-white/10 bg-slate-950/40 p-2.5">
+                <p className="text-slate-500">Total objects</p>
+                <p className="text-slate-200 font-semibold tabular-nums">{orphanScan.stats.totalObjects}</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-slate-950/40 p-2.5">
+                <p className="text-slate-500">Referenced</p>
+                <p className="text-slate-200 font-semibold tabular-nums">{orphanScan.stats.referencedObjects}</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-slate-950/40 p-2.5">
+                <p className="text-slate-500">Orphan candidates</p>
+                <p className="text-amber-300 font-semibold tabular-nums">{orphanScan.stats.orphanCandidates}</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-slate-950/40 p-2.5">
+                <p className="text-slate-500">Skipped by retention</p>
+                <p className="text-slate-200 font-semibold tabular-nums">{orphanScan.stats.skippedByRetention}</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-xs text-slate-400 rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2">
+              <span>
+                หน้า {orphanTokenHistory.length + 1}
+                {orphanScan.meta.hasMore ? " (มีหน้าถัดไป)" : ""}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handlePrevOrphanPage()}
+                  disabled={scanLoading || orphanTokenHistory.length === 0}
+                  className="inline-flex items-center rounded-lg border border-white/15 px-2.5 py-1 text-slate-300 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  ก่อนหน้า
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleNextOrphanPage()}
+                  disabled={scanLoading || !orphanScan.meta.nextContinuationToken}
+                  className="inline-flex items-center rounded-lg border border-white/15 px-2.5 py-1 text-slate-300 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  ถัดไป
+                </button>
+              </div>
+            </div>
+
+            {orphanScan.items.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-white/15 bg-slate-950/30 p-4 text-sm text-slate-400">
+                ไม่พบไฟล์ค้างที่เข้าเงื่อนไขลบ (อายุเกิน {orphanScan.retentionDays} วัน)
+              </div>
+            ) : (
+              <div className="rounded-xl border border-white/10 overflow-hidden">
+                <div className="max-h-[320px] overflow-auto bg-slate-950/35">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-slate-900/90 backdrop-blur-sm">
+                      <tr className="text-slate-400 border-b border-white/10">
+                        <th className="px-3 py-2 text-left w-10">เลือก</th>
+                        <th className="px-3 py-2 text-left">Object key</th>
+                        <th className="px-3 py-2 text-left w-24">ขนาด</th>
+                        <th className="px-3 py-2 text-left w-28">อายุ (วัน)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orphanScan.items.map((item) => {
+                        const checked = selectedOrphanKeys.includes(item.key);
+                        return (
+                          <tr key={item.key} className="border-b border-white/5 text-slate-300 hover:bg-white/5">
+                            <td className="px-3 py-2 align-top">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-white/20 bg-slate-900/60 text-blue-600 focus:ring-blue-500/50 cursor-pointer"
+                                checked={checked}
+                                onChange={(e) => toggleOrphanKey(item.key, e.target.checked)}
+                                disabled={disabledForm || deleteLoading || scanLoading}
+                              />
+                            </td>
+                            <td className="px-3 py-2 font-mono break-all">{item.key}</td>
+                            <td className="px-3 py-2 tabular-nums">{item.size.toLocaleString()}</td>
+                            <td className="px-3 py-2 tabular-nums">{item.ageDays ?? "-"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-xl border border-red-500/20 bg-red-950/20 p-3 space-y-2">
+              <label className="block text-xs font-medium text-red-200" htmlFor="confirm-delete-orphans">
+                ยืนยันการลบ (พิมพ์ DELETE)
+              </label>
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <input
+                  id="confirm-delete-orphans"
+                  type="text"
+                  className="form-input-glass sm:max-w-[220px]"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="DELETE"
+                  disabled={disabledForm || deleteLoading || scanLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteSelectedOrphans()}
+                  disabled={
+                    disabledForm ||
+                    deleteLoading ||
+                    scanLoading ||
+                    selectedOrphanKeys.length === 0 ||
+                    deleteConfirmText.trim().toUpperCase() !== "DELETE"
+                  }
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-medium transition-all active:scale-95 shadow-lg shadow-red-900/30 disabled:opacity-50 disabled:active:scale-100 cursor-pointer min-h-[44px]"
+                >
+                  {deleteLoading ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+                  ลบไฟล์ที่เลือก ({selectedOrphanKeys.length})
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </details>
 
       <div
         className="rounded-xl border border-white/10 p-4 sm:p-5 text-sm text-slate-400 flex gap-3 items-start bg-slate-900/50 backdrop-blur-sm"

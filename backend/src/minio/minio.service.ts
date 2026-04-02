@@ -2,6 +2,13 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as Minio from 'minio';
 import * as crypto from 'crypto';
 
+export type MinioObjectInfo = {
+    key: string;
+    size: number;
+    lastModified: string | null;
+    etag?: string;
+};
+
 @Injectable()
 export class MinioService implements OnModuleInit {
     private minioClient: Minio.Client;
@@ -266,5 +273,38 @@ export class MinioService implements OnModuleInit {
         const normalizedExt = ext.startsWith('.') ? ext : `.${ext}`;
         const objectName = `users/${userId}/profile${normalizedExt}`;
         return this.putObjectAndGetUrl(objectName, file);
+    }
+
+    async listObjectsRecursive(prefix = ''): Promise<MinioObjectInfo[]> {
+        const normalizedPrefix = prefix.trim();
+        const stream = this.minioClient.listObjectsV2(
+            this.bucketName,
+            normalizedPrefix || undefined,
+            true,
+        );
+        const rows: MinioObjectInfo[] = [];
+        await new Promise<void>((resolve, reject) => {
+            stream.on('data', (obj: Minio.BucketItem) => {
+                const key = String(obj.name || '').trim();
+                if (!key) return;
+                rows.push({
+                    key,
+                    size: Number(obj.size || 0),
+                    lastModified: obj.lastModified
+                        ? new Date(obj.lastModified).toISOString()
+                        : null,
+                    etag: obj.etag,
+                });
+            });
+            stream.on('error', (err: unknown) => reject(err));
+            stream.on('end', () => resolve());
+        });
+        return rows;
+    }
+
+    async removeObjectByKey(objectKey: string): Promise<void> {
+        const key = objectKey.trim();
+        if (!key) return;
+        await this.minioClient.removeObject(this.bucketName, key);
     }
 }
