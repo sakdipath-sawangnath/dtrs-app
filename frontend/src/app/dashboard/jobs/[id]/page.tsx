@@ -82,12 +82,14 @@ const STATUS_LABELS: Record<string, string> = {
   PENDING: "รอดำเนินการ",
   IN_PROGRESS: "กำลังแก้ไข",
   RESOLVED: "เสร็จสิ้น",
+  CANCELLED: "ยกเลิก",
 };
 
 const STATUS_BADGE_CLASS: Record<string, string> = {
   PENDING: "badge badge-pending",
   IN_PROGRESS: "badge badge-progress",
   RESOLVED: "badge badge-resolved",
+  CANCELLED: "badge border border-slate-500/40 bg-slate-700/40 text-slate-200",
 };
 
 const FIX_ENVIRONMENT_OPTIONS = [
@@ -884,7 +886,7 @@ export default function JobDetailPage() {
                       <span className="font-semibold text-slate-200">{resolvedAtText}</span>
                     </div>
                   )}
-                  {!job.assignedTo && (
+                  {!job.assignedTo && job.status !== "CANCELLED" && (
                     <div className="space-y-4">
                       <div className="rounded-xl border border-amber-500/35 bg-amber-950/30 backdrop-blur-sm p-4 shadow-inner animate-pulse-slow">
                         <div className="flex items-start gap-3">
@@ -1078,7 +1080,11 @@ export default function JobDetailPage() {
 
               {job && (
                 <div className={`${GLASS_SECTION} space-y-4`}>
-                {(canEditFix || isReadOnlyFix) ? (
+                {job.status === "CANCELLED" ? (
+                  <p className="text-sm text-slate-300 text-center py-6 px-2">
+                    งานนี้ถูกยกเลิกแล้ว — ไม่มีการดำเนินการซ่อมต่อ และไม่สามารถบันทึกการแก้ไขหรือ Reopen ได้
+                  </p>
+                ) : (canEditFix || isReadOnlyFix) ? (
                   <form onSubmit={handleSubmitFix} className="space-y-4">
                     <div className="rounded-xl border border-white/10 bg-slate-950/40 p-3 sm:p-4 space-y-3">
                       <p className="text-xs text-slate-400 leading-relaxed">

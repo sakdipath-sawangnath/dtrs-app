@@ -327,6 +327,152 @@ export class JobsService {
         };
     }
 
+    /**
+     * รูปแบบเบอร์ที่อาจตรงกับ reporterPhone ใน DB
+     * (0 นำหน้า / ไม่มี 0 / รหัสประเทศ 66 / ข้อมูลเก่าอาจมีขีดหรือช่องว่างใน cell — ใช้ contains ประกอบ)
+     */
+    reporterPhoneSearchVariants(raw: string): string[] | null {
+        const digits = String(raw ?? '').replace(/\D/g, '');
+        if (digits.length < 9 || digits.length > 12) {
+            return null;
+        }
+        const variants = new Set<string>();
+        const add = (s: string) => {
+            if (s.length >= 9 && s.length <= 12) {
+                variants.add(s);
+            }
+        };
+
+        add(digits);
+
+        if (digits.length === 9) {
+            add(`0${digits}`);
+        } else if (digits.length === 10) {
+            if (digits.startsWith('0')) {
+                add(digits.slice(1));
+                add(`66${digits.slice(1)}`);
+            } else {
+                add(`0${digits}`);
+            }
+        } else if (digits.length === 11 && digits.startsWith('66')) {
+            const nat = digits.slice(2);
+            add(nat);
+            add(`0${nat}`);
+        } else if (digits.length === 12 && digits.startsWith('66')) {
+            const nat = digits.slice(2);
+            add(nat);
+            add(`0${nat}`);
+        }
+
+        const list = Array.from(variants);
+        return list.length > 0 ? list : null;
+    }
+
+    /**
+     * รายการงานตามเบอร์ผู้แจ้ง — สรุปอย่างเดียว เรียงแจ้งล่าสุดก่อน · ทุกสถานะ
+     * @param includeJobId true เมื่อ JWT (ลิงก์ไปแดชบอร์ด)
+     */
+    async findByReporterPhoneForStatusList(rawPhone: string, includeJobId: boolean) {
+        const variants = this.reporterPhoneSearchVariants(rawPhone);
+        if (!variants?.length) {
+            throw new BadRequestException('เบอร์โทรไม่ถูกต้อง (ต้อง 9–12 หลัก)');
+        }
+        const orClause: Prisma.JobWhereInput[] = [{ reporterPhone: { in: variants } }];
+        for (const v of variants) {
+            if (v.length >= 9) {
+                orClause.push({ reporterPhone: { contains: v } });
+            }
+        }
+
+        const userPhoneOr: Prisma.UserWhereInput[] = [{ phone: { in: variants } }];
+        for (const v of variants) {
+            if (v.length >= 9) {
+                userPhoneOr.push({ phone: { contains: v } });
+            }
+        }
+
+        const [byReporterPhone, reporterUsers] = await Promise.all([
+            this.prisma.job.findMany({
+                where: { OR: orClause },
+                select: {
+                    id: true,
+                    ticketNo: true,
+                    status: true,
+                    reportDate: true,
+                    createdAt: true,
+                    description: true,
+                    title: true,
+                },
+                take: 2000,
+            }),
+            this.prisma.user.findMany({
+                where: { OR: userPhoneOr },
+                select: { id: true },
+                take: 500,
+            }),
+        ]);
+
+        const byReporterId =
+            reporterUsers.length > 0
+                ? await this.prisma.job.findMany({
+                      where: { reporterId: { in: reporterUsers.map((u) => u.id) } },
+                      select: {
+                          id: true,
+                          ticketNo: true,
+                          status: true,
+                          reportDate: true,
+                          createdAt: true,
+                          description: true,
+                          title: true,
+                      },
+                      take: 2000,
+                  })
+                : [];
+
+        const merged = new Map<
+            number,
+            {
+                id: number;
+                ticketNo: string | null;
+                status: JobStatus;
+                reportDate: Date | null;
+                createdAt: Date;
+                description: string | null;
+                title: string | null;
+            }
+        >();
+        for (const j of byReporterPhone) {
+            merged.set(j.id, j);
+        }
+        for (const j of byReporterId) {
+            if (!merged.has(j.id)) {
+                merged.set(j.id, j);
+            }
+        }
+
+        const jobs = Array.from(merged.values());
+        const sorted = [...jobs].sort((a, b) => {
+            const ta = a.reportDate?.getTime() ?? a.createdAt.getTime();
+            const tb = b.reportDate?.getTime() ?? b.createdAt.getTime();
+            return tb - ta;
+        });
+        return {
+            items: sorted.map((j) => {
+                const d = j.description?.trim();
+                const t = j.title?.trim();
+                const issueSummary = d || t || null;
+                const base = {
+                    ticketNo: j.ticketNo,
+                    status: j.status,
+                    reportDate: j.reportDate ? j.reportDate.toISOString() : null,
+                    issueSummary,
+                };
+                return includeJobId ? { id: j.id, ...base } : base;
+            }),
+            detailLevel: 'summary' as const,
+        };
+    }
+
     async updateStatus(id: number, status: any, jwtForEmailPdf?: string) {
         const prev = await this.prisma.job.findUnique({
             where: { id },
@@ -334,6 +480,9 @@ export class JobsService {
         });
         if (!prev) {
             throw new NotFoundException(`ไม่พบงาน id=${id}`);
+        }
+        if (prev.status === JobStatus.CANCELLED) {
+            throw new BadRequestException('ไม่สามารถเปลี่ยนสถานะงานที่ยกเลิกแล้ว');
         }
         const nextSt = String(status ?? '').toUpperCase();
         if (nextSt === String(JobStatus.RESOLVED)) {
@@ -605,8 +754,16 @@ export class JobsService {
     async assignStaff(id: number, staffId: number, assignedByUserId: number) {
         const before = await this.prisma.job.findUnique({
             where: { id },
-            select: { assignedToId: true },
+            select: { assignedToId: true, status: true },
         });
+        if (!before) {
+            throw new NotFoundException(`ไม่พบงาน id=${id}`);
+        }
+        if (before.status !== JobStatus.PENDING) {
+            throw new BadRequestException(
+                'มอบหมายงานได้เฉพาะงานสถานะรอดำเนินการ (PENDING) เท่านั้น',
+            );
+        }
         const updated = await this.prisma.job.update({
             where: { id },
             data: {
@@ -619,6 +776,50 @@ export class JobsService {
             void this.jobEmailNotifications.notifyAssigned(updated.id);
         }
         return updated;
+    }
+
+    /** ยกเลิกงานคิว — เฉพาะ PENDING */
+    async cancelPendingJob(id: number, reason?: string) {
+        const row = await this.prisma.job.findUnique({
+            where: { id },
+            select: { id: true, status: true, fixNote: true },
+        });
+        if (!row) {
+            throw new NotFoundException(`ไม่พบงาน id=${id}`);
+        }
+        if (row.status !== JobStatus.PENDING) {
+            throw new BadRequestException(
+                'ยกเลิกได้เฉพาะงานสถานะรอดำเนินการ (PENDING) เท่านั้น',
+            );
+        }
+        const stamp = new Date().toLocaleString('th-TH', {
+            timeZone: 'Asia/Bangkok',
+        });
+        const trimmed = reason?.trim();
+        const line = trimmed
+            ? `[ยกเลิก ${stamp}] ${trimmed}`
+            : `[ยกเลิก ${stamp}]`;
+        const newNote = row.fixNote ? `${row.fixNote}\n${line}` : line;
+
+        const updated = await this.prisma.job.update({
+            where: { id },
+            data: {
+                status: JobStatus.CANCELLED,
+                fixNote: newNote,
+            },
+            include: {
+                assignedTo: {
+                    select: { id: true, name: true, image: true },
+                },
+                assignedBy: {
+                    select: { id: true, name: true, image: true },
+                },
+                reporter: {
+                    select: { id: true, image: true },
+                },
+            },
+        });
+        return this.mapJobForClient(updated);
     }
 
     /**

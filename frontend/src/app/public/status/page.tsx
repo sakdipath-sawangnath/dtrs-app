@@ -1,14 +1,18 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback } from 'react';
+import { Suspense, useState, useEffect, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { Search, MapPin, Calendar, FileText, User, Phone, Mail, Image as ImageIcon, AlertTriangle, Info } from 'lucide-react';
 import DashboardLayoutShell from '@/components/DashboardLayoutShell';
 import PublicLayoutShell from '@/components/PublicLayoutShell';
 import Link from 'next/link';
 import { dashboardJobImagePath } from '@/lib/dashboardJobImageUrl';
+import { useDashboardTablePaging } from '@/hooks/useDashboardTablePaging';
+import DataTablePagination from '@/components/DataTablePagination';
+import DataTablePageSizeSelect from '@/components/dashboard/DataTablePageSizeSelect';
+import { TextHoverTooltip } from '@/components/TextHoverTooltip';
 
 const STATUS_LABEL: Record<string, { text: string; badgeClass: string }> = {
   PENDING: {
@@ -25,6 +29,11 @@ const STATUS_LABEL: Record<string, { text: string; badgeClass: string }> = {
     text: "แล้วเสร็จ",
     badgeClass:
       "border border-emerald-400/30 bg-emerald-500/15 text-emerald-200 backdrop-blur-md shadow-inner",
+  },
+  CANCELLED: {
+    text: "ยกเลิก",
+    badgeClass:
+      "border border-slate-400/30 bg-slate-600/20 text-slate-200 backdrop-blur-md shadow-inner",
   },
 };
 
@@ -115,13 +124,47 @@ function ReporterAvatarGlass({
   );
 }
 
+type PhoneStatusListItem = {
+  id?: number;
+  ticketNo: string | null;
+  status: string;
+  reportDate: string | null;
+  /** อาการ/รายละเอียดคร่าวๆ (description หรือ fallback title) */
+  issueSummary?: string | null;
+};
+
+const ISSUE_PREVIEW_MAX = 50;
+
+function formatIssuePreview(full: string | null | undefined) {
+  const t = (full ?? '').trim();
+  if (!t) return { short: '–' as const, full: '', clipped: false };
+  const clipped = t.length > ISSUE_PREVIEW_MAX;
+  return {
+    short: clipped ? `${t.slice(0, ISSUE_PREVIEW_MAX)}..` : t,
+    full: t,
+    clipped,
+  };
+}
+
 function StatusPageInner() {
   const { data: session, status } = useSession();
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const API = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api';
   const initialTicketFromUrl = searchParams.get('ticketNo') ?? '';
+  const initialPhoneFromUrl = searchParams.get('phone') ?? '';
+  const [searchMode, setSearchMode] = useState<'phone' | 'ticket'>(
+    initialTicketFromUrl ? 'ticket' : 'phone',
+  );
   const [ticketNo, setTicketNo] = useState(initialTicketFromUrl);
+  const [phone, setPhone] = useState(() => initialPhoneFromUrl.replace(/\D/g, ''));
   const [loading, setLoading] = useState(false);
+  /** undefined = ยังไม่ค้นหาเบอร์, array = ค้นหาแล้ว (อาจว่าง) */
+  const [phoneList, setPhoneList] = useState<PhoneStatusListItem[] | undefined>(undefined);
+  const [phoneSearchError, setPhoneSearchError] = useState<string | null>(null);
+  /** คีย์สำหรับรีเซ็ตหน้าแบ่งเมื่อค้นหาเบอร์ใหม่ */
+  const [phoneQueryKey, setPhoneQueryKey] = useState('');
   const [result, setResult] = useState<{
     id?: number;
     ticketNo: string;
@@ -164,12 +207,92 @@ function StatusPageInner() {
     return typeof o.ticketNo === 'string' && typeof o.status === 'string';
   };
 
+  const isPhoneListPayload = (v: unknown): v is {
+    items: PhoneStatusListItem[];
+    detailLevel: string;
+  } => {
+    if (!v || typeof v !== 'object') return false;
+    const o = v as Record<string, unknown>;
+    if (!Array.isArray(o.items) || o.detailLevel !== 'summary') return false;
+    return o.items.every((row) => {
+      if (!row || typeof row !== 'object') return false;
+      const r = row as Record<string, unknown>;
+      const tnOk = r.ticketNo === null || typeof r.ticketNo === 'string';
+      const idOk = r.id === undefined || typeof r.id === 'number';
+      const issueOk =
+        r.issueSummary === undefined ||
+        r.issueSummary === null ||
+        typeof r.issueSummary === 'string';
+      return (
+        idOk &&
+        tnOk &&
+        typeof r.status === 'string' &&
+        (r.reportDate === null || typeof r.reportDate === 'string') &&
+        issueOk
+      );
+    });
+  };
+
+  const performPhoneListSearch = useCallback(
+    async (rawPhone: string, opts?: { syncUrl?: boolean }) => {
+      const digits = String(rawPhone).replace(/\D/g, '');
+      if (digits.length < 9 || digits.length > 12) {
+        setPhoneSearchError('กรุณากรอกเบอร์ 9–12 หลัก (รองรับ 0 นำหน้าหรือรหัส 66)');
+        return;
+      }
+      setLoading(true);
+      setResult(null);
+      setNotFound(false);
+      setPhoneSearchError(null);
+      try {
+        const token = (session as { accessToken?: string } | null)?.accessToken;
+        const url = token ? `${API}/jobs/status-by-phone` : `${API}/public/jobs/status-by-phone`;
+        const res = await axios.get(url, {
+          params: { phone: digits },
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+        const root: unknown = res?.data;
+        const nested =
+          root && typeof root === 'object' && 'data' in root
+            ? (root as { data?: unknown }).data
+            : undefined;
+        const payload: unknown = nested ?? root;
+        if (isPhoneListPayload(payload)) {
+          setPhoneQueryKey(digits);
+          setPhoneList(payload.items);
+          if (opts?.syncUrl) {
+            const q = new URLSearchParams();
+            q.set('phone', digits);
+            router.replace(`${pathname}?${q.toString()}`);
+          }
+        } else {
+          setPhoneList([]);
+        }
+      } catch (e) {
+        setPhoneList(undefined);
+        if (axios.isAxiosError(e) && e.response?.status === 400) {
+          const data = e.response.data as { message?: string | string[] };
+          const m = data?.message;
+          const msg = Array.isArray(m) ? m[0] : m;
+          setPhoneSearchError(typeof msg === 'string' && msg ? msg : 'เบอร์โทรไม่ถูกต้อง');
+        } else {
+          setPhoneSearchError('เกิดข้อผิดพลาด กรุณาลองใหม่');
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [API, session, pathname, router],
+  );
+
   const performSearch = useCallback(
     async (no: string) => {
       if (!no) return;
       setLoading(true);
       setResult(null);
       setNotFound(false);
+      setPhoneList(undefined);
+      setPhoneSearchError(null);
       try {
         const token = (session as { accessToken?: string } | null)?.accessToken;
         const url = token
@@ -206,6 +329,15 @@ function StatusPageInner() {
     e.preventDefault();
     const no = ticketNo.trim();
     await performSearch(no);
+    const q = new URLSearchParams();
+    q.set('ticketNo', no);
+    router.replace(`${pathname}?${q.toString()}`);
+  };
+
+  const handlePhoneSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const digits = phone.replace(/\D/g, '');
+    await performPhoneListSearch(digits, { syncUrl: true });
   };
 
   useEffect(() => {
@@ -213,6 +345,15 @@ function StatusPageInner() {
     if (status === 'loading') return;
     performSearch(initialTicketFromUrl);
   }, [initialTicketFromUrl, status, performSearch]);
+
+  useEffect(() => {
+    if (initialTicketFromUrl) return;
+    if (!initialPhoneFromUrl) return;
+    if (status === 'loading') return;
+    const digits = initialPhoneFromUrl.replace(/\D/g, '');
+    if (digits.length < 9 || digits.length > 12) return;
+    void performPhoneListSearch(digits, { syncUrl: false });
+  }, [initialTicketFromUrl, initialPhoneFromUrl, status, performPhoneListSearch]);
 
   /** หลังล็อกอิน: ดึงข้อมูลเต็มอีกครั้งเมื่อเคยได้ masked แบบไม่มี token */
   useEffect(() => {
@@ -245,6 +386,23 @@ function StatusPageInner() {
     Boolean(session) &&
     ["STAFF", "ADMIN", "SUPERVISOR"].includes(role || "");
 
+  const phoneRowsForTable = useMemo(
+    () => (searchMode === 'phone' && phoneList !== undefined ? phoneList : []),
+    [searchMode, phoneList],
+  );
+
+  const phonePagingFilterKey = `${phoneQueryKey}|${phoneRowsForTable.length}`;
+
+  const {
+    page: phonePage,
+    setPage: setPhonePage,
+    pageSize: phonePageSize,
+    setPageSize: setPhonePageSize,
+    paginatedItems: phonePageRows,
+    totalPages: phoneTotalPages,
+    filteredCount: phoneFilteredCount,
+  } = useDashboardTablePaging(phoneRowsForTable, phonePagingFilterKey);
+
   const isDark = true;
   const cardOuterClass = isDark
     ? `${GLASS_SECTION} transition-all duration-300`
@@ -258,7 +416,11 @@ function StatusPageInner() {
   const pageContent = (
         <div
           className={`w-full space-y-4 animate-fade-up min-w-0 ${
-            isStaffFlow ? "max-w-5xl mx-auto" : "max-w-3xl mx-auto"
+            isStaffFlow
+              ? "max-w-5xl mx-auto"
+              : searchMode === "phone" && phoneList !== undefined && phoneList.length > 0
+                ? "max-w-4xl mx-auto"
+                : "max-w-3xl mx-auto"
           }`}
         >
           {/* มุมมองสาธารณะ — แจ้งเตือน บนสุด (เหนือฟอร์มค้นหา) เมื่อมีผลแบบมาสก์ */}
@@ -294,52 +456,122 @@ function StatusPageInner() {
             </section>
           )}
 
-          {/* Page Title for public view (Show only when not logged in และยังไม่มีผลค้นหา) */}
-          {!session && !result && (
+          {/* Page Title for public view */}
+          {!session && !result && phoneList === undefined && (
              <div className="text-center mb-8">
                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-2 mt-4 drop-shadow-sm">
                  ตรวจสอบสถานะการแจ้งซ่อม
                </h1>
                <p className="text-[13px] sm:text-sm text-slate-300 max-w-lg mx-auto leading-relaxed">
-                 ค้นหาสถานะใบแจ้งซ่อมด้วยเลขที่ Ticket เพื่อติดตามการดำเนินการ
+                 {searchMode === 'phone'
+                   ? 'กรอกเบอร์โทรผู้แจ้งซ่อมเพื่อดูรายการใบแจ้งทั้งหมดของเบอร์นั้น เรียงจากล่าสุด พร้อมสถานะปัจจุบัน'
+                   : 'ค้นหาด้วยเลขที่ใบแจ้งซ่อมเพื่อดูรายละเอียดการแจ้งแบบเต็ม'}
                </p>
              </div>
           )}
 
-          {/* ค้นหา */}
+          {/* ค้นหา — สลับโหมดเบอร์โทร / เลขที่ใบ */}
           <section className={cardOuterClass}>
-            <div className={headerClass}>
-              <Search size={18} className={headerIconClass} />
-              <h2 className={headerTitleClass}>ตรวจสอบสถานะ</h2>
+            <div className={`${headerClass} flex-wrap gap-y-2`}>
+              <div className="flex items-center gap-2 min-w-0">
+                <Search size={18} className={headerIconClass} />
+                <h2 className={headerTitleClass}>ตรวจสอบสถานะ</h2>
+              </div>
+              <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:ml-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchMode('phone');
+                    setResult(null);
+                    setNotFound(false);
+                    setTicketNo('');
+                  }}
+                  className={`cursor-pointer rounded-xl px-3 py-2 text-xs font-medium transition-all active:scale-95 ${
+                    searchMode === 'phone'
+                      ? 'bg-blue-600/90 text-white shadow-lg ring-1 ring-white/10'
+                      : `${GLASS_BUTTON_SECONDARY} text-slate-200`
+                  }`}
+                >
+                  ตามเบอร์โทร
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchMode('ticket');
+                    setPhoneList(undefined);
+                    setPhoneSearchError(null);
+                  }}
+                  className={`cursor-pointer rounded-xl px-3 py-2 text-xs font-medium transition-all active:scale-95 ${
+                    searchMode === 'ticket'
+                      ? 'bg-blue-600/90 text-white shadow-lg ring-1 ring-white/10'
+                      : `${GLASS_BUTTON_SECONDARY} text-slate-200`
+                  }`}
+                >
+                  ตามเลขที่ใบ
+                </button>
+              </div>
             </div>
-            <form
-              onSubmit={handleSearch}
-              className={`flex flex-col sm:flex-row gap-3 w-full ${
-                isStaffFlow ? "sm:items-center max-w-md sm:max-w-lg" : ""
-              }`}
-            >
-              <div
-                className={`relative min-w-0 flex-1 ${
-                  isStaffFlow ? "sm:max-w-sm" : ""
+
+            {searchMode === 'phone' ? (
+              <form
+                onSubmit={handlePhoneSearch}
+                className={`flex flex-col sm:flex-row gap-3 w-full ${
+                  isStaffFlow ? "sm:items-center max-w-md sm:max-w-lg" : ""
                 }`}
               >
-                <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-                <input
-                  type="text"
-                  className={inputClass}
-                  placeholder="กรอกเลขที่ใบแจ้งซ่อม"
-                  value={ticketNo}
-                  onChange={e => setTicketNo(e.target.value)}
-                />
-              </div>
-              <button type="submit" disabled={loading} className="btn btn-primary whitespace-nowrap disabled:opacity-60 w-full sm:w-auto">
-                {loading ? <span className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"/> : <Search size={16} />}
-                ตรวจสอบ
-              </button>
-            </form>
+                <div
+                  className={`relative min-w-0 flex-1 ${
+                    isStaffFlow ? "sm:max-w-sm" : ""
+                  }`}
+                >
+                  <Phone size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} aria-hidden />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    className={`${inputClass} pl-10`}
+                    placeholder="เบอร์โทรผู้แจ้ง (9–12 หลัก)"
+                    aria-label="เบอร์โทรผู้แจ้งซ่อม"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                  />
+                </div>
+                <button type="submit" disabled={loading} className="btn btn-primary whitespace-nowrap disabled:opacity-60 w-full sm:w-auto cursor-pointer min-h-11 px-4">
+                  {loading ? <span className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full inline-block" aria-hidden /> : <Search size={16} />}
+                  <span className="ml-1.5">ค้นหา</span>
+                </button>
+              </form>
+            ) : (
+              <form
+                onSubmit={handleSearch}
+                className={`flex flex-col sm:flex-row gap-3 w-full ${
+                  isStaffFlow ? "sm:items-center max-w-md sm:max-w-lg" : ""
+                }`}
+              >
+                <div
+                  className={`relative min-w-0 flex-1 ${
+                    isStaffFlow ? "sm:max-w-sm" : ""
+                  }`}
+                >
+                  <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+                  <input
+                    type="text"
+                    className={inputClass}
+                    placeholder="กรอกเลขที่ใบแจ้งซ่อม"
+                    aria-label="เลขที่ใบแจ้งซ่อม"
+                    value={ticketNo}
+                    onChange={(e) => setTicketNo(e.target.value)}
+                  />
+                </div>
+                <button type="submit" disabled={loading} className="btn btn-primary whitespace-nowrap disabled:opacity-60 w-full sm:w-auto cursor-pointer min-h-11 px-4">
+                  {loading ? <span className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full inline-block" aria-hidden /> : <Search size={16} />}
+                  <span className="ml-1.5">ตรวจสอบ</span>
+                </button>
+              </form>
+            )}
           </section>
 
-          {/* Info card (public): ข้อมูลส่วนตัว/รูปถูกมาสก์ */}
+          {/* Info card (public) */}
           {!session && (
             <section
               role="note"
@@ -354,7 +586,9 @@ function StatusPageInner() {
                 />
                 <div className="min-w-0 space-y-1 text-[13px] sm:text-sm leading-relaxed">
                   <p className="text-slate-200/95">
-                    ในโหมดสาธารณะ ข้อมูลส่วนตัวและรูปภาพจะแสดงแบบมาสก์
+                    {searchMode === 'phone'
+                      ? 'การค้นตามเบอร์แสดงเลขที่ใบ อาการเสียคร่าวๆ วันที่แจ้ง และสถานะ — วางเมาส์บนข้อความอาการยาวเพื่อดูเต็ม'
+                      : 'ในโหมดสาธารณะ ข้อมูลส่วนตัวและรูปภาพจะแสดงแบบมาสก์'}
                   </p>
                   <p className="text-slate-400">
                     เข้าสู่ระบบเพื่อดูข้อมูลจริง
@@ -371,8 +605,132 @@ function StatusPageInner() {
             </section>
           )}
 
-          {/* ผลลัพธ์ */}
-          {notFound && !loading && (
+          {/* ผลลัพธ์ — ค้นหาตามเบอร์ */}
+          {phoneSearchError && !loading && searchMode === 'phone' && (
+            <section
+              role="alert"
+              className={`${cardOuterClass} border-rose-500/30 bg-rose-950/25 text-left py-4`}
+            >
+              <p className="text-sm text-rose-100">{phoneSearchError}</p>
+            </section>
+          )}
+
+          {phoneList !== undefined && !loading && searchMode === 'phone' && phoneList.length === 0 && !phoneSearchError && (
+            <section className={`${cardOuterClass} text-center py-8`}>
+              <p className={`text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>
+                ไม่พบรายการแจ้งซ่อมสำหรับเบอร์นี้
+              </p>
+              <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                ตรวจสอบตัวเลขอีกครั้ง หรือลองค้นด้วยเลขที่ใบแจ้งซ่อม
+              </p>
+            </section>
+          )}
+
+          {phoneList !== undefined && phoneList.length > 0 && searchMode === 'phone' && (
+            <section className={GLASS_SECTION} aria-label="รายการแจ้งซ่อมตามเบอร์โทร">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-white/10">
+                <h2 className="text-base font-bold text-white">รายการแจ้งซ่อม</h2>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+                  <p className="text-xs text-slate-400 order-2 sm:order-1">
+                    พบ{" "}
+                    <span className="font-semibold text-slate-200 tabular-nums">
+                      {phoneFilteredCount}
+                    </span>{" "}
+                    รายการ · ทุกสถานะ · เรียงวันที่แจ้งล่าสุดก่อน
+                  </p>
+                  <DataTablePageSizeSelect
+                    value={phonePageSize}
+                    onChange={setPhonePageSize}
+                    className="select-native-glass w-full sm:w-32 min-h-11 cursor-pointer order-1 sm:order-2"
+                    aria-label="จำนวนแถวต่อหน้า"
+                  />
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/10 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[min(100%,520px)] sm:min-w-[560px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10 text-slate-400 text-xs uppercase tracking-wide bg-slate-950/30">
+                      <th className="py-2.5 px-3 font-medium">เลขที่ใบ</th>
+                      <th className="py-2.5 pr-3 font-medium min-w-[140px] max-w-[min(40vw,280px)]">
+                        อาการเสีย (คร่าวๆ)
+                      </th>
+                      <th className="py-2.5 pr-3 font-medium whitespace-nowrap">วันที่แจ้ง</th>
+                      <th className="py-2.5 pr-3 font-medium">สถานะ</th>
+                      {isStaffFlow ? (
+                        <th className="py-2.5 pl-3 pr-3 font-medium text-right whitespace-nowrap min-w-30 w-px">
+                          จัดการ
+                        </th>
+                      ) : null}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {phonePageRows.map((row, rowIdx) => {
+                      const st =
+                        STATUS_LABEL[row.status] ?? {
+                          text: row.status,
+                          badgeClass: STATUS_BADGE_FALLBACK,
+                        };
+                      const issue = formatIssuePreview(row.issueSummary);
+                      return (
+                        <tr key={`${phonePage}-${rowIdx}-${row.id ?? ''}-${row.ticketNo ?? ''}-${row.reportDate ?? ''}`} className="border-b border-white/5 last:border-0">
+                          <td className="py-3 px-3 font-mono text-slate-200 break-all">
+                            {row.ticketNo?.trim() ? row.ticketNo : '–'}
+                          </td>
+                          <td className="py-3 pr-3 text-slate-300 align-top">
+                            {issue.clipped ? (
+                              <TextHoverTooltip text={issue.full}>
+                                <span className="block max-w-[min(40vw,280px)] cursor-help wrap-break-word leading-snug">
+                                  {issue.short}
+                                </span>
+                              </TextHoverTooltip>
+                            ) : (
+                              <span className="block max-w-[min(40vw,280px)] wrap-break-word leading-snug">
+                                {issue.short}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 pr-3 text-slate-300 whitespace-nowrap">
+                            {formatReportDateTime(row.reportDate)}
+                          </td>
+                          <td className="py-3 pr-3">
+                            <span className={`inline-flex text-xs font-semibold px-2.5 py-1 rounded-full ${st.badgeClass}`}>
+                              {st.text}
+                            </span>
+                          </td>
+                          {isStaffFlow ? (
+                            <td className="py-3 pl-3 pr-3 text-right whitespace-nowrap align-middle w-px">
+                              {typeof row.id === 'number' ? (
+                                <Link
+                                  href={`/dashboard/jobs/${row.id}`}
+                                  className={`${GLASS_BUTTON_SECONDARY} inline-flex items-center justify-center min-h-11 px-3 py-2 text-xs cursor-pointer font-medium whitespace-nowrap shrink-0`}
+                                >
+                                  รายละเอียด
+                                </Link>
+                              ) : (
+                                <span className="text-slate-500 text-xs">–</span>
+                              )}
+                            </td>
+                          ) : null}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <DataTablePagination
+                page={phonePage}
+                totalPages={phoneTotalPages}
+                pageSize={phonePageSize}
+                filteredCount={phoneFilteredCount}
+                onPageChange={setPhonePage}
+              />
+              </div>
+            </section>
+          )}
+
+          {/* ผลลัพธ์ — เลขที่ใบ */}
+          {notFound && !loading && searchMode === 'ticket' && (
             <section className={`${cardOuterClass} text-center py-8`}>
               <p className={`text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>ไม่พบข้อมูลใบแจ้งซ่อมเลขที่นี้</p>
               <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>กรุณาตรวจสอบเลขที่ใบแจ้งซ่อมอีกครั้ง</p>
@@ -581,13 +939,22 @@ function StatusPageInner() {
                   เลขที่ {result.ticketNo}
                 </p>
               </>
+            ) : phoneList !== undefined && phoneList.length > 0 ? (
+              <>
+                <h1 className="text-lg sm:text-xl font-bold text-white">
+                  รายการแจ้งซ่อมตามเบอร์โทร
+                </h1>
+                <p className="text-sm mt-0.5 text-slate-400">
+                  พบ {phoneList.length} รายการ · เรียงจากวันที่แจ้งล่าสุด
+                </p>
+              </>
             ) : (
               <>
                 <h1 className="text-lg sm:text-xl font-bold truncate text-white">
                   ตรวจสอบสถานะการแจ้งซ่อม
                 </h1>
                 <p className="text-sm mt-0.5 text-slate-400">
-                  ค้นหาสถานะใบแจ้งซ่อมด้วยเลขที่ Ticket ที่ได้รับจากระบบ
+                  ค้นหาตามเบอร์โทรผู้แจ้ง หรือเลขที่ใบแจ้งซ่อม
                 </p>
               </>
             )}

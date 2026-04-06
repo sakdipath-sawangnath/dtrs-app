@@ -14,6 +14,7 @@ const STATUS_TH: Record<string, string> = {
   PENDING: 'รอดำเนินการ',
   IN_PROGRESS: 'กำลังแก้ไข',
   RESOLVED: 'แล้วเสร็จ',
+  CANCELLED: 'ยกเลิก',
 };
 
 function pickIssueSummary(

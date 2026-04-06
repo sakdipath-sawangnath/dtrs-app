@@ -23,6 +23,7 @@ import {
   X,
   UserPlus,
   Trash2,
+  Ban,
   Loader2,
   Plus,
   Minus,
@@ -36,6 +37,7 @@ import { useRouter } from "next/navigation";
 import { io, Socket } from "socket.io-client";
 import DataTablePagination, { DataTablePageSize } from "./DataTablePagination";
 import { createPortal } from "react-dom";
+import { TextHoverTooltip } from "./TextHoverTooltip";
 import SegmentedTabs from "./SegmentedTabs";
 import {
   extractAssignableArray,
@@ -143,75 +145,6 @@ function ActionIconButton({
   );
 }
 
-function TextHoverTooltip({
-  text,
-  children,
-}: {
-  text: string;
-  children: React.ReactNode;
-}) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
-
-  const computePos = () => {
-    const el = ref.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    setPos({
-      top: r.top + r.height / 2,
-      left: Math.min(window.innerWidth - 16, r.left + r.width + 10),
-    });
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    computePos();
-    const onWin = () => computePos();
-    window.addEventListener("scroll", onWin, true);
-    window.addEventListener("resize", onWin);
-    return () => {
-      window.removeEventListener("scroll", onWin, true);
-      window.removeEventListener("resize", onWin);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  return (
-    <>
-      <span
-        ref={ref}
-        onMouseEnter={() => {
-          setOpen(true);
-          computePos();
-        }}
-        onMouseLeave={() => setOpen(false)}
-        className="inline-block"
-      >
-        {children}
-      </span>
-      {open && pos
-        ? createPortal(
-            <div
-              className="fixed pointer-events-none"
-              style={{
-                top: pos.top,
-                left: pos.left,
-                transform: "translateY(-50%)",
-                zIndex: 9999,
-              }}
-            >
-              <div className="max-w-[520px] bg-slate-900 text-white text-[11px] px-2 py-1 rounded-md shadow-lg whitespace-pre-wrap wrap-break-word">
-                {text}
-              </div>
-            </div>,
-            document.body
-          )
-        : null}
-    </>
-  );
-}
-
 function limitText(s: string, maxLen: number): { short: string; full: string; clipped: boolean } {
   const full = (s ?? "").trim();
   if (!full) return { short: "–", full: "", clipped: false };
@@ -296,6 +229,11 @@ const STATUS_CONFIG: Record<
     label: "เสร็จสิ้น",
     badgeCls: "badge badge-resolved",
     icon: <CheckCircle2 size={14} className="text-green-600" />,
+  },
+  CANCELLED: {
+    label: "ยกเลิก",
+    badgeCls: "badge border border-slate-500/40 bg-slate-700/40 text-slate-200",
+    icon: <Ban size={14} className="text-slate-400" />,
   },
 };
 
@@ -537,6 +475,13 @@ export default function JobsList({
     return userRoleUpper === "ADMIN";
   }, [statusFilter, myPermissions, userRoleUpper]);
 
+  const canCancelPending = useMemo(() => {
+    if (myPermissions !== null) {
+      return myPermissions.includes("job.cancel");
+    }
+    return userRoleUpper === "ADMIN" || userRoleUpper === "SUPERVISOR";
+  }, [myPermissions, userRoleUpper]);
+
   const fetchJobs = async () => {
     if (!token) return;
     setLoading(true);
@@ -661,10 +606,11 @@ export default function JobsList({
     return Array.from(set).sort();
   }, [jobs, provinceFilter]);
 
-  /** งานค้าง = ยังไม่เสร็จสิ้น (ไม่นับ RESOLVED) — แยกนับตามสัญญา/นอกสัญญา */
+  /** งานค้าง = ยังไม่เสร็จสิ้น (ไม่นับ RESOLVED / CANCELLED) — แยกนับตามสัญญา/นอกสัญญา */
   const contractTabBadgeCounts = useMemo(() => {
     if (!showContractTabs) return { contract: 0, out: 0 };
-    const unfinished = (j: Job) => j.status !== "RESOLVED";
+    const unfinished = (j: Job) =>
+      j.status !== "RESOLVED" && j.status !== "CANCELLED";
     return {
       contract: jobsForContractCounts.filter(
         (j) => j.isOutOfContract !== true && unfinished(j),
@@ -719,6 +665,7 @@ export default function JobsList({
             <option value="PENDING">{STATUS_CONFIG.PENDING.label}</option>
             <option value="IN_PROGRESS">{STATUS_CONFIG.IN_PROGRESS.label}</option>
             <option value="RESOLVED">{STATUS_CONFIG.RESOLVED.label}</option>
+            <option value="CANCELLED">{STATUS_CONFIG.CANCELLED.label}</option>
           </select>
 
           <select
@@ -1365,6 +1312,38 @@ export default function JobsList({
     }
   };
 
+  const handleCancelPendingJob = async (jobId: number) => {
+    if (!token || !canCancelPending) return;
+    const ok = await confirmDialog({
+      title: "ยกเลิกการซ่อม?",
+      text: "งานจะถูกตั้งสถานะเป็น «ยกเลิก» และจะไม่อยู่ในคิวรอดำเนินการอีกต่อไป",
+      confirmText: "ยืนยัน ยกเลิก",
+      cancelText: "กลับ",
+      confirmColor: "#64748b",
+      cancelColor: "#475569",
+    });
+    if (!ok) return;
+    try {
+      await axios.patch(
+        `${API}/jobs/${jobId}/cancel`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      toastSuccess("ยกเลิกงานแล้ว", 1200);
+      if (detailJob?.id === jobId) setDetailJob(null);
+      if (assignJob?.id === jobId) setAssignJob(null);
+      await fetchJobs();
+    } catch (err: unknown) {
+      const payload = axiosErrorData(err);
+      const errInner = asRecord(payload?.error);
+      const msg =
+        (typeof errInner?.message === "string" ? errInner.message : undefined) ??
+        (typeof payload?.message === "string" ? payload.message : undefined) ??
+        "ไม่สามารถยกเลิกได้";
+      toastError("ยกเลิกไม่สำเร็จ", String(msg));
+    }
+  };
+
   const handleDeleteInProgressAdmin = async (jobId: number) => {
     if (!token || !canAdminDeleteInProgress) return;
     const ok = await confirmDialog({
@@ -1743,6 +1722,16 @@ export default function JobsList({
                             <Clock size={16} />
                           </ActionIconButton>
                         )}
+
+                      {job.status === "PENDING" && canCancelPending && !!token && (
+                        <ActionIconButton
+                          label="ยกเลิกการซ่อม"
+                          onClick={() => handleCancelPendingJob(job.id)}
+                          color="#64748b"
+                        >
+                          <Ban size={16} />
+                        </ActionIconButton>
+                      )}
 
                       {job.status === "PENDING" &&
                         !job.assignedTo &&

@@ -53,6 +53,10 @@ export const UpdateJobStatusSchema = z.object({
   }),
 });
 
+export const CancelJobSchema = z.object({
+  reason: z.string().trim().max(500).optional(),
+});
+
 export type UpdateJobStatusDto = z.infer<typeof UpdateJobStatusSchema>;
 
 /** Reopen: งานเสร็จสิ้น → กำลังแก้ไข (เฉพาะผู้รับงาน) */

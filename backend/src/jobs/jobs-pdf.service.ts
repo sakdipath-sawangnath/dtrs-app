@@ -350,6 +350,7 @@ export class JobsPdfService {
     const pending = rows.filter((j) => j.status === 'PENDING').length;
     const inProgress = rows.filter((j) => j.status === 'IN_PROGRESS').length;
     const resolved = rows.filter((j) => j.status === 'RESOLVED').length;
+    const cancelled = rows.filter((j) => j.status === 'CANCELLED').length;
     const outOfContract = rows.filter((j) => j.isOutOfContract === true).length;
     const pendingUnassigned = rows.filter(
       (j) => j.status === 'PENDING' && !j.assignedToId,
@@ -415,6 +416,7 @@ export class JobsPdfService {
     <div class="kpi"><div class="label">รอดำเนินการ</div><div class="value">${pending}</div></div>
     <div class="kpi"><div class="label">กำลังแก้ไข</div><div class="value">${inProgress}</div></div>
     <div class="kpi"><div class="label">เสร็จสิ้น</div><div class="value">${resolved}</div></div>
+    <div class="kpi"><div class="label">ยกเลิก</div><div class="value">${cancelled}</div></div>
     <div class="kpi"><div class="label">นอกสัญญา</div><div class="value">${outOfContract}</div></div>
     <div class="kpi"><div class="label">รอและยังไม่มอบหมาย</div><div class="value">${pendingUnassigned}</div></div>
   </div>

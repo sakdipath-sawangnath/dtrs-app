@@ -17,6 +17,7 @@ import {
     ReopenJobSchema,
     BackfillJobDatesSchema,
     DashboardSummaryPdfQuerySchema,
+    CancelJobSchema,
 } from './dto/create-job.dto';
 import type {
     BackfillJobDatesDto,
@@ -91,6 +92,17 @@ export class JobsController {
     @Get('status/:ticketNo')
     async getStatus(@Param('ticketNo') ticketNo: string) {
         return this.jobsService.findByTicketNoForStatus(ticketNo, true);
+    }
+
+    /** รายการงานตามเบอร์ผู้แจ้ง — สรุป + id สำหรับลิงก์แดชบอร์ด */
+    @UseGuards(JwtAuthGuard)
+    @Get('status-by-phone')
+    async getStatusListByPhone(@Query('phone') phone?: string) {
+        const p = String(phone ?? '').trim();
+        if (!p) {
+            throw new BadRequestException('ต้องระบุ query phone');
+        }
+        return this.jobsService.findByReporterPhoneForStatusList(p, true);
     }
 
     /**
@@ -311,6 +323,19 @@ export class JobsController {
         }
 
         const updated = await this.jobsService.moveToOutOfContract(+id, body.isOutOfContract);
+        this.eventsGateway.notifyJobUpdate(updated);
+        return updated;
+    }
+
+    /** ยกเลิกงานสถานะ PENDING — สิทธิ์ job.cancel */
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @Permissions('job.cancel')
+    @Patch(':id/cancel')
+    async cancelJob(
+        @Param('id', new ParseIntPipe({ errorHttpStatusCode: 400 })) id: number,
+        @Body(new ZodValidationPipe(CancelJobSchema)) body: { reason?: string },
+    ) {
+        const updated = await this.jobsService.cancelPendingJob(id, body?.reason);
         this.eventsGateway.notifyJobUpdate(updated);
         return updated;
     }

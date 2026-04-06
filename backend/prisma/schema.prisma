@@ -18,6 +18,7 @@ enum JobStatus {
   PENDING
   IN_PROGRESS
   RESOLVED
+  CANCELLED
 }
 
 model AppRole {

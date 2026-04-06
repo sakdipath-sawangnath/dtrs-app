@@ -48,6 +48,10 @@ function statusBadgeHtml(code: string, label: string): string {
     bg = '#d1fae5';
     fg = '#065f46';
     border = '#6ee7b7';
+  } else if (c === 'CANCELLED') {
+    bg = '#f1f5f9';
+    fg = '#475569';
+    border = '#cbd5e1';
   }
   return `<span style="display:inline-block;padding:5px 14px;border-radius:9999px;font-size:12px;font-weight:600;background:${bg};color:${fg};border:1px solid ${border};">${esc(label)}</span>`;
 }

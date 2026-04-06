@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, UseInterceptors, UploadedFiles, Body } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Post, Param, Query, UseInterceptors, UploadedFiles, Body } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { JobsService } from './jobs.service';
 import { MinioService } from '../minio/minio.service';
@@ -65,5 +65,15 @@ export class PublicJobsController {
     @Get('status/:ticketNo')
     async getStatusPublic(@Param('ticketNo') ticketNo: string) {
         return this.jobsService.findByTicketNoForStatus(ticketNo, false);
+    }
+
+    /** รายการงานตามเบอร์ผู้แจ้ง — สรุป (ไม่มี job id) */
+    @Get('status-by-phone')
+    async getStatusListByPhonePublic(@Query('phone') phone?: string) {
+        const p = String(phone ?? '').trim();
+        if (!p) {
+            throw new BadRequestException('ต้องระบุ query phone');
+        }
+        return this.jobsService.findByReporterPhoneForStatusList(p, false);
     }
 }

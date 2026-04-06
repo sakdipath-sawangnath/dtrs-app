@@ -31,6 +31,7 @@ const ACTION_PERMISSIONS = [
   { code: 'job.updateStatus', name: 'เปลี่ยนสถานะงาน', category: 'job' },
   { code: 'job.backfillDate', name: 'แก้ไขวันเวลาย้อนหลังของงาน', category: 'job' },
   { code: 'job.deleteInProgress', name: 'ลบงานกำลังแก้ไข (ผู้ดูแล)', category: 'job' },
+  { code: 'job.cancel', name: 'ยกเลิกงานรอดำเนินการ (PENDING)', category: 'job' },
   { code: 'job.fix.self', name: 'บันทึก/ปิดงาน (เฉพาะงานที่รับผิดชอบ)', category: 'job' },
   { code: 'job.fix.any', name: 'บันทึก/ปิดงาน (ทุกงาน)', category: 'job' },
   { code: 'job.reopen.self', name: 'Reopen งาน (เฉพาะงานที่รับผิดชอบ)', category: 'job' },

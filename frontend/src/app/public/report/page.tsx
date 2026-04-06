@@ -448,6 +448,7 @@ function ReportPageContent() {
           : undefined;
       const created = (nested ?? root) as { ticketNo?: string } | undefined;
       const ticketNo = created?.ticketNo as string | undefined;
+      const phoneDigits = form.reporterPhone.replace(/\D/g, '').slice(0, 10);
 
       // เคลียร์ Draft ทิ้งเมื่อสำเร็จ
       sessionStorage.removeItem('reportFormDraft');
@@ -455,7 +456,11 @@ function ReportPageContent() {
       if (ticketNo) {
         toastSuccess(`แจ้งซ่อมสำเร็จ! เลขที่ใบแจ้งซ่อมของคุณคือ ${ticketNo}`, 2200);
         setTimeout(() => {
-          router.push(`/public/status?ticketNo=${encodeURIComponent(ticketNo)}`);
+          if (phoneDigits.length >= 9) {
+            router.push(`/public/status?phone=${encodeURIComponent(phoneDigits)}`);
+          } else {
+            router.push(`/public/status?ticketNo=${encodeURIComponent(ticketNo)}`);
+          }
         }, 800);
       } else {
         toastSuccess('แจ้งซ่อมสำเร็จ! ทีมช่างจะดำเนินการในเร็วๆ นี้', 1500);

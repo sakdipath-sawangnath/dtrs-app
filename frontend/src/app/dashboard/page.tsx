@@ -42,6 +42,7 @@ import {
   Target,
   X,
   ChevronDown,
+  Ban,
 } from "lucide-react";
 import {
   PieChart,
@@ -79,6 +80,7 @@ interface Stats {
   pending: number;
   in_progress: number;
   resolved: number;
+  cancelled: number;
   total: number;
 }
 
@@ -94,12 +96,14 @@ const STATUS_COLORS = {
   PENDING: "#e65100",
   IN_PROGRESS: "#1565c0",
   RESOLVED: "#2e7d32",
+  CANCELLED: "#64748b",
 };
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: "รอดำเนินการ",
   IN_PROGRESS: "กำลังแก้ไข",
   RESOLVED: "เสร็จสิ้น",
+  CANCELLED: "ยกเลิก",
 };
 
 const TH_MONTHS = [
@@ -293,6 +297,7 @@ export default function DashboardPage() {
     pending: filteredJobs.filter((j) => j.status === "PENDING").length,
     in_progress: filteredJobs.filter((j) => j.status === "IN_PROGRESS").length,
     resolved: filteredJobs.filter((j) => j.status === "RESOLVED").length,
+    cancelled: filteredJobs.filter((j) => j.status === "CANCELLED").length,
     total: filteredJobs.length,
   }), [filteredJobs]);
 
@@ -305,6 +310,7 @@ export default function DashboardPage() {
     { name: STATUS_LABELS.PENDING, value: stats.pending, color: STATUS_COLORS.PENDING },
     { name: STATUS_LABELS.IN_PROGRESS, value: stats.in_progress, color: STATUS_COLORS.IN_PROGRESS },
     { name: STATUS_LABELS.RESOLVED, value: stats.resolved, color: STATUS_COLORS.RESOLVED },
+    { name: STATUS_LABELS.CANCELLED, value: stats.cancelled, color: STATUS_COLORS.CANCELLED },
   ].filter((d) => d.value > 0), [stats]);
 
   const provinceData = useMemo(() => {
@@ -455,6 +461,7 @@ export default function DashboardPage() {
     { label: "รอดำเนินการ", value: stats.pending, icon: AlertCircle, color: "#fb923c", bg: "rgba(230,81,0,0.12)", border: "rgba(251,146,60,0.25)", href: "/dashboard/pending" },
     { label: "กำลังแก้ไข", value: stats.in_progress, icon: Wrench, color: "#60a5fa", bg: "rgba(21,101,192,0.12)", border: "rgba(96,165,250,0.25)", href: "/dashboard/in-progress" },
     { label: "เสร็จสิ้น", value: stats.resolved, icon: CheckCircle2, color: "#4ade80", bg: "rgba(46,125,50,0.12)", border: "rgba(74,222,128,0.25)", href: "/dashboard/all" },
+    { label: "ยกเลิก", value: stats.cancelled, icon: Ban, color: "#94a3b8", bg: "rgba(100,116,139,0.15)", border: "rgba(148,163,184,0.25)", href: "/dashboard/all" },
   ];
 
   const runExportReportPdf = () => {
@@ -1163,6 +1170,10 @@ export default function DashboardPage() {
               <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5">
                 <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{STATUS_LABELS.RESOLVED}</p>
                 <p className="text-lg font-bold text-emerald-300 tabular-nums">{reportStats.resolved}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5">
+                <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{STATUS_LABELS.CANCELLED}</p>
+                <p className="text-lg font-bold text-slate-300 tabular-nums">{reportStats.cancelled}</p>
               </div>
             </div>
 

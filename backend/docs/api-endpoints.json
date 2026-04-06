@@ -115,6 +115,18 @@
     },
     {
       "method": "GET",
+      "path": "/api/public/jobs/status/:ticketNo",
+      "auth": false,
+      "description": "ตรวจสอบสถานะด้วยเลขที่ใบ (มาสก์ — หน้าสาธารณะ)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/public/jobs/status-by-phone",
+      "auth": false,
+      "description": "รายการงานสรุปตามเบอร์ผู้แจ้ง · query phone= (ไม่มี job id)"
+    },
+    {
+      "method": "GET",
       "path": "/api/jobs/list",
       "auth": "Bearer JWT",
       "description": "รายการแจ้งซ่อมทั้งหมด"
@@ -122,8 +134,14 @@
     {
       "method": "GET",
       "path": "/api/jobs/status/:ticketNo",
-      "auth": false,
-      "description": "ตรวจสอบสถานะด้วยเลขที่ใบแจ้งซ่อม"
+      "auth": "Bearer JWT",
+      "description": "ตรวจสอบสถานะด้วยเลขที่ใบแจ้งซ่อม (ข้อมูลเต็มเมื่อล็อกอิน)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/status-by-phone",
+      "auth": "Bearer JWT",
+      "description": "รายการงานสรุปตามเบอร์ผู้แจ้ง · query phone= (มี id สำหรับลิงก์แดชบอร์ด)"
     },
     {
       "method": "GET",
@@ -186,6 +204,13 @@
       "roles": ["ADMIN", "SUPERVISOR"],
       "description": "ย้ายนอกสัญญา: ตั้ง isOutOfContract=true โดยคงสถานะ PENDING ตาม logic backend",
       "body": { "isOutOfContract": true }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/jobs/:id/cancel",
+      "auth": "Bearer JWT",
+      "description": "ยกเลิกงานสถานะ PENDING → CANCELLED · สิทธิ์ job.cancel",
+      "body": { "reason": "optional string max 500" }
     },
     {
       "method": "DELETE",
