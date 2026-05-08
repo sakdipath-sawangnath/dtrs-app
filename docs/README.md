@@ -4,6 +4,7 @@
 
 | ไฟล์ | หัวข้อ |
 |------|--------|
+| [templates/README.md](./templates/README.md) | **ดัชนีเทมเพลตแอป** — `AGENTS.md`, Skill 3 ตัวใน `templates/skills/`, `frontend_template` / `backend_template`, copy ทั้งโฟลเดอร์ไปโปรเจกต์อื่นได้ |
 | [Project-Plan-Private-MinIO-Images.md](./Project-Plan-Private-MinIO-Images.md) | ปิด MinIO public read, proxy `/job-images` + `/user-images`, checklist ทดสอบ PRD |
 | [Email-Notifications.md](./Email-Notifications.md) | Flow อีเมลแจ้งงาน (To/CC, `publicBaseUrl`, Role) |
 | [CSV-vs-System-Mapping.md](./CSV-vs-System-Mapping.md) | เทียบข้อมูล CSV/Excel กับ Prisma schema |

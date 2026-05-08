@@ -7,6 +7,15 @@
 #
 # หมายเหตุ: ค่า DATABASE_URL / JWT / MinIO ฯลฯ ต้องส่งเข้า backend ผ่าน environment
 # (เช่น export ก่อนรัน หรือสร้าง docker-compose.override.yml ในเครื่อง — ไม่ขึ้น git)
+#
+# Resource limits (CPU/RAM):
+# - จำกัดไม่ให้ container กิน CPU/RAM จน host ค้าง (เช่น กรณีมัลแวร์ / process รันaway)
+# - Docker Compose เวอร์ชันใหม่มัก honor `deploy.resources` ตอน `docker compose up`
+#   ถ้าเครื่องคุณไม่ enforce จริง ให้ตรวจด้วย `docker stats` หรือใช้ Swarm (`docker stack deploy`)
+#   / ปรับใน `docker-compose.override.yml`
+#
+# Volumes:
+# - ไฟล์นี้ไม่ mount โฟลเดอร์จาก host เข้า frontend/backend (ลดความเสี่ยงแพร่จาก host)
 
 services:
   backend:
@@ -20,6 +29,18 @@ services:
     environment:
       NODE_ENV: production
       PORT: "4000"
+    # ไม่มี volumes: — ไม่ผูก path บน host
+    deploy:
+      resources:
+        limits:
+          # Nest + Chromium (PDF) ต้องการ RAM มากกว่า frontend อย่างน้อยเล็กน้อย
+          cpus: "1.50"
+          memory: 1536M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    # จำกัดจำนวน process (ลดความเสียหายถ้ามี fork bomb / process spawn ผิดปกติ)
+    pids_limit: 512
 
   frontend:
     build:
@@ -38,3 +59,13 @@ services:
       API_INTERNAL_BASE_URL: ${API_INTERNAL_BASE_URL:-http://backend:4000/api}
     depends_on:
       - backend
+    # ไม่มี volumes: — ไม่ผูก path บน host
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+    pids_limit: 256
