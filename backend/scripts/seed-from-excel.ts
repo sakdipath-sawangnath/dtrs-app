@@ -3,27 +3,34 @@
  * รัน: npx ts-node scripts/seed-from-excel.ts
  */
 
-import * as xlsx from 'xlsx';
 import * as path from 'path';
+import type ExcelJS from 'exceljs';
 import * as bcrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
+import { loadWorkbookXlsx, worksheetToRecords } from './excel-sheet';
 
 const prisma = new PrismaClient();
 const EXCEL_PATH = path.resolve(__dirname, '../../ระบบแจ้งซ่อม CCTV .xlsx');
 
-function readSheet<T>(wb: xlsx.WorkBook, sheetName: string): T[] {
-  const ws = wb.Sheets[sheetName];
+function readSheet<T extends Record<string, unknown>>(
+  wb: ExcelJS.Workbook,
+  sheetName: string,
+): T[] {
+  const ws = wb.getWorksheet(sheetName);
   if (!ws) {
     console.warn(`⚠️  Sheet "${sheetName}" not found`);
     return [];
   }
-  return xlsx.utils.sheet_to_json<T>(ws);
+  return worksheetToRecords(ws) as T[];
 }
 
 async function main() {
   console.log('📂 Reading Excel:', EXCEL_PATH);
-  const wb = xlsx.readFile(EXCEL_PATH);
-  console.log('📋 Sheets found:', wb.SheetNames);
+  const wb = await loadWorkbookXlsx(EXCEL_PATH);
+  console.log(
+    '📋 Sheets found:',
+    wb.worksheets.map((s) => s.name),
+  );
 
   // ─── 1. พื้นที่ในโครงการ → Site ───
   console.log('\n🏗️  Seeding Sites (พื้นที่ในโครงการ)...');

@@ -33,6 +33,7 @@
 ## ไฟล์/เอกสารที่ควรรู้
 - ภาพรวมระบบ: `README.md` (มีตารางดัชนีเอกสารหลัก)
 - สถานะ/แผน/งาน: `STATUS.md`, `PLAN.md`, `TASK.md` (รวม Phase 6.5–6.8: …, **เทมเพลตอีเมล**, **CrudModal + `/dashboard/roles` Dark Glass**)
+- **เทมเพลตแอปใหม่** (สำเนา AGENTS + Skills + checklist): `docs/templates/README.md`
 - ดัชนี `docs/`: `docs/README.md`
 - Private MinIO + รูปผ่านสิทธิ์: `docs/Project-Plan-Private-MinIO-Images.md`, `minio.md`
 - การแจ้งเตือนอีเมล (To/CC เริ่มต้น, `publicBaseUrl`, Role): `docs/Email-Notifications.md`
@@ -40,4 +41,6 @@
 - RBAC: `backend/docs/RBAC-Setup.md`
 - Postman / สรุป endpoint: `backend/postman/README.md`, `backend/docs/api-endpoints.json`
 - Deploy: `.gitlab-ci.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml` — อ่านคู่กับ `README.md` (backend รัน **`dist/src/main.js`** ใน image ไม่ใช่ `dist/main.js`; frontend ใช้ **`next.config.mjs`**; ตั้ง **`ALLOWED_ORIGINS`** / **`API_INTERNAL_BASE_URL`** / ถ้า PRD ไป MinIO public ไม่ได้ให้ตั้ง **`MINIO_SERVER_FETCH_BASE_URL`** คู่ **`MINIO_PUBLIC_URL`** ตาม `README.md`)
+- Docker ทดสอบ local: `docker-compose.yml` — กำหนด **limits CPU/RAM** และ **`pids_limit`** (ลดความเสี่ยง container กินทรัพยากรจน host ค้าง); ไม่ mount โฟลเดอร์ host ใน service หลักของไฟล์นี้
+- ตรวจ dependency (advisory เท่านั้น ไม่ใช่ antivirus): ใน `frontend/` หรือ `backend/` รัน **`npm run security:audit`** / **`npm run security:audit:prod`**
 

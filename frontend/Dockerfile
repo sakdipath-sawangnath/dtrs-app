@@ -22,6 +22,9 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/next.config.mjs ./next.config.mjs
+# รันเป็น non-root (image node มีผู้ใช้ `node` uid 1000)
+RUN chown -R node:node /app
+USER node
 EXPOSE 3000
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["./node_modules/.bin/next", "start", "-H", "0.0.0.0", "-p", "3000"]

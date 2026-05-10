@@ -247,7 +247,7 @@ export class JobsService {
 
     /**
      * ค้นหาตามเลขที่ใบแจ้งซ่อม (หน้า /status)
-     * - includeSensitive=false: สาธารณะ — มาสก์ PII/สถานที่, ไม่ส่ง URL รูป (ส่ง issueImageCount แทน), รายละเอียดปัญหาแสดงเต็ม
+     * - includeSensitive=false: สาธารณะ — มาสก์ PII/สถานที่, ไม่ส่ง URL รูป (ส่ง issueImageCount แทน), รายละเอียดปัญหา/สาเหตุ/วิธีแก้ไขแสดงเต็ม (ข้อความจากช่าง ไม่ใช่ข้อมูลส่วนบุคคล)
      * - includeSensitive=true: มี JWT ที่ถูกต้อง — ข้อมูลเต็ม
      */
     async findByTicketNoForStatus(ticketNo: string, includeSensitive: boolean) {
@@ -260,6 +260,8 @@ export class JobsService {
                     status: true,
                     reportDate: true,
                     description: true,
+                    cause: true,
+                    fixMethod: true,
                     province: true,
                     district: true,
                     location: true,
@@ -289,6 +291,8 @@ export class JobsService {
                 status: true,
                 reportDate: true,
                 description: true,
+                cause: true,
+                fixMethod: true,
                 province: true,
                 district: true,
                 location: true,
@@ -314,6 +318,9 @@ export class JobsService {
             status: job.status,
             reportDate: job.reportDate,
             description: job.description,
+            /** ข้อความจากช่าง — ไม่ใช่ PII เปิดเต็มเหมือน description */
+            cause: job.cause,
+            fixMethod: job.fixMethod,
             province: provinceMasked,
             district: districtMasked,
             location: locationMasked,
@@ -402,6 +409,8 @@ export class JobsService {
                     createdAt: true,
                     description: true,
                     title: true,
+                    cause: true,
+                    fixMethod: true,
                 },
                 take: 2000,
             }),
@@ -424,6 +433,8 @@ export class JobsService {
                           createdAt: true,
                           description: true,
                           title: true,
+                          cause: true,
+                          fixMethod: true,
                       },
                       take: 2000,
                   })
@@ -439,6 +450,8 @@ export class JobsService {
                 createdAt: Date;
                 description: string | null;
                 title: string | null;
+                cause: string | null;
+                fixMethod: string | null;
             }
         >();
         for (const j of byReporterPhone) {
@@ -466,6 +479,8 @@ export class JobsService {
                     status: j.status,
                     reportDate: j.reportDate ? j.reportDate.toISOString() : null,
                     issueSummary,
+                    cause: j.cause,
+                    fixMethod: j.fixMethod,
                 };
                 return includeJobId ? { id: j.id, ...base } : base;
             }),

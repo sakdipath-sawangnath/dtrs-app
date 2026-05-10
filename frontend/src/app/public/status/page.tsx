@@ -1,10 +1,10 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback, useMemo } from 'react';
+import { Suspense, useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import { useSession } from 'next-auth/react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
-import { Search, MapPin, Calendar, FileText, User, Phone, Mail, Image as ImageIcon, AlertTriangle, Info } from 'lucide-react';
+import { Search, MapPin, Calendar, FileText, User, Phone, Mail, Image as ImageIcon, AlertTriangle, Info, ChevronDown, ChevronUp, Wrench } from 'lucide-react';
 import DashboardLayoutShell from '@/components/DashboardLayoutShell';
 import PublicLayoutShell from '@/components/PublicLayoutShell';
 import Link from 'next/link';
@@ -43,6 +43,14 @@ const STATUS_BADGE_FALLBACK =
 /** ปุ่มรอง — Dark Glass (สอดคล้อง AGENTS: Cancel slate) */
 const GLASS_BUTTON_SECONDARY =
   "inline-flex items-center justify-center rounded-xl border border-white/15 bg-slate-800/50 backdrop-blur-md text-slate-100 shadow-lg hover:bg-slate-700/55 hover:border-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500/50 transition-all active:scale-95";
+
+/** ปุ่มเน้นแบบกระจก — โทนฟ้าเดียวกับปุ่มค้นหา (btn-primary) และแท็บโหมดที่เลือก */
+const GLASS_BUTTON_PRIMARY =
+  "inline-flex items-center justify-center rounded-xl border border-blue-400/35 bg-blue-600/90 backdrop-blur-md text-white shadow-lg shadow-blue-950/30 ring-1 ring-white/10 hover:bg-blue-500/95 hover:border-blue-300/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400/70 transition-all active:scale-95";
+
+/** ปุ่มฟ้าแบบกะทัดรัดสำหรับแถวในตาราง (ไม่ให้ช่องอาการถูกบีบจากปุ่มใหญ่เกินจำเป็น) */
+const GLASS_BUTTON_PRIMARY_TABLE_ROW =
+  "inline-flex items-center justify-center rounded-lg border border-blue-400/35 bg-blue-600/90 backdrop-blur-md text-white text-[10px] sm:text-[11px] font-medium shadow-md shadow-blue-950/25 ring-1 ring-white/10 px-2 py-1.5 sm:px-2.5 gap-1 min-h-10 hover:bg-blue-500/95 hover:border-blue-300/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400/70 transition-all active:scale-95 cursor-pointer";
 
 const GLASS_SECTION =
   'rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl px-5 sm:px-7 py-5 sm:py-6';
@@ -131,6 +139,9 @@ type PhoneStatusListItem = {
   reportDate: string | null;
   /** อาการ/รายละเอียดคร่าวๆ (description หรือ fallback title) */
   issueSummary?: string | null;
+  /** บันทึกเมื่อปิดงาน — จากช่าง */
+  cause?: string | null;
+  fixMethod?: string | null;
 };
 
 const ISSUE_PREVIEW_MAX = 50;
@@ -144,6 +155,68 @@ function formatIssuePreview(full: string | null | undefined) {
     full: t,
     clipped,
   };
+}
+
+/** คีย์คงที่สำหรับแถวรายการตามเบอร์ (เปิด/ปิดรายละเอียดสาเหตุ–วิธีแก้) */
+function phoneFixDetailRowKey(row: PhoneStatusListItem): string {
+  const idPart = typeof row.id === 'number' ? String(row.id) : 'noid';
+  return `${idPart}|${row.ticketNo ?? ''}|${row.reportDate ?? ''}`;
+}
+
+function CauseFixFields({
+  cause,
+  fixMethod,
+  emptyHint,
+  compact,
+}: {
+  cause?: string | null;
+  fixMethod?: string | null;
+  emptyHint: string;
+  compact?: boolean;
+}) {
+  const c = (cause ?? '').trim();
+  const m = (fixMethod ?? '').trim();
+  const blockPad = compact ? 'px-3.5 py-3 sm:px-4 sm:py-3.5' : 'px-4 py-4 sm:px-5 sm:py-4';
+  const bodyCls =
+    'mt-2 text-[15px] sm:text-base text-white font-medium whitespace-pre-wrap wrap-break-word leading-relaxed';
+  const dashCls = 'mt-2 text-base text-slate-500 italic';
+
+  if (!c && !m) {
+    return (
+      <p
+        className={
+          compact ? 'text-sm text-slate-400 leading-relaxed' : 'text-sm sm:text-base text-slate-400 leading-relaxed'
+        }
+      >
+        {emptyHint}
+      </p>
+    );
+  }
+
+  return (
+    <div className={compact ? 'space-y-4' : 'grid gap-4 sm:gap-5'}>
+      <div
+        className={`rounded-xl border border-white/12 border-l-4 border-l-amber-400/90 bg-slate-950/55 backdrop-blur-sm shadow-inner ${blockPad}`}
+      >
+        <p className="text-sm sm:text-[0.9375rem] font-bold tracking-wide text-amber-100">
+          สาเหตุ
+        </p>
+        <p className={c ? bodyCls : dashCls} role={c ? undefined : 'status'}>
+          {c || '–'}
+        </p>
+      </div>
+      <div
+        className={`rounded-xl border border-white/12 border-l-4 border-l-emerald-400/90 bg-slate-950/55 backdrop-blur-sm shadow-inner ${blockPad}`}
+      >
+        <p className="text-sm sm:text-[0.9375rem] font-bold tracking-wide text-emerald-100">
+          วิธีการแก้ไข
+        </p>
+        <p className={m ? bodyCls : dashCls} role={m ? undefined : 'status'}>
+          {m || '–'}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function StatusPageInner() {
@@ -165,6 +238,8 @@ function StatusPageInner() {
   const [phoneSearchError, setPhoneSearchError] = useState<string | null>(null);
   /** คีย์สำหรับรีเซ็ตหน้าแบ่งเมื่อค้นหาเบอร์ใหม่ */
   const [phoneQueryKey, setPhoneQueryKey] = useState('');
+  /** แถวที่ขยายดูสาเหตุ/วิธีแก้ในรายการตามเบอร์ */
+  const [phoneDetailExpandedKey, setPhoneDetailExpandedKey] = useState<string | null>(null);
   const [result, setResult] = useState<{
     id?: number;
     ticketNo: string;
@@ -172,6 +247,8 @@ function StatusPageInner() {
     reportDate: string | null;
     detailLevel?: 'masked' | 'full';
     description?: string | null;
+    cause?: string | null;
+    fixMethod?: string | null;
     province?: string | null;
     district?: string | null;
     location?: string | null;
@@ -192,6 +269,8 @@ function StatusPageInner() {
     reportDate: string | null;
     detailLevel?: 'masked' | 'full';
     description?: string | null;
+    cause?: string | null;
+    fixMethod?: string | null;
     province?: string | null;
     district?: string | null;
     location?: string | null;
@@ -223,12 +302,20 @@ function StatusPageInner() {
         r.issueSummary === undefined ||
         r.issueSummary === null ||
         typeof r.issueSummary === 'string';
+      const causeOk =
+        r.cause === undefined || r.cause === null || typeof r.cause === 'string';
+      const fixOk =
+        r.fixMethod === undefined ||
+        r.fixMethod === null ||
+        typeof r.fixMethod === 'string';
       return (
         idOk &&
         tnOk &&
         typeof r.status === 'string' &&
         (r.reportDate === null || typeof r.reportDate === 'string') &&
-        issueOk
+        issueOk &&
+        causeOk &&
+        fixOk
       );
     });
   };
@@ -347,6 +434,10 @@ function StatusPageInner() {
   }, [initialTicketFromUrl, status, performSearch]);
 
   useEffect(() => {
+    setPhoneDetailExpandedKey(null);
+  }, [phoneQueryKey]);
+
+  useEffect(() => {
     if (initialTicketFromUrl) return;
     if (!initialPhoneFromUrl) return;
     if (status === 'loading') return;
@@ -419,7 +510,7 @@ function StatusPageInner() {
             isStaffFlow
               ? "max-w-5xl mx-auto"
               : searchMode === "phone" && phoneList !== undefined && phoneList.length > 0
-                ? "max-w-4xl mx-auto"
+                ? "max-w-6xl mx-auto"
                 : "max-w-3xl mx-auto"
           }`}
         >
@@ -587,7 +678,7 @@ function StatusPageInner() {
                 <div className="min-w-0 space-y-1 text-[13px] sm:text-sm leading-relaxed">
                   <p className="text-slate-200/95">
                     {searchMode === 'phone'
-                      ? 'การค้นตามเบอร์แสดงเลขที่ใบ อาการเสียคร่าวๆ วันที่แจ้ง และสถานะ — วางเมาส์บนข้อความอาการยาวเพื่อดูเต็ม'
+                      ? 'การค้นตามเบอร์แสดงเลขที่ใบ อาการคร่าวๆ วันที่แจ้ง และสถานะ — ใช้ปุ่ม «สาเหตุ / วิธีแก้» เพื่อเปิดดูรายละเอียดจากผู้ซ่อม (เมื่อมีการบันทึก) และวางเมาส์บนข้อความอาการยาวเพื่อดูเต็ม'
                       : 'ในโหมดสาธารณะ ข้อมูลส่วนตัวและรูปภาพจะแสดงแบบมาสก์'}
                   </p>
                   <p className="text-slate-400">
@@ -627,11 +718,14 @@ function StatusPageInner() {
           )}
 
           {phoneList !== undefined && phoneList.length > 0 && searchMode === 'phone' && (
-            <section className={GLASS_SECTION} aria-label="รายการแจ้งซ่อมตามเบอร์โทร">
+            <section
+              className="rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl px-4 sm:px-6 md:px-8 py-5 sm:py-6"
+              aria-label="รายการแจ้งซ่อมตามเบอร์โทร"
+            >
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-white/10">
-                <h2 className="text-base font-bold text-white">รายการแจ้งซ่อม</h2>
+                <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">รายการแจ้งซ่อม</h2>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
-                  <p className="text-xs text-slate-400 order-2 sm:order-1">
+                  <p className="text-xs sm:text-[13px] text-slate-400 order-2 sm:order-1 leading-snug">
                     พบ{" "}
                     <span className="font-semibold text-slate-200 tabular-nums">
                       {phoneFilteredCount}
@@ -646,25 +740,38 @@ function StatusPageInner() {
                   />
                 </div>
               </div>
-              <div className="rounded-xl border border-white/10 overflow-hidden">
+              <div className="rounded-xl border border-white/10 overflow-hidden -mx-0.5 sm:mx-0">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[min(100%,520px)] sm:min-w-[560px] text-left text-sm">
+                {/*
+                  ใช้ table-auto + w-[1%] ที่คอลัมน์แคบ (เลขที่ใบ/วัน/สถานะ/ปุ่ม) และ min-w ที่คอลัมน์อาการ
+                  แทน table-fixed เพื่อไม่ให้ผลรวม rem เกินความกว้างตารางแล้วบีบคอลัมน์กลางจนเหลือทีละตัวอักษร
+                */}
+                <table className="w-full max-w-full table-auto text-left text-[0.8125rem] sm:text-[0.9375rem]">
                   <thead>
-                    <tr className="border-b border-white/10 text-slate-400 text-xs uppercase tracking-wide bg-slate-950/30">
-                      <th className="py-2.5 px-3 font-medium">เลขที่ใบ</th>
-                      <th className="py-2.5 pr-3 font-medium min-w-[140px] max-w-[min(40vw,280px)]">
+                    <tr className="border-b border-white/10 text-slate-300 text-[11px] sm:text-xs uppercase tracking-wide bg-slate-950/35">
+                      <th className="py-2.5 pl-3 pr-2 font-semibold align-bottom whitespace-nowrap w-[1%]">
+                        เลขที่ใบ
+                      </th>
+                      <th className="py-2.5 pr-2 sm:pr-3 font-semibold align-bottom min-w-48 sm:min-w-72 w-[42%] max-w-xl">
                         อาการเสีย (คร่าวๆ)
                       </th>
-                      <th className="py-2.5 pr-3 font-medium whitespace-nowrap">วันที่แจ้ง</th>
-                      <th className="py-2.5 pr-3 font-medium">สถานะ</th>
+                      <th className="py-2.5 px-2 font-semibold align-bottom whitespace-nowrap w-[1%] text-center sm:text-left">
+                        วันที่แจ้ง
+                      </th>
+                      <th className="py-2.5 px-2 font-semibold align-bottom whitespace-nowrap w-[1%] text-center sm:text-left">
+                        สถานะ
+                      </th>
+                      <th className="py-2.5 pl-2 pr-3 font-semibold align-bottom whitespace-nowrap w-[1%] text-center sm:text-left">
+                        สาเหตุ / วิธีแก้
+                      </th>
                       {isStaffFlow ? (
-                        <th className="py-2.5 pl-3 pr-3 font-medium text-right whitespace-nowrap min-w-30 w-px">
+                        <th className="py-2.5 pl-2 pr-3 font-semibold text-right align-bottom whitespace-nowrap w-[1%]">
                           จัดการ
                         </th>
                       ) : null}
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="text-slate-200">
                     {phonePageRows.map((row, rowIdx) => {
                       const st =
                         STATUS_LABEL[row.status] ?? {
@@ -672,47 +779,106 @@ function StatusPageInner() {
                           badgeClass: STATUS_BADGE_FALLBACK,
                         };
                       const issue = formatIssuePreview(row.issueSummary);
+                      const rowKey = phoneFixDetailRowKey(row);
+                      const expanded = phoneDetailExpandedKey === rowKey;
+                      const detailPanelId = `job-fix-detail-p${phonePage}-i${rowIdx}`;
+                      const tableColSpan = isStaffFlow ? 6 : 5;
                       return (
-                        <tr key={`${phonePage}-${rowIdx}-${row.id ?? ''}-${row.ticketNo ?? ''}-${row.reportDate ?? ''}`} className="border-b border-white/5 last:border-0">
-                          <td className="py-3 px-3 font-mono text-slate-200 break-all">
-                            {row.ticketNo?.trim() ? row.ticketNo : '–'}
-                          </td>
-                          <td className="py-3 pr-3 text-slate-300 align-top">
-                            {issue.clipped ? (
-                              <TextHoverTooltip text={issue.full}>
-                                <span className="block max-w-[min(40vw,280px)] cursor-help wrap-break-word leading-snug">
+                        <Fragment key={`${phonePage}-${rowIdx}-${rowKey}`}>
+                          <tr className="border-b border-white/5 last:border-0">
+                            <td className="py-2.5 pl-3 pr-2 align-top font-mono text-[0.8125rem] sm:text-sm text-slate-100 tracking-tight whitespace-nowrap" title={row.ticketNo?.trim() || undefined}>
+                              {row.ticketNo?.trim() ? row.ticketNo : '–'}
+                            </td>
+                            <td className="py-2.5 pr-2 sm:pr-3 text-slate-200 align-top min-w-48 sm:min-w-72 wrap-break-word">
+                              {issue.clipped ? (
+                                <TextHoverTooltip text={issue.full}>
+                                  <span className="block cursor-help wrap-break-word leading-snug">
+                                    {issue.short}
+                                  </span>
+                                </TextHoverTooltip>
+                              ) : (
+                                <span className="block wrap-break-word leading-snug">
                                   {issue.short}
                                 </span>
-                              </TextHoverTooltip>
-                            ) : (
-                              <span className="block max-w-[min(40vw,280px)] wrap-break-word leading-snug">
-                                {issue.short}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3 pr-3 text-slate-300 whitespace-nowrap">
-                            {formatReportDateTime(row.reportDate)}
-                          </td>
-                          <td className="py-3 pr-3">
-                            <span className={`inline-flex text-xs font-semibold px-2.5 py-1 rounded-full ${st.badgeClass}`}>
-                              {st.text}
-                            </span>
-                          </td>
-                          {isStaffFlow ? (
-                            <td className="py-3 pl-3 pr-3 text-right whitespace-nowrap align-middle w-px">
-                              {typeof row.id === 'number' ? (
-                                <Link
-                                  href={`/dashboard/jobs/${row.id}`}
-                                  className={`${GLASS_BUTTON_SECONDARY} inline-flex items-center justify-center min-h-11 px-3 py-2 text-xs cursor-pointer font-medium whitespace-nowrap shrink-0`}
-                                >
-                                  รายละเอียด
-                                </Link>
-                              ) : (
-                                <span className="text-slate-500 text-xs">–</span>
                               )}
                             </td>
+                            <td className="py-2.5 px-2 text-slate-200 whitespace-nowrap text-[0.8125rem] sm:text-[0.9375rem] align-top tabular-nums text-center sm:text-left">
+                              {formatReportDateTime(row.reportDate)}
+                            </td>
+                            <td className="py-2.5 px-2 align-top text-center sm:text-left">
+                              <span className={`inline-flex text-[11px] sm:text-xs font-semibold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full ${st.badgeClass}`}>
+                                {st.text}
+                              </span>
+                            </td>
+                            <td className="py-2.5 pl-2 pr-3 align-top text-center sm:text-right">
+                              <button
+                                type="button"
+                                id={`${detailPanelId}-btn`}
+                                aria-expanded={expanded}
+                                aria-controls={detailPanelId}
+                                onClick={() =>
+                                  setPhoneDetailExpandedKey(expanded ? null : rowKey)
+                                }
+                                className={GLASS_BUTTON_PRIMARY_TABLE_ROW}
+                                aria-label={expanded ? `ซ่อนรายละเอียดสาเหตุ ใบ ${row.ticketNo ?? ''}` : `สาเหตุและวิธีแก้ ใบ ${row.ticketNo ?? ''}`}
+                              >
+                                <Wrench size={14} className="shrink-0 text-white/95" aria-hidden />
+                                <span className="whitespace-nowrap text-left leading-tight">
+                                  {expanded ? 'ซ่อนรายละเอียด' : 'สาเหตุ / วิธีแก้'}
+                                </span>
+                                {expanded ? (
+                                  <ChevronUp size={14} className="shrink-0 text-white/90" aria-hidden />
+                                ) : (
+                                  <ChevronDown size={14} className="shrink-0 text-white/90" aria-hidden />
+                                )}
+                              </button>
+                            </td>
+                            {isStaffFlow ? (
+                              <td className="py-2.5 pl-2 pr-3 text-right whitespace-nowrap align-middle">
+                                {typeof row.id === 'number' ? (
+                                  <Link
+                                    href={`/dashboard/jobs/${row.id}`}
+                                    className={`${GLASS_BUTTON_SECONDARY} inline-flex items-center justify-center min-h-10 px-2.5 py-1.5 text-[11px] sm:text-xs cursor-pointer font-medium whitespace-nowrap shrink-0 rounded-lg`}
+                                  >
+                                    รายละเอียด
+                                  </Link>
+                                ) : (
+                                  <span className="text-slate-500 text-xs">–</span>
+                                )}
+                              </td>
+                            ) : null}
+                          </tr>
+                          {expanded ? (
+                            <tr className="border-b border-white/5 bg-slate-950/25">
+                              <td colSpan={tableColSpan} className="px-3 pb-4 pt-0">
+                                <div
+                                  id={detailPanelId}
+                                  role="region"
+                                  aria-labelledby={`${detailPanelId}-btn`}
+                                  className="rounded-xl border border-white/10 bg-slate-900/40 backdrop-blur-md px-4 py-4 shadow-inner"
+                                >
+                                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/10">
+                                    <Wrench size={16} className="text-blue-400 shrink-0" aria-hidden />
+                                    <p className="text-sm font-semibold text-white">
+                                      รายละเอียดจากผู้ซ่อม
+                                      {row.ticketNo?.trim() ? (
+                                        <span className="font-normal text-slate-400 ms-1 break-all">
+                                          ({row.ticketNo.trim()})
+                                        </span>
+                                      ) : null}
+                                    </p>
+                                  </div>
+                                  <CauseFixFields
+                                    compact
+                                    cause={row.cause}
+                                    fixMethod={row.fixMethod}
+                                    emptyHint="ยังไม่มีการบันทึกสาเหตุหรือวิธีแก้ไข — ข้อมูลจะแสดงเมื่อผู้รับผิดชอบกรอกขณะปิดงาน"
+                                  />
+                                </div>
+                              </td>
+                            </tr>
                           ) : null}
-                        </tr>
+                        </Fragment>
                       );
                     })}
                   </tbody>
@@ -862,6 +1028,20 @@ function StatusPageInner() {
                 <p className="text-sm text-slate-300 whitespace-pre-wrap wrap-break-word leading-relaxed min-h-12">
                   {result.description?.trim() ? result.description : '–'}
                 </p>
+              </section>
+
+              <section className={GLASS_SECTION} aria-labelledby="status-cause-fix-heading">
+                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-white/10">
+                  <Wrench size={18} className="text-blue-400 shrink-0" aria-hidden />
+                  <h2 id="status-cause-fix-heading" className="text-base font-bold text-white">
+                    สาเหตุและวิธีการแก้ไข
+                  </h2>
+                </div>
+                <CauseFixFields
+                  cause={result.cause}
+                  fixMethod={result.fixMethod}
+                  emptyHint="ยังไม่มีการบันทึกสาเหตุหรือวิธีแก้ไข — ข้อมูลจะแสดงเมื่อผู้รับผิดชอบกรอกขณะปิดงาน"
+                />
               </section>
 
               {/* รูปภาพประกอบ — เต็ม: แสดงรูป | public มาสก์: การ์ดทึบตามจำนวน */}

@@ -93,6 +93,7 @@ frontend/
 - [ ] กำหนด **ชื่อ env** สำหรับ `NEXT_PUBLIC_API_BASE_URL` (ไม่ hardcode secret)
 - [ ] หน้าใช้ `Suspense` ครอบ `useSearchParams` ถ้า Next.js เวอร์ชันร้องขอ
 - [ ] ตารางรายการยาว: มี pagination / page size ตามดีไซน์โปรเจกต์
+- [ ] `package.json` มีสคริปต์ **`security:audit`** / **`security:audit:prod`** (`npm audit`) เพื่อเช็ค advisory — **ไม่แทน**การรีวิว dependency หรือสแกนมัลแวร์
 
 ---
 

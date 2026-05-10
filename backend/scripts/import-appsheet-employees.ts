@@ -99,7 +99,10 @@ async function migrate() {
         try {
           const imgRes = await axios.get(emp.imageUrl, { responseType: 'arraybuffer' });
           const buffer = Buffer.from(imgRes.data, 'binary');
-          const mimetype = imgRes.headers['content-type'] || 'image/png';
+          const rawCt = imgRes.headers['content-type'];
+          const mimetype = String(
+            Array.isArray(rawCt) ? rawCt[0] : rawCt ?? 'image/png',
+          );
           finalImageUrl = await uploadToMinio(buffer, 'profile.png', mimetype);
           console.log(`Uploaded image to MinIO: ${finalImageUrl}`);
         } catch (err) {

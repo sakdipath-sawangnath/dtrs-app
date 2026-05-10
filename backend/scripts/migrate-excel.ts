@@ -1,7 +1,7 @@
-import * as xlsx from 'xlsx';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaClient } from '@prisma/client';
+import { loadWorkbookXlsx, worksheetToRecords } from './excel-sheet';
 
 const prisma = new PrismaClient();
 
@@ -13,11 +13,12 @@ async function run() {
         return;
     }
 
-    const workbook = xlsx.readFile(filePath);
+    const workbook = await loadWorkbookXlsx(filePath);
 
     // Migrate Staff
-    const staffSheet = workbook.Sheets['ผู้แก้ไข'];
-    const staffData: any[] = xlsx.utils.sheet_to_json(staffSheet);
+    const staffData: any[] = worksheetToRecords(
+        workbook.getWorksheet('ผู้แก้ไข'),
+    );
 
     for (const row of staffData) {
         const name = row['ชื่อ-สกุล ผู้แก้ไข'];
@@ -41,8 +42,9 @@ async function run() {
     }
 
     // Migrate Jobs
-    const jobsSheet = workbook.Sheets['TEST ระบบแจ้งซ่อม CCTV '];
-    const jobsData: any[] = xlsx.utils.sheet_to_json(jobsSheet);
+    const jobsData: any[] = worksheetToRecords(
+        workbook.getWorksheet('TEST ระบบแจ้งซ่อม CCTV '),
+    );
 
     for (const row of jobsData) {
         const title = row['ข้อขัดข้อง'] || 'ไม่มีชื่อเรื่อง';

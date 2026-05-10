@@ -24,6 +24,8 @@ services:
       dockerfile: Dockerfile
     container_name: cctv-app-ticket-backend
     restart: unless-stopped
+    tmpfs:
+      - /tmp:rw,noexec,nosuid
     ports:
       - "8310:4000"
     environment:
@@ -50,6 +52,9 @@ services:
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8310/api}
     container_name: cctv-app-ticket-frontend
     restart: unless-stopped
+    # ลดความเสี่ยงรัน binary จาก /tmp (ให้ใช้คู่กับ deploy ผ่าน NPM + ปิดพอร์ต 8309 ที่ firewall)
+    tmpfs:
+      - /tmp:rw,noexec,nosuid
     ports:
       - "8309:3000"
     environment:

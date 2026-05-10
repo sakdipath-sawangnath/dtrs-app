@@ -92,6 +92,7 @@ backend/
 - **Entry production**: ตรวจว่า `Dockerfile` / `npm run start:prod` ชี้ไฟล์ที่ build ออกจริง (ในแอปนี้ใช้ **`node dist/src/main.js`** เพราะผล `nest build` อยู่ใต้ `dist/src/`)
 - **CORS**: `ALLOWED_ORIGINS` ตั้ง origin ของ frontend จริง
 - ถ้ามี reverse proxy: แยก path `/api`, WebSocket (`/socket.io`) ตามเอกสารโปรเจกต์
+- **`docker-compose.yml` (ทดสอบ local)**: พิจารณา **`deploy.resources.limits`** (CPU/RAM) และ **`pids_limit`** เพื่อกันคอนเทนเนอร์ยึดทรัพยากร host และตรวจว่าไม่ mount path host ที่ไม่จำเป็น
 
 บันทึกรายละเอียดเฉพาะเครื่อง deploy ไว้ใน `README.md` ของโปรเจกต์ใหม่ — ไม่ฝัง secret
 
@@ -114,6 +115,7 @@ backend/
 - [ ] Service ไม่พ่น raw DB error — แปลงเป็น HTTP ที่เหมาะสม
 - [ ] Migration Prisma ทดสอบบน DB dev ก่อน merge
 - [ ] (ถ้ามี) อัปเดต `api-endpoints.json` / Postman
+- [ ] `package.json` มี **`security:audit`** / **`security:audit:prod`** และรันเป็นระยะ (`npm audit` = เฉพาะ advisory)
 
 ---
 

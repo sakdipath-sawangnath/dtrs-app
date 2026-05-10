@@ -2,7 +2,13 @@
 
 ระบบแจ้งปัญหาและระบบจัดการการซ่อมบำรุงกล้องวงจรปิด (CCTV) ซึ่งพัฒนาต่อเนื่องมาจากการใช้งานผ่าน AppSheet
 
-## บันทึกการอัปเดตล่าสุด (2026-04-02)
+## บันทึกการอัปเดตล่าสุด (2026-05-08)
+
+- **แพ็กเกจเทมเพลตแอปใหม่** — `docs/templates/`: สำเนา [`AGENTS.md`](docs/templates/AGENTS.md), Skill ใน `docs/templates/skills/`, [`frontend_template.md`](docs/templates/frontend_template.md) / [`backend_template.md`](docs/templates/backend_template.md), ดัชนี [`docs/templates/README.md`](docs/templates/README.md) — คัดลอกทั้งโฟลเดอร์ไปใช้กับโปรเจกต์อื่นได้
+- **`docker-compose.yml`** — จำกัด CPU/RAM และ `pids_limit` ให้ frontend/backend (ลดความเสี่ยงทรัพยากร host ถูกกินจนเครื่องค้าง); ไม่มี volume mount จาก host ใน service หลัก
+- **ตรวจ dependency (npm advisory)** — ใน `frontend/` และ `backend/` มีสคริปต์ `npm run security:audit` และ `security:audit:prod` (ดู [`AGENTS.md`](AGENTS.md))
+
+## บันทึกการอัปเดต (2026-04-02)
 
 - **Serial หลายอุปกรณ์ (งานแก้ไข)** — รองรับได้สูงสุด 4 แถว (ชื่ออุปกรณ์ + S/N เดิม/ใหม่); โหมดหลายแถวเก็บ JSON ใน `Job.oldSerialNumber` (migration คอลัมน์เป็น `TEXT`); รายละเอียด [`docs/Job-Serial-Multi-Row.md`](docs/Job-Serial-Multi-Row.md)
 - **MinIO Orphan Manager** — หน้า `/dashboard/settings`: สแกน object ใน bucket ที่ไม่อ้างอิงจาก `Job` / `User` แล้วเลือกลบ (มี retention + ยืนยันก่อนลบ); [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md)
@@ -73,6 +79,7 @@
 | [`STATUS.md`](STATUS.md) | สถานะระบบและสรุป API |
 | [`PLAN.md`](PLAN.md), [`TASK.md`](TASK.md) | แผนและงาน |
 | [`docs/README.md`](docs/README.md) | ดัชนีโฟลเดอร์ `docs/` |
+| [`docs/templates/README.md`](docs/templates/README.md) | เทมเพลตแอปใหม่ — AGENTS + Skills + checklist (คัดลอกทั้งโฟลเดอร์ได้) |
 | [`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md) | Private MinIO + proxy รูป + checklist QA |
 | [`minio.md`](minio.md) | ตัวแปร MinIO และหมายเหตุ bucket |
 | [`docs/Email-Notifications.md`](docs/Email-Notifications.md) | Flow อีเมลแจ้งงาน |

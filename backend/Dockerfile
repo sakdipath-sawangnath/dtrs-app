@@ -20,6 +20,9 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/prisma ./prisma
+# รันเป็น non-root — Chromium ใช้คู่ args --no-sandbox ใน JobsPdfService แล้ว
+RUN chown -R node:node /app
+USER node
 EXPOSE 4000
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "dist/src/main.js"]
