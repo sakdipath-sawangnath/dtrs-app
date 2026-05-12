@@ -398,3 +398,9 @@ Temporary Items
 dist
 .webpack
 .serverless/**/*.zip
+
+# scripts/: ผล compile (tsc) จากสคริปต์ migration/seed — ไม่ขึ้น git (ซอร์ส *.ts ยัง track ตามเดิม)
+scripts/**/*.js
+scripts/**/*.js.map
+scripts/**/*.d.ts
+tsconfig.build.tsbuildinfo
