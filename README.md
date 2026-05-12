@@ -2,7 +2,14 @@
 
 ระบบแจ้งปัญหาและระบบจัดการการซ่อมบำรุงกล้องวงจรปิด (CCTV) ซึ่งพัฒนาต่อเนื่องมาจากการใช้งานผ่าน AppSheet
 
-## บันทึกการอัปเดตล่าสุด (2026-05-08)
+## บันทึกการอัปเดตล่าสุด (2026-05-10)
+
+- **Docker / hardening — image** — [`frontend/Dockerfile`](frontend/Dockerfile) และ [`backend/Dockerfile`](backend/Dockerfile): หลัง `COPY` และ `chown -R node:node /app` ใช้ **`USER node`** (ไม่รัน process เป็น root ในแอป)
+- **`docker-compose.yml`** — นอกจาก **limits CPU/RAM** และ **`pids_limit`** แล้ว มี **`tmpfs: /tmp:rw,noexec,nosuid`** ทั้ง **frontend** และ **backend** (ลดความเสี่ยงรัน executable จาก `/tmp` ในแท็บเล็กเมื่อ expose public); ถ้าใช้ `docker run` แยก ให้เพิ่ม `--tmpfs /tmp:rw,noexec,nosuid` และจำกัดทรัพยากรตามนโยบาย (ตัวอย่าง frontend: **`--cpus=.5`**, **`--memory=512m`** คู่ map พอร์ต **8309:3000**)
+- **`npm audit` / dependency** — รัน `npm run security:audit` / `security:audit:prod` ใน `frontend/` และ `backend/`; โปรเจกต์ใช้ **`overrides`** ใน [`frontend/package.json`](frontend/package.json) (เช่น `postcss` ให้อยู่ในเวอร์ชันที่ advisory ว่าแก้แล้ว) และ [`backend/package.json`](backend/package.json) (แก้ transitive + สคริปต์ seed/migrate ใช้ **exceljs** แทน `xlsx` ในเครื่อง dev) — รายละเอียดเชิงเทคนิคใน commit / log อย่าวาง credential ใน repo
+- **หน้า public ตรวจสอบสถานะ** — [`/public/status`](frontend/src/app/public/status/page.tsx): ค้นตามเบอร์หรือเลขที่ใบ; API **`GET /public/jobs/status-by-phone`** และ **`GET /public/jobs/status/:ticketNo`** คืนฟิลด์ **`cause`** และ **`fixMethod`** (จากผู้ซ่อมเมื่อปิดงาน) — UI แสดงปุ่มดูสาเหตุ/วิธีแก้และการ์ดรายละเอียด
+
+## บันทึกการอัปเดต (2026-05-08)
 
 - **แพ็กเกจเทมเพลตแอปใหม่** — `docs/templates/`: สำเนา [`AGENTS.md`](docs/templates/AGENTS.md), Skill ใน `docs/templates/skills/`, [`frontend_template.md`](docs/templates/frontend_template.md) / [`backend_template.md`](docs/templates/backend_template.md), ดัชนี [`docs/templates/README.md`](docs/templates/README.md) — คัดลอกทั้งโฟลเดอร์ไปใช้กับโปรเจกต์อื่นได้
 - **`docker-compose.yml`** — จำกัด CPU/RAM และ `pids_limit` ให้ frontend/backend (ลดความเสี่ยงทรัพยากร host ถูกกินจนเครื่องค้าง); ไม่มี volume mount จาก host ใน service หลัก
@@ -172,8 +179,9 @@
    - เมื่อส่งฟอร์มแล้ว ระบบจะสร้าง **เลขที่ใบแจ้งซ่อม (ticketNo)** อัตโนมัติ แสดงเลขนี้ใน Toast — ผู้ใช้ทั่วไปจะไปหน้า `/status?ticketNo=...`
    - รูปภาพข้อขัดข้องถูกอัปโหลดขึ้น **MinIO** ผ่าน `MinioService` และเก็บ URL ไว้ในฟิลด์ `Job.images`
    - เมื่อ staff ล็อกอินแล้วเข้า `/report` จะเห็น layout แดชบอร์ด (DashboardPageShell) สำหรับบันทึกการแจ้งซ่อม
-2. **ตรวจสอบสถานะ:** `http://localhost:3000/status` — ตรวจสอบสถานะการแจ้งซ่อม
-   - กรอกเลขที่ใบแจ้งซ่อม (ทั้งจากข้อมูลเดิมใน CSV และงานใหม่) เพื่อดูสถานะ/รายละเอียด
+2. **ตรวจสอบสถานะ (public):** `http://localhost:3000/public/status` — ตามเบอร์โทร (`?phone=`) หรือเลขที่ใบ (`?ticketNo=`); เส้นทางเดิม `/status` redirect ไปที่นี่
+   - กรอกเลขที่ใบแจ้งซ่อม (ทั้งจากข้อมูลเดิมใน CSV และงานใหม่) เพื่อดูสถานะและรายละเอียด (โหมดสาธารณะมีมาสก์ข้อมูลส่วนตัว/รูปตามที่ API ส่งมา)
+   - รายการตามเบอร์และรายละเอียดเมื่อได้ JWT มีการแสดง **สาเหตุ** (`cause`) และ **วิธีแก้ไข** (`fixMethod`) เมื่อมีการบันทึกจากผู้ซ่อม
    - รองรับ query string `?ticketNo=...` เมื่อมาจากหน้า `/report` ช่องค้นหาจะถูกกรอกอัตโนมัติและค้นหาให้ทันที
 3. **หน้าเข้าสู่ระบบ (Staff Login):** `http://localhost:3000/login`
    - สำหรับเจ้าหน้าที่/ผู้ดูแล (กรอกอีเมลหรือชื่อผู้ใช้ + รหัสผ่าน); การ์ดจัดกลาง

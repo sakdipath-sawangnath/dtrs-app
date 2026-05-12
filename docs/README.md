@@ -2,6 +2,8 @@
 
 ดัชนีอ้างอิงเร็วสำหรับทีมและ AI Agent
 
+**การ deploy สาธารณะ (สรุปจาก `README.md` — 2026-05-10):** image รัน **`USER node`**; `docker-compose.yml` มี **`tmpfs /tmp` (noexec)** + จำกัด CPU/RAM และ `pids_limit`; รัน **`npm run security:audit`** เป็นระยะ; หน้า **[`/public/status`](../frontend/src/app/public/status/page.tsx)** แสดง **`cause`** / **`fixMethod`** เมื่อมีข้อมูลจากผู้ปิดงาน — รายละเอียดใน [`../README.md`](../README.md) และ [`../AGENTS.md`](../AGENTS.md)
+
 | ไฟล์ | หัวข้อ |
 |------|--------|
 | [templates/README.md](./templates/README.md) | **ดัชนีเทมเพลตแอป** — `AGENTS.md`, Skill 3 ตัวใน `templates/skills/`, `frontend_template` / `backend_template`; ซิงค์กับ root `AGENTS.md` + `.agents/skills/` เมื่อมาตรฐานเปลี่ยน |

@@ -10,6 +10,7 @@ import {
   UserCircle2,
 } from "lucide-react";
 import PersonAvatar from "@/components/PersonAvatar";
+import { formatThaiDateTimeDisplay } from "@/lib/formatThaiDateTimeDisplay";
 
 const GLASS_SECTION =
   "rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl p-4 sm:p-5";
@@ -33,16 +34,6 @@ export type JobTimelineJob = {
 
 type AssignMode = "none" | "self" | "delegate" | "unknown";
 
-function formatThaiDateTime(iso: string | undefined): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleString("th-TH", {
-    dateStyle: "short",
-    timeStyle: "short",
-  });
-}
-
 type StepState = "done" | "current" | "upcoming";
 
 const STATUS_LABELS_SHORT: Record<string, string> = {
@@ -53,7 +44,7 @@ const STATUS_LABELS_SHORT: Record<string, string> = {
 
 function buildCollapsedSummary(job: JobTimelineJob): string {
   const statusLabel = STATUS_LABELS_SHORT[job.status] ?? job.status;
-  const reported = formatThaiDateTime(job.reportDate ?? job.createdAt);
+  const reported = formatThaiDateTimeDisplay(job.reportDate ?? job.createdAt);
   const parts = [`สถานะ ${statusLabel}`];
   if (reported) parts.push(`แจ้งเมื่อ ${reported}`);
   if (job.assignedTo && job.assignedBy) {
@@ -64,14 +55,14 @@ function buildCollapsedSummary(job: JobTimelineJob): string {
     }
   }
   if (job.status === "RESOLVED") {
-    const closed = formatThaiDateTime(job.fixDate ?? undefined);
+    const closed = formatThaiDateTimeDisplay(job.fixDate ?? undefined);
     if (closed) parts.push(`ปิดเมื่อ ${closed}`);
   }
   return parts.join(" · ");
 }
 
 function computeSteps(job: JobTimelineJob) {
-  const reportedAt = formatThaiDateTime(job.reportDate ?? job.createdAt);
+  const reportedAt = formatThaiDateTimeDisplay(job.reportDate ?? job.createdAt);
   const hasAssignee = Boolean(job.assignedTo);
   const isPending = job.status === "PENDING";
   const isInProgress = job.status === "IN_PROGRESS";
@@ -168,7 +159,7 @@ function computeSteps(job: JobTimelineJob) {
     return { state: "upcoming", detail: "รอเริ่มดำเนินการแก้ไข" };
   })();
 
-  const closedAt = formatThaiDateTime(job.fixDate ?? undefined);
+  const closedAt = formatThaiDateTimeDisplay(job.fixDate ?? undefined);
   const close: { state: StepState; detail: string; time: string | null } = (() => {
     if (isResolved) {
       return {

@@ -908,6 +908,42 @@ export class JobsService {
         throw new Error('ไม่สามารถสร้างเลขที่ใบแจ้งซ่อมได้ กรุณาลองใหม่อีกครั้ง');
     }
 
+    private static readonly BACKFILL_MIN_YEAR = 2000;
+
+    /** สิ้นวันปัจจุบันตาม Asia/Bangkok (ไม่มี DST) — ใช้เปรียบเทียบกับค่า UTC ใน DB */
+    private getEndOfTodayBangkok(): Date {
+        const ymd = new Intl.DateTimeFormat('sv-SE', {
+            timeZone: 'Asia/Bangkok',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }).format(new Date());
+        return new Date(`${ymd}T23:59:59.999+07:00`);
+    }
+
+    private getStartOfMinBackfillDateBangkok(): Date {
+        return new Date(`${JobsService.BACKFILL_MIN_YEAR}-01-01T00:00:00.000+07:00`);
+    }
+
+    private assertBackfillDateInPolicy(d: Date, fieldName: 'reportDate' | 'fixDate'): void {
+        const start = this.getStartOfMinBackfillDateBangkok();
+        const end = this.getEndOfTodayBangkok();
+        if (d.getTime() < start.getTime()) {
+            throw new BadRequestException(
+                fieldName === 'reportDate'
+                    ? `วันที่แจ้งต้องไม่ก่อนปี ${JobsService.BACKFILL_MIN_YEAR} — กรุณาตรวจสอบปี`
+                    : `วันที่ปิดงานต้องไม่ก่อนปี ${JobsService.BACKFILL_MIN_YEAR} — กรุณาตรวจสอบปี`,
+            );
+        }
+        if (d.getTime() > end.getTime()) {
+            throw new BadRequestException(
+                fieldName === 'reportDate'
+                    ? 'วันที่แจ้งต้องไม่เกินวันนี้ (ตามเวลาไทย) — ตรวจสอบปีหรือวันที่ในอนาคต'
+                    : 'วันที่ปิดงานต้องไม่เกินวันนี้ (ตามเวลาไทย) — ตรวจสอบปีหรือวันที่ในอนาคต',
+            );
+        }
+    }
+
     /** แปลงสตริงวันเวลา (ISO หรือ datetime-local) ให้เป็น Date */
     private parseBackfillDate(input: string, fieldName: 'reportDate' | 'fixDate'): Date {
         const raw = input.trim();
@@ -918,6 +954,7 @@ export class JobsService {
         if (Number.isNaN(d.getTime())) {
             throw new BadRequestException(`${fieldName} ไม่ใช่รูปแบบวันเวลาที่ถูกต้อง`);
         }
+        this.assertBackfillDateInPolicy(d, fieldName);
         return d;
     }
 }

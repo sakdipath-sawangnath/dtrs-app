@@ -41,6 +41,6 @@
 - RBAC: `backend/docs/RBAC-Setup.md`
 - Postman / สรุป endpoint: `backend/postman/README.md`, `backend/docs/api-endpoints.json`
 - Deploy: `.gitlab-ci.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml` — อ่านคู่กับ `README.md` (backend รัน **`dist/src/main.js`** ใน image ไม่ใช่ `dist/main.js`; frontend ใช้ **`next.config.mjs`**; ตั้ง **`ALLOWED_ORIGINS`** / **`API_INTERNAL_BASE_URL`** / ถ้า PRD ไป MinIO public ไม่ได้ให้ตั้ง **`MINIO_SERVER_FETCH_BASE_URL`** คู่ **`MINIO_PUBLIC_URL`** ตาม `README.md`)
-- Docker ทดสอบ local: `docker-compose.yml` — กำหนด **limits CPU/RAM** และ **`pids_limit`** (ลดความเสี่ยง container กินทรัพยากรจน host ค้าง); ไม่ mount โฟลเดอร์ host ใน service หลักของไฟล์นี้
+- Docker ทดสอบ local: `docker-compose.yml` — **runner stage** ใช้ **`USER node`** หลัง `chown` (ทั้ง **`frontend/Dockerfile`** และ **`backend/Dockerfile`**); กำหนด **limits CPU/RAM**, **`pids_limit`**, และ **`tmpfs: /tmp:rw,noexec,nosuid`** ต่อ service (ลดความเสี่ยง container กินทรัพยากร host / ใช้ `/tmp` รัน malicious binary); **ไม่** mount โฟลเดอร์ host ใน service หลักของไฟล์นี้ — **ผ่าน** reverse proxy ให้เปิดแค่ 80/443 ไม่ expose พอร์ตแอพตรงที่ firewall เมื่อ deploy public
 - ตรวจ dependency (advisory เท่านั้น ไม่ใช่ antivirus): ใน `frontend/` หรือ `backend/` รัน **`npm run security:audit`** / **`npm run security:audit:prod`**
 

@@ -40,6 +40,12 @@ import {
   serializeJobSerialRowsToFormFields,
   type JobSerialRowForm,
 } from "@/lib/jobSerialRows";
+import { validateBackfillDate } from "@/lib/jobBackfillDatePolicy";
+import {
+  formatThaiDateTimeDisplay,
+  joinLocalDateTime,
+  splitLocalDateTime,
+} from "@/lib/formatThaiDateTimeDisplay";
 
 interface JobDetail {
   id: number;
@@ -121,6 +127,83 @@ function toDateTimeLocalInputValue(iso?: string | null): string {
   const hour = pad(d.getHours());
   const minute = pad(d.getMinutes());
   return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+/** คู่ date + time แทน datetime-local — แสดงบรรทัดพ.ศ. ให้สอดคล้องส่วนอื่นของหน้า */
+function BackfillDateTimeFields({
+  groupAriaLabel,
+  dateId,
+  timeId,
+  value,
+  onChange,
+  disabled,
+}: {
+  groupAriaLabel: string;
+  dateId: string;
+  timeId: string;
+  value: string;
+  onChange: (v: string) => void;
+  disabled: boolean;
+}) {
+  const { date, time } = splitLocalDateTime(value);
+  const preview = value.trim() ? formatThaiDateTimeDisplay(value) : null;
+
+  return (
+    <div
+      role="group"
+      aria-label={groupAriaLabel}
+      className="space-y-1.5 min-w-0"
+      lang="th"
+    >
+      <p className={GLASS_LABEL}>{groupAriaLabel}</p>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex-1 min-w-0">
+          <label htmlFor={dateId} className="mb-1 block text-[10px] font-medium text-slate-500">
+            วันที่ (ปฏิทิน)
+          </label>
+          <input
+            id={dateId}
+            type="date"
+            className={GLASS_FIELD}
+            value={date}
+            onChange={(e) => {
+              const nextDate = e.target.value;
+              if (!nextDate) {
+                onChange("");
+                return;
+              }
+              onChange(joinLocalDateTime(nextDate, time || "00:00"));
+            }}
+            disabled={disabled}
+          />
+        </div>
+        <div className="w-full sm:w-38 shrink-0">
+          <label htmlFor={timeId} className="mb-1 block text-[10px] font-medium text-slate-500">
+            เวลา (24 ชม.)
+          </label>
+          <input
+            id={timeId}
+            type="time"
+            step={60}
+            className={GLASS_FIELD}
+            value={time}
+            onChange={(e) => {
+              const nextTime = e.target.value;
+              if (!date) return;
+              onChange(joinLocalDateTime(date, nextTime));
+            }}
+            disabled={disabled || !date}
+          />
+        </div>
+      </div>
+      {preview ? (
+        <p className="text-xs text-slate-400 leading-relaxed pt-0.5" aria-live="polite">
+          <span className="text-slate-500">แสดงเป็นปฏิทินไทย (พ.ศ.): </span>
+          <span className="font-medium tabular-nums text-slate-200">{preview}</span>
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 export default function JobDetailPage() {
@@ -260,11 +343,50 @@ export default function JobDetailPage() {
 
   const resolvedAtText = useMemo(() => {
     if (!job?.fixDate) return null;
-    return new Date(job.fixDate).toLocaleString("th-TH", {
-      dateStyle: "short",
-      timeStyle: "short",
-    });
+    return formatThaiDateTimeDisplay(job.fixDate);
   }, [job?.fixDate]);
+
+  /** แบนเนอร์เตือนก่อน submit — สอดคล้องกฎเดียวกับ backend */
+  const backfillPolicyWarnings = useMemo(() => {
+    const lines: string[] = [];
+    const r = backfillReportDate.trim();
+    const f = backfillFixDate.trim();
+    if (r) {
+      const d = new Date(r);
+      if (!Number.isNaN(d.getTime())) {
+        const err = validateBackfillDate(d, "reportDate");
+        if (err) lines.push(err);
+      }
+    }
+    if (f) {
+      const d = new Date(f);
+      if (!Number.isNaN(d.getTime())) {
+        const err = validateBackfillDate(d, "fixDate");
+        if (err) lines.push(err);
+      }
+    }
+    if (job) {
+      const reportMsCandidate = r
+        ? new Date(r).getTime()
+        : new Date(job.reportDate || job.createdAt).getTime();
+      const fixMsCandidate = f
+        ? new Date(f).getTime()
+        : job.fixDate
+          ? new Date(job.fixDate).getTime()
+          : null;
+      if (
+        fixMsCandidate != null &&
+        !Number.isNaN(reportMsCandidate) &&
+        !Number.isNaN(fixMsCandidate) &&
+        fixMsCandidate < reportMsCandidate
+      ) {
+        lines.push(
+          "วันที่ปิดย้อนหลังต้องไม่น้อยกว่าวันที่แจ้ง (รวมค่าที่มีอยู่แล้วในระบบ)",
+        );
+      }
+    }
+    return lines;
+  }, [backfillReportDate, backfillFixDate, job]);
 
   const fixEnvironmentSelectValue = useMemo(() => {
     if (!fixEnvironment) return null;
@@ -463,6 +585,52 @@ export default function JobDetailPage() {
         toastError("ข้อมูลไม่ถูกต้อง", "วันที่ปิดย้อนหลังต้องไม่น้อยกว่าวันที่แจ้งย้อนหลัง");
         return;
       }
+    }
+
+    if (reportLocal) {
+      const reportDt = new Date(reportLocal);
+      if (Number.isNaN(reportDt.getTime())) {
+        toastError("รูปแบบเวลาไม่ถูกต้อง", "กรุณาตรวจสอบวันที่แจ้งย้อนหลัง");
+        return;
+      }
+      const err = validateBackfillDate(reportDt, "reportDate");
+      if (err) {
+        toastError("วันที่แจ้งไม่ถูกต้อง", err);
+        return;
+      }
+    }
+    if (fixLocal) {
+      const fixDt = new Date(fixLocal);
+      if (Number.isNaN(fixDt.getTime())) {
+        toastError("รูปแบบเวลาไม่ถูกต้อง", "กรุณาตรวจสอบวันที่ปิดย้อนหลัง");
+        return;
+      }
+      const err = validateBackfillDate(fixDt, "fixDate");
+      if (err) {
+        toastError("วันที่ปิดงานไม่ถูกต้อง", err);
+        return;
+      }
+    }
+
+    const nextReportMs = reportLocal
+      ? new Date(reportLocal).getTime()
+      : new Date(job.reportDate || job.createdAt).getTime();
+    const nextFixMs = fixLocal
+      ? new Date(fixLocal).getTime()
+      : job.fixDate
+        ? new Date(job.fixDate).getTime()
+        : null;
+    if (
+      nextFixMs != null &&
+      !Number.isNaN(nextReportMs) &&
+      !Number.isNaN(nextFixMs) &&
+      nextFixMs < nextReportMs
+    ) {
+      toastError(
+        "ข้อมูลไม่ถูกต้อง",
+        "วันที่ปิดย้อนหลังต้องไม่น้อยกว่าวันที่แจ้ง (รวมค่าที่มีอยู่แล้วในระบบ)",
+      );
+      return;
     }
 
     const payload: { reportDate?: string; fixDate?: string } = {};
@@ -725,10 +893,9 @@ export default function JobDetailPage() {
                             <span>วันที่แจ้ง:</span>
                             <span className="flex items-center gap-1 text-slate-300">
                               <Calendar size={12} aria-hidden />
-                              {new Date(job.reportDate || job.createdAt).toLocaleString(
-                                "th-TH",
-                                { dateStyle: "short", timeStyle: "short" }
-                              )}
+                              {formatThaiDateTimeDisplay(
+                                job.reportDate || job.createdAt,
+                              ) ?? "–"}
                             </span>
                           </div>
                         )}
@@ -1034,33 +1201,47 @@ export default function JobDetailPage() {
                   </div>
 
                   <form onSubmit={handleBackfillDates} className="space-y-3">
+                    {backfillPolicyWarnings.length > 0 ? (
+                      <div
+                        role="status"
+                        className="rounded-xl border border-amber-500/35 bg-amber-950/25 px-3 py-2.5 text-xs text-amber-100/95 leading-relaxed"
+                      >
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle
+                            className="shrink-0 mt-0.5 text-amber-400"
+                            size={16}
+                            aria-hidden
+                          />
+                          <div>
+                            <p className="font-semibold text-amber-100">
+                              ตรวจสอบวันที่ก่อนบันทึก
+                            </p>
+                            <ul className="mt-1 list-disc list-inside space-y-0.5">
+                              {backfillPolicyWarnings.map((w, idx) => (
+                                <li key={`${idx}-${w.slice(0, 40)}`}>{w}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className={GLASS_LABEL} htmlFor="job-backfill-report-date">
-                          วันที่แจ้งย้อนหลัง
-                        </label>
-                        <input
-                          id="job-backfill-report-date"
-                          type="datetime-local"
-                          className={GLASS_FIELD}
-                          value={backfillReportDate}
-                          onChange={(e) => setBackfillReportDate(e.target.value)}
-                          disabled={backfillSaving}
-                        />
-                      </div>
-                      <div>
-                        <label className={GLASS_LABEL} htmlFor="job-backfill-fix-date">
-                          วันที่ปิดย้อนหลัง
-                        </label>
-                        <input
-                          id="job-backfill-fix-date"
-                          type="datetime-local"
-                          className={GLASS_FIELD}
-                          value={backfillFixDate}
-                          onChange={(e) => setBackfillFixDate(e.target.value)}
-                          disabled={backfillSaving}
-                        />
-                      </div>
+                      <BackfillDateTimeFields
+                        groupAriaLabel="วันที่แจ้งย้อนหลัง"
+                        dateId="job-backfill-report-date"
+                        timeId="job-backfill-report-time"
+                        value={backfillReportDate}
+                        onChange={setBackfillReportDate}
+                        disabled={backfillSaving}
+                      />
+                      <BackfillDateTimeFields
+                        groupAriaLabel="วันที่ปิดย้อนหลัง"
+                        dateId="job-backfill-fix-date"
+                        timeId="job-backfill-fix-time"
+                        value={backfillFixDate}
+                        onChange={setBackfillFixDate}
+                        disabled={backfillSaving}
+                      />
                     </div>
                     <p className="text-xs text-slate-500 leading-relaxed">
                       หมายเหตุ: วันที่ปิดย้อนหลังตั้งได้เฉพาะงานสถานะ{" "}
@@ -1069,7 +1250,7 @@ export default function JobDetailPage() {
                     </p>
                     <button
                       type="submit"
-                      disabled={backfillSaving}
+                      disabled={backfillSaving || backfillPolicyWarnings.length > 0}
                       className="min-h-[44px] px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-cyan-100 bg-cyan-900/40 border border-cyan-500/35 hover:bg-cyan-800/45 disabled:opacity-60 transition-all shadow-lg active:scale-95 focus:ring-2 focus:ring-cyan-500/40 outline-none cursor-pointer"
                     >
                       {backfillSaving ? "กำลังบันทึกวันเวลาย้อนหลัง..." : "บันทึกวันเวลาย้อนหลัง"}

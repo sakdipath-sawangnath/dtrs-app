@@ -8,8 +8,8 @@
 # หมายเหตุ: ค่า DATABASE_URL / JWT / MinIO ฯลฯ ต้องส่งเข้า backend ผ่าน environment
 # (เช่น export ก่อนรัน หรือสร้าง docker-compose.override.yml ในเครื่อง — ไม่ขึ้น git)
 #
-# Resource limits (CPU/RAM):
-# - จำกัดไม่ให้ container กิน CPU/RAM จน host ค้าง (เช่น กรณีมัลแวร์ / process รันaway)
+# stResource limits (CPU/RAM):
+# - จำกัดไม่ให้ container กิน CPU/RAM จน ho ค้าง (เช่น กรณีมัลแวร์ / process รันaway)
 # - Docker Compose เวอร์ชันใหม่มัก honor `deploy.resources` ตอน `docker compose up`
 #   ถ้าเครื่องคุณไม่ enforce จริง ให้ตรวจด้วย `docker stats` หรือใช้ Swarm (`docker stack deploy`)
 #   / ปรับใน `docker-compose.override.yml`

@@ -276,6 +276,52 @@ const PAGE_SIZE_OPTIONS = [
   { value: "all", label: "ทั้งหมด" },
 ] as const;
 
+/** เรียงรายการงาน — ค่า null/parse ไม่ได้ = ไปท้ายรายการเสมอ (ตามแผนตรวจสอบข้อมูล) */
+export type JobListSortField = "report" | "created" | "fix";
+export type JobListSortDir = "desc" | "asc";
+
+function parseJobTimeMs(iso: string | undefined | null): number | null {
+  if (iso == null || String(iso).trim() === "") return null;
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? null : t;
+}
+
+function getJobSortComparable(
+  job: Job,
+  field: JobListSortField,
+): { primary: number | null; secondary: number } {
+  const createdMs = parseJobTimeMs(job.createdAt) ?? 0;
+  if (field === "created") {
+    return { primary: createdMs, secondary: job.id };
+  }
+  if (field === "report") {
+    const reportMs = parseJobTimeMs(job.reportDate ?? null);
+    const primary = reportMs ?? createdMs;
+    return { primary, secondary: job.id };
+  }
+  // fix
+  const fixMs = parseJobTimeMs(job.fixDate ?? null);
+  return { primary: fixMs, secondary: job.id };
+}
+
+function compareJobsForList(
+  a: Job,
+  b: Job,
+  field: JobListSortField,
+  dir: JobListSortDir,
+): number {
+  const ca = getJobSortComparable(a, field);
+  const cb = getJobSortComparable(b, field);
+  const aNull = ca.primary == null;
+  const bNull = cb.primary == null;
+  if (aNull && bNull) return ca.secondary - cb.secondary;
+  if (aNull) return 1;
+  if (bNull) return -1;
+  const diff = (ca.primary as number) - (cb.primary as number);
+  if (diff !== 0) return dir === "desc" ? -diff : diff;
+  return ca.secondary - cb.secondary;
+}
+
 /** No-Card: แยก Glass ย่อย (AGENTS.md) */
 const GLASS_SECTION =
   "rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl";
@@ -332,6 +378,8 @@ export default function JobsList({
   const [brokenPartSelect, setBrokenPartSelect] = useState<string>("");
   const [pageSize, setPageSize] = useState<DataTablePageSize>(15);
   const [page, setPage] = useState(1);
+  const [jobSortField, setJobSortField] = useState<JobListSortField>("report");
+  const [jobSortDir, setJobSortDir] = useState<JobListSortDir>("desc");
   const [detailJob, setDetailJob] = useState<Job | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [assignJob, setAssignJob] = useState<Job | null>(null);
@@ -590,6 +638,12 @@ export default function JobsList({
     brokenPartSelect,
   ]);
 
+  const sortedFilteredJobs = useMemo(() => {
+    const list = [...filteredJobs];
+    list.sort((a, b) => compareJobsForList(a, b, jobSortField, jobSortDir));
+    return list;
+  }, [filteredJobs, jobSortField, jobSortDir]);
+
   const provinces = useMemo(() => {
     const set = new Set<string>();
     jobs.forEach((j) => j.province && set.add(j.province));
@@ -640,15 +694,15 @@ export default function JobsList({
   );
 
   const paginatedJobs = useMemo(() => {
-    if (pageSize === "all") return filteredJobs;
+    if (pageSize === "all") return sortedFilteredJobs;
     const start = (page - 1) * pageSize;
-    return filteredJobs.slice(start, start + pageSize);
-  }, [filteredJobs, pageSize, page]);
+    return sortedFilteredJobs.slice(start, start + pageSize);
+  }, [sortedFilteredJobs, pageSize, page]);
 
   const totalPages = useMemo(() => {
     if (pageSize === "all") return 1;
-    return Math.ceil(filteredJobs.length / pageSize) || 1;
-  }, [filteredJobs.length, pageSize]);
+    return Math.ceil(sortedFilteredJobs.length / pageSize) || 1;
+  }, [sortedFilteredJobs.length, pageSize]);
 
   const showAssignedToColumn = statusFilter !== "PENDING";
 
@@ -711,6 +765,31 @@ export default function JobsList({
         {districts.map((d) => (
           <option key={d} value={d}>{d}</option>
         ))}
+      </select>
+      <select
+        className="select-native-glass w-full sm:w-48 md:min-w-[180px]"
+        value={jobSortField}
+        onChange={(e) => {
+          setPage(1);
+          setJobSortField(e.target.value as JobListSortField);
+        }}
+        aria-label="เรียงตามวันที่"
+      >
+        <option value="report">วันที่แจ้ง (report → สร้าง)</option>
+        <option value="created">วันที่สร้างในระบบ</option>
+        <option value="fix">วันที่ปิดงาน</option>
+      </select>
+      <select
+        className="select-native-glass w-full sm:w-40 md:min-w-[140px]"
+        value={jobSortDir}
+        onChange={(e) => {
+          setPage(1);
+          setJobSortDir(e.target.value as JobListSortDir);
+        }}
+        aria-label="ทิศทางการเรียง"
+      >
+        <option value="desc">ใหม่ → เก่า</option>
+        <option value="asc">เก่า → ใหม่</option>
       </select>
       <select
         className="select-native-glass w-full sm:w-28 md:min-w-[112px]"
@@ -1784,7 +1863,7 @@ export default function JobsList({
         page={page}
         totalPages={totalPages}
         pageSize={pageSize}
-        filteredCount={filteredJobs.length}
+        filteredCount={sortedFilteredJobs.length}
         showExtraTotal={
           !!search.trim() ||
           !!provinceFilter ||
