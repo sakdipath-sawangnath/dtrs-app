@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
-import { createPortal } from "react-dom";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface CrudModalProps {
   open: boolean;
@@ -20,7 +26,7 @@ interface CrudModalProps {
 }
 
 /**
- * Modal รองรับ CRUD - ใช้ได้ทุกหน้าที่มีฟอร์มใน popup (สร้าง/แก้ไข)
+ * Modal รองรับ CRUD — ใช้ shadcn Dialog (portal + z-100) คง API เดิม
  */
 export default function CrudModal({
   open,
@@ -33,70 +39,65 @@ export default function CrudModal({
   submitLabel,
   onSubmit,
 }: CrudModalProps) {
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
-
-  if (!open) return null;
-
-  /** Portal → body + z-index สูงกว่า SiteHeader/sidebar (z-50) เพื่อไม่ถูกบังหรือ clip */
-  const modal = (
-    <div
-      className="fixed inset-0 z-100 flex items-center justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] bg-slate-950/70 backdrop-blur-md"
-      onClick={() => !saving && onClose()}
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && !saving) onClose();
+      }}
+      modal
     >
-      <div
-        className={`rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl ring-1 ring-white/5 w-full max-h-[min(90vh,calc(100vh-2rem))] overflow-y-auto flex flex-col ${
-          size === "lg" ? "max-w-lg" : "max-w-md"
-        }`}
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="crud-modal-title"
+      <DialogContent
+        showCloseButton={false}
+        overlayClassName={cn(
+          "bg-slate-950/70 backdrop-blur-md supports-backdrop-filter:backdrop-blur-md",
+        )}
+        className={cn(
+          "flex max-h-[min(90vh,calc(100vh-2rem))] w-full max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/50 p-0 text-slate-100 shadow-2xl ring-1 ring-white/5 backdrop-blur-md sm:max-w-md",
+          size === "lg" && "sm:max-w-lg",
+        )}
       >
-        <div className="p-4 sm:p-6 border-b border-white/10 bg-slate-950/30 shrink-0">
-          <h3 id="crud-modal-title" className="text-lg font-bold tracking-tight text-white">
+        <DialogHeader className="shrink-0 space-y-0 border-b border-white/10 bg-slate-950/30 p-4 sm:p-6">
+          <DialogTitle
+            id="crud-modal-title"
+            className="text-lg font-bold tracking-tight text-white"
+          >
             {title}
-          </h3>
-        </div>
+          </DialogTitle>
+        </DialogHeader>
         <form
           onSubmit={(e) => {
             e.preventDefault();
             onSubmit?.(e);
           }}
-          className="flex flex-col flex-1 min-h-0"
+          className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 bg-slate-950/20">{children}</div>
-          <div className="flex gap-3 p-4 sm:p-6 border-t border-white/10 bg-slate-950/35 backdrop-blur-sm shrink-0">
-            <button
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-slate-950/20 p-4 sm:p-6">
+            {children}
+          </div>
+          <div className="flex shrink-0 gap-3 border-t border-white/10 bg-slate-950/35 p-4 backdrop-blur-sm sm:p-6">
+            <Button
               type="button"
+              variant="outline"
               onClick={onClose}
               disabled={saving}
-              className="flex-1 min-h-11 py-2.5 rounded-xl border border-white/10 bg-slate-800/50 backdrop-blur-sm text-sm font-medium text-slate-300 hover:bg-slate-700/55 hover:border-white/15 disabled:opacity-50 transition-all active:scale-95"
+              className="min-h-11 flex-1 cursor-pointer rounded-xl border-white/10 bg-slate-800/50 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-700/55 hover:border-white/15 disabled:opacity-50"
             >
               {cancelLabel}
-            </button>
+            </Button>
             {submitLabel != null && (
-              <button
+              <Button
                 type="submit"
+                variant="default"
                 disabled={saving}
-                className="flex-1 min-h-11 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-60 bg-blue-600 hover:bg-blue-500 transition-all shadow-lg shadow-blue-600/25 active:scale-95"
+                className="min-h-11 flex-1 cursor-pointer rounded-xl bg-blue-600 py-2.5 text-sm font-medium text-white shadow-lg shadow-blue-600/25 hover:bg-blue-500 disabled:opacity-60"
               >
                 {saving ? "กำลังบันทึก..." : submitLabel}
-              </button>
+              </Button>
             )}
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
-
-  if (typeof document === "undefined") return null;
-
-  return createPortal(modal, document.body);
 }

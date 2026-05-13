@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { User, LogOut, ChevronDown, LoaderCircle } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { confirmDialog } from "@/lib/toast";
+import { MANAGED_IMAGE_SIZES } from "@/components/ManagedImage";
+import ManagedImageFrame from "@/components/ManagedImageFrame";
 
 interface UserMenuDropdownProps {
   name?: string | null;
@@ -67,10 +69,12 @@ export default function UserMenuDropdown({ name, image, onClose }: UserMenuDropd
         ) : (
           <>
             {image && !imgError ? (
-              <img
+              <ManagedImageFrame
                 src={image}
                 alt={name ?? "โปรไฟล์"}
-                className="w-7 h-7 rounded-full object-cover shrink-0"
+                sizes={MANAGED_IMAGE_SIZES.avatarXs}
+                frameClassName="w-7 h-7 rounded-full shrink-0"
+                imageClassName="object-cover"
                 onError={() => setImgError(true)}
               />
             ) : (

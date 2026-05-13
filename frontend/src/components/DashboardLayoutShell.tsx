@@ -194,7 +194,7 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
   );
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-[#0a1128] text-slate-200">
+    <div className="dark h-screen flex flex-col overflow-hidden bg-[#0a1128] text-slate-200">
       <SiteHeader right={headerRight} subtitle={currentPage?.name} isDark={true} />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">

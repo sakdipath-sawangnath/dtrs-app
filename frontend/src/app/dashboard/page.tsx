@@ -60,6 +60,10 @@ import {
   CartesianGrid,
 } from "recharts";
 import { toastError, toastWarning } from "@/lib/toast";
+import DashboardRouteLoading from "@/components/DashboardRouteLoading";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { countJobBreakdowns } from "@/lib/jobBreakdownCounts";
 
 interface Job {
@@ -524,6 +528,10 @@ export default function DashboardPage() {
     setReportDialogOpen(true);
   };
 
+  if (loading) {
+    return <DashboardRouteLoading variant="page" />;
+  }
+
   return (
     <div className="animate-fade-up w-full min-w-0 max-w-[1600px] mx-auto space-y-6">
       {/* หัวข้อ + สรุปรายงาน — หลีกเลี่ยง w-full บนแถบขวาในโหมดแถว (กัน flex บีบคอลัมน์ซ้ายจนแคบเกินไป) */}
@@ -542,7 +550,7 @@ export default function DashboardPage() {
           aria-label="สรุปรายงานและส่งออก PDF"
         >
           <div className="min-w-max overflow-x-auto pb-1 flex flex-wrap items-end gap-x-2 gap-y-3 sm:gap-3 xl:flex-nowrap xl:justify-end">
-            <label className="relative flex flex-col gap-1 w-[176px] shrink-0">
+            <Label className="relative flex w-[176px] shrink-0 flex-col gap-1">
               <span className="text-[11px] font-medium text-slate-500">ช่วงสรุป</span>
               <select
                 value={filterMode}
@@ -562,10 +570,10 @@ export default function DashboardPage() {
                 className="pointer-events-none absolute right-3 top-[33px] text-slate-400"
                 aria-hidden="true"
               />
-            </label>
+            </Label>
             {filterMode === "month" && (
               <>
-                <label className="relative flex flex-col gap-1 w-[150px] shrink-0">
+                <Label className="relative flex w-[150px] shrink-0 flex-col gap-1">
                   <span className="text-[11px] font-medium text-slate-500">เดือน</span>
                   <select
                     value={monthYear.month}
@@ -588,8 +596,8 @@ export default function DashboardPage() {
                     className="pointer-events-none absolute right-3 top-[33px] text-slate-400"
                     aria-hidden="true"
                   />
-                </label>
-                <label className="relative flex flex-col gap-1 w-[120px] shrink-0">
+                </Label>
+                <Label className="relative flex w-[120px] shrink-0 flex-col gap-1">
                   <span className="text-[11px] font-medium text-slate-500">ปี (ค.ศ.)</span>
                   <select
                     value={monthYear.year}
@@ -615,13 +623,13 @@ export default function DashboardPage() {
                     className="pointer-events-none absolute right-3 top-[33px] text-slate-400"
                     aria-hidden="true"
                   />
-                </label>
+                </Label>
               </>
             )}
             {filterMode === "year" && (
-              <label className="flex flex-col gap-1 w-[110px] shrink-0">
+              <Label className="flex w-[110px] shrink-0 flex-col gap-1">
                 <span className="text-[11px] font-medium text-slate-500">ปี (ค.ศ.)</span>
-                <input
+                <Input
                   type="number"
                   min={1990}
                   max={2100}
@@ -630,50 +638,50 @@ export default function DashboardPage() {
                   className={`${FILTER_INPUT_CLASS} tabular-nums`}
                   aria-label="เลือกปีสำหรับรายงาน"
                 />
-              </label>
+              </Label>
             )}
             {filterMode === "custom" && (
               <>
-                <label className="flex flex-col gap-1 w-[190px] shrink-0">
+                <Label className="flex w-[190px] shrink-0 flex-col gap-1">
                   <span className="text-[11px] font-medium text-slate-500">เริ่ม</span>
-                  <input
+                  <Input
                     type="datetime-local"
                     value={rangeStart}
                     onChange={(e) => setRangeStart(e.target.value)}
                     className={FILTER_DATE_INPUT_CLASS}
                     aria-label="วันเวลาเริ่มต้นช่วงรายงาน"
                   />
-                </label>
-                <label className="flex flex-col gap-1 w-[190px] shrink-0">
+                </Label>
+                <Label className="flex w-[190px] shrink-0 flex-col gap-1">
                   <span className="text-[11px] font-medium text-slate-500">สิ้นสุด</span>
-                  <input
+                  <Input
                     type="datetime-local"
                     value={rangeEnd}
                     onChange={(e) => setRangeEnd(e.target.value)}
                     className={FILTER_DATE_INPUT_CLASS}
                     aria-label="วันเวลาสิ้นสุดช่วงรายงาน"
                   />
-                </label>
+                </Label>
               </>
             )}
-            <button
+            <Button
               type="button"
               onClick={handleViewReport}
-              disabled={loading}
-              className="inline-flex h-11 min-h-11 min-w-[120px] shrink-0 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-medium text-white shadow-lg transition-all hover:bg-blue-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+              className="inline-flex h-11 min-h-11 min-w-[120px] shrink-0 cursor-pointer items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-medium text-white shadow-lg transition-all hover:bg-blue-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
             >
               ดูรายงาน
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outline"
               onClick={runExportReportPdf}
-              disabled={loading || reportPrintBusy}
-              className="inline-flex h-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-slate-800/80 text-slate-200 shadow-lg transition-all hover:border-blue-500/30 hover:bg-slate-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500/45"
+              disabled={reportPrintBusy}
+              className="inline-flex h-11 min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/10 bg-slate-800/80 text-slate-200 shadow-lg transition-all hover:border-blue-500/30 hover:bg-slate-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500/45 focus:ring-inset"
               aria-label="ส่งออก PDF จากเซิร์ฟเวอร์"
               title="ส่งออก PDF"
             >
               <FileDown size={20} className="shrink-0" aria-hidden />
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -695,7 +703,7 @@ export default function DashboardPage() {
             </div>
             <div className="min-w-0">
               <p className="text-xl sm:text-2xl font-bold truncate" style={{ color: card.color }}>
-                {loading ? "–" : card.value}
+                {card.value}
               </p>
               <p className="text-xs font-medium mt-0.5 truncate text-slate-400">
                 {card.label}
@@ -723,21 +731,15 @@ export default function DashboardPage() {
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between gap-3 border-b border-white/5 pb-2">
               <dt className="text-slate-400">ภายใน (ในอาคาร)</dt>
-              <dd className="tabular-nums font-semibold text-slate-100">
-                {loading ? "–" : jobBreakdown.env.INDOOR}
-              </dd>
+              <dd className="tabular-nums font-semibold text-slate-100">{jobBreakdown.env.INDOOR}</dd>
             </div>
             <div className="flex justify-between gap-3 border-b border-white/5 pb-2">
               <dt className="text-slate-400">ภายนอก (นอกอาคาร)</dt>
-              <dd className="tabular-nums font-semibold text-slate-100">
-                {loading ? "–" : jobBreakdown.env.OUTDOOR}
-              </dd>
+              <dd className="tabular-nums font-semibold text-slate-100">{jobBreakdown.env.OUTDOOR}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-slate-400">ไม่ระบุ</dt>
-              <dd className="tabular-nums font-semibold text-slate-100">
-                {loading ? "–" : jobBreakdown.env.UNKNOWN}
-              </dd>
+              <dd className="tabular-nums font-semibold text-slate-100">{jobBreakdown.env.UNKNOWN}</dd>
             </div>
           </dl>
         </section>
@@ -757,21 +759,15 @@ export default function DashboardPage() {
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between gap-3 border-b border-white/5 pb-2">
               <dt className="text-slate-400">Hardware (ฮาร์ดแวร์)</dt>
-              <dd className="tabular-nums font-semibold text-slate-100">
-                {loading ? "–" : jobBreakdown.part.Hardware}
-              </dd>
+              <dd className="tabular-nums font-semibold text-slate-100">{jobBreakdown.part.Hardware}</dd>
             </div>
             <div className="flex justify-between gap-3 border-b border-white/5 pb-2">
               <dt className="text-slate-400">Software (ซอฟต์แวร์)</dt>
-              <dd className="tabular-nums font-semibold text-slate-100">
-                {loading ? "–" : jobBreakdown.part.Software}
-              </dd>
+              <dd className="tabular-nums font-semibold text-slate-100">{jobBreakdown.part.Software}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-slate-400">ไม่ระบุ</dt>
-              <dd className="tabular-nums font-semibold text-slate-100">
-                {loading ? "–" : jobBreakdown.part.UNKNOWN}
-              </dd>
+              <dd className="tabular-nums font-semibold text-slate-100">{jobBreakdown.part.UNKNOWN}</dd>
             </div>
           </dl>
         </section>
@@ -791,11 +787,7 @@ export default function DashboardPage() {
           </div>
           {/* ความสูงคงที่: Recharts ResponsiveContainer ต้องการ parent ที่มี height ชัดเจน ไม่ใช่แค่ min-height + flex-1 */}
           <div className="w-full min-w-0 h-[260px]">
-            {loading ? (
-              <div className="h-full flex items-center justify-center text-sm text-slate-500">
-                กำลังโหลด...
-              </div>
-            ) : pieData.length === 0 ? (
+            {pieData.length === 0 ? (
               <div className="h-full flex items-center justify-center text-sm text-slate-500">
                 ยังไม่มีข้อมูล
               </div>
@@ -835,11 +827,7 @@ export default function DashboardPage() {
             </h3>
           </div>
           <div className="w-full min-w-0 h-[260px]">
-            {loading ? (
-              <div className="h-full flex items-center justify-center text-sm text-slate-500">
-                กำลังโหลด...
-              </div>
-            ) : provinceData.length === 0 ? (
+            {provinceData.length === 0 ? (
               <div className="h-full flex items-center justify-center text-sm text-slate-500">
                 ยังไม่มีข้อมูล
               </div>
@@ -878,39 +866,32 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="w-full min-w-0 h-[280px] sm:h-[300px]">
-          {loading ? (
-            <div className="h-full flex items-center justify-center text-sm text-slate-500">
-              กำลังโหลด...
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendMeta.data} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-                <defs>
-                  <linearGradient id="dashTrendReport" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#64748b" stopOpacity={0.45} />
-                    <stop offset="95%" stopColor="#64748b" stopOpacity={0.05} />
-                  </linearGradient>
-                  <linearGradient id="dashTrendResolved" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0.05} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} stroke="rgba(255,255,255,0.1)" />
-                <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} stroke="rgba(255,255,255,0.1)" allowDecimals={false} domain={[0, "auto"]} />
-                <Tooltip
-                  contentStyle={{ borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "#1e293b", color: "#e2e8f0" }}
-                  formatter={(value: number, name: string) => [value, name === "แจ้งในช่วง" ? "แจ้งในช่วง (รายการ)" : "ปิดในช่วง (รายการ)"]}
-                />
-                <Legend />
-                <Area type="monotone" dataKey="แจ้งในช่วง" stroke="#94a3b8" fillOpacity={1} fill="url(#dashTrendReport)" strokeWidth={2} />
-                <Area type="monotone" dataKey="ปิดในช่วง" stroke="#4ade80" fillOpacity={1} fill="url(#dashTrendResolved)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={trendMeta.data} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+              <defs>
+                <linearGradient id="dashTrendReport" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#64748b" stopOpacity={0.45} />
+                  <stop offset="95%" stopColor="#64748b" stopOpacity={0.05} />
+                </linearGradient>
+                <linearGradient id="dashTrendResolved" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#22c55e" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#22c55e" stopOpacity={0.05} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} stroke="rgba(255,255,255,0.1)" />
+              <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} stroke="rgba(255,255,255,0.1)" allowDecimals={false} domain={[0, "auto"]} />
+              <Tooltip
+                contentStyle={{ borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "#1e293b", color: "#e2e8f0" }}
+                formatter={(value: number, name: string) => [value, name === "แจ้งในช่วง" ? "แจ้งในช่วง (รายการ)" : "ปิดในช่วง (รายการ)"]}
+              />
+              <Legend />
+              <Area type="monotone" dataKey="แจ้งในช่วง" stroke="#94a3b8" fillOpacity={1} fill="url(#dashTrendReport)" strokeWidth={2} />
+              <Area type="monotone" dataKey="ปิดในช่วง" stroke="#4ade80" fillOpacity={1} fill="url(#dashTrendResolved)" strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
-        {!loading && (
-          <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 shrink-0">
+        <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 shrink-0">
             <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5">
               <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">แจ้งรวม 14 วัน</p>
               <p className="text-lg font-bold text-slate-200 tabular-nums">{trendSummary.reported}</p>
@@ -949,7 +930,6 @@ export default function DashboardPage() {
               </p>
             </div>
           </div>
-        )}
       </div>
 
       {/* สรุปวิเคราะห์จากข้อมูลชุดเดียวกับรายการงาน */}
@@ -962,7 +942,7 @@ export default function DashboardPage() {
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold text-slate-400">รอดำเนินการ · ยังไม่มีผู้รับ</p>
-              <p className="text-2xl font-bold text-slate-100 tabular-nums">{loading ? "–" : pendingUnassigned}</p>
+              <p className="text-2xl font-bold text-slate-100 tabular-nums">{pendingUnassigned}</p>
               <p className="text-[11px] text-slate-500 mt-0.5">ควรมอบหมายหรือรับงานเพื่อไม่ให้ค้างที่สถานะรอ</p>
             </div>
           </div>
@@ -972,7 +952,7 @@ export default function DashboardPage() {
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold text-slate-400">นอกสัญญา · ยังไม่ปิด</p>
-              <p className="text-2xl font-bold text-slate-100 tabular-nums">{loading ? "–" : openOutOfContract}</p>
+              <p className="text-2xl font-bold text-slate-100 tabular-nums">{openOutOfContract}</p>
               <p className="text-[11px] text-slate-500 mt-0.5">PENDING / IN_PROGRESS ที่ทำเครื่องหมายนอกสัญญา</p>
             </div>
           </div>
@@ -983,7 +963,7 @@ export default function DashboardPage() {
             <div className="min-w-0">
               <p className="text-xs font-semibold text-slate-400">เวลาแก้เฉลี่ย (งานปิดแล้ว)</p>
               <p className="text-2xl font-bold text-slate-100 tabular-nums">
-                {loading ? "–" : avgResolutionDays != null ? avgResolutionDays.toFixed(1) : "–"}
+                {avgResolutionDays != null ? avgResolutionDays.toFixed(1) : "–"}
               </p>
               <p className="text-[11px] text-slate-500 mt-0.5">วัน จากวันแจ้งถึงวันบันทึกแก้ไขเสร็จ (ทุกใบที่ RESOLVED)</p>
             </div>
@@ -993,9 +973,7 @@ export default function DashboardPage() {
               <MapPin size={16} className="text-slate-400 shrink-0" aria-hidden />
               <p className="text-xs font-semibold text-slate-400">พื้นที่แจ้งถี่ (จังหวัด · อำเภอ Top 5)</p>
             </div>
-            {loading ? (
-              <p className="text-sm text-slate-500">กำลังโหลด...</p>
-            ) : districtTop5.length === 0 ? (
+            {districtTop5.length === 0 ? (
               <p className="text-sm text-slate-500">ยังไม่มีข้อมูล</p>
             ) : (
               <ul className="space-y-1.5 text-xs">
@@ -1135,7 +1113,7 @@ export default function DashboardPage() {
         >
           <button
             type="button"
-            className="absolute inset-0 bg-black/60 backdrop-blur-[2px] cursor-pointer"
+            className="absolute inset-0 cursor-pointer bg-slate-950/70 backdrop-blur-[2px] outline-none"
             aria-label="ปิดหน้าต่างรายงาน"
             onClick={() => setReportDialogOpen(false)}
           />
@@ -1144,14 +1122,15 @@ export default function DashboardPage() {
               <h2 id="dashboard-report-dialog-title" className="text-base font-bold text-white pr-2">
                 สรุปรายงานในช่วงที่เลือก
               </h2>
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => setReportDialogOpen(false)}
-                className="min-h-11 min-w-11 shrink-0 inline-flex items-center justify-center rounded-xl border border-white/10 bg-slate-800/80 text-slate-300 hover:bg-slate-800 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="inline-flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/10 bg-slate-800/80 text-slate-300 transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 aria-label="ปิด"
               >
                 <X size={18} aria-hidden />
-              </button>
+              </Button>
             </div>
             <p className="text-xs text-slate-400 mb-4 leading-relaxed">{activeRange.labelTh}</p>
             <div className="grid grid-cols-2 gap-2 mb-6">
@@ -1224,24 +1203,25 @@ export default function DashboardPage() {
               นับจากวันที่แจ้ง (หรือวันที่สร้างใบ) ให้ตรงกับช่วงที่เลือก — ใช้ปุ่มด้านล่างเพื่อดาวน์โหลดไฟล์ PDF ที่สร้างจากเซิร์ฟเวอร์
             </p>
             <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => setReportDialogOpen(false)}
-                className="min-h-11 rounded-xl border border-white/10 bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-200 transition-all hover:bg-slate-700 active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="min-h-11 cursor-pointer rounded-xl border border-white/10 bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-200 transition-all hover:bg-slate-700 active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               >
                 ปิด
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => {
                   runExportReportPdf();
                 }}
                 disabled={reportPrintBusy}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg transition-all hover:bg-blue-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg transition-all hover:bg-blue-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <FileDown size={18} className="shrink-0" aria-hidden />
                 พิมพ์ / บันทึกเป็น PDF
-              </button>
+              </Button>
             </div>
           </div>
         </div>,

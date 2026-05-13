@@ -2,6 +2,23 @@
 
 ระบบแจ้งปัญหาและระบบจัดการการซ่อมบำรุงกล้องวงจรปิด (CCTV) ซึ่งพัฒนาต่อเนื่องมาจากการใช้งานผ่าน AppSheet
 
+## บันทึกการอัปเดตล่าสุด (2026-05-13)
+
+- **`shadcn/ui` skill (frontend)** — ติดตั้งที่ `frontend/.agents/skills/shadcn`; ใช้ project context จาก `frontend/components.json` และ workflow `npx shadcn@latest info --json` / `docs` / `search` ก่อนเพิ่มหรือปรับ primitive; โปรเจกต์นี้ยืนยันเป็น **Next.js 15 + Tailwind v4 + base=`base` + style=`base-nova`**
+- **UI primitives rollout** — หน้า **`/login`**, **`/public/report`**, **`/public/status`**, **`/dashboard`**, **`/dashboard/settings`**, **`/dashboard/profile`** และ **`/print/jobs/[id]`** เปลี่ยนส่วนควบคุมหลักไปใช้ `@/components/ui/*` ที่มีในโปรเจกต์แล้ว (เช่น `Button`, `Input`, `Label`, `Alert`, `Textarea`)
+- **Dialog migration** — `CrudModal` เปลี่ยนเป็น wrapper ของ **`ui/Dialog`**; `JobsList` ย้าย modal รายละเอียด / มอบหมาย / อัปเดตการแก้ไขไปใช้ `Dialog` + `JobImageLightbox`; `alert-dialog` ปรับ overlay/popup เป็น **`z-100`**
+- **Loading pattern กลาง** — หน้า **`/public/report`**, **`/public/status`**, **`/dashboard/settings`**, **`/dashboard/users`**, **`/dashboard/roles`** และ **`/dashboard/sites`** ใช้ `PublicRouteLoading` / `DashboardRouteLoading` เป็น pattern กลางเดียวกัน แทน loading implementation ที่กระจายหลายแบบ
+- **Footer app metadata** — backend เพิ่ม setting คีย์ `app_meta`; หน้า **`/dashboard/settings`** เพิ่มฟอร์มแก้ `appName` / `companyName` / `version`; `SiteFooter` ใช้ fallback **DB → env → `package.json`** และอ่านค่าฝั่ง public ผ่าน `GET /public/settings/app-meta`
+- **Image primitives กลาง** — frontend รวมการแสดงรูปด้วย `ManagedImage`, `ManagedImageFrame` และ preset `MANAGED_IMAGE_SIZES` เพื่อให้ avatar / preview / lightbox ใช้โครงสร้างเดียวกัน; template PDF ยังใช้ `forceRaw` ในจุดที่ต้องคง `<img>` สำหรับการ render
+- **Backfill วันที่ + modal polish** — หน้า **`/dashboard/jobs/[id]`** ปรับ card “ลงข้อมูลย้อนหลัง (Backfill วันที่)” ให้กรอกวันที่แบบ **`dd/mm/yyyy`** และ validate ก่อนบันทึกให้สอดคล้องบรรทัด preview “ปฏิทินไทย (พ.ศ.)”; `JobImageLightbox` ปรับขนาดพื้นที่แสดงผลให้รูปเปิดดูได้จริง; backdrop ของ report modal บนหน้า dashboard และปุ่ม `ghost` ใน modal/lightbox ถูกปรับมาตรฐานสี `hover` / `focus` เพื่อไม่ให้ข้อความจมหรือพื้นหลังสว่างผิด theme
+- **Frontend build** — ยืนยัน `npm run build` ใน `frontend/` ผ่านหลัง refactor รอบนี้ และ warnings กลุ่ม `<img>` / hooks / unused code ที่ตั้งใจเก็บได้ถูกเคลียร์แล้ว
+
+## บันทึกการอัปเดตล่าสุด (2026-05-12)
+
+- **สคริปต์แก้/ตรวจวันที่แจ้ง (Job `reportDate` / `fixDate`)** — อยู่ใน `backend/scripts/`; ใช้ `DATABASE_URL` จาก `backend/.env`; สรุปคำสั่ง `npm run` ดู [`backend/README.md`](backend/README.md) ส่วน Scripts
+- **`.gitignore` (backend)** — ไม่ commit ผล compile ใต้ `scripts/**/*.js|.map|.d.ts` และ `tsconfig.build.tsbuildinfo`
+- **รูปแบบแปลงวันที่** — สอดคล้อง backfill ใน `JobsService` (สลับเดือน↔วัน + ปี −1 + เลื่อนเวลา ±10–15 น.); ฟังก์ชัน Bangkok ร่วมอยู่ที่ `backend/scripts/lib/jobBangkokAndCorruptionFix.ts`
+
 ## บันทึกการอัปเดตล่าสุด (2026-05-10)
 
 - **Docker / hardening — image** — [`frontend/Dockerfile`](frontend/Dockerfile) และ [`backend/Dockerfile`](backend/Dockerfile): หลัง `COPY` และ `chown -R node:node /app` ใช้ **`USER node`** (ไม่รัน process เป็น root ในแอป)
@@ -103,9 +120,11 @@
 ### 1. Frontend (Next.js 15)
 - **Framework:** Next.js (App Router)
 - **UI & Styling:** Tailwind CSS, Lucide React, Google Font (Sarabun)
+- **Design System / Primitive Library:** `shadcn/ui` (base) + local wrappers ใน `frontend/src/components/ui/`
 - **Standard Theme:** **Dark Glassmorphism** (slate-950 background, semi-transparent glass cards)
 - **Layout Architecture:** **No-Card Layout** (แยกส่วน Content เป็น Glass Cards ย่อยๆ แทนการใช้ขอบขาวขนาดใหญ่)
-- **Components:** Unified Layout with `SiteHeader` (fixed), `SiteFooter`, `PublicLayoutShell`, `DashboardPageShell`, `DashboardFilterBar`, `CrudModal`, `UserMenuDropdown`, `SegmentedTabs` (แท็บสัญญา/นอกสัญญา + badge จำนวนงานค้าง), `JobsList` (ตารางงาน + ดูรายละเอียด full page + มอบหมายงาน react-select / รับงาน + modal อัปเดตข้อมูลการแก้ไขแบบ Dark Glassmorphism)
+- **Components:** Unified Layout with `SiteHeader` (fixed), `SiteFooter`, `PublicLayoutShell`, `DashboardPageShell`, `DashboardFilterBar`, `CrudModal` (ภายในใช้ `ui/Dialog`), `UserMenuDropdown`, `SegmentedTabs` (แท็บสัญญา/นอกสัญญา + badge จำนวนงานค้าง), `JobsList` (ตารางงาน + modal รายละเอียด/มอบหมาย/อัปเดตผ่าน `Dialog` + `JobImageLightbox`)
+- **Shared UI Utilities:** `DashboardRouteLoading`, `PublicRouteLoading`, `ManagedImage`, `ManagedImageFrame`, `JobImageLightbox`, `MANAGED_IMAGE_SIZES`
 - **Authentication:** NextAuth.js (login ด้วยอีเมลหรือชื่อผู้ใช้ + รหัสผ่าน, password toggle)
 - **State & Integration:** Axios, Socket.io-client, SweetAlert2 (Toast: success 1.2s, error, confirm)
 - **โฟลเดอร์หลัก:** `/frontend`
@@ -129,6 +148,7 @@
 - อ่าน `AGENT_INSTRUCTIONS.md` ก่อนเริ่มงาน (มี bootstrap + security gate)
 - ใช้ checklist/Definition of Done ใน `AGENTS.md` เป็นเกณฑ์ก่อนส่งงาน
 - งาน UI/UX ให้ยึด `frontend/.agents/skills/ui-ux-pro-max/SKILL.md`
+- งานที่ใช้ `shadcn/ui` / `@/components/ui/*` ให้ยึด `frontend/.agents/skills/shadcn/SKILL.md`
 - งาน Backend/NestJS ให้ยึด `backend/.agents/skills/backend-api-pro/SKILL.md` และ `backend/.agents/skills/nestjs-best-practices/SKILL.md`
 
 ### 1. การตั้งค่า Backend (NestJS)
@@ -172,25 +192,25 @@
 
 ## 📂 โครงสร้างและหน้าจอการใช้งาน
 
-1. **หน้าแจ้งซ่อมออนไลน์ (Public Report):** `http://localhost:3000/report`
+1. **หน้าแจ้งซ่อมออนไลน์ (Public Report):** `http://localhost:3000/public/report`
    - สำหรับบุคคลทั่วไป แจ้งปัญหาได้ทันทีโดยไม่ต้องเข้าสู่ระบบ (การ์ด: ผู้แจ้ง → สถานที่ → รายละเอียดปัญหา → รูปภาพ)
    - **ผู้ใช้ทั่วไป (ไม่ล็อกอิน):** กรอกเบอร์โทรศัพท์ 10 หลัก แล้วกด **ตรวจสอบ** ให้พบผู้แจ้งในระบบก่อน — หลังนั้นจึงเลือกสถานที่และส่งฟอร์มได้
    - **เจ้าหน้าที่ที่ล็อกอิน** (บทบาท STAFF / ADMIN / SUPERVISOR): ใช้ flow แยก — โหลดรายการสถานที่ได้ทันที, กรอกเบอร์ 10 หลักแล้วดำเนินการต่อได้โดยไม่บังคับพบจากระบบ (ระบุชื่อ-สกุลเองเมื่อไม่พบ), ส่งคำขอพร้อม **Bearer token** ได้, หลังสำเร็จ redirect ไป **`/dashboard/jobs`**
-   - เมื่อส่งฟอร์มแล้ว ระบบจะสร้าง **เลขที่ใบแจ้งซ่อม (ticketNo)** อัตโนมัติ แสดงเลขนี้ใน Toast — ผู้ใช้ทั่วไปจะไปหน้า `/status?ticketNo=...`
+   - เมื่อส่งฟอร์มแล้ว ระบบจะสร้าง **เลขที่ใบแจ้งซ่อม (ticketNo)** อัตโนมัติ แสดงเลขนี้ใน Toast — ผู้ใช้ทั่วไปจะไปหน้า `/public/status?ticketNo=...` (เส้นทางเดิม `/status` redirect ได้)
    - รูปภาพข้อขัดข้องถูกอัปโหลดขึ้น **MinIO** ผ่าน `MinioService` และเก็บ URL ไว้ในฟิลด์ `Job.images`
-   - เมื่อ staff ล็อกอินแล้วเข้า `/report` จะเห็น layout แดชบอร์ด (DashboardPageShell) สำหรับบันทึกการแจ้งซ่อม
+   - เมื่อ staff ล็อกอินแล้วเข้า `/report` จะ redirect/ใช้งาน flow เดียวกับ `/public/report` ภายใต้ layout แดชบอร์ด; primitive หลักของฟอร์มถูกย้ายไปใช้ `@/components/ui/*`
 2. **ตรวจสอบสถานะ (public):** `http://localhost:3000/public/status` — ตามเบอร์โทร (`?phone=`) หรือเลขที่ใบ (`?ticketNo=`); เส้นทางเดิม `/status` redirect ไปที่นี่
    - กรอกเลขที่ใบแจ้งซ่อม (ทั้งจากข้อมูลเดิมใน CSV และงานใหม่) เพื่อดูสถานะและรายละเอียด (โหมดสาธารณะมีมาสก์ข้อมูลส่วนตัว/รูปตามที่ API ส่งมา)
    - รายการตามเบอร์และรายละเอียดเมื่อได้ JWT มีการแสดง **สาเหตุ** (`cause`) และ **วิธีแก้ไข** (`fixMethod`) เมื่อมีการบันทึกจากผู้ซ่อม
    - รองรับ query string `?ticketNo=...` เมื่อมาจากหน้า `/report` ช่องค้นหาจะถูกกรอกอัตโนมัติและค้นหาให้ทันที
 3. **หน้าเข้าสู่ระบบ (Staff Login):** `http://localhost:3000/login`
-   - สำหรับเจ้าหน้าที่/ผู้ดูแล (กรอกอีเมลหรือชื่อผู้ใช้ + รหัสผ่าน); การ์ดจัดกลาง
+   - สำหรับเจ้าหน้าที่/ผู้ดูแล (กรอกอีเมลหรือชื่อผู้ใช้ + รหัสผ่าน); การ์ดจัดกลาง และใช้ primitive `Button` / `Input` / `Label` / `Alert`
 4. **ระบบจัดการแดชบอร์ด (Dashboard):** `http://localhost:3000/dashboard`
    - ภาพรวม (สถิติ, กราฟสัดส่วน/จังหวัด/แนวโน้มรายวัน, เมนูด่วนตาม RBAC)
    - รอดำเนินการ (ปุ่ม ดูรายละเอียด → ไปหน้า `/dashboard/jobs/:id` / **มอบหมายงาน** และ **ย้ายนอกสัญญา** ตามสิทธิ์ **`job.assign`** จาก RBAC; **รับงาน** = assign เป็นตัวเองเมื่อมี `menu.pending` แต่ไม่มี `job.assign`; **ลบงาน** เมื่อมี **`job.deleteUnassigned`**; ย้ายนอกสัญญาคงสถานะ `PENDING`)
-   - รายละเอียดงาน (`/dashboard/jobs/:id`): พิมพ์รายงานได้เมื่องานมีสถานะเสร็จสิ้น (Resolved) ผ่านหน้า **`/print/jobs/:id`** (เทมเพลต `JobMaintenancePdfTemplate` + `print.css`; พิมพ์จากเบราว์เซอร์)
+  - รายละเอียดงาน (`/dashboard/jobs/:id`): พิมพ์รายงานได้เมื่องานมีสถานะเสร็จสิ้น (Resolved) ผ่านหน้า **`/print/jobs/:id`** (เทมเพลต `JobMaintenancePdfTemplate` + `print.css`; พิมพ์จากเบราว์เซอร์); card **Backfill วันที่** ใช้รูปแบบวันที่ **`dd/mm/yyyy`** พร้อม preview ปฏิทินไทย (พ.ศ.) และรูปในงานเปิดดูผ่าน `JobImageLightbox`
    - **งานที่รับผิดชอบ** — รายการงานที่รับมอบหมาย (filter + datatable)
    - กำลังแก้ไข (`/dashboard/in-progress`): แท็บสัญญา/นอกสัญญา + badge งานค้าง; ปุ่มอัปเดต (ผู้รับผิดชอบ); ปุ่มลบงาน IN_PROGRESS ตามสิทธิ์ **`job.deleteInProgress`** (UI `JobsList` + API `DELETE /jobs/:id`); ข้อขัดข้องทั้งหมด, นอกสัญญา (แสดงเฉพาะ PENDING ที่ `isOutOfContract=true`)
    - จัดการผู้ใช้ (ADMIN: CRUD; บทบาท: ADMIN, STAFF, หัวหน้างาน, ผู้แจ้งซ่อม) — คลิกรูปโปรไฟล์ในตารางเปิด modal ดูรูปขนาดใหญ่
-   - จัดการบทบาทและสิทธิ์ (ADMIN), **ตั้งค่าระบบ** (`/dashboard/settings`, ADMIN) — กำหนด SMTP, ทดสอบส่งอีเมล, ตัวเลือก TLS, เทมเพลตอีเมลแจ้งงาน (รวม `publicBaseUrl`, แจ้งตาม Role), รหัสผ่านเริ่มต้น, **สแกน/ลบไฟล์ MinIO ค้าง**; สรุป flow การส่งอีเมล: [`docs/Email-Notifications.md`](docs/Email-Notifications.md) · orphan: [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md)
+  - จัดการบทบาทและสิทธิ์ (ADMIN), **ตั้งค่าระบบ** (`/dashboard/settings`, ADMIN) — กำหนด SMTP, ทดสอบส่งอีเมล, ตัวเลือก TLS, เทมเพลตอีเมลแจ้งงาน (รวม `publicBaseUrl`, แจ้งตาม Role), รหัสผ่านเริ่มต้น, ข้อมูล Footer (`appName` / `companyName` / `version`), **สแกน/ลบไฟล์ MinIO ค้าง**; ค่าที่แสดงใน `SiteFooter` ใช้ fallback **DB → env → `package.json`**; สรุป flow การส่งอีเมล: [`docs/Email-Notifications.md`](docs/Email-Notifications.md) · orphan: [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md)
    - โปรไฟล์เข้าได้จากเมนูผู้ใช้ (dropdown) ไม่แสดงใน sidebar

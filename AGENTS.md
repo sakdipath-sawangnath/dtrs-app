@@ -4,6 +4,7 @@
 
 ## MUST READ (Skills พื้นฐาน)
 - Frontend UI/UX: `frontend/.agents/skills/ui-ux-pro-max/SKILL.md`
+- Frontend shadcn/ui: `frontend/.agents/skills/shadcn/SKILL.md`
 - Backend API: `backend/.agents/skills/backend-api-pro/SKILL.md`
 - Backend NestJS: `backend/.agents/skills/nestjs-best-practices/SKILL.md`
 
@@ -16,12 +17,13 @@
 - **Interaction**: touch targets ≥ 44x44px, ปุ่ม/ฟอร์ม disable ระหว่าง async, error feedback ใกล้จุดผิด, clickable มี `cursor-pointer`
 - **Responsive**: ทดสอบ 375 / 768 / 1024 / 1440, ไม่มี horizontal scroll, content ไม่ถูกซ่อนหลัง fixed header
 - **Visual rules**: ไม่ใช้ emoji เป็น icons, ใช้ชุด icon เดียว (เช่น Lucide), hover ไม่ทำให้ layout shift
+- **Primitive rules**: งานที่ใช้ `shadcn/ui` ให้ใช้ `@/components/ui/*` ก่อน custom markup สำหรับปุ่ม/อินพุต/ป้าย/alert/dialog/textarea; ถ้ามี skill อยู่แล้วให้เช็ก context จาก `components.json` ก่อนเพิ่ม component ใหม่
 - **Standard Style**: ทุกหน้าต้องเป็น **Dark Glassmorphism** และโครงสร้างแบบ **No-Card Layout** (ยกเว้นหน้า Dashboard Overview)
     - **Background**: `bg-[#020617]` หรือ `bg-slate-950`
     - **Glass Card**: `rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl`
     - **Inputs**: `rounded-xl bg-slate-900/40 border-white/10 focus:ring-blue-500/50` — บนแดชบอร์ดใช้ class **`form-input-glass`** ใน `frontend/src/app/globals.css` แทน `.form-input` ที่ไปคู่พื้นสว่าง
     - **Buttons**: `rounded-xl transition-all active:scale-95 shadow-lg` (Confirm: Blue/Red, Cancel: Slate-800)
-    - **Modal แดชบอร์ด**: `CrudModal` — แสดงด้วย **portal ไป `document.body`**, **`z-100`** (เหนือ header `z-50`), โทน Dark Glass ตามด้านบน
+    - **Modal แดชบอร์ด**: `CrudModal` / dialog บนแดชบอร์ดให้ใช้ `Dialog` / `AlertDialog` ของ `@/components/ui/*` (portal ไป `document.body` ผ่าน primitive), **`z-100`** (เหนือ header `z-50`), โทน Dark Glass ตามด้านบน
 
 ## Definition of Done — API/NestJS (Backend)
 - **Validation**: validate input ทุก endpoint (DTO + pipes/validators) ก่อนแตะ DB
@@ -43,4 +45,5 @@
 - Deploy: `.gitlab-ci.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml` — อ่านคู่กับ `README.md` (backend รัน **`dist/src/main.js`** ใน image ไม่ใช่ `dist/main.js`; frontend ใช้ **`next.config.mjs`**; ตั้ง **`ALLOWED_ORIGINS`** / **`API_INTERNAL_BASE_URL`** / ถ้า PRD ไป MinIO public ไม่ได้ให้ตั้ง **`MINIO_SERVER_FETCH_BASE_URL`** คู่ **`MINIO_PUBLIC_URL`** ตาม `README.md`)
 - Docker ทดสอบ local: `docker-compose.yml` — **runner stage** ใช้ **`USER node`** หลัง `chown` (ทั้ง **`frontend/Dockerfile`** และ **`backend/Dockerfile`**); กำหนด **limits CPU/RAM**, **`pids_limit`**, และ **`tmpfs: /tmp:rw,noexec,nosuid`** ต่อ service (ลดความเสี่ยง container กินทรัพยากร host / ใช้ `/tmp` รัน malicious binary); **ไม่** mount โฟลเดอร์ host ใน service หลักของไฟล์นี้ — **ผ่าน** reverse proxy ให้เปิดแค่ 80/443 ไม่ expose พอร์ตแอพตรงที่ firewall เมื่อ deploy public
 - ตรวจ dependency (advisory เท่านั้น ไม่ใช่ antivirus): ใน `frontend/` หรือ `backend/` รัน **`npm run security:audit`** / **`npm run security:audit:prod`**
+- **สคริปต์แก้/ตรวจ `reportDate` (one-off):** [`backend/README.md`](backend/README.md) ส่วน Scripts และ `backend/scripts/lib/jobBangkokAndCorruptionFix.ts` — อย่า commit ผล `tsc` ใต้ `backend/scripts/` (ดู `backend/.gitignore`)
 

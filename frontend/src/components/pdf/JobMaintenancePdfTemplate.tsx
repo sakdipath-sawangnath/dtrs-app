@@ -2,6 +2,7 @@
 
 import type { CSSProperties, RefObject } from "react";
 import { useRef } from "react";
+import ManagedImage from "@/components/ManagedImage";
 import { sarabun } from "@/lib/fonts";
 
 /** ข้อมูลงานสำหรับเทมเพลต PDF (สอดคล้องกับ JobDetail หน้า dashboard) */
@@ -206,8 +207,8 @@ function JobProxiedImage({
       ? prefetchedSrc
       : `/job-images/${jobId}/${kind}/${index}`;
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- เทมเพลต PDF + พิมพ์
-    <img
+    <ManagedImage
+      forceRaw
       className="pdf-print-img"
       src={src}
       alt={alt}
@@ -320,8 +321,8 @@ export function JobMaintenancePdfTemplate({
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 88 }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <ManagedImage
+                    forceRaw
                     src={REPORT_LOGO_SRC}
                     alt="ตราหน่วยงาน"
                     style={{ maxHeight: 68, maxWidth: 68, objectFit: "contain" }}

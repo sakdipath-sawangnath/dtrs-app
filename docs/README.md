@@ -2,7 +2,7 @@
 
 ดัชนีอ้างอิงเร็วสำหรับทีมและ AI Agent
 
-**การ deploy สาธารณะ (สรุปจาก `README.md` — 2026-05-10):** image รัน **`USER node`**; `docker-compose.yml` มี **`tmpfs /tmp` (noexec)** + จำกัด CPU/RAM และ `pids_limit`; รัน **`npm run security:audit`** เป็นระยะ; หน้า **[`/public/status`](../frontend/src/app/public/status/page.tsx)** แสดง **`cause`** / **`fixMethod`** เมื่อมีข้อมูลจากผู้ปิดงาน — รายละเอียดใน [`../README.md`](../README.md) และ [`../AGENTS.md`](../AGENTS.md)
+**Frontend UI update (สรุปจาก `README.md` — 2026-05-13):** ติดตั้ง **`shadcn/ui` skill** ที่ `frontend/.agents/skills/shadcn`; หน้า `login` / `public/report` / `public/status` / `dashboard` / `settings` / `profile` / `print` ใช้ primitive จาก `@/components/ui/*` มากขึ้น; `CrudModal` และ modal ใน `JobsList` ย้ายไปใช้ `Dialog`/`AlertDialog` พร้อม `z-100`; loading ของหน้าหลักถูกรวมไปที่ `PublicRouteLoading` / `DashboardRouteLoading`; footer รองรับ `app_meta` แบบ fallback **DB → env → `package.json`**; โครงสร้างรูปภาพรวมศูนย์ผ่าน `ManagedImage` / `ManagedImageFrame` / `MANAGED_IMAGE_SIZES`; งานรอบล่าสุดเพิ่ม backfill วันที่แบบ `dd/mm/yyyy`, แก้ `JobImageLightbox` ให้แสดงรูปใน modal ได้เสถียร, และรวมมาตรฐานปุ่ม `ghost` ใน modal/overlay — รายละเอียดใน [`../README.md`](../README.md) และ [`../AGENTS.md`](../AGENTS.md)
 
 | ไฟล์ | หัวข้อ |
 |------|--------|
@@ -15,4 +15,6 @@
 
 เอกสาร root ที่เกี่ยวข้อง: [`../README.md`](../README.md), [`../STATUS.md`](../STATUS.md), [`../PLAN.md`](../PLAN.md), [`../TASK.md`](../TASK.md), [`../minio.md`](../minio.md) (ตัวแปร MinIO)
 
-เอกสาร backend: [`../backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md`](../backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md), [`../backend/docs/RBAC-Setup.md`](../backend/docs/RBAC-Setup.md), [`../backend/docs/api-endpoints.json`](../backend/docs/api-endpoints.json)
+หมายเหตุสำหรับ AI Agent ฝั่ง frontend: งานที่เกี่ยวกับ `shadcn/ui` และ `@/components/ui/*` ให้อ้างอิง `frontend/.agents/skills/shadcn/SKILL.md` ควบคู่กับ `AGENTS.md`
+
+เอกสาร backend: [`../backend/README.md`](../backend/README.md) (สคริปต์ one-off รวม audit/fix `reportDate`), [`../backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md`](../backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md), [`../backend/docs/RBAC-Setup.md`](../backend/docs/RBAC-Setup.md), [`../backend/docs/api-endpoints.json`](../backend/docs/api-endpoints.json)

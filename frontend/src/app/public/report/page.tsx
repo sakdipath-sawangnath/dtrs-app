@@ -10,6 +10,15 @@ import PublicLayoutShell from '@/components/PublicLayoutShell';
 import DashboardLayoutShell from '@/components/DashboardLayoutShell';
 import Select from 'react-select';
 import { getReactSelectGlassStyles } from '@/lib/reactSelectGlassStyles';
+import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Textarea } from "@/components/ui/textarea";
+import PublicRouteLoading from "@/components/PublicRouteLoading";
+import ManagedImage, { MANAGED_IMAGE_SIZES } from "@/components/ManagedImage";
+import ManagedImageFrame from "@/components/ManagedImageFrame";
 
 interface Site { id: number; province: string; district: string; agency: string; }
 type ReporterPayload = {
@@ -60,7 +69,7 @@ function ReportPageContent() {
   const [sites, setSites] = useState<Site[]>([]);
   const [districts, setDistricts] = useState<string[]>([]);
   const [agencies, setAgencies] = useState<string[]>([]);
-  const [sitesLoading, setSitesLoading] = useState(true);
+  const [sitesLoading, setSitesLoading] = useState(false);
   const [sitesError, setSitesError] = useState<string | null>(null);
   const [sitesFetched, setSitesFetched] = useState(false);
   
@@ -149,8 +158,6 @@ function ReportPageContent() {
 
   // --- 1. Load Draft from Session Storage ---
   useEffect(() => {
-    setSitesLoading(false);
-    
     try {
       const saved = sessionStorage.getItem('reportFormDraft');
       if (saved) {
@@ -552,12 +559,15 @@ function ReportPageContent() {
          </div>
       )}
 
-      {sitesError && (
-        <div className="alert alert-error rounded-2xl" role="alert">
-          <AlertCircle size={18} aria-hidden="true" /> 
-          <span>{sitesError}</span>
-        </div>
-      )}
+      {sitesError ? (
+        <Alert
+          variant="destructive"
+          className="alert-error rounded-2xl border-red-500/30 bg-red-950/35 text-red-100"
+        >
+          <AlertCircle size={18} aria-hidden />
+          <AlertDescription>{sitesError}</AlertDescription>
+        </Alert>
+      ) : null}
 
         <form id="report-form" onSubmit={handleSubmit} className="w-full space-y-6">
 
@@ -597,7 +607,7 @@ function ReportPageContent() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <label className={labelClass}>เบอร์โทรศัพท์ <span className="text-red-500">*</span></label>
+                <Label className={labelClass}>เบอร์โทรศัพท์ <span className="text-red-500">*</span></Label>
                 <div
                   className={`flex flex-col sm:flex-row gap-3 w-full ${
                     isStaffFlow ? "sm:items-center max-w-md sm:max-w-lg" : ""
@@ -609,12 +619,12 @@ function ReportPageContent() {
                     }`}
                   >
                     <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input 
-                      type="tel" 
+                    <Input
+                      type="tel"
                       required
                       maxLength={10}
                       placeholder="กรอกเบอร์โทรศัพท์มือถือ"
-                      className={`${inputClass} pl-10`}
+                      className={cn(inputClass, "min-h-11 h-auto pl-10")}
                       value={form.reporterPhone}
                       onChange={(e) => {
                         const val = e.target.value.replace(/\D/g, '');
@@ -647,16 +657,16 @@ function ReportPageContent() {
                       }}
                     />
                   </div>
-                  <button 
-                    type="button" 
+                  <Button
+                    type="button"
                     onClick={handlePhoneSearch}
                     disabled={isSearchingPhone || !form.reporterPhone}
-                    className="btn btn-primary whitespace-nowrap disabled:opacity-60 w-full sm:w-auto"
+                    className="btn btn-primary h-auto min-h-11 w-full cursor-pointer whitespace-nowrap sm:w-auto"
                     aria-label="ตรวจสอบเบอร์โทรศัพท์"
                   >
                     {isSearchingPhone ? <span className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"/> : <Search size={16} />}
                     ตรวจสอบ
-                  </button>
+                  </Button>
                 </div>
                 {!phoneSearched && isStaffFlow && (
                   <p className="text-xs text-slate-500 mt-2">กรอกเบอร์ 10 หลักได้เลย หรือกด &quot;ตรวจสอบ&quot; หากต้องการดึงข้อมูลผู้แจ้งจากระบบ</p>
@@ -674,28 +684,28 @@ function ReportPageContent() {
                 <div className="md:col-span-2 animate-fade-in mt-2 space-y-4">
                   <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
                     <div className="flex flex-col items-center sm:items-start gap-2 shrink-0">
-                      <span className={labelClass}>รูปโปรไฟล์</span>
+                      <Label className={labelClass}>รูปโปรไฟล์</Label>
                       <div className="relative">
-                        <button
+                        <Button
                           type="button"
+                          variant="outline"
                           onClick={() => reporterAvatarRef.current?.click()}
-                          className={`relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-2 border-dashed transition-colors cursor-pointer min-h-[112px] min-w-[112px] ${
+                          className={`relative flex h-28 w-28 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-dashed p-0 transition-colors min-h-[112px] min-w-[112px] ${
                             isDark
                               ? 'border-white/15 bg-slate-900/50 hover:border-blue-400/40'
                               : 'border-slate-300 bg-slate-50 hover:border-blue-400'
                           }`}
                           aria-label="เลือกรูปโปรไฟล์ผู้แจ้ง"
                         >
-                          {reporterAvatarDisplayUrl ? (
-                            <img
-                              src={reporterAvatarDisplayUrl}
-                              alt="รูปโปรไฟล์ผู้แจ้ง"
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <UserCircle className="h-14 w-14 text-slate-500" aria-hidden="true" />
-                          )}
-                        </button>
+                          <ManagedImageFrame
+                            src={reporterAvatarDisplayUrl}
+                            alt="รูปโปรไฟล์ผู้แจ้ง"
+                            sizes={MANAGED_IMAGE_SIZES.avatar3xl}
+                            frameClassName="absolute inset-0"
+                            imageClassName="h-full w-full object-cover"
+                            fallback={<UserCircle className="h-14 w-14 text-slate-500" aria-hidden="true" />}
+                          />
+                        </Button>
                         <input
                           ref={reporterAvatarRef}
                           type="file"
@@ -709,35 +719,52 @@ function ReportPageContent() {
                     </div>
                     <div className="min-w-0 flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className={labelClass}>ชื่อ-สกุล <span className="text-red-500">*</span></label>
-                        <input 
-                          type="text" 
+                        <Label className={labelClass}>ชื่อ-สกุล <span className="text-red-500">*</span></Label>
+                        <Input
+                          type="text"
                           required
                           readOnly={isUserFound}
                           placeholder="ชื่อ และ นามสกุล"
-                          className={`${inputClass} ${isUserFound ? (isDark ? 'bg-slate-800/30 text-slate-500 cursor-not-allowed border-white/5 opacity-60' : 'bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200 focus:ring-0 shadow-inner') : ''}`}
+                          className={cn(
+                            inputClass,
+                            "min-h-11 h-auto",
+                            isUserFound
+                              ? isDark
+                                ? "cursor-not-allowed border-white/5 bg-slate-800/30 text-slate-500 opacity-60"
+                                : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500 shadow-inner focus:ring-0"
+                              : "",
+                          )}
                           value={form.reporterName}
                           onChange={(e) => setForm({ ...form, reporterName: e.target.value })}
                         />
                       </div>
                       <div>
-                        <label className={labelClass} htmlFor="reporter-email-input">
+                        <Label className={labelClass} htmlFor="reporter-email-input">
                           อีเมล <span className="text-red-500">*</span>
-                        </label>
-                        <input 
+                        </Label>
+                        <Input
                           id="reporter-email-input"
-                          type="email" 
+                          type="email"
                           required
                           readOnly={isUserFound && !!form.reporterEmail.trim()}
                           placeholder="example@email.com"
                           autoComplete="email"
                           aria-invalid={reporterEmailError ? true : undefined}
-                          aria-describedby={reporterEmailError ? 'reporter-email-error' : undefined}
-                          className={`${inputClass} ${isUserFound && !!form.reporterEmail.trim() ? (isDark ? 'bg-slate-800/30 text-slate-500 cursor-not-allowed border-white/5 opacity-60' : 'bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200 focus:ring-0 shadow-inner') : ''} ${reporterEmailError ? 'border-red-500/60 focus:ring-red-500/20' : ''}`}
+                          aria-describedby={reporterEmailError ? "reporter-email-error" : undefined}
+                          className={cn(
+                            inputClass,
+                            "min-h-11 h-auto",
+                            isUserFound && !!form.reporterEmail.trim()
+                              ? isDark
+                                ? "cursor-not-allowed border-white/5 bg-slate-800/30 text-slate-500 opacity-60"
+                                : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500 shadow-inner focus:ring-0"
+                              : "",
+                            reporterEmailError ? "border-red-500/60 focus:ring-red-500/20" : "",
+                          )}
                           value={form.reporterEmail}
                           onChange={(e) => {
                             setReporterEmailError(null);
-                            setForm({ ...form, reporterEmail: e.target.value.replace(/\s/g, '') });
+                            setForm({ ...form, reporterEmail: e.target.value.replace(/\s/g, "") });
                           }}
                           onBlur={() => void validateReporterEmailOnBlur()}
                         />
@@ -753,15 +780,23 @@ function ReportPageContent() {
                         )}
                       </div>
                       <div className="md:col-span-2">
-                        <label className={labelClass}>
+                        <Label className={labelClass}>
                           ตำแหน่ง <span className="text-slate-400 font-normal text-xs ml-1">(ถ้ามี)</span>
-                        </label>
-                        <input
+                        </Label>
+                        <Input
                           type="text"
                           readOnly={isUserFound}
                           placeholder="เช่น เจ้าหน้าที่ IT, ผู้ประสานงาน"
                           maxLength={200}
-                          className={`${inputClass} ${isUserFound ? (isDark ? 'bg-slate-800/30 text-slate-500 cursor-not-allowed border-white/5 opacity-60' : 'bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200 focus:ring-0 shadow-inner') : ''}`}
+                          className={cn(
+                            inputClass,
+                            "min-h-11 h-auto",
+                            isUserFound
+                              ? isDark
+                                ? "cursor-not-allowed border-white/5 bg-slate-800/30 text-slate-500 opacity-60"
+                                : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500 shadow-inner focus:ring-0"
+                              : "",
+                          )}
                           value={form.reporterPosition}
                           onChange={(e) =>
                             setForm({ ...form, reporterPosition: e.target.value })
@@ -786,7 +821,7 @@ function ReportPageContent() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className={labelClass}>จังหวัด <span className="text-red-500">*</span></label>
+                <Label className={labelClass}>จังหวัด <span className="text-red-500">*</span></Label>
                 <Select
                   options={provinces.map(p => ({ value: p, label: p }))}
                   styles={customStyles}
@@ -801,7 +836,7 @@ function ReportPageContent() {
                 />
               </div>
               <div>
-                <label className={labelClass}>อำเภอ <span className="text-red-500">*</span></label>
+                <Label className={labelClass}>อำเภอ <span className="text-red-500">*</span></Label>
                 <Select
                   options={districts.map(d => ({ value: d, label: d }))}
                   styles={customStyles}
@@ -816,7 +851,7 @@ function ReportPageContent() {
                 />
               </div>
               <div>
-                <label className={labelClass}>สถานที่ / หน่วยงาน <span className="text-red-500">*</span></label>
+                <Label className={labelClass}>สถานที่ / หน่วยงาน <span className="text-red-500">*</span></Label>
                 <Select
                   options={agencies.map(a => ({ value: a, label: a }))}
                   styles={customStyles}
@@ -840,9 +875,9 @@ function ReportPageContent() {
               <h2 className={headerTitleClass}>รายละเอียดปัญหา</h2>
             </div>
             <div>
-              <label className={labelClass} htmlFor="report-description">
+              <Label className={labelClass} htmlFor="report-description">
                 อาการที่พบ <span className="text-red-500">*</span>
-              </label>
+              </Label>
               <p
                 id="report-description-hint"
                 className="text-xs text-slate-500 leading-relaxed mb-2 max-w-3xl"
@@ -851,11 +886,11 @@ function ReportPageContent() {
                 &nbsp;กรุณาเขียนให้ครบอย่างน้อยหนึ่งประโยค เช่น อาการที่เห็น (เสียง ภาพ ไฟ ฯลฯ) จุดที่เกิด
                 (ห้อง/ชั้น/อุปกรณ์) เวลาที่พบ หรือความถี่ของปัญหา
               </p>
-              <textarea
+              <Textarea
                 id="report-description"
                 required
                 minLength={10}
-                className={`${inputClass} min-h-[140px] resize-y`}
+                className={cn(inputClass, "min-h-[140px] resize-y")}
                 placeholder="ระบุอาการ, จุดสังเกต หรือปัญหาที่พบให้ละเอียด..."
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -902,7 +937,13 @@ function ReportPageContent() {
                     )}
                     {previews[i] ? (
                       <>
-                        <img src={previews[i]!} alt={`รูปภาพประกอบที่ ${i + 1}`} className="w-full h-full object-cover" />
+                        <ManagedImage
+                          src={previews[i]!}
+                          alt={`รูปภาพประกอบที่ ${i + 1}`}
+                          fill
+                          sizes={MANAGED_IMAGE_SIZES.uploadGridResponsive}
+                          className="w-full h-full object-cover"
+                        />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                            <span className="text-white text-xs font-semibold px-2 py-1 bg-black/50 rounded-lg backdrop-blur-sm">เปลี่ยนรูปภาพ</span>
                         </div>
@@ -929,10 +970,10 @@ function ReportPageContent() {
 
               {/* ปุ่มแจ้งปัญหาด้านล่าง */}
               <div className="pt-4 pb-8 flex justify-center w-full">
-                 <button
+                 <Button
                   type="submit"
                   disabled={submitting || !canSubmit}
-                  className="btn btn-primary w-full sm:w-auto px-10 py-3.5 text-base shadow-lg shadow-blue-600/20 active:scale-[0.98]"
+                  className="btn btn-primary inline-flex h-auto min-h-12 w-full cursor-pointer items-center justify-center gap-2 px-10 py-3.5 text-base shadow-lg shadow-blue-600/20 active:scale-[0.98] sm:w-auto"
                   aria-label="ส่งข้อมูลแจ้งปัญหา"
                 >
               {submitting ? (
@@ -943,7 +984,7 @@ function ReportPageContent() {
               ) : (
                  'ส่งข้อมูลแจ้งปัญหา'
               )}
-            </button>
+            </Button>
               </div>
             </div>
           )}
@@ -953,10 +994,10 @@ function ReportPageContent() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-        <div className="animate-spin w-8 h-8 border-3 border-blue-600/30 border-t-blue-600 rounded-full mb-3" />
-        <div className="text-sm font-medium text-slate-500">กำลังโหลด...</div>
-      </div>
+      <PublicRouteLoading
+        title="กำลังตรวจสอบสิทธิ์..."
+        description="กำลังเตรียมแบบฟอร์มแจ้งปัญหา"
+      />
     );
   }
 
@@ -991,10 +1032,10 @@ export default function ReportPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950">
-          <div className="animate-spin w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full mb-3" />
-          <div className="text-sm text-slate-400">กำลังโหลด...</div>
-        </div>
+        <PublicRouteLoading
+          title="กำลังโหลดหน้าแจ้งปัญหา..."
+          description="กำลังเตรียมข้อมูลเริ่มต้นของแบบฟอร์ม"
+        />
       }
     >
       <ReportPageContent />

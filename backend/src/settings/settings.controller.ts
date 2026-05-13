@@ -3,6 +3,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { UpdateAppMetaDto } from './dto/app-meta.dto';
 import { TestEmailSmtpDto, UpdateEmailSmtpDto } from './dto/email-smtp.dto';
 import { UpdateEmailTemplatesDto } from './dto/email-templates.dto';
 import { UpdateDefaultPassDto } from './dto/default-pass.dto';
@@ -21,6 +22,16 @@ import type {
 @Permissions('menu.settings')
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
+
+  @Get('app-meta')
+  async getAppMeta() {
+    return this.settingsService.getAppMeta();
+  }
+
+  @Put('app-meta')
+  async putAppMeta(@Body() dto: UpdateAppMetaDto) {
+    return this.settingsService.updateAppMeta(dto);
+  }
 
   @Get('email-smtp')
   async getEmailSmtp() {

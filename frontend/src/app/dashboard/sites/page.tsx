@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import DashboardPageShell from "@/components/DashboardPageShell";
 import DashboardFilterBar from "@/components/DashboardFilterBar";
+import DashboardRouteLoading from "@/components/DashboardRouteLoading";
 import CrudModal from "@/components/CrudModal";
 import DataTablePagination from "@/components/DataTablePagination";
 import DataTablePageSizeSelect from "@/components/dashboard/DataTablePageSizeSelect";
@@ -522,6 +523,18 @@ export default function DashboardSitesPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <DashboardPageShell
+        title="จัดการ Site"
+        subtitle="จังหวัด อำเภอ หน่วยงาน — ข้อมูลหลักจังหวัด–อำเภอสัมพันธ์กัน · กรองจากการ์ดหรือตารางด้านล่าง"
+        noCard={true}
+      >
+        <DashboardRouteLoading variant="page" />
+      </DashboardPageShell>
+    );
+  }
+
   return (
     <DashboardPageShell
       title="จัดการ Site"
@@ -563,7 +576,9 @@ export default function DashboardSitesPage() {
           </div>
 
           {locationsLoading ? (
-            <p className="text-sm text-slate-500 mt-5">กำลังโหลดโครงสร้างจังหวัด–อำเภอ...</p>
+            <div className="mt-5">
+              <DashboardRouteLoading variant="overlay" />
+            </div>
           ) : locationTree.length === 0 ? (
             <p className="text-sm text-slate-500 mt-5">
               {canCreate
@@ -737,9 +752,7 @@ export default function DashboardSitesPage() {
             </div>
           )}
 
-          {loading ? (
-            <div className="p-8 flex justify-center text-sm text-slate-500">กำลังโหลด...</div>
-          ) : loadError ? (
+          {loadError ? (
             <div className="p-8 text-center text-sm text-red-400">{loadError}</div>
           ) : sites.length === 0 ? (
             <div className="p-12 flex flex-col items-center justify-center text-center">

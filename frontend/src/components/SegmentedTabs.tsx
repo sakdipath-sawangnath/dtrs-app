@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export type SegmentedTabDef<T extends string> = {
   id: T;
@@ -52,12 +54,15 @@ export default function SegmentedTabs<T extends string>({
             {t.icon ? <t.icon size={16} className="shrink-0" aria-hidden /> : null}
             <span className="whitespace-nowrap">{t.label}</span>
             {badge > 0 ? (
-              <span
-                className="absolute -top-1 -right-1 min-w-5 h-5 px-1.5 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center shadow"
+              <Badge
+                variant="default"
+                className={cn(
+                  "absolute -top-1 -right-1 min-h-5 min-w-5 justify-center rounded-full border-0 bg-blue-600 px-1.5 py-0 text-[11px] font-bold text-white shadow",
+                )}
                 aria-label={`มีแจ้งเตือน ${badge} รายการ`}
               >
                 {badge > 99 ? "99+" : badge}
-              </span>
+              </Badge>
             ) : null}
           </button>
         );

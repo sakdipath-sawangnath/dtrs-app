@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff, AlertCircle, LoaderCircle } from "lucide-react";
 import PublicLayoutShell from "@/components/PublicLayoutShell";
 import { getClientApiBaseUrl } from "@/lib/clientApiBase";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 function unwrapApiData<T>(root: unknown): T | null {
   if (!root) return null;
@@ -26,8 +30,6 @@ function getApiErrorMessageFromBody(raw: unknown): string | undefined {
 /** Dark Glass — สอดคล้อง AGENTS.md */
 const GLASS_CARD =
   "rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl ring-1 ring-white/5";
-const INPUT_GLASS =
-  "w-full rounded-xl min-h-[44px] border border-white/10 bg-slate-900/40 backdrop-blur-sm px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 shadow-inner outline-none transition-all focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/50 disabled:opacity-60 disabled:cursor-not-allowed [color-scheme:dark]";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -137,19 +139,19 @@ export default function LoginPage() {
                 </p>
               </div>
 
-              {error && (
-                <div
-                  className="mb-6 flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-950/40 px-3 py-2.5 text-sm text-red-200 backdrop-blur-sm"
-                  role="alert"
+              {error ? (
+                <Alert
+                  variant="destructive"
+                  className="mb-6 rounded-xl border-red-500/25 bg-red-950/40 text-red-200 backdrop-blur-sm"
                 >
                   <AlertCircle
                     size={18}
-                    className="shrink-0 mt-0.5 text-red-400"
+                    className="shrink-0 text-red-400"
                     aria-hidden
                   />
-                  <span>{error}</span>
-                </div>
-              )}
+                  <AlertDescription className="text-red-200">{error}</AlertDescription>
+                </Alert>
+              ) : null}
 
               <form
                 onSubmit={handleLogin}
@@ -157,17 +159,17 @@ export default function LoginPage() {
                 aria-busy={loading}
               >
                 <div>
-                  <label
+                  <Label
                     htmlFor="login-email"
-                    className="block text-sm font-semibold mb-1.5 text-slate-300"
+                    className="mb-1.5 block text-sm font-semibold text-slate-300"
                   >
                     อีเมล หรือ ชื่อผู้ใช้
-                  </label>
-                  <input
+                  </Label>
+                  <Input
                     id="login-email"
                     required
                     type="text"
-                    className={INPUT_GLASS}
+                    className="form-input-glass h-auto min-h-11 text-sm"
                     placeholder="เช่น staff@dopa.go.th หรือชื่อผู้ใช้"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -176,29 +178,31 @@ export default function LoginPage() {
                   />
                 </div>
                 <div>
-                  <label
+                  <Label
                     htmlFor="login-password"
-                    className="block text-sm font-semibold mb-1.5 text-slate-300"
+                    className="mb-1.5 block text-sm font-semibold text-slate-300"
                   >
                     รหัสผ่าน
-                  </label>
+                  </Label>
                   <div className="relative">
-                    <input
+                    <Input
                       id="login-password"
                       required
                       type={showPassword ? "text" : "password"}
-                      className={`${INPUT_GLASS} pr-12`}
+                      className="form-input-glass h-auto min-h-11 pr-12 text-sm"
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       autoComplete="current-password"
                       disabled={loading}
                     />
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon"
                       onClick={() => setShowPassword(!showPassword)}
                       disabled={loading}
-                      className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                      className="absolute right-1 top-1/2 size-11 -translate-y-1/2 cursor-pointer text-slate-400 hover:bg-white/10 hover:text-white"
                       aria-label={
                         showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"
                       }
@@ -209,13 +213,13 @@ export default function LoginPage() {
                       ) : (
                         <Eye size={18} aria-hidden />
                       )}
-                    </button>
+                    </Button>
                   </div>
                 </div>
-                <button
+                <Button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-2 min-h-[44px] rounded-xl font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-lg transition-all active:scale-95 disabled:opacity-60 disabled:active:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer px-4 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+                  className="mt-2 flex h-auto min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-blue-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
                 >
                   {loading ? (
                     <>
@@ -234,7 +238,7 @@ export default function LoginPage() {
                   ) : (
                     "เข้าสู่ระบบ"
                   )}
-                </button>
+                </Button>
               </form>
             </div>
           </div>

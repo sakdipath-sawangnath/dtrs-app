@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "shadcn": {
+      "source": "shadcn/ui",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn/SKILL.md",
+      "computedHash": "ca8988aee27e6a43ef09250c0dead76374ba88df9fcd21bcb6ca9eedb9df0e6f"
+    },
     "ui-ux-pro-max": {
       "source": "skills.volces.com",
       "sourceType": "well-known",

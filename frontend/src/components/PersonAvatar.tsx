@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { User } from "lucide-react";
+import ManagedImageFrame from "@/components/ManagedImageFrame";
+import { MANAGED_IMAGE_SIZES } from "@/components/ManagedImage";
 
 /** วงกลมรูปโปรไฟล์ / fallback ไอคอน — ใช้ใน JobsList, หน้ารายละเอียดงาน */
 export default function PersonAvatar({
@@ -40,19 +42,14 @@ export default function PersonAvatar({
       : "border border-white/10 bg-slate-800/80 ring-1 ring-white/5";
   const iconCls = variant === "light" ? "text-slate-400" : "text-slate-500";
   return (
-    <div
-      className={`${dim} shrink-0 rounded-full overflow-hidden flex items-center justify-center ${shell}`}
-    >
-      {showImg && url ? (
-        <img
-          src={url}
-          alt={nameLabel ? `รูป ${nameLabel}` : "รูปโปรไฟล์"}
-          className="h-full w-full object-cover"
-          onError={() => setImgErr(true)}
-        />
-      ) : (
-        <User size={iconSz} className={iconCls} aria-hidden />
-      )}
-    </div>
+    <ManagedImageFrame
+      src={showImg && url ? url : null}
+      alt={nameLabel ? `รูป ${nameLabel}` : "รูปโปรไฟล์"}
+      sizes={size === "md" ? MANAGED_IMAGE_SIZES.avatarMd : MANAGED_IMAGE_SIZES.avatarSm}
+      frameClassName={`${dim} shrink-0 rounded-full flex items-center justify-center ${shell}`}
+      imageClassName="h-full w-full object-cover"
+      onError={() => setImgErr(true)}
+      fallback={<User size={iconSz} className={iconCls} aria-hidden />}
+    />
   );
 }

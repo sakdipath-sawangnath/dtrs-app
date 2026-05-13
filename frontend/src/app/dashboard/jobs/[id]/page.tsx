@@ -17,7 +17,6 @@ import {
   FileDown,
   Printer,
   Wrench,
-  X,
   AlertTriangle,
   Loader2,
   Clock3,
@@ -26,6 +25,7 @@ import {
 } from "lucide-react";
 import DashboardPageShell from "@/components/DashboardPageShell";
 import JobTimelineCard from "@/components/JobTimelineCard";
+import ManagedImage, { MANAGED_IMAGE_SIZES } from "@/components/ManagedImage";
 import PersonAvatar from "@/components/PersonAvatar";
 import { confirmDialog, toastError, toastSuccess } from "@/lib/toast";
 import Select from "react-select";
@@ -41,11 +41,18 @@ import {
   type JobSerialRowForm,
 } from "@/lib/jobSerialRows";
 import { validateBackfillDate } from "@/lib/jobBackfillDatePolicy";
-import {
-  formatThaiDateTimeDisplay,
-  joinLocalDateTime,
-  splitLocalDateTime,
-} from "@/lib/formatThaiDateTimeDisplay";
+import { formatThaiDateTimeDisplay } from "@/lib/formatThaiDateTimeDisplay";
+import BackfillDateTimeFields from "@/components/jobs/BackfillDateTimeFields";
+import JobStatusBadge from "@/components/jobs/JobStatusBadge";
+import JobAssignDialog from "@/components/jobs/JobAssignDialog";
+import JobImageLightbox from "@/components/jobs/JobImageLightbox";
+import { GLASS_FIELD, GLASS_LABEL, GLASS_SECTION } from "@/components/jobs/jobDetailStyles";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 
 interface JobDetail {
   id: number;
@@ -84,20 +91,6 @@ function isJobDetail(v: unknown): v is JobDetail {
   return typeof o.id === "number" && typeof o.status === "string";
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  PENDING: "รอดำเนินการ",
-  IN_PROGRESS: "กำลังแก้ไข",
-  RESOLVED: "เสร็จสิ้น",
-  CANCELLED: "ยกเลิก",
-};
-
-const STATUS_BADGE_CLASS: Record<string, string> = {
-  PENDING: "badge badge-pending",
-  IN_PROGRESS: "badge badge-progress",
-  RESOLVED: "badge badge-resolved",
-  CANCELLED: "badge border border-slate-500/40 bg-slate-700/40 text-slate-200",
-};
-
 const FIX_ENVIRONMENT_OPTIONS = [
   { value: "INDOOR", label: "Indoor (ในอาคาร)" },
   { value: "OUTDOOR", label: "Outdoor (นอกอาคาร)" },
@@ -107,14 +100,6 @@ const FIX_CATEGORY_OPTIONS = [
   { value: "Hardware", label: "Hardware (ฮาร์ดแวร์)" },
   { value: "Software", label: "Software (ซอฟต์แวร์)" },
 ] as const;
-
-/** Dark Glassmorphism — ฟิลด์ฟอร์ม (AGENTS.md: inputs) */
-const GLASS_LABEL = "block text-xs font-semibold mb-1 text-slate-200";
-const GLASS_FIELD =
-  "w-full text-xs sm:text-sm rounded-xl border border-white/10 bg-slate-900/40 px-3 py-2.5 text-slate-100 placeholder:text-slate-500 shadow-inner focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/50 outline-none transition-all disabled:cursor-not-allowed disabled:bg-slate-900/25 disabled:text-slate-500 disabled:opacity-80 [color-scheme:dark]";
-/** No-Card: แยกเป็น Glass ย่อยหลายก้อน (AGENTS.md) */
-const GLASS_SECTION =
-  "rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl p-4 sm:p-5";
 
 function toDateTimeLocalInputValue(iso?: string | null): string {
   if (!iso) return "";
@@ -127,83 +112,6 @@ function toDateTimeLocalInputValue(iso?: string | null): string {
   const hour = pad(d.getHours());
   const minute = pad(d.getMinutes());
   return `${year}-${month}-${day}T${hour}:${minute}`;
-}
-
-/** คู่ date + time แทน datetime-local — แสดงบรรทัดพ.ศ. ให้สอดคล้องส่วนอื่นของหน้า */
-function BackfillDateTimeFields({
-  groupAriaLabel,
-  dateId,
-  timeId,
-  value,
-  onChange,
-  disabled,
-}: {
-  groupAriaLabel: string;
-  dateId: string;
-  timeId: string;
-  value: string;
-  onChange: (v: string) => void;
-  disabled: boolean;
-}) {
-  const { date, time } = splitLocalDateTime(value);
-  const preview = value.trim() ? formatThaiDateTimeDisplay(value) : null;
-
-  return (
-    <div
-      role="group"
-      aria-label={groupAriaLabel}
-      className="space-y-1.5 min-w-0"
-      lang="th"
-    >
-      <p className={GLASS_LABEL}>{groupAriaLabel}</p>
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="flex-1 min-w-0">
-          <label htmlFor={dateId} className="mb-1 block text-[10px] font-medium text-slate-500">
-            วันที่ (ปฏิทิน)
-          </label>
-          <input
-            id={dateId}
-            type="date"
-            className={GLASS_FIELD}
-            value={date}
-            onChange={(e) => {
-              const nextDate = e.target.value;
-              if (!nextDate) {
-                onChange("");
-                return;
-              }
-              onChange(joinLocalDateTime(nextDate, time || "00:00"));
-            }}
-            disabled={disabled}
-          />
-        </div>
-        <div className="w-full sm:w-38 shrink-0">
-          <label htmlFor={timeId} className="mb-1 block text-[10px] font-medium text-slate-500">
-            เวลา (24 ชม.)
-          </label>
-          <input
-            id={timeId}
-            type="time"
-            step={60}
-            className={GLASS_FIELD}
-            value={time}
-            onChange={(e) => {
-              const nextTime = e.target.value;
-              if (!date) return;
-              onChange(joinLocalDateTime(date, nextTime));
-            }}
-            disabled={disabled || !date}
-          />
-        </div>
-      </div>
-      {preview ? (
-        <p className="text-xs text-slate-400 leading-relaxed pt-0.5" aria-live="polite">
-          <span className="text-slate-500">แสดงเป็นปฏิทินไทย (พ.ศ.): </span>
-          <span className="font-medium tabular-nums text-slate-200">{preview}</span>
-        </p>
-      ) : null}
-    </div>
-  );
 }
 
 export default function JobDetailPage() {
@@ -329,7 +237,9 @@ export default function JobDetailPage() {
   const [reopenReason, setReopenReason] = useState("");
   const [reopening, setReopening] = useState(false);
   const [backfillReportDate, setBackfillReportDate] = useState("");
+  const [backfillReportDateValid, setBackfillReportDateValid] = useState(true);
   const [backfillFixDate, setBackfillFixDate] = useState("");
+  const [backfillFixDateValid, setBackfillFixDateValid] = useState(true);
   const [backfillSaving, setBackfillSaving] = useState(false);
 
   /** แก้ไข/บันทึกได้เมื่อยังไม่ปิดงาน — หลังปิดต้อง Reopen (API) ให้เป็นกำลังแก้ไขก่อน */
@@ -351,6 +261,12 @@ export default function JobDetailPage() {
     const lines: string[] = [];
     const r = backfillReportDate.trim();
     const f = backfillFixDate.trim();
+    if (!backfillReportDateValid) {
+      lines.push("วันที่แจ้งย้อนหลังต้องกรอกเป็น dd/mm/yyyy และต้องเป็นวันที่จริง");
+    }
+    if (!backfillFixDateValid) {
+      lines.push("วันที่ปิดย้อนหลังต้องกรอกเป็น dd/mm/yyyy และต้องเป็นวันที่จริง");
+    }
     if (r) {
       const d = new Date(r);
       if (!Number.isNaN(d.getTime())) {
@@ -386,7 +302,7 @@ export default function JobDetailPage() {
       }
     }
     return lines;
-  }, [backfillReportDate, backfillFixDate, job]);
+  }, [backfillFixDate, backfillFixDateValid, backfillReportDate, backfillReportDateValid, job]);
 
   const fixEnvironmentSelectValue = useMemo(() => {
     if (!fixEnvironment) return null;
@@ -566,6 +482,11 @@ export default function JobDetailPage() {
     const fixLocal = backfillFixDate.trim();
     if (!reportLocal && !fixLocal) {
       toastError("ข้อมูลไม่ครบ", "กรุณาระบุวันที่แจ้งย้อนหลังหรือวันที่ปิดย้อนหลังอย่างน้อย 1 ค่า");
+      return;
+    }
+
+    if (!backfillReportDateValid || !backfillFixDateValid) {
+      toastError("รูปแบบวันที่ไม่ถูกต้อง", "กรุณากรอกวันที่ย้อนหลังเป็น dd/mm/yyyy ให้ครบถ้วนก่อนบันทึก");
       return;
     }
 
@@ -795,18 +716,39 @@ export default function JobDetailPage() {
     }
     setServerPdfDownloading(true);
     try {
-      const res = await fetch(`${API}/jobs/${job.id}/report-pdf`, {
+      const res = await fetch(`/api/jobs/${job.id}/report-pdf`, {
         headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
       });
       if (!res.ok) {
-        const t = await res.text();
-        throw new Error(t || res.statusText);
+        let detail = res.statusText;
+        const contentType = res.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const payload = (await res.json()) as
+            | { error?: { message?: string }; message?: string }
+            | null;
+          detail =
+            payload?.error?.message ??
+            payload?.message ??
+            detail;
+        } else {
+          detail = (await res.text()) || detail;
+        }
+        throw new Error(detail || "ไม่สามารถดาวน์โหลด PDF ได้");
       }
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `report-${job.ticketNo || job.id}.pdf`;
+      const disposition = res.headers.get("content-disposition") || "";
+      const match =
+        /filename\*=UTF-8''([^;]+)|filename="([^"]+)"|filename=([^;]+)/i.exec(
+          disposition,
+        );
+      const filename = match
+        ? decodeURIComponent(match[1] || match[2] || match[3] || "")
+        : `report-${job.ticketNo || job.id}.pdf`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -843,13 +785,14 @@ export default function JobDetailPage() {
     <DashboardPageShell title={title} subtitle={subtitle} noCard>
       <div className="flex-1 overflow-auto p-4 sm:p-6 bg-[#020617] min-h-0">
         <div className="space-y-4 max-w-[1600px] mx-auto w-full">
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => router.back()}
-            className="inline-flex items-center gap-1.5 text-xs sm:text-sm px-3.5 py-2 rounded-xl border border-white/10 bg-slate-800/50 text-slate-300 hover:bg-slate-700/60 hover:text-white shadow-sm transition-all focus:ring-2 focus:ring-slate-500/20 outline-none font-medium cursor-pointer"
+            className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-xl border-white/10 bg-slate-800/50 px-3.5 py-2 text-xs font-medium text-slate-300 shadow-sm hover:bg-slate-700/60 hover:text-white focus-visible:ring-2 focus-visible:ring-slate-500/20 sm:text-sm"
           >
-            <ArrowLeft size={16} /> กลับไปหน้ารายการ
-          </button>
+            <ArrowLeft size={16} aria-hidden /> กลับไปหน้ารายการ
+          </Button>
 
           {!loading && !error && job ? (
             <JobTimelineCard job={job} />
@@ -880,13 +823,7 @@ export default function JobDetailPage() {
                       <div className="space-y-1 text-xs text-slate-400">
                         <div className="flex justify-between gap-2 items-center">
                           <span>สถานะปัจจุบัน:</span>
-                          <span
-                            className={
-                              STATUS_BADGE_CLASS[job.status] ?? "badge badge-pending"
-                            }
-                          >
-                            {STATUS_LABELS[job.status] ?? job.status}
-                          </span>
+                          <JobStatusBadge status={job.status} />
                         </div>
                         {(job.reportDate || job.createdAt) && (
                           <div className="flex justify-between gap-2">
@@ -1011,9 +948,11 @@ export default function JobDetailPage() {
                             }}
                             className="relative w-full aspect-4/3 sm:aspect-video rounded-xl border border-white/10 overflow-hidden bg-slate-800/50 group cursor-pointer"
                           >
-                            <img
+                            <ManagedImage
                               src={dashboardJobImagePath(job.id, "issue", i)}
                               alt={`รูปประกอบ ${i + 1}`}
+                              fill
+                              sizes={MANAGED_IMAGE_SIZES.galleryResponsiveSm}
                               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                             />
                             <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -1041,11 +980,7 @@ export default function JobDetailPage() {
                 <div className={`${GLASS_SECTION} space-y-3 text-xs text-slate-400`}>
                   <div className="flex justify-between gap-2 items-center">
                     <span>สถานะปัจจุบัน:</span>
-                    <span
-                      className={STATUS_BADGE_CLASS[job.status] ?? "badge badge-pending"}
-                    >
-                      {STATUS_LABELS[job.status] ?? job.status}
-                    </span>
+                    <JobStatusBadge status={job.status} />
                   </div>
                   {resolvedAtText && (
                     <div className="flex justify-between gap-2">
@@ -1055,41 +990,39 @@ export default function JobDetailPage() {
                   )}
                   {!job.assignedTo && job.status !== "CANCELLED" && (
                     <div className="space-y-4">
-                      <div className="rounded-xl border border-amber-500/35 bg-amber-950/30 backdrop-blur-sm p-4 shadow-inner animate-pulse-slow">
-                        <div className="flex items-start gap-3">
-                          <div className="bg-amber-500/15 p-2 rounded-lg text-amber-400 shrink-0 border border-amber-500/25">
-                            <AlertTriangle size={18} aria-hidden />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-bold text-amber-200 mb-0.5">สถานะ: รอผู้รับผิดชอบ</h4>
-                            <p className="text-xs text-amber-100/85 leading-relaxed">
-                              กรุณามอบหมายงานหรือรับงานนี้ก่อน จึงจะสามารถปลดล็อคแบบฟอร์มเพื่อบันทึกการแก้ไขและปิดงานได้
-                            </p>
-                          </div>
-                        </div>
-                      </div>
+                      <Alert className="animate-pulse-slow border-amber-500/35 bg-amber-950/30 text-amber-100/85 shadow-inner backdrop-blur-sm [&>svg]:text-amber-400">
+                        <AlertTriangle size={18} aria-hidden />
+                        <AlertTitle className="text-sm font-bold text-amber-200">
+                          สถานะ: รอผู้รับผิดชอบ
+                        </AlertTitle>
+                        <AlertDescription className="text-xs leading-relaxed text-amber-100/85">
+                          กรุณามอบหมายงานหรือรับงานนี้ก่อน จึงจะสามารถปลดล็อคแบบฟอร์มเพื่อบันทึกการแก้ไขและปิดงานได้
+                        </AlertDescription>
+                      </Alert>
 
-                      <div className="flex flex-col sm:flex-row gap-2.5 mt-2">
+                      <div className="mt-2 flex flex-col gap-2.5 sm:flex-row">
                       {job?.status === "PENDING" && canAssignAny && (
-                          <button
+                          <Button
                             type="button"
+                            variant="outline"
                             onClick={openAssignModal}
                             disabled={assignActionSaving || assignLoading}
-                            className="flex-1 min-h-[44px] py-2.5 rounded-xl text-sm font-semibold border border-sky-500/50 text-sky-100 bg-sky-950/40 hover:bg-sky-900/50 disabled:opacity-50 transition-all shadow-lg active:scale-95 focus:ring-2 focus:ring-sky-500/30 outline-none cursor-pointer"
+                            className="min-h-11 flex-1 cursor-pointer rounded-xl border-sky-500/50 bg-sky-950/40 py-2.5 text-sm font-semibold text-sky-100 shadow-lg hover:bg-sky-900/50 focus-visible:ring-sky-500/30 active:scale-95"
                           >
-                            <UserPlus size={16} className="inline-block mr-1.5 -mt-0.5" aria-hidden /> มอบหมายงาน
-                          </button>
+                            <UserPlus size={16} className="mr-1.5 inline-block -mt-0.5" aria-hidden /> มอบหมายงาน
+                          </Button>
                         )}
 
                       {job?.status === "PENDING" && canTakeJob && (
-                          <button
+                          <Button
                             type="button"
+                            variant="outline"
                             onClick={handleTakeJob}
                             disabled={assignActionSaving || assignLoading}
-                            className="flex-1 min-h-[44px] py-2.5 rounded-xl text-sm font-semibold text-slate-100 bg-slate-800 border border-white/10 hover:bg-slate-700 disabled:opacity-50 transition-all shadow-lg active:scale-95 focus:ring-2 focus:ring-slate-500/25 outline-none cursor-pointer"
+                            className="min-h-11 flex-1 cursor-pointer rounded-xl border-white/10 bg-slate-800 py-2.5 text-sm font-semibold text-slate-100 shadow-lg hover:bg-slate-700 focus-visible:ring-slate-500/25 active:scale-95"
                           >
-                            <Wrench size={16} className="inline-block mr-1.5 -mt-0.5" aria-hidden /> รับงานด้วยตนเอง
-                          </button>
+                            <Wrench size={16} className="mr-1.5 inline-block -mt-0.5" aria-hidden /> รับงานด้วยตนเอง
+                          </Button>
                         )}
                       </div>
                     </div>
@@ -1115,13 +1048,14 @@ export default function JobDetailPage() {
                           <Printer size={14} aria-hidden />
                           <span>เปิดหน้าพิมพ์ (เบราว์เซอร์)</span>
                         </a>
-                        <button
+                        <Button
                           type="button"
+                          variant="outline"
                           onClick={() => void handleDownloadServerPdf()}
                           disabled={serverPdfDownloading || !token}
                           aria-label="ดาวน์โหลด PDF จากเซิร์ฟเวอร์ Chromium"
                           aria-busy={serverPdfDownloading}
-                          className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 py-2 rounded-xl text-xs font-semibold border border-sky-500/40 bg-sky-900/40 text-sky-100 hover:bg-sky-800/50 transition-all active:scale-95 shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                          className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl border-sky-500/40 bg-sky-900/40 px-3 py-2 text-xs font-semibold text-sky-100 shadow-lg hover:bg-sky-800/50 focus-visible:ring-sky-500/40 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <FileDown size={14} aria-hidden />
                           <span>
@@ -1129,7 +1063,7 @@ export default function JobDetailPage() {
                               ? "กำลังสร้าง PDF…"
                               : "ดาวน์โหลด (เซิร์ฟเวอร์)"}
                           </span>
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   )}
@@ -1165,9 +1099,11 @@ export default function JobDetailPage() {
                             }}
                             className="relative w-full aspect-4/3 rounded-xl border border-white/10 overflow-hidden bg-slate-800/50 group cursor-pointer"
                           >
-                            <img
+                            <ManagedImage
                               src={dashboardJobImagePath(job.id, "fix", i)}
                               alt={`รูปการแก้ไข ${i + 1}`}
+                              fill
+                              sizes={MANAGED_IMAGE_SIZES.galleryResponsiveSm}
                               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                             />
                             <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -1202,28 +1138,22 @@ export default function JobDetailPage() {
 
                   <form onSubmit={handleBackfillDates} className="space-y-3">
                     {backfillPolicyWarnings.length > 0 ? (
-                      <div
+                      <Alert
                         role="status"
-                        className="rounded-xl border border-amber-500/35 bg-amber-950/25 px-3 py-2.5 text-xs text-amber-100/95 leading-relaxed"
+                        className="border-amber-500/35 bg-amber-950/25 text-amber-100/95 [&>svg]:text-amber-400"
                       >
-                        <div className="flex items-start gap-2">
-                          <AlertTriangle
-                            className="shrink-0 mt-0.5 text-amber-400"
-                            size={16}
-                            aria-hidden
-                          />
-                          <div>
-                            <p className="font-semibold text-amber-100">
-                              ตรวจสอบวันที่ก่อนบันทึก
-                            </p>
-                            <ul className="mt-1 list-disc list-inside space-y-0.5">
-                              {backfillPolicyWarnings.map((w, idx) => (
-                                <li key={`${idx}-${w.slice(0, 40)}`}>{w}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-                      </div>
+                        <AlertTriangle size={16} aria-hidden />
+                        <AlertTitle className="text-amber-100">
+                          ตรวจสอบวันที่ก่อนบันทึก
+                        </AlertTitle>
+                        <AlertDescription className="text-amber-100/95">
+                          <ul className="mt-1 list-inside list-disc space-y-0.5">
+                            {backfillPolicyWarnings.map((w, idx) => (
+                              <li key={`${idx}-${w.slice(0, 40)}`}>{w}</li>
+                            ))}
+                          </ul>
+                        </AlertDescription>
+                      </Alert>
                     ) : null}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <BackfillDateTimeFields
@@ -1232,6 +1162,7 @@ export default function JobDetailPage() {
                         timeId="job-backfill-report-time"
                         value={backfillReportDate}
                         onChange={setBackfillReportDate}
+                        onValidityChange={setBackfillReportDateValid}
                         disabled={backfillSaving}
                       />
                       <BackfillDateTimeFields
@@ -1240,6 +1171,7 @@ export default function JobDetailPage() {
                         timeId="job-backfill-fix-time"
                         value={backfillFixDate}
                         onChange={setBackfillFixDate}
+                        onValidityChange={setBackfillFixDateValid}
                         disabled={backfillSaving}
                       />
                     </div>
@@ -1248,13 +1180,14 @@ export default function JobDetailPage() {
                       <span className="text-slate-300 font-medium">เสร็จสิ้น (RESOLVED)</span>{" "}
                       และต้องไม่น้อยกว่าวันที่แจ้งย้อนหลัง
                     </p>
-                    <button
+                    <Button
                       type="submit"
+                      variant="outline"
                       disabled={backfillSaving || backfillPolicyWarnings.length > 0}
-                      className="min-h-[44px] px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-cyan-100 bg-cyan-900/40 border border-cyan-500/35 hover:bg-cyan-800/45 disabled:opacity-60 transition-all shadow-lg active:scale-95 focus:ring-2 focus:ring-cyan-500/40 outline-none cursor-pointer"
+                      className="min-h-11 cursor-pointer rounded-xl border-cyan-500/35 bg-cyan-900/40 px-4 py-2.5 text-xs font-semibold text-cyan-100 shadow-lg hover:bg-cyan-800/45 focus-visible:ring-cyan-500/40 disabled:opacity-60 sm:text-sm"
                     >
                       {backfillSaving ? "กำลังบันทึกวันเวลาย้อนหลัง..." : "บันทึกวันเวลาย้อนหลัง"}
-                    </button>
+                    </Button>
                   </form>
                 </div>
               )}
@@ -1286,12 +1219,12 @@ export default function JobDetailPage() {
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                          <label
+                          <Label
                             className={GLASS_LABEL}
                             htmlFor="job-fix-environment"
                           >
                             ประเภทสถานที่ <span className="text-red-400">*</span>
-                          </label>
+                          </Label>
                           <Select
                             inputId="job-fix-environment"
                             instanceId="job-fix-environment"
@@ -1318,12 +1251,12 @@ export default function JobDetailPage() {
                           />
                         </div>
                         <div>
-                          <label
+                          <Label
                             className={GLASS_LABEL}
                             htmlFor="job-fix-category"
                           >
                             ประเภทงาน <span className="text-red-400">*</span>
-                          </label>
+                          </Label>
                           <Select
                             inputId="job-fix-category"
                             instanceId="job-fix-category"
@@ -1354,13 +1287,13 @@ export default function JobDetailPage() {
                       </div>
                     </div>
                     <div>
-                      <label className={GLASS_LABEL} htmlFor="job-cause">
+                      <Label className={GLASS_LABEL} htmlFor="job-cause">
                         สาเหตุ <span className="text-red-400">*</span>
-                      </label>
-                      <input
+                      </Label>
+                      <Input
                         id="job-cause"
                         type="text"
-                        className={GLASS_FIELD}
+                        className={cn("h-auto min-h-10", GLASS_FIELD)}
                         value={cause}
                         onChange={(e) => setCause(e.target.value)}
                         disabled={isReadOnlyFix}
@@ -1368,12 +1301,12 @@ export default function JobDetailPage() {
                       />
                     </div>
                     <div>
-                      <label className={GLASS_LABEL} htmlFor="job-fix-method">
+                      <Label className={GLASS_LABEL} htmlFor="job-fix-method">
                         วิธีแก้ไข <span className="text-red-400">*</span>
-                      </label>
-                      <textarea
+                      </Label>
+                      <Textarea
                         id="job-fix-method"
-                        className={`${GLASS_FIELD} min-h-[100px] resize-y`}
+                        className={cn("min-h-[100px] resize-y", GLASS_FIELD)}
                         value={fixMethod}
                         onChange={(e) => setFixMethod(e.target.value)}
                         disabled={isReadOnlyFix}
@@ -1381,13 +1314,13 @@ export default function JobDetailPage() {
                       />
                     </div>
                     <div>
-                      <label className={GLASS_LABEL} htmlFor="job-fix-note">
+                      <Label className={GLASS_LABEL} htmlFor="job-fix-note">
                         หมายเหตุการแก้ไข
-                      </label>
-                      <input
+                      </Label>
+                      <Input
                         id="job-fix-note"
                         type="text"
-                        className={GLASS_FIELD}
+                        className={cn("h-auto min-h-10", GLASS_FIELD)}
                         value={note}
                         onChange={(e) => setNote(e.target.value)}
                         disabled={isReadOnlyFix}
@@ -1549,9 +1482,11 @@ export default function JobDetailPage() {
                                 )}
                                 {fixPreviews[i] ? (
                                   <>
-                                    <img
+                                    <ManagedImage
                                       src={fixPreviews[i]!}
                                       alt=""
+                                      fill
+                                      sizes={MANAGED_IMAGE_SIZES.uploadGridResponsive}
                                       className="w-full h-full object-cover"
                                     />
                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -1587,13 +1522,14 @@ export default function JobDetailPage() {
                       </div>
                     )}
                     {canEditFix ? (
-                      <button
+                      <Button
                         type="submit"
+                        variant="default"
                         disabled={saving || !fixFormReadyToSubmit}
-                        className="w-full mt-3 py-3 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-lg active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100 transition-all focus:ring-2 focus:ring-blue-500/40 outline-none cursor-pointer disabled:cursor-not-allowed"
+                        className="mt-3 w-full cursor-pointer rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white shadow-lg hover:bg-blue-700 focus-visible:ring-blue-500/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
                       >
                         {saving ? "กำลังบันทึก..." : "บันทึกและปิดงาน (สถานะ: เสร็จสิ้น)"}
-                      </button>
+                      </Button>
                     ) : isResolved && (canReopenAny || (canReopenSelf && isAssignee)) ? (
                       <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-white/15 text-slate-300 bg-slate-800/40 backdrop-blur-sm">
                         งานนี้ถูกปิดแล้ว — หากต้องการแก้ไขข้อมูลการแก้ไข ให้ใช้ขั้นตอน Reopen ด้านล่าง
@@ -1621,8 +1557,8 @@ export default function JobDetailPage() {
                         <div className="font-semibold text-orange-200">
                           Reopen เพื่อเปลี่ยนสถานะเป็น &quot;กำลังแก้ไข&quot; แล้วจึงแก้ไขข้อมูลได้
                         </div>
-                        <textarea
-                          className="w-full rounded-xl border border-orange-500/30 bg-slate-900/50 px-3 py-2 text-xs sm:text-sm text-slate-100 placeholder:text-orange-200/40 focus:border-orange-400/60 focus:ring-2 focus:ring-orange-500/25 outline-none transition-all"
+                        <Textarea
+                          className="w-full rounded-xl border border-orange-500/30 bg-slate-900/50 px-3 py-2 text-xs text-slate-100 placeholder:text-orange-200/40 focus-visible:border-orange-400/60 focus-visible:ring-orange-500/25 sm:text-sm"
                           rows={2}
                           placeholder="ระบุเหตุผลในการ Reopen เช่น ต้องแก้ไขรายละเอียดวิธีการแก้ไข หรืออัปเดตรูปเพิ่มเติม"
                           value={reopenReason}
@@ -1630,17 +1566,18 @@ export default function JobDetailPage() {
                           disabled={reopening}
                         />
                         <div className="flex justify-end gap-2">
-                          <button
+                          <Button
                             type="button"
+                            variant="default"
                             onClick={() => void handleReopenJob()}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 min-h-[44px] rounded-xl text-xs sm:text-sm font-semibold text-white bg-orange-600 hover:bg-orange-700 disabled:bg-orange-900/50 transition-all shadow-lg active:scale-95 disabled:opacity-60"
+                            className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl bg-orange-600 px-4 py-2 text-xs font-semibold text-white shadow-lg hover:bg-orange-700 focus-visible:ring-orange-500/40 active:scale-95 disabled:bg-orange-900/50 disabled:opacity-60"
                             disabled={!reopenReason.trim() || reopening}
                           >
                             {reopening ? (
                               <Loader2 size={16} className="animate-spin shrink-0" aria-hidden />
                             ) : null}
                             Reopen → กำลังแก้ไข
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -1656,151 +1593,27 @@ export default function JobDetailPage() {
           </div>
         </div>
       </div>
-      {previewImages && previewImages.length > 0 && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-3 sm:px-6"
-          onClick={() => setPreviewImages(null)}
-        >
-          <div
-            className="relative max-w-5xl w-full max-h-[92vh] bg-black/90 rounded-2xl overflow-hidden flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-4 py-3 text-xs sm:text-sm text-slate-200 bg-black/70">
-              <span>
-                รูปที่ {previewIndex + 1} / {previewImages.length}
-              </span>
-              <button
-                type="button"
-                onClick={() => setPreviewImages(null)}
-                className="px-2 py-1 rounded-lg hover:bg-white/10"
-              >
-                ปิด
-              </button>
-            </div>
-            <div className="flex-1 flex items-center justify-center bg-black">
-              <img
-                src={previewImages[previewIndex]}
-                alt=""
-                className="max-h-[82vh] max-w-full object-contain"
-              />
-              {previewImages.length > 1 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPreviewIndex((prev) =>
-                        prev === 0 ? previewImages.length - 1 : prev - 1,
-                      )
-                    }
-                    className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 px-2.5 py-2 rounded-full bg-black/60 text-xs sm:text-sm text-slate-100 hover:bg-black/80"
-                  >
-                    ‹ Prev
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPreviewIndex((prev) =>
-                        prev === previewImages.length - 1 ? 0 : prev + 1,
-                      )
-                    }
-                    className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 px-2.5 py-2 rounded-full bg-black/60 text-xs sm:text-sm text-slate-100 hover:bg-black/80"
-                  >
-                    Next ›
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <JobImageLightbox
+        open={!!previewImages?.length}
+        onOpenChange={(open) => {
+          if (!open) setPreviewImages(null);
+        }}
+        urls={previewImages ?? []}
+        index={previewIndex}
+        onIndexChange={setPreviewIndex}
+      />
 
-      {/* Modal มอบหมายงาน (ADMIN/SUPERVISOR) — Dark Glassmorphism */}
-      {assignOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
-          onClick={() => setAssignOpen(false)}
-          role="presentation"
-        >
-          <div
-            className="rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl w-full max-w-md overflow-visible flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="assign-modal-title"
-          >
-            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/10 shrink-0">
-              <h3
-                id="assign-modal-title"
-                className="font-bold text-base text-white"
-              >
-                มอบหมายงาน {job?.ticketNo && `· ${job.ticketNo}`}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setAssignOpen(false)}
-                className="p-2 rounded-xl text-slate-400 hover:bg-white/10 hover:text-slate-200 transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
-                aria-label="ปิด"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-4 sm:p-5 space-y-4">
-              {assignLoading ? (
-                <p className="text-sm text-slate-400">กำลังโหลดรายชื่อเจ้าหน้าที่...</p>
-              ) : (
-                <>
-                  <p className={`${GLASS_LABEL} mb-0`}>
-                    เลือกเจ้าหน้าที่ที่ต้องการมอบหมายงานนี้ให้
-                  </p>
-
-                  <Select
-                    instanceId="assign-staff-select-detail"
-                    styles={reactSelectGlassStyles}
-                    menuPortalTarget={
-                      typeof document !== "undefined" ? document.body : null
-                    }
-                    menuPosition="fixed"
-                    options={assignOptions}
-                    placeholder="ค้นหาและเลือกเจ้าหน้าที่..."
-                    value={
-                      assignSelectedId != null
-                        ? assignOptions.find((o) => o.value === assignSelectedId) ?? null
-                        : null
-                    }
-                    onChange={(opt: { value: number } | null) =>
-                      setAssignSelectedId(opt ? Number(opt.value) : null)
-                    }
-                    isClearable
-                    isSearchable
-                    isDisabled={assignActionSaving}
-                    noOptionsMessage={() => "ไม่พบเจ้าหน้าที่"}
-                  />
-
-                  <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setAssignOpen(false)}
-                      className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-white/10 bg-slate-800 text-slate-200 hover:bg-slate-700/90 transition-all active:scale-95 disabled:opacity-50 cursor-pointer min-h-[44px]"
-                      disabled={assignActionSaving}
-                    >
-                      ยกเลิก
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleAssignSubmit}
-                      disabled={assignSelectedId == null || assignActionSaving}
-                      className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
-                    >
-                      <UserPlus size={14} className="inline mr-1.5" aria-hidden /> มอบหมายให้เจ้าหน้าที่
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <JobAssignDialog
+        open={assignOpen}
+        onOpenChange={setAssignOpen}
+        ticketNo={job?.ticketNo}
+        assignLoading={assignLoading}
+        assignOptions={assignOptions}
+        assignSelectedId={assignSelectedId}
+        onSelectStaff={setAssignSelectedId}
+        assignActionSaving={assignActionSaving}
+        onSubmit={() => void handleAssignSubmit()}
+      />
     </DashboardPageShell>
   );
 }

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MinioService } from '../minio/minio.service';
+import { UpdateAppMetaDto } from './dto/app-meta.dto';
 import { TestEmailSmtpDto, UpdateEmailSmtpDto } from './dto/email-smtp.dto';
 import { UpdateEmailTemplatesDto } from './dto/email-templates.dto';
 import {
@@ -14,6 +15,13 @@ import { EmailSmtpConfig, MailService } from './mail.service';
 
 export const EMAIL_SMTP_SETTING_KEY = 'email_smtp';
 export const DEFAULT_PASS_SETTING_KEY = 'default_pass';
+export const APP_META_SETTING_KEY = 'app_meta';
+
+export type AppMetaPublic = {
+  appName: string;
+  companyName: string;
+  version: string;
+};
 
 export type EmailSmtpPublic = {
   smtpHost: string;
@@ -58,6 +66,55 @@ export class SettingsService {
       from: String(o.from ?? ''),
       tlsRejectUnauthorized,
     };
+  }
+
+  private parseAppMetaStored(raw: Prisma.JsonValue | null): AppMetaPublic {
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+      return {
+        appName: '',
+        companyName: '',
+        version: '',
+      };
+    }
+    const o = raw as Record<string, unknown>;
+    return {
+      appName:
+        typeof o.appName === 'string' ? o.appName.trim().slice(0, 120) : '',
+      companyName:
+        typeof o.companyName === 'string'
+          ? o.companyName.trim().slice(0, 120)
+          : '',
+      version:
+        typeof o.version === 'string' ? o.version.trim().slice(0, 40) : '',
+    };
+  }
+
+  async getAppMeta(): Promise<AppMetaPublic> {
+    const row = await this.prisma.setting.findUnique({
+      where: { key: APP_META_SETTING_KEY },
+    });
+    return this.parseAppMetaStored(row?.value ?? null);
+  }
+
+  async updateAppMeta(dto: UpdateAppMetaDto): Promise<AppMetaPublic> {
+    const next: AppMetaPublic = {
+      appName: dto.appName.trim().slice(0, 120),
+      companyName: dto.companyName.trim().slice(0, 120),
+      version: dto.version.trim().slice(0, 40),
+    };
+
+    await this.prisma.setting.upsert({
+      where: { key: APP_META_SETTING_KEY },
+      create: {
+        key: APP_META_SETTING_KEY,
+        value: next as unknown as Prisma.InputJsonValue,
+      },
+      update: {
+        value: next as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    return next;
   }
 
   private toPublic(cfg: EmailSmtpConfig | null): EmailSmtpPublic | null {

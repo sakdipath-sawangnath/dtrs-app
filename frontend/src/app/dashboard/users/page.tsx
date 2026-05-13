@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
 import {
@@ -19,6 +19,9 @@ import {
 } from "lucide-react";
 import DashboardPageShell from "@/components/DashboardPageShell";
 import DashboardFilterBar from "@/components/DashboardFilterBar";
+import DashboardRouteLoading from "@/components/DashboardRouteLoading";
+import { MANAGED_IMAGE_SIZES } from "@/components/ManagedImage";
+import ManagedImageFrame from "@/components/ManagedImageFrame";
 import CrudModal from "@/components/CrudModal";
 import RoleBadge from "@/components/RoleBadge";
 import { toastSuccess, toastError, toastWarning, confirmDialog } from "@/lib/toast";
@@ -109,28 +112,29 @@ function UserAvatarCell({
           className={`${frameClass} cursor-pointer transition-shadow hover:ring-2 hover:ring-blue-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50`}
           aria-label="ดูรูปโปรไฟล์"
         >
-          <img
-            src={src}
+          <ManagedImageFrame
+            src={src ?? ""}
             alt={imgAlt}
-            className="h-full w-full object-cover pointer-events-none"
+            sizes={MANAGED_IMAGE_SIZES.avatarMd}
+            frameClassName="absolute inset-0"
+            imageClassName="h-full w-full object-cover pointer-events-none"
             onError={() => setImgError(true)}
           />
         </button>
       ) : (
-        <div className={frameClass}>
-          {showImg ? (
-            <img
-              src={src}
-              alt={imgAlt}
-              className="h-full w-full object-cover"
-              onError={() => setImgError(true)}
-            />
-          ) : (
+        <ManagedImageFrame
+          src={showImg ? src ?? "" : null}
+          alt={imgAlt}
+          sizes={MANAGED_IMAGE_SIZES.avatarMd}
+          frameClassName={frameClass}
+          imageClassName="h-full w-full object-cover"
+          onError={() => setImgError(true)}
+          fallback={
             <div className="flex h-full w-full items-center justify-center bg-slate-800/80 text-xs font-semibold text-slate-400">
               {initial}
             </div>
-          )}
-        </div>
+          }
+        />
       )}
     </div>
   );
@@ -277,7 +281,7 @@ export default function UsersPage() {
     return "สิทธิ์ตามที่กำหนดไว้ในหน้าบทบาทและสิทธิ์ (RBAC)";
   };
 
-  const fetchUsers = () => {
+  const fetchUsers = useCallback(() => {
     if (!token) return;
     setLoading(true);
     setError(null);
@@ -299,11 +303,11 @@ export default function UsersPage() {
         setList([]);
       })
       .finally(() => setLoading(false));
-  };
+  }, [API, token]);
 
   useEffect(() => {
     fetchUsers();
-  }, [session]);
+  }, [fetchUsers, session]);
 
   useEffect(() => {
     if (!avatarLightbox) return;
@@ -560,6 +564,18 @@ export default function UsersPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <DashboardPageShell
+        title="จัดการผู้ใช้และบทบาท"
+        subtitle={isAdmin ? "เพิ่ม/แก้ไข/ลบผู้ใช้ และกำหนด Role (ADMIN, STAFF, USER)" : "รายชื่อผู้ใช้และบทบาท (ดูอย่างเดียว)"}
+        noCard={true}
+      >
+        <DashboardRouteLoading variant="page" />
+      </DashboardPageShell>
+    );
+  }
+
   return (
     <DashboardPageShell
       title="จัดการผู้ใช้และบทบาท"
@@ -689,12 +705,6 @@ export default function UsersPage() {
           <button type="button" onClick={fetchUsers} className="mt-3 px-4 py-2 rounded-lg border border-white/10 text-sm text-slate-400 hover:bg-white/5 transition-colors">
             โหลดใหม่
           </button>
-        </div>
-      ) : loading ? (
-        <div className="flex-1 p-8 flex justify-center">
-          <div className="animate-pulse text-sm text-slate-500">
-            กำลังโหลด...
-          </div>
         </div>
       ) : filteredList.length === 0 ? (
         <div className="flex-1 p-12 flex flex-col items-center justify-center text-center">
@@ -847,10 +857,12 @@ export default function UsersPage() {
           <>
             <div className="rounded-2xl border border-white/10 bg-slate-900/40 backdrop-blur-sm p-4 flex items-center gap-4 mb-1">
               {avatarPreview ? (
-                <img
+                <ManagedImageFrame
                   src={avatarPreview}
                   alt=""
-                  className="w-14 h-14 rounded-2xl object-cover border border-white/15 ring-2 ring-white/5 shrink-0"
+                  sizes={MANAGED_IMAGE_SIZES.avatarLg}
+                  frameClassName="w-14 h-14 rounded-2xl border border-white/15 ring-2 ring-white/5 shrink-0"
+                  imageClassName="object-cover"
                 />
               ) : (
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-base font-semibold text-slate-300 bg-slate-800/80 border border-white/10 shrink-0">
@@ -1096,13 +1108,13 @@ export default function UsersPage() {
               </button>
             </div>
             <div className="flex items-center justify-center bg-slate-950/90 p-4 sm:p-5">
-              <div className="w-full max-w-[240px] aspect-square flex items-center justify-center rounded-xl bg-slate-900/50 ring-1 ring-white/10 overflow-hidden">
-                <img
-                  src={avatarLightbox.src}
-                  alt={avatarLightbox.alt}
-                  className="max-h-full max-w-full h-full w-full object-contain"
-                />
-              </div>
+              <ManagedImageFrame
+                src={avatarLightbox.src}
+                alt={avatarLightbox.alt}
+                sizes={MANAGED_IMAGE_SIZES.lightboxSquare}
+                frameClassName="w-full max-w-[240px] aspect-square flex items-center justify-center rounded-xl bg-slate-900/50 ring-1 ring-white/10"
+                imageClassName="object-contain"
+              />
             </div>
           </div>
         </div>

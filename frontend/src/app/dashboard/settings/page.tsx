@@ -4,7 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
 import { Loader2, Save, Info, Send, Settings, Eye, EyeOff, Mail, Search, Trash2, ChevronDown, Download } from "lucide-react";
+import DashboardRouteLoading from "@/components/DashboardRouteLoading";
 import { toastSuccess, toastError } from "@/lib/toast";
+import { FOOTER_ENV_FALLBACK, resolveFooterAppMeta, type AppMeta } from "@/lib/appMeta";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
 
@@ -30,6 +35,8 @@ type DefaultPassResponse = {
   passwordSet: boolean;
   password: string;
 };
+
+type AppMetaResponse = AppMeta;
 
 type EmailTemplateBlockResponse = {
   enabled: boolean;
@@ -107,6 +114,12 @@ export default function SettingsPage() {
   const [defaultPassForm, setDefaultPassForm] = useState({ password: "" });
   const [savingDefaultPass, setSavingDefaultPass] = useState(false);
   const [showDefaultPass, setShowDefaultPass] = useState(false);
+  const [appMetaForm, setAppMetaForm] = useState<AppMetaResponse>({
+    appName: "",
+    companyName: "",
+    version: "",
+  });
+  const [savingAppMeta, setSavingAppMeta] = useState(false);
 
   const [emailForm, setEmailForm] = useState({
     smtpHost: "",
@@ -149,7 +162,10 @@ export default function SettingsPage() {
     if (!token) return;
     setLoadingSettings(true);
     try {
-      const [smtpRes, defaultPassRes, templatesRes, meRes] = await Promise.all([
+      const [appMetaRes, smtpRes, defaultPassRes, templatesRes, meRes] = await Promise.all([
+        axios.get(`${API}/settings/app-meta`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
         axios.get(`${API}/settings/email-smtp`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -163,6 +179,15 @@ export default function SettingsPage() {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
+
+      const appMeta = unwrapApiData<AppMetaResponse>(appMetaRes.data);
+      if (appMeta) {
+        setAppMetaForm({
+          appName: appMeta.appName ?? "",
+          companyName: appMeta.companyName ?? "",
+          version: appMeta.version ?? "",
+        });
+      }
 
       const smtp = unwrapApiData<EmailSmtpResponse>(smtpRes.data);
       if (smtp) {
@@ -273,6 +298,37 @@ export default function SettingsPage() {
       toastError("บันทึก Default Pass ไม่สำเร็จ", apiErrorMessage(err));
     } finally {
       setSavingDefaultPass(false);
+    }
+  };
+
+  const handleSaveAppMeta = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) {
+      toastError("กรุณาเข้าสู่ระบบใหม่");
+      return;
+    }
+
+    setSavingAppMeta(true);
+    try {
+      const body = {
+        appName: appMetaForm.appName.trim(),
+        companyName: appMetaForm.companyName.trim(),
+        version: appMetaForm.version.trim(),
+      };
+      const res = await axios.put(`${API}/settings/app-meta`, body, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const updated = unwrapApiData<AppMetaResponse>(res.data);
+      setAppMetaForm({
+        appName: updated?.appName ?? body.appName,
+        companyName: updated?.companyName ?? body.companyName,
+        version: updated?.version ?? body.version,
+      });
+      toastSuccess("บันทึกข้อมูล Footer สำเร็จ");
+    } catch (err: unknown) {
+      toastError("บันทึกข้อมูล Footer ไม่สำเร็จ", apiErrorMessage(err));
+    } finally {
+      setSavingAppMeta(false);
     }
   };
 
@@ -531,7 +587,24 @@ export default function SettingsPage() {
     }
   };
 
-  const disabledForm = loadingSettings || sessionStatus !== "authenticated" || !token;
+  const disabledForm = sessionStatus !== "authenticated" || !token;
+  const resolvedFooterMeta = resolveFooterAppMeta(appMetaForm);
+
+  if (loadingSettings) {
+    return (
+      <div className="animate-fade-up w-full min-w-0 space-y-6">
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-xl font-bold truncate text-white">
+            ตั้งค่าระบบ
+          </h1>
+          <p className="text-sm mt-0.5 text-slate-400">
+            กำหนดค่าอีเมล (SMTP)
+          </p>
+        </div>
+        <DashboardRouteLoading variant="overlay" />
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-up w-full min-w-0 space-y-6">
@@ -544,6 +617,106 @@ export default function SettingsPage() {
         </p>
       </div>
 
+      <details className="group rounded-xl border border-white/10 p-4 sm:p-5 w-full bg-slate-900/50 backdrop-blur-sm" open>
+        <summary className="list-none flex items-center gap-2 mb-4 shrink-0 cursor-pointer">
+          <Info size={18} className="text-slate-400 shrink-0" aria-hidden />
+          <h2 className="font-bold text-sm text-slate-200 flex-1">
+            ข้อมูลแอปสำหรับ Footer
+          </h2>
+          <span className="text-xs text-slate-400 hidden sm:inline">ย่อ/ขยาย</span>
+          <ChevronDown size={16} className="text-slate-400 transition-transform group-open:rotate-180" />
+        </summary>
+
+        <form onSubmit={handleSaveAppMeta} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label className="mb-1.5 block text-sm font-medium text-slate-300" htmlFor="app-meta-name">
+                ชื่อระบบ
+              </Label>
+              <Input
+                id="app-meta-name"
+                type="text"
+                className="form-input-glass"
+                value={appMetaForm.appName}
+                onChange={(e) => setAppMetaForm((prev) => ({ ...prev, appName: e.target.value }))}
+                placeholder={FOOTER_ENV_FALLBACK.appName}
+                disabled={disabledForm || savingAppMeta}
+                maxLength={120}
+              />
+            </div>
+            <div>
+              <Label className="mb-1.5 block text-sm font-medium text-slate-300" htmlFor="app-meta-company">
+                บริษัท / หน่วยงาน
+              </Label>
+              <Input
+                id="app-meta-company"
+                type="text"
+                className="form-input-glass"
+                value={appMetaForm.companyName}
+                onChange={(e) => setAppMetaForm((prev) => ({ ...prev, companyName: e.target.value }))}
+                placeholder={FOOTER_ENV_FALLBACK.companyName}
+                disabled={disabledForm || savingAppMeta}
+                maxLength={120}
+              />
+            </div>
+            <div>
+              <Label className="mb-1.5 block text-sm font-medium text-slate-300" htmlFor="app-meta-version">
+                เวอร์ชันที่แสดง
+              </Label>
+              <Input
+                id="app-meta-version"
+                type="text"
+                className="form-input-glass"
+                value={appMetaForm.version}
+                onChange={(e) => setAppMetaForm((prev) => ({ ...prev, version: e.target.value }))}
+                placeholder={FOOTER_ENV_FALLBACK.version}
+                disabled={disabledForm || savingAppMeta}
+                maxLength={40}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-slate-950/40 p-4 space-y-3">
+            <p className="text-sm font-medium text-slate-200">ค่าที่จะแสดงจริงใน Footer</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+              <div className="rounded-lg border border-white/10 bg-slate-900/30 px-3 py-2.5">
+                <p className="text-xs text-slate-500">ชื่อระบบ</p>
+                <p className="mt-1 text-slate-200 wrap-break-word">{resolvedFooterMeta.appName}</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-slate-900/30 px-3 py-2.5">
+                <p className="text-xs text-slate-500">บริษัท / หน่วยงาน</p>
+                <p className="mt-1 text-slate-200 wrap-break-word">{resolvedFooterMeta.companyName}</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-slate-900/30 px-3 py-2.5">
+                <p className="text-xs text-slate-500">เวอร์ชัน</p>
+                <p className="mt-1 text-slate-200 wrap-break-word">{resolvedFooterMeta.version}</p>
+              </div>
+            </div>
+            <p className="text-xs leading-relaxed text-slate-500">
+              ลำดับ fallback: <code className="text-slate-300">DB</code> →{" "}
+              <code className="text-slate-300">NEXT_PUBLIC_APP_NAME</code> /{" "}
+              <code className="text-slate-300">NEXT_PUBLIC_COMPANY_NAME</code> /{" "}
+              <code className="text-slate-300">NEXT_PUBLIC_APP_VERSION</code> →{" "}
+              <code className="text-slate-300">package.json</code> (ใช้กับ version เท่านั้น)
+            </p>
+            <p className="text-xs leading-relaxed text-slate-500">
+              เว้นว่างช่องใดไว้ ระบบจะ fallback ตามลำดับข้างต้นทันทีโดยไม่ต้องใส่ค่าซ้ำใน DB
+            </p>
+          </div>
+
+          <div className="pt-2 border-t border-white/10 flex justify-end">
+            <Button
+              type="submit"
+              disabled={disabledForm || savingAppMeta}
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-all active:scale-95 shadow-lg shadow-blue-900/30 disabled:opacity-50 disabled:active:scale-100 cursor-pointer min-h-[44px]"
+            >
+              {savingAppMeta ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+              บันทึกข้อมูล Footer
+            </Button>
+          </div>
+        </form>
+      </details>
+
       <details className="group rounded-xl border border-white/10 p-4 sm:p-5 w-full bg-slate-900/50 backdrop-blur-sm">
         <summary className="list-none flex items-center gap-2 mb-4 shrink-0 cursor-pointer">
           <Settings size={18} className="text-slate-400 shrink-0" aria-hidden />
@@ -554,20 +727,14 @@ export default function SettingsPage() {
           <ChevronDown size={16} className="text-slate-400 transition-transform group-open:rotate-180" />
         </summary>
 
-          {loadingSettings ? (
-            <div className="flex items-center justify-center py-16 text-slate-400 gap-2">
-              <Loader2 className="animate-spin" size={22} aria-hidden />
-              <span>กำลังโหลดการตั้งค่า…</span>
-            </div>
-          ) : (
-            <form onSubmit={handleSaveEmail} className="space-y-6">
+          <form onSubmit={handleSaveEmail} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1.5 text-slate-300" htmlFor="smtp-host">
+                    <Label className="mb-1.5 block text-sm font-medium text-slate-300" htmlFor="smtp-host">
                       SMTP Host
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       id="smtp-host"
                       type="text"
                       className="form-input-glass"
@@ -579,10 +746,10 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1.5 text-slate-300" htmlFor="smtp-port">
+                    <Label className="mb-1.5 block text-sm font-medium text-slate-300" htmlFor="smtp-port">
                       SMTP Port
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       id="smtp-port"
                       type="text"
                       className="form-input-glass"
@@ -594,9 +761,9 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1.5 text-slate-300" htmlFor="smtp-secure">
+                    <Label className="mb-1.5 block text-sm font-medium text-slate-300" htmlFor="smtp-secure">
                       Secure (SSL/TLS)
-                    </label>
+                    </Label>
                     <select
                       id="smtp-secure"
                       className="select-native-glass w-full"
@@ -612,10 +779,10 @@ export default function SettingsPage() {
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1.5 text-slate-300" htmlFor="smtp-user">
+                    <Label className="mb-1.5 block text-sm font-medium text-slate-300" htmlFor="smtp-user">
                       User (Username)
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       id="smtp-user"
                       type="text"
                       className="form-input-glass"
@@ -626,10 +793,10 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1.5 text-slate-300" htmlFor="smtp-password">
+                    <Label className="mb-1.5 block text-sm font-medium text-slate-300" htmlFor="smtp-password">
                       Password
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       id="smtp-password"
                       type="password"
                       className="form-input-glass"
@@ -642,10 +809,10 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1.5 text-slate-300" htmlFor="smtp-from">
+                    <Label className="mb-1.5 block text-sm font-medium text-slate-300" htmlFor="smtp-from">
                       Sender Email (From)
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       id="smtp-from"
                       type="email"
                       className="form-input-glass"
@@ -660,7 +827,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="rounded-xl border border-white/10 bg-slate-950/40 p-4">
-                <label className="flex items-start gap-3 cursor-pointer group min-h-[44px]">
+                <Label className="flex cursor-pointer items-start gap-3 group min-h-[44px]">
                   <input
                     type="checkbox"
                     className="mt-1 h-4 w-4 rounded border-white/20 bg-slate-900/60 text-blue-600 focus:ring-blue-500/50 shrink-0 cursor-pointer"
@@ -677,7 +844,7 @@ export default function SettingsPage() {
                   <span className="text-sm text-slate-300 leading-snug">
                     ตรวจสอบใบรับรอง TLS (ปิดเมื่อ SMTP ใช้ใบ self-signed หรือ CA ภายในองค์กร)
                   </span>
-                </label>
+                </Label>
                 <p id="smtp-tls-hint" className="text-xs text-slate-500 mt-2 pl-7">
                   ปิดตัวเลือกนี้ช่วยแก้ข้อความ «self-signed certificate» — ใช้เฉพาะเครือข่ายที่เชื่อถือได้
                 </p>
@@ -687,10 +854,10 @@ export default function SettingsPage() {
                 <p className="text-sm font-medium text-slate-300">ทดสอบส่งอีเมล</p>
                 <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
                   <div className="flex-1 min-w-0">
-                    <label className="block text-sm font-medium mb-1.5 text-slate-300" htmlFor="test-to">
+                    <Label className="mb-1.5 block text-sm font-medium text-slate-300" htmlFor="test-to">
                       ส่งทดสอบไปที่
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       id="test-to"
                       type="email"
                       className="form-input-glass w-full"
@@ -700,7 +867,7 @@ export default function SettingsPage() {
                       disabled={disabledForm || testingEmail}
                     />
                   </div>
-                  <button
+                  <Button
                     type="button"
                     onClick={() => void handleTestEmail()}
                     disabled={disabledForm || testingEmail || savingEmail}
@@ -708,7 +875,7 @@ export default function SettingsPage() {
                   >
                     {testingEmail ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} aria-hidden />}
                     ทดสอบส่งอีเมล
-                  </button>
+                  </Button>
                 </div>
                 <p className="text-xs text-slate-500">
                   ใช้ค่าจากฟอร์มด้านบน (รวมรหัสผ่านที่เคยบันทึก หากไม่กรอกใหม่) — บันทึกได้ก่อนหรือหลังทดสอบ
@@ -716,17 +883,16 @@ export default function SettingsPage() {
               </div>
 
               <div className="pt-6 border-t border-white/10 flex justify-end">
-                <button
+                <Button
                   type="submit"
                   disabled={savingEmail || disabledForm}
                   className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-all active:scale-95 shadow-lg shadow-blue-900/30 disabled:opacity-50 disabled:active:scale-100 cursor-pointer min-h-[44px]"
                 >
                   {savingEmail ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                   บันทึกการตั้งค่า Email
-                </button>
+                </Button>
               </div>
-            </form>
-          )}
+          </form>
       </details>
 
       <details className="group rounded-xl border border-white/10 p-4 sm:p-5 w-full bg-slate-900/50 backdrop-blur-sm">
@@ -744,18 +910,12 @@ export default function SettingsPage() {
           ต้องตั้งค่า SMTP ด้านบน และเปิดเทมเพลตที่ต้องการ — ผู้รับหลักตามคำอธิบายในแต่ละกล่อง
         </p>
 
-        {loadingSettings ? (
-          <div className="flex items-center justify-center py-16 text-slate-400 gap-2">
-            <Loader2 className="animate-spin" size={22} aria-hidden />
-            <span>กำลังโหลดการตั้งค่า…</span>
-          </div>
-        ) : (
-          <form onSubmit={handleSaveEmailTemplates} className="space-y-6">
+        <form onSubmit={handleSaveEmailTemplates} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium mb-1.5 text-slate-300" htmlFor="brand-logo-url">
+              <Label className="mb-1.5 block text-sm font-medium text-slate-300" htmlFor="brand-logo-url">
                 URL โลโก้ (แสดงในอีเมล)
-              </label>
-              <input
+              </Label>
+              <Input
                 id="brand-logo-url"
                 type="url"
                 className="form-input-glass"
@@ -772,10 +932,10 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1.5 text-slate-300" htmlFor="email-public-base-url">
+              <Label className="mb-1.5 block text-sm font-medium text-slate-300" htmlFor="email-public-base-url">
                 Public URL สำหรับลิงก์ในอีเมล
-              </label>
-              <input
+              </Label>
+              <Input
                 id="email-public-base-url"
                 type="url"
                 className="form-input-glass"
@@ -837,20 +997,20 @@ export default function SettingsPage() {
                     disabled={disabledForm}
                   />
                   <div className="min-w-0 flex-1">
-                    <label htmlFor={`tpl-${section.key}-en`} className="font-medium text-slate-200 cursor-pointer">
+                    <Label htmlFor={`tpl-${section.key}-en`} className="cursor-pointer font-medium text-slate-200">
                       {section.title}
-                    </label>
+                    </Label>
                     <p className="text-xs text-slate-500 mt-1">{section.hint}</p>
                   </div>
                 </div>
                 <div>
-                  <label
-                    className="block text-sm font-medium mb-1.5 text-slate-300"
+                  <Label
+                    className="mb-1.5 block text-sm font-medium text-slate-300"
                     htmlFor={`tpl-${section.key}-to`}
                   >
                     To เพิ่มเติม (คั่นด้วยจุลภาค)
-                  </label>
-                  <input
+                  </Label>
+                  <Input
                     id={`tpl-${section.key}-to`}
                     type="text"
                     className="form-input-glass"
@@ -869,13 +1029,13 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <label
-                    className="block text-sm font-medium mb-1.5 text-slate-300"
+                  <Label
+                    className="mb-1.5 block text-sm font-medium text-slate-300"
                     htmlFor={`tpl-${section.key}-cc`}
                   >
                     CC
-                  </label>
-                  <input
+                  </Label>
+                  <Input
                     id={`tpl-${section.key}-cc`}
                     type="text"
                     className="form-input-glass"
@@ -906,9 +1066,9 @@ export default function SettingsPage() {
                       {rolesList.map((r) => {
                         const checked = emailTemplatesForm[section.key].notifyRoleIds.includes(r.id);
                         return (
-                          <label
+                          <Label
                             key={r.id}
-                            className="inline-flex items-center gap-2 cursor-pointer rounded-lg border border-white/10 bg-slate-950/50 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-slate-800/60 min-h-[40px]"
+                            className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-slate-950/50 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-slate-800/60"
                           >
                             <input
                               type="checkbox"
@@ -933,7 +1093,7 @@ export default function SettingsPage() {
                               {r.name}
                               <span className="text-slate-500 font-mono text-[10px] ml-1">({r.code})</span>
                             </span>
-                          </label>
+                          </Label>
                         );
                       })}
                     </div>
@@ -943,17 +1103,16 @@ export default function SettingsPage() {
             ))}
 
             <div className="pt-2 border-t border-white/10 flex justify-end">
-              <button
+              <Button
                 type="submit"
                 disabled={disabledForm || savingTemplates}
                 className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-all active:scale-95 shadow-lg shadow-blue-900/30 disabled:opacity-50 disabled:active:scale-100 cursor-pointer min-h-[44px]"
               >
                 {savingTemplates ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                 บันทึกเทมเพลตอีเมล
-              </button>
+              </Button>
             </div>
-          </form>
-        )}
+        </form>
       </details>
 
       <details className="group rounded-xl border border-white/10 p-4 sm:p-5 w-full bg-slate-900/50 backdrop-blur-sm">
@@ -964,13 +1123,7 @@ export default function SettingsPage() {
           <ChevronDown size={16} className="text-slate-400 transition-transform group-open:rotate-180" />
         </summary>
 
-        {loadingSettings ? (
-          <div className="flex items-center justify-center py-16 text-slate-400 gap-2">
-            <Loader2 className="animate-spin" size={22} aria-hidden />
-            <span>กำลังโหลดการตั้งค่า…</span>
-          </div>
-        ) : (
-          <form onSubmit={handleSaveDefaultPass} className="space-y-6">
+        <form onSubmit={handleSaveDefaultPass} className="space-y-6">
             <div className="space-y-4">
               <p className="text-sm text-slate-400">
                 ใช้สำหรับปุ่ม <span className="text-slate-200 font-medium">Reset Pass</span> ในหน้า <span className="text-slate-200 font-medium">จัดการผู้ใช้</span>
@@ -985,11 +1138,11 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-slate-300" htmlFor="default-pass">
+                <Label className="mb-1.5 block text-sm font-medium text-slate-300" htmlFor="default-pass">
                   Default Pass
-                </label>
+                </Label>
                 <div className="relative">
-                  <input
+                  <Input
                     id="default-pass"
                     type={showDefaultPass ? "text" : "password"}
                     className="form-input-glass pr-12"
@@ -1000,7 +1153,7 @@ export default function SettingsPage() {
                     disabled={disabledForm || savingDefaultPass}
                     autoComplete="new-password"
                   />
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setShowDefaultPass((v) => !v)}
                     disabled={disabledForm || savingDefaultPass}
@@ -1009,31 +1162,30 @@ export default function SettingsPage() {
                     aria-pressed={showDefaultPass}
                   >
                     {showDefaultPass ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
 
             <div className="pt-2 border-t border-white/10 flex justify-end gap-3">
-              <button
+              <Button
                 type="button"
                 onClick={() => setDefaultPassForm({ password: "F0rth2026@" })}
                 disabled={disabledForm || savingDefaultPass}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium transition-all active:scale-95 shadow-lg shadow-black/20 disabled:opacity-50 disabled:active:scale-100 cursor-pointer min-h-[44px]"
               >
                 ใส่ค่าเริ่มต้น
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
                 disabled={disabledForm || savingDefaultPass || !defaultPassForm.password.trim()}
                 className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-all active:scale-95 shadow-lg shadow-blue-900/30 disabled:opacity-50 disabled:active:scale-100 cursor-pointer min-h-[44px]"
               >
                 {savingDefaultPass ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                 บันทึก Default Pass
-              </button>
+              </Button>
             </div>
-          </form>
-        )}
+        </form>
       </details>
 
       <details className="group rounded-xl border border-white/10 p-4 sm:p-5 w-full bg-slate-900/50 backdrop-blur-sm space-y-4">
@@ -1051,10 +1203,10 @@ export default function SettingsPage() {
 
         <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
           <div className="w-full sm:max-w-[300px]">
-            <label className="block text-sm font-medium mb-1.5 text-slate-300" htmlFor="orphan-prefix">
+            <Label className="mb-1.5 block text-sm font-medium text-slate-300" htmlFor="orphan-prefix">
               Prefix ที่ต้องการสแกน
-            </label>
-            <input
+            </Label>
+            <Input
               id="orphan-prefix"
               type="text"
               className="form-input-glass"
@@ -1065,9 +1217,9 @@ export default function SettingsPage() {
             />
           </div>
           <div className="w-full sm:max-w-[180px]">
-            <label className="block text-sm font-medium mb-1.5 text-slate-300" htmlFor="older-than-days">
+            <Label className="mb-1.5 block text-sm font-medium text-slate-300" htmlFor="older-than-days">
               แสดงอายุเกิน (วัน)
-            </label>
+            </Label>
             <select
               id="older-than-days"
               className="select-native-glass w-full"
@@ -1080,7 +1232,7 @@ export default function SettingsPage() {
               ))}
             </select>
           </div>
-          <button
+          <Button
             type="button"
             onClick={() => {
               setOrphanTokenHistory([]);
@@ -1091,8 +1243,8 @@ export default function SettingsPage() {
           >
             {scanLoading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
             สแกนไฟล์ค้าง
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={handleExportOrphansCsv}
             disabled={disabledForm || scanLoading || deleteLoading || !orphanScan || orphanScan.items.length === 0}
@@ -1100,7 +1252,7 @@ export default function SettingsPage() {
           >
             <Download size={18} />
             Export CSV
-          </button>
+          </Button>
         </div>
 
         {orphanScan ? (
@@ -1129,22 +1281,22 @@ export default function SettingsPage() {
                 {orphanScan.meta.hasMore ? " (มีหน้าถัดไป)" : ""}
               </span>
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   type="button"
                   onClick={() => void handlePrevOrphanPage()}
                   disabled={scanLoading || orphanTokenHistory.length === 0}
                   className="inline-flex items-center rounded-lg border border-white/15 px-2.5 py-1 text-slate-300 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   ก่อนหน้า
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={() => void handleNextOrphanPage()}
                   disabled={scanLoading || !orphanScan.meta.nextContinuationToken}
                   className="inline-flex items-center rounded-lg border border-white/15 px-2.5 py-1 text-slate-300 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   ถัดไป
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -1191,11 +1343,11 @@ export default function SettingsPage() {
             )}
 
             <div className="rounded-xl border border-red-500/20 bg-red-950/20 p-3 space-y-2">
-              <label className="block text-xs font-medium text-red-200" htmlFor="confirm-delete-orphans">
+              <Label className="mb-1.5 block text-xs font-medium text-red-200" htmlFor="confirm-delete-orphans">
                 ยืนยันการลบ (พิมพ์ DELETE)
-              </label>
+              </Label>
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                <input
+                <Input
                   id="confirm-delete-orphans"
                   type="text"
                   className="form-input-glass sm:max-w-[220px]"
@@ -1204,7 +1356,7 @@ export default function SettingsPage() {
                   placeholder="DELETE"
                   disabled={disabledForm || deleteLoading || scanLoading}
                 />
-                <button
+                <Button
                   type="button"
                   onClick={() => void handleDeleteSelectedOrphans()}
                   disabled={
@@ -1218,7 +1370,7 @@ export default function SettingsPage() {
                 >
                   {deleteLoading ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
                   ลบไฟล์ที่เลือก ({selectedOrphanKeys.length})
-                </button>
+                </Button>
               </div>
             </div>
           </div>

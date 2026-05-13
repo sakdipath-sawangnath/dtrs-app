@@ -121,7 +121,7 @@
 
 ### Frontend
 - [x] **`SegmentedTabs`** — รองรับ `badgeCount`; แท็บสัญญา/นอกสัญญาแสดงจำนวนงานค้าง; ปรับ layout กล่องให้พอดี
-- [x] **`JobsList`** — modal อัปเดตข้อมูลการแก้ไข = Dark Glass (แสดงกลางจอผ่าน portal เพื่อลดปัญหา header ทับ); หน้ากำลังแก้ไขแสดงปุ่มลบงาน IN_PROGRESS ตาม **`job.deleteInProgress`**
+- [x] **`JobsList`** — modal อัปเดตข้อมูลการแก้ไข = Dark Glass (ปัจจุบันใช้ `Dialog` / `JobImageLightbox` แทน portal เขียนเองเพื่อลดปัญหา header ทับ); หน้ากำลังแก้ไขแสดงปุ่มลบงาน IN_PROGRESS ตาม **`job.deleteInProgress`**
 - [x] **`/dashboard/users`** — คลิกรูปโปรไฟล์เปิด modal ดูรูปใหญ่
 
 ### เอกสาร
@@ -193,7 +193,7 @@
 ## 18. Phase 6.8 — CrudModal + หน้า Roles (Dark Glass) (2026-03-24)
 
 ### Frontend
-- [x] **`CrudModal`** — Portal ไป `document.body`, `z-100`, สไตล์ Dark Glass, `size` md/lg
+- [x] **`CrudModal`** — `Dialog` + portal ไป `document.body`, `z-100`, สไตล์ Dark Glass, `size` md/lg
 - [x] **`/dashboard/roles`** — `form-input-glass`, modal กำหนดสิทธิ์ + กล่องรายการ permission
 
 ### เอกสาร
@@ -237,4 +237,40 @@
 
 ### เอกสาร
 - [x] `README.md`, `STATUS.md`, `TASK.md`, `docs/README.md`, `minio.md`, `docs/Project-Plan-Private-MinIO-Images.md`, [`docs/Job-Serial-Multi-Row.md`](docs/Job-Serial-Multi-Row.md), [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md)
+
+## 22. Phase 6.11 — shadcn audit + primitives rollout (2026-05-13)
+
+### Frontend / Skill
+- [x] ติดตั้ง `shadcn/ui` skill ที่ `frontend/.agents/skills/shadcn`
+- [x] ยืนยัน project context ด้วย `npx shadcn@latest info --json` จาก `frontend/components.json` (Next.js 15, Tailwind v4, `base`, `base-nova`, `lucide`)
+- [x] Audit `components.json`, `globals.css`, `package.json` และยืนยัน `npm run build` ผ่านหลัง rollout
+
+### Frontend / UI
+- [x] `CrudModal` — refactor ภายในให้ใช้ `ui/Dialog` และคง `z-100` / Dark Glass
+- [x] `JobsList` — modal รายละเอียด / มอบหมาย / อัปเดตข้อมูลการแก้ไข ย้ายเป็น `Dialog`; preview รูปใช้ `JobImageLightbox`; `alert-dialog` ใช้ `z-100`
+- [x] `/login` — เปลี่ยนส่วนควบคุมหลักเป็น `Button` / `Input` / `Label` / `Alert`
+- [x] `/public/report` — เปลี่ยนส่วนควบคุมหลักเป็น `Button` / `Input` / `Label` / `Alert` / `Textarea` (คง `react-select` และ file input)
+- [x] `/public/status` — เปลี่ยนส่วนควบคุมหลักเป็น `Button` / `Input`
+- [x] `/dashboard` — filter/report controls และ report modal ใช้ `Button` / `Input` / `Label`
+- [x] `/dashboard/settings` — ฟอร์มหลักใช้ `Button` / `Input` / `Label` (checkbox/file input คง native ตามความเหมาะสม)
+- [x] `/dashboard/profile` — ฟอร์มโปรไฟล์/รหัสผ่านใช้ `Button` / `Input` / `Label` (file input คง native เพราะใช้ ref)
+- [x] `/print/jobs/[id]` — ปุ่มหลักใช้ `Button`
+
+### เอกสาร
+- [x] อัปเดต `README.md`, `STATUS.md`, `TASK.md`, `docs/README.md`, `AGENTS.md`
+
+## 23. Phase 6.12 — Dashboard job detail polish + modal overlay consistency (2026-05-13)
+
+### Frontend / `/dashboard/jobs/[id]`
+- [x] ปรับ card “ลงข้อมูลย้อนหลัง (Backfill วันที่)” ให้กรอกวันที่เป็น **`dd/mm/yyyy`**
+- [x] เพิ่ม validation รูปแบบวันที่และ preview “ปฏิทินไทย (พ.ศ.)” ให้สอดคล้องกับค่าที่จะบันทึกจริง
+- [x] แก้ `JobImageLightbox` ให้ modal เปิดดูรูปจากหน้า job detail แสดงรูปได้จริง (กำหนดความสูง container/lightbox ให้ไม่ยุบ)
+
+### Frontend / Modal & Overlay
+- [x] แก้ backdrop ของ report modal บน `/dashboard` เพื่อไม่ให้ hover พื้นหลังแล้วเกิดสีขาว/สว่างจาก `Button` base style
+- [x] รวมมาตรฐานปุ่ม `ghost` ใน modal/overlay ผ่าน utility `modalGhostButtonStyles`
+- [x] ปรับ `ui/dialog`, `JobAssignDialog`, `JobImageLightbox` ให้ใช้มาตรฐาน `hover` / `focus-visible` เดียวกันสำหรับปุ่ม `ปิด`, `Prev`, `Next`
+
+### เอกสาร
+- [x] อัปเดต `README.md`, `STATUS.md`, `TASK.md`, `docs/README.md`
 

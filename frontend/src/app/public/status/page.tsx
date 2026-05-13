@@ -13,6 +13,12 @@ import { useDashboardTablePaging } from '@/hooks/useDashboardTablePaging';
 import DataTablePagination from '@/components/DataTablePagination';
 import DataTablePageSizeSelect from '@/components/dashboard/DataTablePageSizeSelect';
 import { TextHoverTooltip } from '@/components/TextHoverTooltip';
+import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import PublicRouteLoading from "@/components/PublicRouteLoading";
+import ManagedImage, { MANAGED_IMAGE_SIZES } from "@/components/ManagedImage";
+import ManagedImageFrame from "@/components/ManagedImageFrame";
 
 const STATUS_LABEL: Record<string, { text: string; badgeClass: string }> = {
   PENDING: {
@@ -43,10 +49,6 @@ const STATUS_BADGE_FALLBACK =
 /** ปุ่มรอง — Dark Glass (สอดคล้อง AGENTS: Cancel slate) */
 const GLASS_BUTTON_SECONDARY =
   "inline-flex items-center justify-center rounded-xl border border-white/15 bg-slate-800/50 backdrop-blur-md text-slate-100 shadow-lg hover:bg-slate-700/55 hover:border-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500/50 transition-all active:scale-95";
-
-/** ปุ่มเน้นแบบกระจก — โทนฟ้าเดียวกับปุ่มค้นหา (btn-primary) และแท็บโหมดที่เลือก */
-const GLASS_BUTTON_PRIMARY =
-  "inline-flex items-center justify-center rounded-xl border border-blue-400/35 bg-blue-600/90 backdrop-blur-md text-white shadow-lg shadow-blue-950/30 ring-1 ring-white/10 hover:bg-blue-500/95 hover:border-blue-300/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400/70 transition-all active:scale-95";
 
 /** ปุ่มฟ้าแบบกะทัดรัดสำหรับแถวในตาราง (ไม่ให้ช่องอาการถูกบีบจากปุ่มใหญ่เกินจำเป็น) */
 const GLASS_BUTTON_PRIMARY_TABLE_ROW =
@@ -112,23 +114,22 @@ function ReporterAvatarGlass({
   const showImg = Boolean(src) && !imgError;
 
   return (
-    <div className="relative flex h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-white/15 bg-slate-800/50 shadow-inner ring-1 ring-white/10 backdrop-blur-md sm:h-22 sm:w-22">
-      {showImg ? (
-        <img
-          src={src}
-          alt={name ? `รูปโปรไฟล์ ${name}` : "ผู้แจ้ง"}
-          className="h-full w-full object-cover"
-          onError={() => setImgError(true)}
-        />
-      ) : (
+    <ManagedImageFrame
+      src={showImg ? src ?? "" : null}
+      alt={name ? `รูปโปรไฟล์ ${name}` : "ผู้แจ้ง"}
+      sizes={MANAGED_IMAGE_SIZES.avatarXlResponsive}
+      frameClassName="flex h-20 w-20 shrink-0 rounded-2xl border border-white/15 bg-slate-800/50 shadow-inner ring-1 ring-white/10 backdrop-blur-md sm:h-22 sm:w-22"
+      imageClassName="h-full w-full object-cover"
+      onError={() => setImgError(true)}
+      fallback={
         <div
           className="flex h-full w-full items-center justify-center bg-slate-800/80 text-slate-500"
           aria-hidden
         >
           <User size={40} strokeWidth={1.35} className="opacity-95" />
         </div>
-      )}
-    </div>
+      }
+    />
   );
 }
 
@@ -568,38 +569,42 @@ function StatusPageInner() {
                 <Search size={18} className={headerIconClass} />
                 <h2 className={headerTitleClass}>ตรวจสอบสถานะ</h2>
               </div>
-              <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:ml-auto">
-                <button
+              <div className="flex w-full flex-wrap gap-2 sm:ml-auto sm:w-auto">
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => {
                     setSearchMode('phone');
                     setResult(null);
                     setNotFound(false);
                     setTicketNo('');
                   }}
-                  className={`cursor-pointer rounded-xl px-3 py-2 text-xs font-medium transition-all active:scale-95 ${
+                  className={cn(
+                    "h-auto min-h-10 cursor-pointer rounded-xl px-3 py-2 text-xs font-medium transition-all active:scale-95",
                     searchMode === 'phone'
-                      ? 'bg-blue-600/90 text-white shadow-lg ring-1 ring-white/10'
-                      : `${GLASS_BUTTON_SECONDARY} text-slate-200`
-                  }`}
+                      ? 'bg-blue-600/90 text-white shadow-lg ring-1 ring-white/10 hover:bg-blue-600/90'
+                      : `${GLASS_BUTTON_SECONDARY} text-slate-200`,
+                  )}
                 >
                   ตามเบอร์โทร
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => {
                     setSearchMode('ticket');
                     setPhoneList(undefined);
                     setPhoneSearchError(null);
                   }}
-                  className={`cursor-pointer rounded-xl px-3 py-2 text-xs font-medium transition-all active:scale-95 ${
+                  className={cn(
+                    "h-auto min-h-10 cursor-pointer rounded-xl px-3 py-2 text-xs font-medium transition-all active:scale-95",
                     searchMode === 'ticket'
-                      ? 'bg-blue-600/90 text-white shadow-lg ring-1 ring-white/10'
-                      : `${GLASS_BUTTON_SECONDARY} text-slate-200`
-                  }`}
+                      ? 'bg-blue-600/90 text-white shadow-lg ring-1 ring-white/10 hover:bg-blue-600/90'
+                      : `${GLASS_BUTTON_SECONDARY} text-slate-200`,
+                  )}
                 >
                   ตามเลขที่ใบ
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -616,21 +621,25 @@ function StatusPageInner() {
                   }`}
                 >
                   <Phone size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} aria-hidden />
-                  <input
+                  <Input
                     type="text"
                     inputMode="numeric"
                     autoComplete="tel"
-                    className={`${inputClass} pl-10`}
+                    className={cn(inputClass, "min-h-11 h-auto pl-10")}
                     placeholder="เบอร์โทรผู้แจ้ง (9–12 หลัก)"
                     aria-label="เบอร์โทรผู้แจ้งซ่อม"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 12))}
                   />
                 </div>
-                <button type="submit" disabled={loading} className="btn btn-primary whitespace-nowrap disabled:opacity-60 w-full sm:w-auto cursor-pointer min-h-11 px-4">
-                  {loading ? <span className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full inline-block" aria-hidden /> : <Search size={16} />}
-                  <span className="ml-1.5">ค้นหา</span>
-                </button>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="btn btn-primary inline-flex h-auto min-h-11 w-full cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap disabled:opacity-60 sm:w-auto"
+                >
+                  {loading ? <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" aria-hidden /> : <Search size={16} />}
+                  <span>ค้นหา</span>
+                </Button>
               </form>
             ) : (
               <form
@@ -645,19 +654,23 @@ function StatusPageInner() {
                   }`}
                 >
                   <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-                  <input
+                  <Input
                     type="text"
-                    className={inputClass}
+                    className={cn(inputClass, "min-h-11 h-auto")}
                     placeholder="กรอกเลขที่ใบแจ้งซ่อม"
                     aria-label="เลขที่ใบแจ้งซ่อม"
                     value={ticketNo}
                     onChange={(e) => setTicketNo(e.target.value)}
                   />
                 </div>
-                <button type="submit" disabled={loading} className="btn btn-primary whitespace-nowrap disabled:opacity-60 w-full sm:w-auto cursor-pointer min-h-11 px-4">
-                  {loading ? <span className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full inline-block" aria-hidden /> : <Search size={16} />}
-                  <span className="ml-1.5">ตรวจสอบ</span>
-                </button>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="btn btn-primary inline-flex h-auto min-h-11 w-full cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap disabled:opacity-60 sm:w-auto"
+                >
+                  {loading ? <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" aria-hidden /> : <Search size={16} />}
+                  <span>ตรวจสอบ</span>
+                </Button>
               </form>
             )}
           </section>
@@ -811,7 +824,7 @@ function StatusPageInner() {
                               </span>
                             </td>
                             <td className="py-2.5 pl-2 pr-3 align-top text-center sm:text-right">
-                              <button
+                              <Button
                                 type="button"
                                 id={`${detailPanelId}-btn`}
                                 aria-expanded={expanded}
@@ -819,7 +832,7 @@ function StatusPageInner() {
                                 onClick={() =>
                                   setPhoneDetailExpandedKey(expanded ? null : rowKey)
                                 }
-                                className={GLASS_BUTTON_PRIMARY_TABLE_ROW}
+                                className={cn(GLASS_BUTTON_PRIMARY_TABLE_ROW, "cursor-pointer")}
                                 aria-label={expanded ? `ซ่อนรายละเอียดสาเหตุ ใบ ${row.ticketNo ?? ''}` : `สาเหตุและวิธีแก้ ใบ ${row.ticketNo ?? ''}`}
                               >
                                 <Wrench size={14} className="shrink-0 text-white/95" aria-hidden />
@@ -831,7 +844,7 @@ function StatusPageInner() {
                                 ) : (
                                   <ChevronDown size={14} className="shrink-0 text-white/90" aria-hidden />
                                 )}
-                              </button>
+                              </Button>
                             </td>
                             {isStaffFlow ? (
                               <td className="py-2.5 pl-2 pr-3 text-right whitespace-nowrap align-middle">
@@ -1062,9 +1075,11 @@ function StatusPageInner() {
                         key={i}
                         className="relative w-full aspect-video rounded-xl border border-white/10 overflow-hidden bg-slate-800/50"
                       >
-                        <img
+                        <ManagedImage
                           src={dashboardJobImagePath(result.id!, "issue", i)}
                           alt={`รูปภาพประกอบ ${i + 1}`}
+                          fill
+                          sizes={MANAGED_IMAGE_SIZES.galleryResponsiveSm}
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -1098,10 +1113,10 @@ function StatusPageInner() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-        <div className="animate-spin w-8 h-8 border-3 border-blue-600/30 border-t-blue-600 rounded-full mb-3" />
-        <div className="text-sm font-medium text-slate-500">กำลังโหลด...</div>
-      </div>
+      <PublicRouteLoading
+        title="กำลังตรวจสอบสิทธิ์..."
+        description="กำลังเตรียมข้อมูลสำหรับตรวจสอบสถานะ"
+      />
     );
   }
 
@@ -1159,10 +1174,10 @@ export default function StatusPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-          <div className="animate-spin w-8 h-8 border-3 border-blue-600/30 border-t-blue-600 rounded-full mb-3" />
-          <div className="text-sm font-medium text-slate-500">กำลังโหลด...</div>
-        </div>
+        <PublicRouteLoading
+          title="กำลังโหลดหน้าตรวจสอบสถานะ..."
+          description="กำลังเตรียมแบบฟอร์มค้นหาและผลลัพธ์"
+        />
       }
     >
       <StatusPageInner />

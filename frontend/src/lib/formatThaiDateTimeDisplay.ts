@@ -35,6 +35,36 @@ export function splitLocalDateTime(localDatetime: string): {
   return { date: d, time: timePart };
 }
 
+/** แปลง `yyyy-mm-dd` เป็น `dd/mm/yyyy` สำหรับ text input */
+export function formatSlashDateInput(date: string): string {
+  const raw = String(date ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return "";
+  const [year, month, day] = raw.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+/** แปลง `dd/mm/yyyy` กลับเป็น `yyyy-mm-dd` ถ้าวันที่ถูกต้องจริง */
+export function parseSlashDateInput(dateText: string): string | null {
+  const raw = String(dateText ?? "").trim();
+  if (!raw) return null;
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(raw);
+  if (!match) return null;
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const utcDate = new Date(Date.UTC(year, month - 1, day));
+  if (
+    utcDate.getUTCFullYear() !== year ||
+    utcDate.getUTCMonth() + 1 !== month ||
+    utcDate.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 /** รวมจาก date (yyyy-mm-dd) + time (HH:mm) เป็นรูปแบบเดียวกับ datetime-local */
 export function joinLocalDateTime(date: string, time: string): string {
   const d = String(date ?? "").trim();

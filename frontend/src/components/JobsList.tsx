@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
 import { signOut } from "next-auth/react";
@@ -27,8 +27,19 @@ import {
   Loader2,
   Plus,
   Minus,
+  Download,
 } from "lucide-react";
 import { toastSuccess, toastError, confirmDialog } from "@/lib/toast";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import DashboardPageShell from "./DashboardPageShell";
 import DashboardFilterBar from "./DashboardFilterBar";
 import Select from "react-select";
@@ -60,6 +71,12 @@ import {
   normalizeBrokenPart,
   normalizeFixEnvironment,
 } from "@/lib/jobBreakdownCounts";
+import {
+  buildJobsListAuditCsv,
+  downloadUtf8Csv,
+} from "@/lib/jobsListCsvExport";
+import JobImageLightbox from "@/components/jobs/JobImageLightbox";
+import ManagedImage, { MANAGED_IMAGE_SIZES } from "@/components/ManagedImage";
 
 function ActionIconButton({
   label,
@@ -97,7 +114,6 @@ function ActionIconButton({
       window.removeEventListener("scroll", onWin, true);
       window.removeEventListener("resize", onWin);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   return (
@@ -378,10 +394,11 @@ export default function JobsList({
   const [brokenPartSelect, setBrokenPartSelect] = useState<string>("");
   const [pageSize, setPageSize] = useState<DataTablePageSize>(15);
   const [page, setPage] = useState(1);
-  const [jobSortField, setJobSortField] = useState<JobListSortField>("report");
+  const [jobSortField, setJobSortField] = useState<JobListSortField>(
+    enableAllBreakdownFilters ? "created" : "report",
+  );
   const [jobSortDir, setJobSortDir] = useState<JobListSortDir>("desc");
   const [detailJob, setDetailJob] = useState<Job | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
   const [assignJob, setAssignJob] = useState<Job | null>(null);
   const [assignableStaff, setAssignableStaff] = useState<
     { id: number; name?: string | null; username?: string; email?: string }[]
@@ -463,12 +480,11 @@ export default function JobsList({
   const [updateFixReopening, setUpdateFixReopening] = useState(false);
   const [updatePreviewImages, setUpdatePreviewImages] = useState<string[] | null>(null);
   const [updatePreviewIndex, setUpdatePreviewIndex] = useState(0);
-  /** Portal ไป document.body — หลีกเลี่ยงการถูก parent clip และ z-index ต่ำกว่า header */
-  const [portalMounted, setPortalMounted] = useState(false);
   const API =
     process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
   const token = (session as { accessToken?: string })?.accessToken;
   const router = useRouter();
+  const currentUserId = Number((session?.user as { id?: string })?.id ?? 0);
 
   // ใช้ permission เพื่อให้ปุ่มขึ้น/ลงได้ตามหน้า "จัดการบทบาทและสิทธิ์"
   useEffect(() => {
@@ -530,7 +546,7 @@ export default function JobsList({
     return userRoleUpper === "ADMIN" || userRoleUpper === "SUPERVISOR";
   }, [myPermissions, userRoleUpper]);
 
-  const fetchJobs = async () => {
+  const fetchJobs = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
@@ -571,11 +587,22 @@ export default function JobsList({
     } finally {
       setLoading(false);
     }
-  };
+  }, [
+    API,
+    assignedToMe,
+    currentUserId,
+    router,
+    showContractTabs,
+    showOutOfContract,
+    statusFilter,
+    token,
+  ]);
 
   useEffect(() => {
-    if (session?.user) fetchJobs();
-  }, [session, statusFilter, showOutOfContract, assignedToMe, showContractTabs]);
+    if (session?.user) {
+      void fetchJobs();
+    }
+  }, [fetchJobs, session]);
 
   // Real-time refresh: เมื่อมีงานใหม่/อัปเดตสถานะ ให้รีเฟรช list
   useEffect(() => {
@@ -585,8 +612,8 @@ export default function JobsList({
     // บางสภาพแวดล้อม/หลังบ้านอาจปิด websocket ทำให้ console error บ่อย
     // ใช้ polling เพื่อให้เชื่อมต่อได้เสถียรกว่า แล้ว socket.io จะจัดการ fallback เอง
     const s: Socket = io(base, { transports: ["polling"] });
-    const onNewJob = () => fetchJobs();
-    const onJobUpdated = () => fetchJobs();
+    const onNewJob = () => void fetchJobs();
+    const onJobUpdated = () => void fetchJobs();
     s.on("new-job", onNewJob);
     s.on("job-updated", onJobUpdated);
     return () => {
@@ -594,8 +621,7 @@ export default function JobsList({
       s.off("job-updated", onJobUpdated);
       s.disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, API, statusFilter, showOutOfContract, assignedToMe]);
+  }, [API, fetchJobs, token]);
 
   const baseFilteredJobs = useMemo(() => {
     let list = jobs;
@@ -703,6 +729,21 @@ export default function JobsList({
     if (pageSize === "all") return 1;
     return Math.ceil(sortedFilteredJobs.length / pageSize) || 1;
   }, [sortedFilteredJobs.length, pageSize]);
+
+  const handleExportJobsCsv = useCallback(() => {
+    if (sortedFilteredJobs.length === 0) {
+      toastError("ไม่มีข้อมูลที่ส่งออก", "ลองปรับตัวกรองหรือรีเฟรชรายการ");
+      return;
+    }
+    const tab = showOutOfContract ? "นอกสัญญา" : "สัญญา";
+    const stamp = format(new Date(), "yyyy-MM-dd_HHmm", { locale: th });
+    const filename = `รายการงาน_${tab}_${stamp}.csv`;
+    const body = buildJobsListAuditCsv(sortedFilteredJobs);
+    downloadUtf8Csv(filename, body);
+    toastSuccess(
+      `ส่งออก CSV แล้ว · รวม ${sortedFilteredJobs.length} แถว (ตามตัวกรองและการเรียงปัจจุบัน ไม่จำกัดเฉพาะหน้าตาราง)`,
+    );
+  }, [sortedFilteredJobs, showOutOfContract]);
 
   const showAssignedToColumn = statusFilter !== "PENDING";
 
@@ -814,7 +855,25 @@ export default function JobsList({
     onSearchChange: setSearch,
     onRefresh: fetchJobs,
     children: filterBarChildren,
-  } as const;
+    ...(enableAllBreakdownFilters
+      ? {
+          rightActions: (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-lg"
+              onClick={handleExportJobsCsv}
+              disabled={sortedFilteredJobs.length === 0}
+              aria-label="ส่งออกรายการเป็นไฟล์ CSV สำหรับตรวจสอบข้อมูล"
+              title="ส่งออกทุกแถวที่ผ่านตัวกรองปัจจุบัน (ไม่จำกัดเฉพาะหน้าตาราง) — UTF-8 พร้อม BOM สำหรับ Excel"
+              className="size-11 shrink-0 cursor-pointer rounded-xl border-blue-500/40 bg-slate-800/60 text-slate-100 shadow-lg hover:bg-blue-500/15 hover:border-blue-500/50 focus-visible:ring-blue-500/50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
+            >
+              <Download size={18} className="shrink-0" aria-hidden />
+            </Button>
+          ),
+        }
+      : {}),
+  };
 
   const jobsForEnvCardCounts = useMemo(() => {
     if (!enableAllBreakdownFilters) return baseFilteredJobs;
@@ -1045,24 +1104,9 @@ export default function JobsList({
   ]);
 
   useEffect(() => {
-    setPortalMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (updateFixJob == null) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [updateFixJob]);
-
-  useEffect(() => {
     // reset district เมื่อเปลี่ยนจังหวัด
     setDistrictFilter("");
   }, [provinceFilter]);
-
-  const currentUserId = Number((session?.user as { id?: string })?.id ?? 0);
 
   const handleTakeJob = async (id: number) => {
     const ok = await confirmDialog({
@@ -1510,7 +1554,13 @@ export default function JobsList({
                 : "flex-1 p-6 flex items-center justify-center"
             }
           >
-            <div className="animate-pulse text-sm text-slate-400">กำลังโหลด...</div>
+            <div className="flex w-full max-w-lg flex-col gap-3 px-4 py-2" aria-busy="true" aria-label="กำลังโหลดรายการ">
+              <Skeleton className="h-4 w-[72%] bg-slate-700/45" />
+              <Skeleton className="h-4 w-[58%] bg-slate-700/45" />
+              <Skeleton className="h-4 w-[88%] bg-slate-700/45" />
+              <Skeleton className="h-4 w-[64%] bg-slate-700/45" />
+              <p className="text-xs text-slate-500 pt-1">กำลังโหลด...</p>
+            </div>
           </div>
         </div>
       </DashboardPageShell>
@@ -1556,13 +1606,14 @@ export default function JobsList({
                 <p className="text-sm mt-1 text-slate-400">
                   ไม่มีงานในสถานะนี้ในขณะนี้
                 </p>
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={fetchJobs}
-                  className="mt-6 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium border border-white/10 bg-slate-800 text-slate-200 hover:bg-slate-700 transition-all active:scale-95 shadow-lg cursor-pointer min-h-[44px]"
+                  className="mt-6 min-h-[44px] cursor-pointer gap-1.5 rounded-xl border-white/10 bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-200 shadow-lg hover:bg-slate-700 active:scale-95"
                 >
                   <RefreshCw size={14} aria-hidden /> รีเฟรช
-                </button>
+                </Button>
               </div>
             </>
           ) : (
@@ -1574,13 +1625,14 @@ export default function JobsList({
                 <p className="text-sm mt-1 text-slate-400">
                   ไม่มีงานในสถานะนี้ในขณะนี้
                 </p>
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={fetchJobs}
-                  className="mt-4 btn btn-secondary text-sm"
+                  className="mt-4 min-h-[44px] cursor-pointer gap-1.5 text-sm"
                 >
                   <RefreshCw size={14} aria-hidden /> รีเฟรช
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -1722,10 +1774,26 @@ export default function JobsList({
                   {enableAllBreakdownFilters && (
                     <>
                       <td className="px-2.5 py-2.5">
-                        <span className={`badge ${envBadgeCls}`}>{envLabel}</span>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "h-auto max-w-full whitespace-normal border px-2 py-0.5 text-[11px] font-semibold leading-snug shadow-none",
+                            envBadgeCls,
+                          )}
+                        >
+                          {envLabel}
+                        </Badge>
                       </td>
                       <td className="px-2.5 py-2.5">
-                        <span className={`badge ${partBadgeCls}`}>{partLabel}</span>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "h-auto max-w-full whitespace-normal border px-2 py-0.5 text-[11px] font-semibold leading-snug shadow-none",
+                            partBadgeCls,
+                          )}
+                        >
+                          {partLabel}
+                        </Badge>
                       </td>
                     </>
                   )}
@@ -1740,7 +1808,17 @@ export default function JobsList({
                       </span>
                     )}
                   </td>
-                  <td className="px-2.5 py-2.5"><span className={cfg.badgeCls}>{cfg.label}</span></td>
+                  <td className="px-2.5 py-2.5">
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "h-auto border-0 bg-transparent px-2 py-1 text-xs font-semibold shadow-none ring-0",
+                        cfg.badgeCls,
+                      )}
+                    >
+                      {cfg.label}
+                    </Badge>
+                  </td>
                   {showAssignedToColumn && (
                     <td className="px-2.5 py-2.5 text-sm text-slate-300">
                       <div className="flex items-center gap-2 min-w-0">
@@ -1925,37 +2003,39 @@ export default function JobsList({
       </div>
 
       {/* Modal ดูรายละเอียดปัญหา */}
-      {detailJob != null && (
-        <div
-          className="fixed inset-0 z-60 flex items-center justify-center px-3 sm:px-6 py-4 bg-black/50"
-          onClick={() => setDetailJob(null)}
+      <Dialog
+        open={detailJob != null}
+        onOpenChange={(open) => {
+          if (!open) setDetailJob(null);
+        }}
+      >
+        <DialogContent
+          showCloseButton={false}
+          overlayClassName="bg-black/50"
+          className="max-h-[min(92vh,calc(100vh-2rem))] w-full max-w-[calc(100%-1.5rem)] gap-0 overflow-hidden border-0 bg-transparent p-0 shadow-none ring-0 sm:max-w-5xl"
         >
-          <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              className="flex items-center justify-between px-5 py-4 border-b shrink-0"
+          <div className="flex max-h-[92vh] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <DialogHeader
+              className="shrink-0 flex-row items-center justify-between space-y-0 border-b px-5 py-4"
               style={{ borderColor: "#e2e8f0" }}
             >
-              <h3 className="font-bold text-base sm:text-lg" style={{ color: "#334155" }}>
-                รายละเอียดข้อขัดข้อง {detailJob.ticketNo && `· ${detailJob.ticketNo}`}
-              </h3>
+              <DialogTitle
+                className="font-bold text-base sm:text-lg"
+                style={{ color: "#334155" }}
+              >
+                รายละเอียดข้อขัดข้อง {detailJob?.ticketNo && `· ${detailJob.ticketNo}`}
+              </DialogTitle>
               <button
                 type="button"
                 onClick={() => setDetailJob(null)}
-                className="p-2 rounded-lg hover:bg-slate-100"
+                className="cursor-pointer rounded-lg p-2 hover:bg-slate-100"
                 aria-label="ปิด"
               >
                 <X size={20} style={{ color: "#64748b" }} />
               </button>
-            </div>
+            </DialogHeader>
             <div className="px-5 sm:px-6 py-4 overflow-y-auto">
-              {detailLoading ? (
-                <p className="text-sm" style={{ color: "#64748b" }}>
-                  กำลังโหลด...
-                </p>
-              ) : (
+              {detailJob == null ? null : (
                 <div className="grid gap-6 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)]">
                     <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-2">
@@ -2123,9 +2203,11 @@ export default function JobsList({
                             className="relative w-full aspect-4/3 sm:aspect-video rounded-2xl border overflow-hidden bg-slate-100"
                             style={{ borderColor: "#e2e8f0" }}
                           >
-                            <img
+                            <ManagedImage
                               src={dashboardJobImagePath(detailJob.id, "issue", i)}
                               alt={`รูปประกอบ ${i + 1}`}
+                              fill
+                              sizes={MANAGED_IMAGE_SIZES.galleryResponsiveMd}
                               className="w-full h-full object-cover transition-transform duration-300 hover:scale-[1.05]"
                             />
                           </div>
@@ -2138,74 +2220,55 @@ export default function JobsList({
               )}
             </div>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
-      {/* Modal ข้อมูลการแก้ไข (IN_PROGRESS) — portal + z เหนือ SiteHeader (z-50) */}
-      {portalMounted &&
-        updateFixJob != null &&
-        createPortal(
-          <>
-            {updatePreviewImages && updatePreviewImages.length > 0 && (
-            <div
-              className="fixed inset-0 z-110 flex items-center justify-center bg-black/75 px-3 sm:px-6"
-              onClick={() => setUpdatePreviewImages(null)}
-            >
-              <div
-                className="relative max-w-5xl w-full max-h-[92vh] bg-black/90 rounded-2xl overflow-hidden flex flex-col"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between px-4 py-3 text-xs sm:text-sm text-slate-200 bg-black/70">
-                  <span>
-                    รูปที่ {updatePreviewIndex + 1} / {updatePreviewImages.length}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setUpdatePreviewImages(null)}
-                    className="px-2 py-1 rounded-lg hover:bg-white/10"
-                  >
-                    ปิด
-                  </button>
-                </div>
-                <div className="flex-1 flex items-center justify-center bg-black">
-                  <img
-                    src={updatePreviewImages[updatePreviewIndex]}
-                    alt=""
-                    className="max-h-[82vh] max-w-full object-contain"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
+      <JobImageLightbox
+        open={Boolean(updatePreviewImages && updatePreviewImages.length > 0)}
+        onOpenChange={(open) => {
+          if (!open) setUpdatePreviewImages(null);
+        }}
+        urls={updatePreviewImages ?? []}
+        index={updatePreviewIndex}
+        onIndexChange={setUpdatePreviewIndex}
+      />
 
+      <Dialog
+        open={updateFixJob != null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setUpdateFixJob(null);
+            setUpdatePreviewImages(null);
+          }
+        }}
+      >
+        <DialogContent
+          showCloseButton={false}
+          overlayClassName="bg-slate-950/70 backdrop-blur-md"
+          className="max-h-[min(90dvh,calc(100dvh-2rem))] max-w-[calc(100%-1.5rem)] gap-0 overflow-hidden border-0 bg-transparent p-0 py-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] shadow-none ring-0 sm:max-w-5xl"
+        >
           <div
-            className="fixed inset-0 z-100 flex items-center justify-center px-3 sm:px-6 py-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] bg-slate-950/70 backdrop-blur-md"
-            onClick={() => setUpdateFixJob(null)}
-            role="presentation"
+            className={`${GLASS_SECTION} flex max-h-[min(90dvh,calc(100dvh-2rem))] w-full flex-col overflow-hidden shadow-2xl ring-1 ring-white/5`}
           >
-            <div
-              className={`${GLASS_SECTION} w-full max-w-5xl max-h-[min(90dvh,calc(100dvh-2rem))] overflow-hidden flex flex-col shadow-2xl ring-1 ring-white/5`}
-              onClick={(e) => e.stopPropagation()}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="update-fix-modal-title"
-            >
-              <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 shrink-0">
-                <h3
-                  id="update-fix-modal-title"
-                  className="font-bold text-base sm:text-lg text-white"
-                >
-                  ข้อมูลการแก้ไข {updateFixJob.ticketNo && `· ${updateFixJob.ticketNo}`}
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setUpdateFixJob(null)}
-                  className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
-                  aria-label="ปิด"
-                >
-                  <X size={20} />
-                </button>
-              </div>
+            <DialogHeader className="flex shrink-0 flex-row items-center justify-between space-y-0 border-b border-white/10 px-5 py-4">
+              <DialogTitle
+                id="update-fix-modal-title"
+                className="font-bold text-base text-white sm:text-lg"
+              >
+                ข้อมูลการแก้ไข {updateFixJob?.ticketNo && `· ${updateFixJob.ticketNo}`}
+              </DialogTitle>
+              <button
+                type="button"
+                onClick={() => {
+                  setUpdateFixJob(null);
+                  setUpdatePreviewImages(null);
+                }}
+                className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-xl p-2 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+                aria-label="ปิด"
+              >
+                <X size={20} />
+              </button>
+            </DialogHeader>
 
               <div className="px-5 sm:px-6 py-4 overflow-y-auto flex-1 min-h-0">
                 {updateFixLoading ? (
@@ -2289,13 +2352,15 @@ export default function JobsList({
                                         }}
                                         className="relative w-full aspect-4/3 rounded-xl border border-white/10 overflow-hidden bg-slate-800/50 group cursor-pointer"
                                       >
-                                        <img
+                                        <ManagedImage
                                           src={dashboardJobImagePath(
                                             updateFixJob.id,
                                             "fix",
                                             i,
                                           )}
                                           alt={`รูปการแก้ไข ${i + 1}`}
+                                          fill
+                                          sizes={MANAGED_IMAGE_SIZES.galleryResponsiveMd}
                                           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                                         />
                                         <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -2610,9 +2675,11 @@ export default function JobsList({
                                         )}
                                         {updateFixPreviews[i] ? (
                                           <>
-                                            <img
+                                            <ManagedImage
                                               src={updateFixPreviews[i]!}
                                               alt=""
+                                              fill
+                                              sizes={MANAGED_IMAGE_SIZES.uploadGridResponsive}
                                               className="w-full h-full object-cover"
                                             />
                                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -2721,35 +2788,36 @@ export default function JobsList({
                 )}
               </div>
             </div>
-          </div>
-          </>,
-          document.body,
-        )}
+        </DialogContent>
+      </Dialog>
 
       {/* Modal มอบหมายงาน (สำหรับ SUPERVISOR/ADMIN) */}
-      {assignJob != null && (
-        <div
-          className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-          onClick={() => setAssignJob(null)}
+      <Dialog
+        open={assignJob != null}
+        onOpenChange={(open) => {
+          if (!open) setAssignJob(null);
+        }}
+      >
+        <DialogContent
+          showCloseButton={false}
+          overlayClassName="bg-black/60 backdrop-blur-sm"
+          className="max-w-md gap-0 overflow-visible border-0 bg-transparent p-3 shadow-none ring-0 sm:max-w-md"
         >
-          <div
-            className="bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl w-full max-w-md overflow-visible flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
-              <h3 className="font-bold text-base text-white">
-                เลขที่แจ้งซ่อม {assignJob.ticketNo && `· ${assignJob.ticketNo}`}
-              </h3>
+          <div className="flex flex-col overflow-visible rounded-2xl border border-white/10 bg-slate-900/90 shadow-2xl backdrop-blur-xl">
+            <DialogHeader className="flex shrink-0 flex-row items-center justify-between space-y-0 border-b border-white/10 p-4">
+              <DialogTitle className="font-bold text-base text-white">
+                เลขที่แจ้งซ่อม {assignJob?.ticketNo && `· ${assignJob.ticketNo}`}
+              </DialogTitle>
               <button
                 type="button"
                 onClick={() => setAssignJob(null)}
-                className="p-2 rounded-lg hover:bg-white/5 transition-colors"
+                className="cursor-pointer rounded-lg p-2 transition-colors hover:bg-white/5"
                 aria-label="ปิด"
               >
                 <X size={20} className="text-slate-400" />
               </button>
-            </div>
-            <div className="p-5 space-y-5">
+            </DialogHeader>
+            <div className="space-y-5 p-5">
               {assignLoading ? (
                 <p className="text-sm text-slate-400">กำลังโหลดรายชื่อเจ้าหน้าที่...</p>
               ) : (
@@ -2777,28 +2845,29 @@ export default function JobsList({
                     noOptionsMessage={() => "ไม่พบเจ้าหน้าที่"}
                   />
                   <div className="flex gap-3 pt-2">
-                    <button
+                    <Button
                       type="button"
+                      variant="secondary"
                       onClick={() => setAssignJob(null)}
-                      className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-white/10 bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
+                      className="flex-1 cursor-pointer rounded-xl border border-white/10 bg-slate-800 text-slate-300 hover:bg-slate-700"
                     >
                       ยกเลิก
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       onClick={handleAssignSubmit}
                       disabled={assignSelectedId == null}
-                      className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-40 transition-all shadow-lg shadow-blue-600/20 active:scale-95 flex items-center justify-center"
+                      className="flex flex-1 cursor-pointer items-center justify-center rounded-xl bg-blue-600 text-sm font-medium text-white shadow-lg shadow-blue-600/20 hover:bg-blue-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      <UserPlus size={16} className="mr-2" /> มอบหมายงาน
-                    </button>
+                      <UserPlus size={16} className="mr-2 shrink-0" aria-hidden /> มอบหมายงาน
+                    </Button>
                   </div>
                 </>
               )}
             </div>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </DashboardPageShell>
   );
 }

@@ -6,6 +6,7 @@ import axios from "axios";
 import { Shield, Plus, Pencil, Trash2 } from "lucide-react";
 import DashboardPageShell from "@/components/DashboardPageShell";
 import DashboardFilterBar from "@/components/DashboardFilterBar";
+import DashboardRouteLoading from "@/components/DashboardRouteLoading";
 import CrudModal from "@/components/CrudModal";
 import RoleBadge from "@/components/RoleBadge";
 import { toastSuccess, toastError, confirmDialog } from "@/lib/toast";
@@ -263,6 +264,18 @@ export default function RolesPage() {
     })),
   );
 
+  if (loading) {
+    return (
+      <DashboardPageShell
+        title="จัดการบทบาทและสิทธิ์"
+        subtitle="สร้าง/แก้ไขบทบาท และกำหนดสิทธิ์เมนู (RBAC) ให้แต่ละบทบาท"
+        noCard={true}
+      >
+        <DashboardRouteLoading variant="page" />
+      </DashboardPageShell>
+    );
+  }
+
   return (
     <DashboardPageShell
       title="จัดการบทบาทและสิทธิ์"
@@ -283,11 +296,7 @@ export default function RolesPage() {
           }
         />
 
-        {loading ? (
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl p-8 flex justify-center text-sm text-slate-500">
-            กำลังโหลด...
-          </div>
-        ) : roles.length === 0 ? (
+        {roles.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl p-12 flex flex-col items-center justify-center text-center">
             <Shield size={48} className="opacity-40 mb-3 text-slate-600" />
             <p className="font-semibold text-slate-400">

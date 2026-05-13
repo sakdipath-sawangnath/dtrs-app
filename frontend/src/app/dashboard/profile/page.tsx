@@ -3,12 +3,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
-import { User, Lock, Loader2, Eye, EyeOff, Camera } from "lucide-react";
+import { User, Lock, Eye, EyeOff, Camera } from "lucide-react";
+import ManagedImageFrame from "@/components/ManagedImageFrame";
+import DashboardRouteLoading from "@/components/DashboardRouteLoading";
 import SegmentedTabs from "@/components/SegmentedTabs";
 import RoleBadge from "@/components/RoleBadge";
 import { toastSuccess, toastError } from "@/lib/toast";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { unwrapApiData } from "@/lib/apiResponse";
 import { buildRoleBadgeStyleMap, type RoleBadgeStyleMap } from "@/lib/roleBadge";
+import { MANAGED_IMAGE_SIZES } from "@/components/ManagedImage";
 
 interface Profile {
   id: number;
@@ -271,10 +277,7 @@ export default function ProfilePage() {
 
         <div className="mt-4 sm:mt-6">
           {loading ? (
-            <div className="flex items-center justify-center py-16 text-slate-400 gap-2">
-              <Loader2 className="animate-spin" size={22} aria-hidden />
-              <span>กำลังโหลดข้อมูล…</span>
-            </div>
+            <DashboardRouteLoading variant="overlay" />
           ) : tab === "profile" ? (
             <form onSubmit={handleSaveProfile} className="w-full">
               {loadError && (
@@ -289,18 +292,15 @@ export default function ProfilePage() {
                 <div className="flex flex-col sm:flex-row items-start gap-4">
                   <div className="shrink-0">
                     {avatarPreview && !avatarLoadFailed ? (
-                      <div
-                        className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-white/20 bg-slate-800/50"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={avatarPreview}
-                          alt="รูปโปรไฟล์"
-                          className="w-full h-full object-cover"
-                          onError={() => setAvatarLoadFailed(true)}
-                        />
-                        <div className="absolute inset-0 pointer-events-none bg-black/20" />
-                      </div>
+                      <ManagedImageFrame
+                        src={avatarPreview}
+                        alt="รูปโปรไฟล์"
+                        sizes={MANAGED_IMAGE_SIZES.avatar2xl}
+                        frameClassName="w-24 h-24 rounded-full border-2 border-white/20 bg-slate-800/50"
+                        imageClassName="w-full h-full object-cover"
+                        onError={() => setAvatarLoadFailed(true)}
+                        imageOverlay={<div className="absolute inset-0 pointer-events-none bg-black/20" />}
+                      />
                     ) : (
                       <div
                         className="w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold text-white bg-slate-700"
@@ -338,14 +338,14 @@ export default function ProfilePage() {
                     />
 
                     <div className="flex flex-wrap items-center gap-2">
-                      <button
+                      <Button
                         type="button"
                         onClick={() => avatarInputRef.current?.click()}
                         className="flex items-center gap-2 min-h-[44px] px-3 py-2 rounded-xl border border-white/10 text-xs sm:text-sm font-medium bg-slate-800/50 text-slate-300 hover:bg-slate-700/60 hover:text-white transition-all active:scale-95 cursor-pointer shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
                         aria-label="เปลี่ยนรูปโปรไฟล์"
                       >
                         <Camera size={16} /> เปลี่ยนรูป
-                      </button>
+                      </Button>
                       {avatarPreview && (
                         <div className="text-[11px] text-slate-500">
                           ตัวอย่างพร้อมอัปโหลด
@@ -374,10 +374,10 @@ export default function ProfilePage() {
 
                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1.5 text-slate-300">
+                    <Label className="mb-1.5 block text-sm font-medium text-slate-300">
                       ชื่อ-สกุล
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       type="text"
                       className="form-input-glass"
                       value={form.name}
@@ -387,10 +387,10 @@ export default function ProfilePage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1.5 text-slate-300">
+                    <Label className="mb-1.5 block text-sm font-medium text-slate-300">
                       Username
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       type="text"
                       className="form-input-glass opacity-70 cursor-not-allowed"
                       value={profile?.username ?? ""}
@@ -402,10 +402,10 @@ export default function ProfilePage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1.5 text-slate-300">
+                    <Label className="mb-1.5 block text-sm font-medium text-slate-300">
                       อีเมล
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       type="email"
                       className="form-input-glass"
                       value={form.email}
@@ -415,10 +415,10 @@ export default function ProfilePage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1.5 text-slate-300">
+                    <Label className="mb-1.5 block text-sm font-medium text-slate-300">
                       เบอร์โทร
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       type="text"
                       className="form-input-glass"
                       value={form.phone}
@@ -428,10 +428,10 @@ export default function ProfilePage() {
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium mb-1.5 text-slate-300">
+                    <Label className="mb-1.5 block text-sm font-medium text-slate-300">
                       ตำแหน่ง
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       type="text"
                       className="form-input-glass"
                       value={form.position}
@@ -442,13 +442,13 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="mt-6 pt-6 border-t border-white/10 flex justify-end">
-                  <button
+                  <Button
                     type="submit"
                     disabled={saving}
                     className="inline-flex items-center justify-center gap-2 min-h-[44px] px-6 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-60 disabled:active:scale-100 bg-blue-600 hover:bg-blue-500 transition-all active:scale-95 shadow-lg shadow-blue-900/30 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                   >
                     {saving ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </form>
@@ -462,11 +462,11 @@ export default function ProfilePage() {
 
                 <div className="space-y-4">
                   <section className="rounded-xl border border-white/10 p-4 bg-slate-900/40">
-                    <label className="block text-sm font-medium mb-1.5 text-slate-300">
+                    <Label className="mb-1.5 block text-sm font-medium text-slate-300">
                       รหัสผ่านปัจจุบัน
-                    </label>
+                    </Label>
                     <div className="relative">
-                      <input
+                      <Input
                         type={showCurrentPassword ? "text" : "password"}
                         required
                         className="form-input-glass pr-11"
@@ -477,7 +477,7 @@ export default function ProfilePage() {
                         placeholder="••••••••"
                         autoComplete="current-password"
                       />
-                      <button
+                      <Button
                         type="button"
                         className={pwdToggleBtn}
                         aria-label={showCurrentPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
@@ -485,16 +485,16 @@ export default function ProfilePage() {
                         onClick={() => setShowCurrentPassword((v) => !v)}
                       >
                         {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
+                      </Button>
                     </div>
                   </section>
 
                   <section className="rounded-xl border border-white/10 p-4 bg-slate-900/40">
-                    <label className="block text-sm font-medium mb-1.5 text-slate-300">
+                    <Label className="mb-1.5 block text-sm font-medium text-slate-300">
                       รหัสผ่านใหม่
-                    </label>
+                    </Label>
                     <div className="relative">
-                      <input
+                      <Input
                         type={showNewPassword ? "text" : "password"}
                         required
                         minLength={6}
@@ -506,7 +506,7 @@ export default function ProfilePage() {
                         placeholder="อย่างน้อย 6 ตัวอักษร"
                         autoComplete="new-password"
                       />
-                      <button
+                      <Button
                         type="button"
                         className={pwdToggleBtn}
                         aria-label={showNewPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
@@ -514,7 +514,7 @@ export default function ProfilePage() {
                         onClick={() => setShowNewPassword((v) => !v)}
                       >
                         {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
+                      </Button>
                     </div>
                     <p className="text-[11px] mt-1.5 text-slate-500">
                       ต้องมีความยาวอย่างน้อย 6 ตัวอักษร
@@ -522,11 +522,11 @@ export default function ProfilePage() {
                   </section>
 
                   <section className="rounded-xl border border-white/10 p-4 bg-slate-900/40">
-                    <label className="block text-sm font-medium mb-1.5 text-slate-300">
+                    <Label className="mb-1.5 block text-sm font-medium text-slate-300">
                       ยืนยันรหัสผ่านใหม่
-                    </label>
+                    </Label>
                     <div className="relative">
-                      <input
+                      <Input
                         type={showConfirmPassword ? "text" : "password"}
                         required
                         className="form-input-glass pr-11"
@@ -537,7 +537,7 @@ export default function ProfilePage() {
                         placeholder="••••••••"
                         autoComplete="new-password"
                       />
-                      <button
+                      <Button
                         type="button"
                         className={pwdToggleBtn}
                         aria-label={showConfirmPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
@@ -545,19 +545,19 @@ export default function ProfilePage() {
                         onClick={() => setShowConfirmPassword((v) => !v)}
                       >
                         {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
+                      </Button>
                     </div>
                   </section>
                 </div>
 
                 <div className="mt-6 pt-6 border-t border-white/10 flex justify-end">
-                  <button
+                  <Button
                     type="submit"
                     disabled={saving}
                     className="inline-flex items-center justify-center gap-2 min-h-[44px] px-6 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-60 disabled:active:scale-100 bg-blue-600 hover:bg-blue-500 transition-all active:scale-95 shadow-lg shadow-blue-900/30 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                   >
                     {saving ? "กำลังบันทึก..." : "เปลี่ยนรหัสผ่าน"}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </form>

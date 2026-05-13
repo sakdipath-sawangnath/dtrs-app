@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { FileWarning, Search, LayoutDashboard } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import ManagedImage, { MANAGED_IMAGE_SIZES } from '@/components/ManagedImage';
+import ManagedImageFrame from '@/components/ManagedImageFrame';
 
 /** ความสูงรวมของ header (stripe + แถบหลัก) ใช้สำหรับ spacer */
 export const SITE_HEADER_HEIGHT = 62; // px
@@ -74,10 +76,12 @@ export default function SiteHeader({ right, subtitle, isDark = false }: SiteHead
               }`}
             >
               {session?.user && avatarImage && !avatarImgError ? (
-                <img
+                <ManagedImageFrame
                   src={avatarImage}
                   alt={session.user.name || "โปรไฟล์"}
-                  className={`w-7 h-7 rounded-full object-cover border shrink-0 ${isDark ? 'border-slate-600' : 'border-slate-200'}`}
+                  sizes={MANAGED_IMAGE_SIZES.avatarXs}
+                  frameClassName={`w-7 h-7 rounded-full border shrink-0 ${isDark ? 'border-slate-600' : 'border-slate-200'}`}
+                  imageClassName="object-cover"
                   onError={() => setAvatarImgError(true)}
                 />
               ) : (
@@ -118,13 +122,14 @@ export default function SiteHeader({ right, subtitle, isDark = false }: SiteHead
           {/* Logo + ชื่อระบบ */}
           <Link href="/" className="flex items-center gap-3 group shrink-0 min-w-0">
             <div className="p-1.5">
-              <img
+              <ManagedImage
                 src="/logo/dopa-logo.png"
                 alt="DOPA"
                 width={28}
                 height={28}
-                style={{ objectFit: 'contain' }}
+                sizes={MANAGED_IMAGE_SIZES.avatarXs}
                 className="shrink-0"
+                style={{ objectFit: 'contain' }}
               />
             </div>
             <div className="leading-tight min-w-0 hidden sm:block">

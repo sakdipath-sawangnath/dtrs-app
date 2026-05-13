@@ -11,6 +11,7 @@ import {
 } from "@/components/pdf/JobMaintenancePdfTemplate";
 import { sarabun } from "@/lib/fonts";
 import { waitForFonts } from "@/lib/jobMaintenancePdf";
+import { Button } from "@/components/ui/button";
 
 type Props = {
   jobId: number;
@@ -80,13 +81,14 @@ export function PrintJobPageClient({ jobId }: Props) {
     return (
       <div className="min-h-screen bg-white p-8 text-center text-slate-800">
         <p>{error}</p>
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={() => router.push("/dashboard/jobs")}
-          className="mt-4 rounded-xl border border-slate-300 px-4 py-2 text-sm"
+          className="mt-4 cursor-pointer rounded-xl border border-slate-300 px-4 py-2 text-sm"
         >
           กลับไปหน้ารายการ
-        </button>
+        </Button>
       </div>
     );
   }
@@ -115,14 +117,14 @@ export function PrintJobPageClient({ jobId }: Props) {
             </p>
           </div>
           <div className="flex shrink-0 justify-end">
-            <button
+            <Button
               type="button"
               onClick={() => void handlePrint()}
-              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-2 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500/40"
+              className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500/40"
             >
               <Printer size={18} aria-hidden />
               พิมพ์ / บันทึกเป็น PDF
-            </button>
+            </Button>
           </div>
         </div>
       </header>

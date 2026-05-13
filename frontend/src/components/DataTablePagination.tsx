@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { Button } from "@/components/ui/button";
 
 export type DataTablePageSize = 15 | 30 | 45 | "all";
 
@@ -47,6 +48,9 @@ export default function DataTablePagination({
       ? ` (จาก ${extraTotalCount} รายการ)`
       : "";
 
+  const navBtnClass =
+    "min-h-9 rounded-lg border-white/10 bg-slate-800/50 px-3 text-xs font-medium text-slate-300 hover:bg-slate-700/60 cursor-pointer disabled:pointer-events-none disabled:opacity-40";
+
   return (
     <div
       className="px-4 py-2.5 text-xs border-t border-white/10 text-slate-400 flex flex-wrap justify-between items-center gap-2"
@@ -58,25 +62,29 @@ export default function DataTablePagination({
 
       {showNav && (
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             disabled={page <= 1}
             onClick={() => onPageChange(Math.max(1, page - 1))}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium border border-white/10 bg-slate-800/50 text-slate-300 hover:bg-slate-700/60 disabled:opacity-40 transition-colors"
+            className={navBtnClass}
           >
             ก่อนหน้า
-          </button>
+          </Button>
           <span className="text-sm text-slate-300">
             หน้า {page} / {totalPages}
           </span>
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             disabled={page >= totalPages}
             onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium border border-white/10 bg-slate-800/50 text-slate-300 hover:bg-slate-700/60 disabled:opacity-40 transition-colors"
+            className={navBtnClass}
           >
             ถัดไป
-          </button>
+          </Button>
         </div>
       )}
     </div>
