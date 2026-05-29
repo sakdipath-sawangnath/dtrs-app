@@ -274,3 +274,28 @@
 ### เอกสาร
 - [x] อัปเดต `README.md`, `STATUS.md`, `TASK.md`, `docs/README.md`
 
+## 24. Phase 6.13 — มอบหมายงาน import ที่ไม่มีผู้รับผิดชอบ (2026-05-29)
+
+### Backend
+- [x] `assignStaff` — รองรับ `IN_PROGRESS` / `RESOLVED` ที่ `assignedToId = null` (คงสถานะเดิม); `PENDING` ยังเปลี่ยนเป็น `IN_PROGRESS` ตามเดิม; ปฏิเสธเมื่อมีผู้รับผิดชอบแล้ว
+
+### Frontend
+- [x] `jobAssignEligibility.ts` — helper `jobNeedsAssignee`
+- [x] `JobsList` — ปุ่มมอบหมาย/รับงานสำหรับงาน orphan (รวมหน้า `/dashboard/in-progress`, `/dashboard/all`)
+- [x] `/dashboard/jobs/[id]` — ปุ่มมอบหมาย/รับงาน + แก้ guard ใน `openAssignModal` / `handleTakeJob`
+
+### เอกสาร
+- [x] อัปเดต `backend/docs/RBAC-Setup.md`, `STATUS.md`, `TASK.md`
+
+## 25. Phase 6.14 — รูปแก้ไขเดิมไม่บังคับอัปโหลดซ้ำ (2026-05-29)
+
+### Backend
+- [x] `PATCH /jobs/:id/fix` — ยอมรับ multipart 0 ไฟล์เมื่องานมี `fixImages` ≥ 2 ใน DB; แนบใหม่ ≥ 2 รูปแทนที่ชุดเดิม; ปฏิเสธแนบ 1 รูป
+
+### Frontend
+- [x] `jobFixImageSlots.ts` — seed preview จากรูปเดิม + `hasRequiredFixImageSlots`
+- [x] `/dashboard/jobs/[id]` + `JobsList` modal — ช่องอัปโหลดแสดงรูปเดิม, validation/submit ไม่บังคับ `File` ใหม่
+
+### เอกสาร
+- [x] อัปเดต `STATUS.md`, `TASK.md`
+

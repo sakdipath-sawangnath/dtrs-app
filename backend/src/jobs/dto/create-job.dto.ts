@@ -222,6 +222,16 @@ export const AssignStaffSchema = z.object({
 
 export type AssignStaffDto = z.infer<typeof AssignStaffSchema>;
 
+export const BulkAssignStaffSchema = z.object({
+  jobIds: z
+    .array(z.number().int().positive())
+    .min(1, 'ต้องระบุงานอย่างน้อย 1 รายการ')
+    .max(50, 'มอบหมายพร้อมกันได้ไม่เกิน 50 รายการ'),
+  staffId: z.number().int().positive('รหัสเจ้าหน้าที่ต้องเป็นตัวเลขบวก'),
+});
+
+export type BulkAssignStaffDto = z.infer<typeof BulkAssignStaffSchema>;
+
 /**
  * Backfill วันที่ย้อนหลังของงาน
  * - รับเป็น string (ISO/parse ได้) แล้วแปลงใน service เพื่อควบคุม validation เพิ่มเติม

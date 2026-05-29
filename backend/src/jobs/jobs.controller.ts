@@ -13,6 +13,7 @@ import {
     UpdateJobStatusSchema,
     UpdateFixInfoSchema,
     AssignStaffSchema,
+    BulkAssignStaffSchema,
     UpdateOutOfContractSchema,
     ReopenJobSchema,
     BackfillJobDatesSchema,
@@ -251,12 +252,21 @@ export class JobsController {
         /** Reopen/บันทึกการแก้ไข — RBAC: job.fix.self|any */
         await this.jobsService.assertUserCanFix(+id, userId);
 
-        if (!files || files.length < 2) {
-            throw new BadRequestException('กรุณาแนบรูปการแก้ไขอย่างน้อย 2 รูป');
+        const existingCount = await this.jobsService.getNonemptyFixImageCount(+id);
+        const newCount = files?.length ?? 0;
+        if (newCount > 0 && newCount < 2) {
+            throw new BadRequestException(
+                'กรุณาแนบรูปการแก้ไขอย่างน้อย 2 รูป หรือไม่แนบรูปเพื่อใช้รูปเดิม',
+            );
+        }
+        if (newCount < 2 && existingCount < 2) {
+            throw new BadRequestException(
+                'กรุณาแนบรูปการแก้ไขอย่างน้อย 2 รูป',
+            );
         }
 
         const uploadedUrls: string[] = [];
-        if (files && files.length > 0) {
+        if (newCount >= 2) {
             let index = 1;
             for (const file of files) {
                 const url = await this.minioService.uploadJobImage(+id, 'fix', index, file);
@@ -278,10 +288,38 @@ export class JobsController {
             note: body.note ?? null,
             oldSerialNumber: body.oldSerialNumber ?? null,
             newSerialNumber: body.newSerialNumber ?? null,
-            fixImagesUrls: uploadedUrls,
+            fixImagesUrls: uploadedUrls.length > 0 ? uploadedUrls : undefined,
         }, jwt);
         this.eventsGateway.notifyJobUpdate(updated);
         return updated;
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('bulk-assign')
+    async bulkAssignStaff(
+        @Req() req: ReqUser,
+        @Body(new ZodValidationPipe(BulkAssignStaffSchema))
+        body: { jobIds: number[]; staffId: number },
+    ) {
+        const userId = req.user.id;
+        const codes = await this.rolesService.getPermissionsForUser(userId);
+        const targetStaffId = Number(body.staffId);
+        if (codes.includes('job.assign')) {
+            // มอบหมายให้ผู้อื่นได้
+        } else if (targetStaffId === Number(userId) && codes.includes('menu.pending')) {
+            // รับงานเองหลายรายการ
+        } else {
+            throw new ForbiddenException('ไม่มีสิทธิ์มอบหมายงาน');
+        }
+        const result = await this.jobsService.bulkAssignStaff(
+            body.jobIds,
+            body.staffId,
+            userId,
+        );
+        for (const job of result.jobs) {
+            this.eventsGateway.notifyJobUpdate(job);
+        }
+        return result;
     }
 
     @UseGuards(JwtAuthGuard)

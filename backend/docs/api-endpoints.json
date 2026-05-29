@@ -172,8 +172,15 @@
       "method": "PATCH",
       "path": "/api/jobs/:id/assign",
       "auth": "Bearer JWT",
-      "description": "มอบหมายงาน: ADMIN/SUPERVISOR ส่ง staffId ใครก็ได้; STAFF ส่งได้เฉพาะ staffId = ตัวเอง (รับงาน)",
+      "description": "มอบหมายงาน: มี job.assign ส่ง staffId ใครก็ได้; มี menu.pending และ staffId=ตัวเอง = รับงาน · งานไม่มีผู้รับผิดชอบ → IN_PROGRESS",
       "body": { "staffId": "number (user id ของผู้รับผิดชอบ)" }
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/bulk-assign",
+      "auth": "Bearer JWT",
+      "description": "มอบหมายหลายงานพร้อมกัน (สูงสุด 50 jobIds) — สิทธิ์เดียวกับ assign · คืน updated, updatedIds, failed",
+      "body": { "jobIds": "number[]", "staffId": "number" }
     },
     {
       "method": "PATCH",

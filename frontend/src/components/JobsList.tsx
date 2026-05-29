@@ -77,6 +77,11 @@ import {
 } from "@/lib/jobsListCsvExport";
 import JobImageLightbox from "@/components/jobs/JobImageLightbox";
 import ManagedImage, { MANAGED_IMAGE_SIZES } from "@/components/ManagedImage";
+import { jobNeedsAssignee } from "@/lib/jobAssignEligibility";
+import {
+  buildFixPreviewUrlsFromJob,
+  hasRequiredFixImageSlots,
+} from "@/lib/jobFixImageSlots";
 
 function ActionIconButton({
   label,
@@ -367,7 +372,7 @@ export default function JobsList({
   noCard?: boolean;
   /**
    * เฉพาะหน้า `/dashboard/all`:
-   * - เพิ่ม Filter Select: ประเภทสถานที่ (fixEnvironment), ประเภทงาน (brokenPart), สถานะ
+   * - เพิ่ม Filter Select: ประเภทสถานที่ (fixEnvironment), ประเภทงาน (brokenPart), สถานะ, ผู้รับผิดชอบ
    * - เพิ่ม Card quick filter ที่ทำให้ข้อมูลเปลี่ยนตามค่า
    * - เพิ่มคอลัมน์ในตารางสำหรับ fixEnvironment / brokenPart
    */
@@ -388,10 +393,12 @@ export default function JobsList({
   const [search, setSearch] = useState("");
   const [provinceFilter, setProvinceFilter] = useState("");
   const [districtFilter, setDistrictFilter] = useState("");
-  // เฉพาะหน้า `/dashboard/all`: แยกตามประเภทสถานที่ (fixEnvironment), ประเภทงาน (brokenPart), และสถานะ
+  // เฉพาะหน้า `/dashboard/all`: แยกตามประเภทสถานที่, ประเภทงาน, สถานะ, และผู้รับผิดชอบ
   const [statusSelect, setStatusSelect] = useState<string>("");
   const [fixEnvironmentSelect, setFixEnvironmentSelect] = useState<string>("");
   const [brokenPartSelect, setBrokenPartSelect] = useState<string>("");
+  /** ค่า `__unassigned__` = ยังไม่มีผู้รับผิดชอบ; อื่นๆ = id ผู้รับงาน */
+  const [assignedToSelect, setAssignedToSelect] = useState<string>("");
   const [pageSize, setPageSize] = useState<DataTablePageSize>(15);
   const [page, setPage] = useState(1);
   const [jobSortField, setJobSortField] = useState<JobListSortField>(
@@ -400,11 +407,17 @@ export default function JobsList({
   const [jobSortDir, setJobSortDir] = useState<JobListSortDir>("desc");
   const [detailJob, setDetailJob] = useState<Job | null>(null);
   const [assignJob, setAssignJob] = useState<Job | null>(null);
+  /** มอบหมายหลายรายการพร้อมกัน (หน้า /dashboard/all) */
+  const [assignBulkIds, setAssignBulkIds] = useState<number[]>([]);
+  const [bulkAssignSelectedIds, setBulkAssignSelectedIds] = useState<Set<number>>(
+    () => new Set(),
+  );
   const [assignableStaff, setAssignableStaff] = useState<
     { id: number; name?: string | null; username?: string; email?: string }[]
   >([]);
   const [assignSelectedId, setAssignSelectedId] = useState<number | null>(null);
   const [assignLoading, setAssignLoading] = useState(false);
+  const [assignSubmitting, setAssignSubmitting] = useState(false);
   const [myPermissions, setMyPermissions] = useState<string[] | null>(null);
   const { data: session } = useSession();
   const userRole = (session?.user as { role?: string })?.role ?? "";
@@ -517,6 +530,8 @@ export default function JobsList({
     }
     return userRoleUpper === "SUPERVISOR" || userRoleUpper === "ADMIN";
   }, [myPermissions, userRoleUpper]);
+
+  const enableBulkAssign = enableAllBreakdownFilters && canAssignJob;
 
   const canMoveOutOfContract = useMemo(() => {
     if (myPermissions !== null) {
@@ -632,6 +647,7 @@ export default function JobsList({
           (j.ticketNo && j.ticketNo.toLowerCase().includes(q)) ||
           (j.description && j.description.toLowerCase().includes(q)) ||
           (j.reporterName && j.reporterName.toLowerCase().includes(q)) ||
+          (j.assignedTo?.name && j.assignedTo.name.toLowerCase().includes(q)) ||
           (j.province && j.province.toLowerCase().includes(q)) ||
           (j.district && j.district.toLowerCase().includes(q)) ||
           (j.location && j.location.toLowerCase().includes(q))
@@ -641,6 +657,31 @@ export default function JobsList({
     if (districtFilter) list = list.filter((j) => (j.district ?? "") === districtFilter);
     return list;
   }, [jobs, search, provinceFilter, districtFilter]);
+
+  const assigneeFilterOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    jobs.forEach((j) => {
+      if (j.assignedTo?.id != null) {
+        map.set(j.assignedTo.id, j.assignedTo.name?.trim() || `ผู้ใช้ #${j.assignedTo.id}`);
+      }
+    });
+    return Array.from(map.entries()).sort((a, b) =>
+      a[1].localeCompare(b[1], "th"),
+    );
+  }, [jobs]);
+
+  const applyAssignedToFilter = useCallback(
+    (list: Job[]) => {
+      if (!assignedToSelect) return list;
+      if (assignedToSelect === "__unassigned__") {
+        return list.filter((j) => !j.assignedTo);
+      }
+      return list.filter(
+        (j) => j.assignedTo && String(j.assignedTo.id) === assignedToSelect,
+      );
+    },
+    [assignedToSelect],
+  );
 
   const filteredJobs = useMemo(() => {
     let list = baseFilteredJobs;
@@ -654,6 +695,7 @@ export default function JobsList({
         list = list.filter(
           (j) => normalizeBrokenPart(j.brokenPart) === brokenPartSelect
         );
+      list = applyAssignedToFilter(list);
     }
     return list;
   }, [
@@ -662,6 +704,7 @@ export default function JobsList({
     statusSelect,
     fixEnvironmentSelect,
     brokenPartSelect,
+    applyAssignedToFilter,
   ]);
 
   const sortedFilteredJobs = useMemo(() => {
@@ -784,6 +827,21 @@ export default function JobsList({
             <option value="Software">Software (ซอฟต์แวร์)</option>
             <option value="UNKNOWN">ไม่ระบุ</option>
           </select>
+
+          <select
+            className="select-native-glass w-full sm:w-44 md:min-w-[160px]"
+            value={assignedToSelect}
+            onChange={(e) => setAssignedToSelect(e.target.value)}
+            aria-label="กรองตามผู้รับผิดชอบ"
+          >
+            <option value="">ทุกผู้รับผิดชอบ</option>
+            <option value="__unassigned__">ยังไม่มีผู้รับผิดชอบ</option>
+            {assigneeFilterOptions.map(([id, name]) => (
+              <option key={id} value={String(id)}>
+                {name}
+              </option>
+            ))}
+          </select>
         </>
       )}
       <select
@@ -884,12 +942,14 @@ export default function JobsList({
         (j) => normalizeBrokenPart(j.brokenPart) === brokenPartSelect
       );
     }
+    list = applyAssignedToFilter(list);
     return list;
   }, [
     enableAllBreakdownFilters,
     baseFilteredJobs,
     statusSelect,
     brokenPartSelect,
+    applyAssignedToFilter,
   ]);
 
   const jobsForStatusCardCounts = useMemo(() => {
@@ -905,12 +965,14 @@ export default function JobsList({
         (j) => normalizeBrokenPart(j.brokenPart) === brokenPartSelect
       );
     }
+    list = applyAssignedToFilter(list);
     return list;
   }, [
     enableAllBreakdownFilters,
     baseFilteredJobs,
     fixEnvironmentSelect,
     brokenPartSelect,
+    applyAssignedToFilter,
   ]);
 
   const jobsForPartCardCounts = useMemo(() => {
@@ -922,8 +984,15 @@ export default function JobsList({
         (j) => normalizeFixEnvironment(j.fixEnvironment) === fixEnvironmentSelect
       );
     }
+    list = applyAssignedToFilter(list);
     return list;
-  }, [enableAllBreakdownFilters, baseFilteredJobs, statusSelect, fixEnvironmentSelect]);
+  }, [
+    enableAllBreakdownFilters,
+    baseFilteredJobs,
+    statusSelect,
+    fixEnvironmentSelect,
+    applyAssignedToFilter,
+  ]);
 
   const envCounts = useMemo(() => {
     if (!enableAllBreakdownFilters) return { INDOOR: 0, OUTDOOR: 0, UNKNOWN: 0 };
@@ -1101,6 +1170,7 @@ export default function JobsList({
     statusSelect,
     fixEnvironmentSelect,
     brokenPartSelect,
+    assignedToSelect,
   ]);
 
   useEffect(() => {
@@ -1167,6 +1237,8 @@ export default function JobsList({
       setUpdateSerialRows(
         parseJobSerialRowsFromDb(job.oldSerialNumber, job.newSerialNumber),
       );
+      setUpdateFixImages([null, null, null]);
+      setUpdateFixPreviews(buildFixPreviewUrlsFromJob(job.id, job.fixImages));
     } catch {
       toastError("โหลดข้อมูลไม่สำเร็จ", "ไม่สามารถโหลดข้อมูลใบแจ้งซ่อมได้");
     } finally {
@@ -1211,6 +1283,8 @@ export default function JobsList({
         setUpdateSerialRows(
           parseJobSerialRowsFromDb(j.oldSerialNumber, j.newSerialNumber),
         );
+        setUpdateFixImages([null, null, null]);
+        setUpdateFixPreviews(buildFixPreviewUrlsFromJob(j.id, j.fixImages));
       }
       await fetchJobs();
     } catch (err: unknown) {
@@ -1269,8 +1343,11 @@ export default function JobsList({
       toastError("ข้อมูลไม่ครบ", "กรุณาระบุวิธีแก้ไข");
       return;
     }
-    if (!updateFixImages[0] || !updateFixImages[1]) {
-      toastError("รูปภาพไม่ครบ", "กรุณาแนบรูปการแก้ไขอย่างน้อย 2 รูปแรก");
+    if (!hasRequiredFixImageSlots(updateFixImages, updateFixPreviews)) {
+      toastError(
+        "รูปภาพไม่ครบ",
+        "กรุณาแนบรูปการแก้ไขอย่างน้อย 2 รูปแรก หรือใช้รูปเดิมที่มีอยู่แล้ว",
+      );
       return;
     }
 
@@ -1305,56 +1382,113 @@ export default function JobsList({
     }
   };
 
-  const openAssignModal = async (job: Job) => {
-    setAssignJob(job);
-    setAssignSelectedId(null);
-    setAssignableStaff([]);
+  const loadAssignableStaff = async (): Promise<boolean> => {
     if (!token) {
       toastError("เซสชันหมดอายุ", "กรุณาเข้าสู่ระบบใหม่เพื่อมอบหมายงานได้");
-      setAssignJob(null);
-      return;
+      return false;
     }
     setAssignLoading(true);
     try {
       const res = await axios.get(`${API}/users/assignable`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // รองรับหลายรูปแบบ response:
-      // - { success, data: [...] } (ResponseInterceptor)
-      // - { data: { data: [...] } } (บางกรณี response ซ้อน)
       const extracted = extractAssignableArray(res?.data as unknown);
-
       setAssignableStaff(
         Array.isArray(extracted)
-          ? (extracted as { id: number; name?: string | null; username?: string; email?: string }[])
-          : []
+          ? (extracted as {
+              id: number;
+              name?: string | null;
+              username?: string;
+              email?: string;
+            }[])
+          : [],
       );
+      return true;
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;
       const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ??
         (err as { message?: string })?.message ??
         "เกิดข้อผิดพลาดในการดึงข้อมูล";
       toastError("โหลดรายชื่อเจ้าหน้าที่ไม่สำเร็จ", `status=${status ?? "?"} ${msg}`);
-      setAssignJob(null);
+      return false;
     } finally {
       setAssignLoading(false);
     }
   };
 
+  const openAssignModal = async (job: Job) => {
+    setAssignJob(job);
+    setAssignBulkIds([]);
+    setAssignSelectedId(null);
+    setAssignableStaff([]);
+    const ok = await loadAssignableStaff();
+    if (!ok) setAssignJob(null);
+  };
+
+  const openBulkAssignModal = async () => {
+    const ids = [...bulkAssignSelectedIds];
+    if (ids.length === 0) return;
+    setAssignJob(null);
+    setAssignBulkIds(ids);
+    setAssignSelectedId(null);
+    setAssignableStaff([]);
+    const ok = await loadAssignableStaff();
+    if (!ok) setAssignBulkIds([]);
+  };
+
+  const closeAssignModal = () => {
+    setAssignJob(null);
+    setAssignBulkIds([]);
+    setAssignSelectedId(null);
+  };
+
   const handleAssignSubmit = async () => {
-    if (!assignJob || assignSelectedId == null || !token) return;
+    if (assignSelectedId == null || !token) return;
+    const bulkIds = assignBulkIds;
+    const singleJob = assignJob;
+    if (bulkIds.length === 0 && !singleJob) return;
+
+    setAssignSubmitting(true);
     try {
-      await axios.patch(
-        `${API}/jobs/${assignJob.id}/assign`,
-        { staffId: assignSelectedId },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      toastSuccess("มอบหมายงานสำเร็จ", 1200);
-      fetchJobs();
-      setAssignJob(null);
+      if (bulkIds.length > 0) {
+        const res = await axios.post<{
+          data?: { updated?: number; failed?: { id: number; message: string }[] };
+        }>(
+          `${API}/jobs/bulk-assign`,
+          { jobIds: bulkIds, staffId: assignSelectedId },
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        const payload = unwrapApiData<{
+          updated?: number;
+          failed?: { id: number; message: string }[];
+        }>(res?.data);
+        const updated = payload?.updated ?? bulkIds.length;
+        const failed = payload?.failed ?? [];
+        if (failed.length > 0) {
+          toastError(
+            `มอบหมายสำเร็จ ${updated} รายการ · ไม่สำเร็จ ${failed.length} รายการ`,
+            failed.map((f) => `#${f.id}: ${f.message}`).join("; "),
+          );
+        } else {
+          toastSuccess(`มอบหมายงานสำเร็จ ${updated} รายการ`, 1500);
+        }
+        setBulkAssignSelectedIds(new Set());
+      } else if (singleJob) {
+        await axios.patch(
+          `${API}/jobs/${singleJob.id}/assign`,
+          { staffId: assignSelectedId },
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        toastSuccess("มอบหมายงานสำเร็จ", 1200);
+      }
+      await fetchJobs();
+      closeAssignModal();
     } catch {
       toastError("ข้อผิดพลาด", "ไม่สามารถมอบหมายงานได้");
+    } finally {
+      setAssignSubmitting(false);
     }
   };
 
@@ -1643,6 +1777,48 @@ export default function JobsList({
 
   const displayList = paginatedJobs;
 
+  const bulkAssignableFiltered = sortedFilteredJobs.filter((j) =>
+    jobNeedsAssignee(j),
+  );
+  const pageAssignableIds = displayList
+    .filter((j) => jobNeedsAssignee(j))
+    .map((j) => j.id);
+  const allPageAssignableSelected =
+    pageAssignableIds.length > 0 &&
+    pageAssignableIds.every((id) => bulkAssignSelectedIds.has(id));
+  const allFilteredAssignableSelected =
+    bulkAssignableFiltered.length > 0 &&
+    bulkAssignableFiltered.every((j) => bulkAssignSelectedIds.has(j.id));
+
+  const toggleBulkAssignSelect = (id: number) => {
+    setBulkAssignSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleBulkAssignPage = () => {
+    setBulkAssignSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allPageAssignableSelected) {
+        for (const id of pageAssignableIds) next.delete(id);
+      } else {
+        for (const id of pageAssignableIds) next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const selectAllBulkAssignableFiltered = () => {
+    setBulkAssignSelectedIds(new Set(bulkAssignableFiltered.map((j) => j.id)));
+  };
+
+  const clearBulkAssignSelection = () => setBulkAssignSelectedIds(new Set());
+
+  const assignModalOpen = assignJob != null || assignBulkIds.length > 0;
+
   // Derived permission flags for update-fix modal
   const isUpdateResolved = updateFixJob?.status === "RESOLVED";
   /** ผู้รับงาน — Reopen/บันทึกแก้ไขได้เฉพาะคนนี้ */
@@ -1665,16 +1841,82 @@ export default function JobsList({
         updateBrokenPartType === "Software") &&
       updateCause.trim().length > 0 &&
       updateFixMethod.trim().length > 0 &&
-      updateFixImages[0] != null &&
-      updateFixImages[1] != null
+      hasRequiredFixImageSlots(updateFixImages, updateFixPreviews)
     : true;
 
   const tableAndPagination = (
     <>
+      {enableBulkAssign && bulkAssignableFiltered.length > 0 && (
+        <div className="px-3 sm:px-4 py-2.5 border-b border-white/10 flex flex-wrap items-center gap-2 sm:gap-3 bg-slate-950/40 shrink-0">
+          {bulkAssignSelectedIds.size === 0 ? (
+            <p className="text-xs sm:text-sm text-slate-400 flex flex-wrap items-center gap-2">
+              <span className="hidden sm:inline">
+                เลือกงานที่ยังไม่มีผู้รับผิดชอบเพื่อมอบหมายทีละหลายรายการ
+              </span>
+              <button
+                type="button"
+                onClick={selectAllBulkAssignableFiltered}
+                className="text-blue-400/95 hover:text-blue-300 underline-offset-2 hover:underline cursor-pointer text-xs sm:text-sm font-medium min-h-[44px] sm:min-h-0 inline-flex items-center"
+              >
+                เลือกทั้งหมดที่ตรงตัวกรอง ({bulkAssignableFiltered.length})
+              </button>
+            </p>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <span className="inline-flex items-center rounded-lg border border-blue-500/35 bg-blue-950/25 px-2.5 py-1.5 text-xs sm:text-sm font-medium text-blue-100 tabular-nums">
+                  เลือกแล้ว {bulkAssignSelectedIds.size} รายการ
+                </span>
+                <button
+                  type="button"
+                  onClick={selectAllBulkAssignableFiltered}
+                  disabled={allFilteredAssignableSelected || assignSubmitting}
+                  className="text-xs text-slate-400 hover:text-slate-200 underline-offset-2 hover:underline cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0 inline-flex items-center"
+                >
+                  + เลือกทั้งหมดที่กรอง ({bulkAssignableFiltered.length})
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:ml-auto">
+                <button
+                  type="button"
+                  onClick={clearBulkAssignSelection}
+                  disabled={assignSubmitting}
+                  className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded-xl text-sm font-medium border border-white/15 bg-slate-800/60 text-slate-200 hover:bg-slate-700/70 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <X size={16} aria-hidden /> ยกเลิกการเลือก
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void openBulkAssignModal()}
+                  disabled={assignSubmitting}
+                  className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 transition-all active:scale-[0.98] shadow-lg shadow-blue-900/30 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <UserPlus size={16} aria-hidden /> มอบหมายที่เลือก (
+                  {bulkAssignSelectedIds.size})
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="flex-1 min-h-0 overflow-auto">
         <table className="w-full min-w-full text-left border-collapse table-fixed">
           <thead>
             <tr className="text-xs font-semibold uppercase tracking-wide sticky top-0 z-10 bg-slate-800/80 backdrop-blur-sm text-slate-400">
+              {enableBulkAssign && (
+                <th className="px-2 py-2.5 border-b border-white/10 w-10">
+                  {pageAssignableIds.length > 0 ? (
+                    <input
+                      type="checkbox"
+                      className="size-4 rounded border-white/20 bg-slate-900/60 cursor-pointer accent-blue-500"
+                      checked={allPageAssignableSelected}
+                      onChange={toggleBulkAssignPage}
+                      aria-label="เลือกทุกแถวในหน้านี้ที่มอบหมายได้"
+                    />
+                  ) : null}
+                </th>
+              )}
               <th className="px-2.5 py-2.5 border-b border-white/10 whitespace-nowrap w-24">เลขที่</th>
               <th className="px-2.5 py-2.5 border-b border-white/10 whitespace-nowrap w-24">วันที่</th>
               <th className="px-2.5 py-2.5 border-b border-white/10 whitespace-nowrap w-52">ผู้แจ้ง</th>
@@ -1740,11 +1982,25 @@ export default function JobsList({
                   : partBucket === "Software"
                     ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
                     : "bg-slate-700/30 text-slate-300 border border-white/10";
+              const canBulkSelectRow = enableBulkAssign && jobNeedsAssignee(job);
               return (
                 <tr
                   key={job.id}
                   className="hover:bg-white/5 transition-colors text-sm border-b border-white/5"
                 >
+                  {enableBulkAssign && (
+                    <td className="px-2 py-2.5 align-middle">
+                      {canBulkSelectRow ? (
+                        <input
+                          type="checkbox"
+                          className="size-4 rounded border-white/20 bg-slate-900/60 cursor-pointer accent-blue-500"
+                          checked={bulkAssignSelectedIds.has(job.id)}
+                          onChange={() => toggleBulkAssignSelect(job.id)}
+                          aria-label={`เลือกงาน ${job.ticketNo ?? job.id}`}
+                        />
+                      ) : null}
+                    </td>
+                  )}
                   <td className="px-2.5 py-2.5 font-mono text-sm text-slate-300">{job.ticketNo ?? "–"}</td>
                   <td className="px-2.5 py-2.5 text-sm whitespace-nowrap text-slate-400">
                     {dateStr ? format(new Date(dateStr), "dd/MM/yy", { locale: th }) : "–"}
@@ -1846,7 +2102,7 @@ export default function JobsList({
                         <Eye size={16} />
                       </ActionIconButton>
 
-                      {job.status === "PENDING" && canAssignJob && !!token && (
+                      {jobNeedsAssignee(job) && canAssignJob && !!token && (
                         <ActionIconButton
                           label="มอบหมายงาน"
                           onClick={() => openAssignModal(job)}
@@ -1856,7 +2112,7 @@ export default function JobsList({
                         </ActionIconButton>
                       )}
 
-                      {job.status === "PENDING" && (
+                      {jobNeedsAssignee(job) && !!token && (
                         <ActionIconButton
                           label="รับงาน"
                           onClick={() => handleTakeJob(job.id)}
@@ -2152,7 +2408,7 @@ export default function JobsList({
                         </div>
                       </div>
                     )}
-                    {detailJob.status === "PENDING" && (
+                    {jobNeedsAssignee(detailJob) && (
                       <div className="pt-2 flex flex-col sm:flex-row gap-2">
                         {canAssignJob && (
                           <button
@@ -2650,7 +2906,7 @@ export default function JobsList({
                                 <span className={GLASS_MODAL_LABEL}>
                                   รูปการแก้ไข{" "}
                                   <span className="text-slate-400 font-normal">
-                                    (บังคับ 2 รูปแรก — รูปที่ 3 ไม่บังคับ)
+                                    (บังคับ 2 รูปแรก — ใช้รูปเดิมได้ / อัปโหลดใหม่เพื่อเปลี่ยน)
                                   </span>
                                 </span>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mt-1">
@@ -2738,9 +2994,37 @@ export default function JobsList({
                               <div className="w-full mt-2 py-2.5 rounded-xl text-xs font-semibold text-center border border-dashed border-white/15 bg-slate-800/40 text-slate-500">
                                 งานนี้ปิดแล้ว — โหมดอ่านอย่างเดียว — หากต้องการแก้ไข ให้ติดต่อผู้รับงานหรือผู้ดูแลระบบ
                               </div>
-                            ) : updateFixJob && !updateFixJob.assignedTo ? (
-                              <div className="w-full mt-2 py-2.5 rounded-xl text-xs font-semibold text-center border border-dashed border-amber-500/25 bg-amber-950/20 text-amber-100/90">
-                                ยังไม่มีผู้รับผิดชอบ — มอบหมายหรือรับงานก่อน จึงจะบันทึกการแก้ไขได้
+                            ) : updateFixJob && jobNeedsAssignee(updateFixJob) ? (
+                              <div className="w-full mt-2 space-y-2">
+                                <div className="py-2.5 rounded-xl text-xs font-semibold text-center border border-dashed border-amber-500/25 bg-amber-950/20 text-amber-100/90">
+                                  ยังไม่มีผู้รับผิดชอบ — มอบหมายหรือรับงานก่อน จึงจะบันทึกการแก้ไขได้
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                  {canAssignJob && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (!updateFixJob) return;
+                                        void openAssignModal(updateFixJob);
+                                      }}
+                                      className="flex-1 min-h-11 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border border-sky-500/50 bg-sky-950/40 text-sky-100 cursor-pointer hover:bg-sky-900/50"
+                                    >
+                                      <UserPlus size={14} className="inline mr-1.5" aria-hidden />
+                                      มอบหมายงาน
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (!updateFixJob) return;
+                                      void handleTakeJob(updateFixJob.id);
+                                    }}
+                                    className="flex-1 min-h-11 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-800 text-slate-100 cursor-pointer hover:bg-slate-700"
+                                  >
+                                    <Wrench size={14} className="inline mr-1.5" aria-hidden />
+                                    รับงานนี้
+                                  </button>
+                                </div>
                               </div>
                             ) : (
                               <div className="w-full mt-2 py-2.5 rounded-xl text-xs font-semibold text-center border border-dashed border-white/15 bg-slate-800/40 text-slate-500">
@@ -2793,9 +3077,9 @@ export default function JobsList({
 
       {/* Modal มอบหมายงาน (สำหรับ SUPERVISOR/ADMIN) */}
       <Dialog
-        open={assignJob != null}
+        open={assignModalOpen}
         onOpenChange={(open) => {
-          if (!open) setAssignJob(null);
+          if (!open) closeAssignModal();
         }}
       >
         <DialogContent
@@ -2806,11 +3090,13 @@ export default function JobsList({
           <div className="flex flex-col overflow-visible rounded-2xl border border-white/10 bg-slate-900/90 shadow-2xl backdrop-blur-xl">
             <DialogHeader className="flex shrink-0 flex-row items-center justify-between space-y-0 border-b border-white/10 p-4">
               <DialogTitle className="font-bold text-base text-white">
-                เลขที่แจ้งซ่อม {assignJob?.ticketNo && `· ${assignJob.ticketNo}`}
+                {assignBulkIds.length > 0
+                  ? `มอบหมายงาน ${assignBulkIds.length} รายการ`
+                  : `เลขที่แจ้งซ่อม ${assignJob?.ticketNo ? `· ${assignJob.ticketNo}` : ""}`}
               </DialogTitle>
               <button
                 type="button"
-                onClick={() => setAssignJob(null)}
+                onClick={closeAssignModal}
                 className="cursor-pointer rounded-lg p-2 transition-colors hover:bg-white/5"
                 aria-label="ปิด"
               >
@@ -2823,7 +3109,9 @@ export default function JobsList({
               ) : (
                 <>
                   <p className="text-sm text-slate-300">
-                    เลือกเจ้าหน้าที่ที่ต้องการมอบหมายงานนี้ให้
+                    {assignBulkIds.length > 0
+                      ? "เลือกเจ้าหน้าที่ที่ต้องการมอบหมายให้ทุกงานที่เลือก — สถานะจะเป็น «กำลังแก้ไข» หลังมอบหมาย"
+                      : "เลือกเจ้าหน้าที่ที่ต้องการมอบหมายงานนี้ให้ — สถานะจะเป็น «กำลังแก้ไข» หลังมอบหมาย"}
                   </p>
                   <Select
                     instanceId="assign-staff-select"
@@ -2848,18 +3136,24 @@ export default function JobsList({
                     <Button
                       type="button"
                       variant="secondary"
-                      onClick={() => setAssignJob(null)}
+                      onClick={closeAssignModal}
+                      disabled={assignSubmitting}
                       className="flex-1 cursor-pointer rounded-xl border border-white/10 bg-slate-800 text-slate-300 hover:bg-slate-700"
                     >
                       ยกเลิก
                     </Button>
                     <Button
                       type="button"
-                      onClick={handleAssignSubmit}
-                      disabled={assignSelectedId == null}
+                      onClick={() => void handleAssignSubmit()}
+                      disabled={assignSelectedId == null || assignSubmitting}
                       className="flex flex-1 cursor-pointer items-center justify-center rounded-xl bg-blue-600 text-sm font-medium text-white shadow-lg shadow-blue-600/20 hover:bg-blue-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      <UserPlus size={16} className="mr-2 shrink-0" aria-hidden /> มอบหมายงาน
+                      <UserPlus size={16} className="mr-2 shrink-0" aria-hidden />
+                      {assignSubmitting
+                        ? "กำลังมอบหมาย..."
+                        : assignBulkIds.length > 0
+                          ? `มอบหมาย ${assignBulkIds.length} รายการ`
+                          : "มอบหมายงาน"}
                     </Button>
                   </div>
                 </>

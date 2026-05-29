@@ -53,6 +53,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
+import { jobNeedsAssignee } from "@/lib/jobAssignEligibility";
+import {
+  buildFixPreviewUrlsFromJob,
+  hasRequiredFixImageSlots,
+} from "@/lib/jobFixImageSlots";
 
 interface JobDetail {
   id: number;
@@ -201,6 +206,8 @@ export default function JobDetailPage() {
             toDateTimeLocalInputValue(data.reportDate ?? data.createdAt),
           );
           setBackfillFixDate(toDateTimeLocalInputValue(data.fixDate ?? null));
+          setFixImages([null, null, null]);
+          setFixPreviews(buildFixPreviewUrlsFromJob(data.id, data.fixImages));
         }
       })
       .catch(() => setError("ไม่พบข้อมูลใบแจ้งซ่อมนี้"))
@@ -327,7 +334,7 @@ export default function JobDetailPage() {
       brokenPartType === "Hardware" || brokenPartType === "Software";
     const causeOk = cause.trim().length > 0;
     const methodOk = fixMethod.trim().length > 0;
-    const imagesOk = fixImages[0] != null && fixImages[1] != null;
+    const imagesOk = hasRequiredFixImageSlots(fixImages, fixPreviews);
     return envOk && catOk && causeOk && methodOk && imagesOk;
   }, [
     canEditFix,
@@ -336,6 +343,7 @@ export default function JobDetailPage() {
     cause,
     fixMethod,
     fixImages,
+    fixPreviews,
   ]);
 
   const handleFixImage = (index: number, file: File | null) => {
@@ -394,8 +402,11 @@ export default function JobDetailPage() {
       toastError("ข้อมูลไม่ครบ", "กรุณาระบุวิธีแก้ไข");
       return;
     }
-    if (!fixImages[0] || !fixImages[1]) {
-      toastError("รูปภาพไม่ครบ", "กรุณาแนบรูปการแก้ไขอย่างน้อย 2 รูปแรก");
+    if (!hasRequiredFixImageSlots(fixImages, fixPreviews)) {
+      toastError(
+        "รูปภาพไม่ครบ",
+        "กรุณาแนบรูปการแก้ไขอย่างน้อย 2 รูปแรก หรือใช้รูปเดิมที่มีอยู่แล้ว",
+      );
       return;
     }
     setSaving(true);
@@ -430,6 +441,8 @@ export default function JobDetailPage() {
         setSerialRows(
           parseJobSerialRowsFromDb(data.oldSerialNumber, data.newSerialNumber),
         );
+        setFixImages([null, null, null]);
+        setFixPreviews(buildFixPreviewUrlsFromJob(data.id, data.fixImages));
       }
     } catch {
       toastError("ข้อผิดพลาด", "ไม่สามารถบันทึกข้อมูลการแก้ไขได้");
@@ -462,6 +475,8 @@ export default function JobDetailPage() {
         );
         setBackfillReportDate(toDateTimeLocalInputValue(data.reportDate ?? data.createdAt));
         setBackfillFixDate(toDateTimeLocalInputValue(data.fixDate ?? null));
+        setFixImages([null, null, null]);
+        setFixPreviews(buildFixPreviewUrlsFromJob(data.id, data.fixImages));
       }
     } catch {
       setError("ไม่พบข้อมูลใบแจ้งซ่อมนี้");
@@ -620,11 +635,10 @@ export default function JobDetailPage() {
       toastError("สิทธิ์ไม่เพียงพอ", "คุณไม่มีสิทธิ์รับงาน");
       return;
     }
-    if (job.status !== "PENDING") {
-      toastError("ทำรายการไม่ได้", "งานนี้ไม่อยู่ในสถานะ PENDING");
+    if (!jobNeedsAssignee(job)) {
+      toastError("ทำรายการไม่ได้", "งานนี้มีผู้รับผิดชอบแล้ว หรือไม่สามารถรับงานในสถานะนี้ได้");
       return;
     }
-    if (job.assignedTo) return;
     if (!currentUserId) {
       toastError("สิทธิ์ไม่เพียงพอ", "ไม่พบข้อมูลผู้ใช้");
       return;
@@ -659,7 +673,7 @@ export default function JobDetailPage() {
   const openAssignModal = async () => {
     if (!job || !token) return;
     if (!canAssignAny) return;
-    if (job.status !== "PENDING") return;
+    if (!jobNeedsAssignee(job)) return;
     setAssignOpen(true);
     setAssignSelectedId(null);
     setAssignableStaff([]);
@@ -1001,7 +1015,7 @@ export default function JobDetailPage() {
                       </Alert>
 
                       <div className="mt-2 flex flex-col gap-2.5 sm:flex-row">
-                      {job?.status === "PENDING" && canAssignAny && (
+                      {job && jobNeedsAssignee(job) && canAssignAny && (
                           <Button
                             type="button"
                             variant="outline"
@@ -1013,7 +1027,7 @@ export default function JobDetailPage() {
                           </Button>
                         )}
 
-                      {job?.status === "PENDING" && canTakeJob && (
+                      {job && jobNeedsAssignee(job) && canTakeJob && (
                           <Button
                             type="button"
                             variant="outline"
@@ -1457,7 +1471,7 @@ export default function JobDetailPage() {
                         <span className={GLASS_LABEL}>
                           รูปการแก้ไข{" "}
                           <span className="text-slate-400 font-normal">
-                            (บังคับ 2 รูปแรก — รูปที่ 3 ไม่บังคับ)
+                            (บังคับ 2 รูปแรก — ใช้รูปเดิมได้ / อัปโหลดใหม่เพื่อเปลี่ยน)
                           </span>
                         </span>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mt-1">

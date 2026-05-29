@@ -42,6 +42,27 @@ export class JobsService {
         return { ...u, image } as T;
     }
 
+    /** นับ URL รูปแก้ไขที่ไม่ว่างใน JSON ของ Job.fixImages */
+    countNonemptyFixImages(fixImages: unknown): number {
+        if (!Array.isArray(fixImages)) {
+            return 0;
+        }
+        return fixImages.filter(
+            (u) => typeof u === 'string' && u.trim().length > 0,
+        ).length;
+    }
+
+    async getNonemptyFixImageCount(jobId: number): Promise<number> {
+        const row = await this.prisma.job.findUnique({
+            where: { id: jobId },
+            select: { fixImages: true },
+        });
+        if (!row) {
+            throw new NotFoundException(`ไม่พบงาน id=${jobId}`);
+        }
+        return this.countNonemptyFixImages(row.fixImages);
+    }
+
     private mapJobForClient<
         T extends {
             assignedTo?: { image?: string | null } | null;
@@ -774,23 +795,77 @@ export class JobsService {
         if (!before) {
             throw new NotFoundException(`ไม่พบงาน id=${id}`);
         }
-        if (before.status !== JobStatus.PENDING) {
+        if (before.assignedToId != null) {
             throw new BadRequestException(
-                'มอบหมายงานได้เฉพาะงานสถานะรอดำเนินการ (PENDING) เท่านั้น',
+                'งานนี้มีผู้รับผิดชอบแล้ว — มอบหมายใหม่ได้เฉพาะงานที่ยังไม่มีผู้รับผิดชอบ',
             );
         }
+
+        const isOrphanInProgress =
+            before.status === JobStatus.IN_PROGRESS;
+        const isOrphanResolved = before.status === JobStatus.RESOLVED;
+        const isPending = before.status === JobStatus.PENDING;
+
+        if (!isPending && !isOrphanInProgress && !isOrphanResolved) {
+            throw new BadRequestException(
+                'มอบหมายงานได้เฉพาะงานสถานะรอดำเนินการ (PENDING) หรืองานกำลังแก้ไข/เสร็จสิ้นที่ยังไม่มีผู้รับผิดชอบ',
+            );
+        }
+
+        const data: {
+            assignedToId: number;
+            assignedById: number;
+            status?: typeof JobStatus.IN_PROGRESS;
+            fixDate?: null;
+        } = {
+            assignedToId: staffId,
+            assignedById: assignedByUserId,
+        };
+        if (isPending || isOrphanInProgress || isOrphanResolved) {
+            data.status = JobStatus.IN_PROGRESS;
+        }
+        if (isOrphanResolved) {
+            data.fixDate = null;
+        }
+
         const updated = await this.prisma.job.update({
             where: { id },
-            data: {
-                assignedToId: staffId,
-                assignedById: assignedByUserId,
-                status: 'IN_PROGRESS',
-            },
+            data,
         });
-        if (before?.assignedToId !== staffId) {
+        if (before.assignedToId !== staffId) {
             void this.jobEmailNotifications.notifyAssigned(updated.id);
         }
         return updated;
+    }
+
+    async bulkAssignStaff(
+        jobIds: number[],
+        staffId: number,
+        assignedByUserId: number,
+    ) {
+        const uniqueIds = [...new Set(jobIds)];
+        const jobs: Awaited<ReturnType<typeof this.assignStaff>>[] = [];
+        const updatedIds: number[] = [];
+        const failed: { id: number; message: string }[] = [];
+
+        for (const id of uniqueIds) {
+            try {
+                const updated = await this.assignStaff(id, staffId, assignedByUserId);
+                jobs.push(updated);
+                updatedIds.push(id);
+            } catch (err: unknown) {
+                const message =
+                    err instanceof Error ? err.message : 'มอบหมายไม่สำเร็จ';
+                failed.push({ id, message });
+            }
+        }
+
+        return {
+            updated: updatedIds.length,
+            updatedIds,
+            failed,
+            jobs,
+        };
     }
 
     /** ยกเลิกงานคิว — เฉพาะ PENDING */

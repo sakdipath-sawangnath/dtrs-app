@@ -23,9 +23,9 @@
    - **Login**: รองรับอีเมลหรือชื่อผู้ใช้ (`email` / `username`) + รหัสผ่าน คืนค่า `access_token` + `user` (id, name, username, role)
    - **User CRUD**: ผู้ที่มีสิทธิ์ **`menu.users`** เรียก `GET/POST/PATCH/DELETE /users` (และที่เกี่ยวข้อง) ได้ — บทบาทกำหนดเองที่ได้รับเมนูนี้ใช้งานได้เหมือน “แอดมินผู้ใช้” โดยไม่จำเป็นต้องเป็นรหัส `ADMIN` ใน JWT
    - **โปรไฟล์ผู้ใช้**: `GET /users/me`, `PATCH /users/me` (ชื่อ, อีเมล, เบอร์, ตำแหน่ง, รูป), `PATCH /users/me/password` (เปลี่ยนรหัสผ่านต้องส่งรหัสเดิม)
-   - **มอบหมายงาน**: `GET /users/assignable` — ต้องมีสิทธิ์ **`job.assign`** (`PermissionsGuard`); `PATCH /jobs/:id/assign` — อิง RBAC เหมือน `GET /roles/me/permissions`: มี **`job.assign`** → ส่ง `staffId` ใครก็ได้; ไม่มี `job.assign` แต่มี **`menu.pending`** และ `staffId` = ตัวเอง → รับงานเอง
+   - **มอบหมายงาน**: `GET /users/assignable` — ต้องมีสิทธิ์ **`job.assign`** (`PermissionsGuard`); `PATCH /jobs/:id/assign` — อิง RBAC เหมือน `GET /roles/me/permissions`: มี **`job.assign`** → ส่ง `staffId` ใครก็ได้; ไม่มี `job.assign` แต่มี **`menu.pending`** และ `staffId` = ตัวเอง → รับงานเอง; **`PENDING`** → เปลี่ยนเป็น **`IN_PROGRESS`**; **`IN_PROGRESS`/`RESOLVED` ที่ยังไม่มีผู้รับผิดชอบ** (ข้อมูล import) → ตั้งผู้รับงานโดยคงสถานะเดิม
    - **นอกสัญญา**: `PATCH /jobs/:id/out-of-contract` — ตั้ง `isOutOfContract=true` โดย “คงสถานะเป็น `PENDING`”; ต้องมีสิทธิ์ **`job.assign`**
-  - **บันทึกการแก้ไขงาน / ปิดงาน**: `PATCH /jobs/:id/fix` — คุมสิทธิ์ผ่าน RBAC:
+  - **บันทึกการแก้ไขงาน / ปิดงาน**: `PATCH /jobs/:id/fix` — คุมสิทธิ์ผ่าน RBAC; ถ้างานมีรูปแก้ไขใน DB อย่างน้อย 2 รูปแล้ว **ไม่บังคับ** แนบไฟล์ใหม่ (อัปเดตข้อความ/ปิดงานได้) — แนบใหม่ ≥ 2 รูปจะแทนที่ชุดรูปเดิม
     - `job.fix.any`: ทำได้ทุกงาน
     - `job.fix.self`: ทำได้เฉพาะงานที่เป็นผู้รับงาน (assignee)
     - ถ้างานมีสถานะ `RESOLVED` ต้อง **`PATCH /jobs/:id/reopen`** ก่อน
@@ -107,8 +107,8 @@
 | GET | `/jobs/list` | ✅ JWT | ดูรายการแจ้งซ่อมทั้งหมด (Dashboard / JobsList) |
 | GET | `/jobs/:id/image/:kind/:index` | ✅ JWT | สตรีมรูป (`kind`= issue \| fix, `index`=0–2) จาก URL ใน `Job.images` / `Job.fixImages` — proxy same-origin ให้ frontend ไม่ติด CORS |
 | GET | `/jobs/:id/report-pdf` | ✅ JWT | สร้างไฟล์ PDF รายงาน (โหลดหน้า `/print/jobs/:id` + Chromium) |
-| PATCH | `/jobs/:id/assign` | ✅ JWT | มอบหมายงาน (RBAC): มี `job.assign` → `staffId` ใครก็ได้; ไม่มีแต่มี `menu.pending` และ `staffId` = ตัวเอง → รับงานเอง; ระบบบันทึกผู้กดมอบหมายใน `assignedById` เพื่อแยก “มอบหมายงาน” vs “รับงานเอง” บนหน้า `/dashboard/jobs/:id` |
-| PATCH | `/jobs/:id/fix` | ✅ JWT | บันทึก/ปิดงาน (RBAC): `job.fix.any` ทำได้ทุกงาน, `job.fix.self` ทำได้เฉพาะ assignee; multipart ต้องมีรูปแก้ไขอย่างน้อย 2 รูปแรก; ตั้ง status=RESOLVED, fixDate อัตโนมัติ; ถ้ายัง `RESOLVED` ต้อง reopen ก่อน |
+| PATCH | `/jobs/:id/assign` | ✅ JWT | มอบหมายงาน (RBAC): มี `job.assign` → `staffId` ใครก็ได้; ไม่มีแต่มี `menu.pending` และ `staffId` = ตัวเอง → รับงานเอง; `PENDING` → `IN_PROGRESS`; `IN_PROGRESS`/`RESOLVED` ไม่มีผู้รับผิดชอบ → ตั้งผู้รับงานคงสถานะ (ข้อมูล import); บันทึก `assignedById` |
+| PATCH | `/jobs/:id/fix` | ✅ JWT | บันทึก/ปิดงาน (RBAC): `job.fix.*`; รูปแก้ไข — แนบใหม่ ≥ 2 รูป **หรือ** มีรูปใน DB ≥ 2 รูป (ไม่แนบใหม่); แนบ 1 รูปไม่รองรับ; ตั้ง `RESOLVED` + `fixDate`; ถ้ายัง `RESOLVED` ต้อง reopen ก่อน |
 | PATCH | `/jobs/:id/reopen` | ✅ JWT | Reopen (RBAC): `job.reopen.any` ทำได้ทุกงาน, `job.reopen.self` ทำได้เฉพาะ assignee; `RESOLVED` → `IN_PROGRESS`, ล้าง `fixDate`, ต่อท้ายเหตุผลใน `fixNote` |
 | PATCH | `/jobs/:id/status` | ✅ JWT + **`job.updateStatus`** | เปลี่ยนสถานะงาน |
 | GET | `/settings/email-smtp` | ✅ JWT + **`menu.settings`** | อ่านการตั้งค่า SMTP (ไม่คืนรหัสผ่าน) |
