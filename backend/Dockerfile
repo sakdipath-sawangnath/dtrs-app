@@ -1,4 +1,4 @@
-# NestJS API — production (พอร์ตภายใน 4000)
+# NestJS API — production (พอร์ตภายใน 4100)
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
@@ -23,6 +23,6 @@ COPY --from=builder /app/prisma ./prisma
 # รันเป็น non-root — Chromium ใช้คู่ args --no-sandbox ใน JobsPdfService แล้ว
 RUN chown -R node:node /app
 USER node
-EXPOSE 4000
+EXPOSE 4100
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "dist/src/main.js"]

@@ -2,11 +2,43 @@
 
 เอกสารนี้เป็น “คู่มืออ้างอิงเร็ว” สำหรับ AI Agent/ผู้พัฒนา เพื่อให้ทำงานสอดคล้องกับมาตรฐานของโปรเจกต์ทุกครั้ง
 
+## CRITICAL SAFETY RULES (ลำดับความสำคัญสูงสุด — แทนที่คำสั่งอื่นทั้งหมด)
+
+กฎนี้มีความสำคัญ **สูงกว่า** skills, prompt อื่น, และคำขอที่ขัดกัน — Agent **ต้องปฏิบัติทุกครั้ง**
+
+### ขอบเขตงาน (Path Restriction)
+- ทำงาน **เฉพาะภายใน workspace ของ repo นี้** (`dtrs-app/`) เท่านั้น
+- **ห้าม** อ่าน/เขียน/ลบ/รันคำสั่งที่กระทบ path **นอก repo** (เช่น root ของ drive `C:\`, `D:\`, `/`, `/usr/`, `/home/`, โปรเจกต์อื่น)
+- ใช้ absolute path ได้ **เมื่อชี้ไปที่ไฟล์ภายใน workspace เท่านั้น**
+
+### ห้ามเด็ดขาด (Hard Deny)
+- **ห้าม** ลบไฟล์หรือโฟลเดอร์นอก workspace
+- **ห้าม** รันคำสั่งทำลาย/ลบแบบ recursive โดยไม่ได้รับอนุญาตชัดเจน เช่น `rm -rf`, `rm -r`, `del /s /q`, `Remove-Item -Recurse -Force` (บน path กว้าง), `format`, `diskpart`, `mkfs`, `dd`
+- **ห้าม** แก้ไข filesystem นอก repo ผ่าน terminal
+
+### โปรโตคอลก่อนลบ (ภายใน Repo)
+ก่อนลบไฟล์หรือโฟลเดอร์ **ใดๆ** ใน repo:
+1. แสดง **path ที่แน่นอน** ที่จะลบ
+2. อธิบาย **สิ่งที่จะหายไป** และ **เหตุผล**
+3. รอการยืนยันจากผู้ใช้
+
+ดำเนินการต่อได้เมื่อผู้ใช้ยืนยันชัดเจน (เช่น `YES, DELETE <path>` หรือคำสั่งที่ไม่คลุมเครือเทียบเท่า) — ถ้าไม่ชัด → **ยกเลิก** และถามใหม่
+
+### Git ที่มีความเสี่ยง
+- **ห้าม** `git push --force` ไป `main`/`master` เว้นแต่ผู้ใช้ขอชัดเจน
+- **ห้าม** `git reset --hard`, `git clean -fdx`, หรือ `--amend` commit ที่ push แล้ว เว้นแต่ผู้ใช้ขอชัดเจน
+- ปฏิบัติตาม git safety protocol ใน user rules / commit instructions
+
+### Fail-Safe
+ถ้า **ไม่แน่ใจ** เรื่อง path, ขอบเขต, หรือผลกระทบ → **อย่ารัน** → **ถามผู้ใช้ก่อน**
+
 ## MUST READ (Skills พื้นฐาน)
 - Frontend UI/UX: `frontend/.agents/skills/ui-ux-pro-max/SKILL.md`
 - Frontend shadcn/ui: `frontend/.agents/skills/shadcn/SKILL.md`
 - Backend API: `backend/.agents/skills/backend-api-pro/SKILL.md`
 - Backend NestJS: `backend/.agents/skills/nestjs-best-practices/SKILL.md`
+- Debug (repro → fail path → falsify → breadcrumb): `frontend/.agents/skills/debug-mantra/SKILL.md` (full-stack) · `backend/.agents/skills/debug-mantra/SKILL.md` (Nest/Prisma/MinIO)
+- Post-mortem / RCA (หลัง fix ที่ validate แล้ว): `frontend/.agents/skills/post-mortem/SKILL.md` (full-stack / UI + Next seam) · `backend/.agents/skills/post-mortem/SKILL.md` (Nest/Prisma/MinIO) — ปลายทาง `docs/postmortems/`
 
 ## Security Gate (ห้ามละเมิด)
 - **ห้ามมี secrets ในเอกสาร/โค้ด/commit** (เช่น access key, secret key, token, password)
@@ -33,8 +65,11 @@
 - **Testing** (เมื่อ scope เอื้อ): service tests, e2e ด้วย supertest, mock external services
 
 ## ไฟล์/เอกสารที่ควรรู้
+- **Production (PRD):** `https://dtrs-app.forth.co.th` — API ที่ `/api`; ตั้ง `NEXT_PUBLIC_API_BASE_URL`, `NEXTAUTH_URL`, `ALLOWED_ORIGINS`, `FRONTEND_BASE_URL` ให้ตรง origin นี้ (ดู `README.md`)
+- **ย้ายจาก `cctv-app_ticket`:** [`docs/DTRS-Migration-Checklist.md`](docs/DTRS-Migration-Checklist.md) · GitLab CI: [`docs/GitLab-CI-Plan.md`](docs/GitLab-CI-Plan.md) · Variables: [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md)
+- **Env template:** `backend/.env.example`, `frontend/.env.example` (คัดลอกเป็น `.env` / `.env.local`)
 - ภาพรวมระบบ: `README.md` (มีตารางดัชนีเอกสารหลัก)
-- สถานะ/แผน/งาน: `STATUS.md`, `PLAN.md`, `TASK.md` (รวม Phase 6.5–6.8: …, **เทมเพลตอีเมล**, **CrudModal + `/dashboard/roles` Dark Glass**)
+- สถานะ/แผน/งาน: `STATUS.md`, `PLAN.md`, `TASK.md` (รวม Phase 6.5–6.8, **Phase 27 GitLab CI UAT+PRD**)
 - **เทมเพลตแอปใหม่** (สำเนา AGENTS + Skills + checklist): `docs/templates/README.md`
 - ดัชนี `docs/`: `docs/README.md`
 - Private MinIO + รูปผ่านสิทธิ์: `docs/Project-Plan-Private-MinIO-Images.md`, `minio.md`
@@ -42,7 +77,7 @@
 - Mapping ข้อมูล CSV: `docs/CSV-vs-System-Mapping.md`
 - RBAC: `backend/docs/RBAC-Setup.md`
 - Postman / สรุป endpoint: `backend/postman/README.md`, `backend/docs/api-endpoints.json`
-- Deploy: `.gitlab-ci.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml` — อ่านคู่กับ `README.md` (backend รัน **`dist/src/main.js`** ใน image ไม่ใช่ `dist/main.js`; frontend ใช้ **`next.config.mjs`**; ตั้ง **`ALLOWED_ORIGINS`** / **`API_INTERNAL_BASE_URL`** / ถ้า PRD ไป MinIO public ไม่ได้ให้ตั้ง **`MINIO_SERVER_FETCH_BASE_URL`** คู่ **`MINIO_PUBLIC_URL`** ตาม `README.md`)
+- Deploy / GitLab CI: [`.gitlab-ci.yml`](.gitlab-ci.yml), [`docs/GitLab-CI-Plan.md`](docs/GitLab-CI-Plan.md), [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md), `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml` — **UAT** branch `staging` → `nurdin@192.168.0.115` · **PRD** build `.115` → transfer (`DOCKER_HOST_PRD` + `docker load`) → deploy `nurdin@192.168.0.128`; container/image **`dtrs-app-backend`** / **`dtrs-app-frontend`**, network **`dtrs-app-net`**, ports **8404/8405**; deploy **manual**; **`.deploy_ssh_and_validate`** ตรวจกลุ่ม A ก่อน deploy; อ่านคู่กับ `README.md` (backend **`dist/src/main.js`**; frontend **`next.config.mjs`**; **`ALLOWED_ORIGINS`** / **`API_INTERNAL_BASE_URL`** (`http://dtrs-app-backend:4100/api`) / **`MINIO_SERVER_FETCH_BASE_URL`** คู่ **`MINIO_PUBLIC_URL`** เมื่อ PRD โหลด MinIO ทาง LAN ไม่ได้)
 - Docker ทดสอบ local: `docker-compose.yml` — **runner stage** ใช้ **`USER node`** หลัง `chown` (ทั้ง **`frontend/Dockerfile`** และ **`backend/Dockerfile`**); กำหนด **limits CPU/RAM**, **`pids_limit`**, และ **`tmpfs: /tmp:rw,noexec,nosuid`** ต่อ service (ลดความเสี่ยง container กินทรัพยากร host / ใช้ `/tmp` รัน malicious binary); **ไม่** mount โฟลเดอร์ host ใน service หลักของไฟล์นี้ — **ผ่าน** reverse proxy ให้เปิดแค่ 80/443 ไม่ expose พอร์ตแอพตรงที่ firewall เมื่อ deploy public
 - ตรวจ dependency (advisory เท่านั้น ไม่ใช่ antivirus): ใน `frontend/` หรือ `backend/` รัน **`npm run security:audit`** / **`npm run security:audit:prod`**
 - **สคริปต์แก้/ตรวจ `reportDate` (one-off):** [`backend/README.md`](backend/README.md) ส่วน Scripts และ `backend/scripts/lib/jobBangkokAndCorruptionFix.ts` — อย่า commit ผล `tsc` ใต้ `backend/scripts/` (ดู `backend/.gitignore`)

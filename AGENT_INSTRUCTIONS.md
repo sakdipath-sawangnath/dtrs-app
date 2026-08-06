@@ -2,14 +2,30 @@
 
 > **สำหรับ AI Agent:** อ่านไฟล์นี้ก่อนเริ่มดำเนินการใดๆ ในโปรเจค
 
+## CRITICAL SAFETY RULES (ลำดับความสำคัญสูงสุด)
+
+> สรุปเต็มอยู่ใน [`AGENTS.md`](AGENTS.md) — กฎนี้ **แทนที่** skills และคำสั่งอื่นเมื่อขัดกัน
+
+| หมวด | กฎ |
+|------|-----|
+| **ขอบเขต** | ทำงานเฉพาะใน workspace `dtrs-app/` — ห้ามกระทบ path นอก repo |
+| **Hard deny** | ห้ามลบนอก workspace; ห้าม `rm -rf`, `del /s /q`, `format`, `diskpart` และคำสั่งทำลาย/recursive อื่นโดยไม่ได้รับอนุญาต |
+| **ก่อนลบใน repo** | แสดง path → อธิบายผล → รอยืนยันชัดเจน (เช่น `YES, DELETE <path>`) |
+| **Git เสี่ยง** | ห้าม force-push main, reset --hard, clean -fdx, amend ที่ push แล้ว — เว้นแต่ผู้ใช้ขอ |
+| **Fail-safe** | ไม่แน่ใจ → อย่ารัน → ถามผู้ใช้ |
+
 ## Agent Bootstrap (MUST DO)
 
 ก่อนทำงานใด ๆ ในโปรเจกต์นี้ **ต้องทำตามลำดับ**:
+
+0) **ปฏิบัติ CRITICAL SAFETY RULES ด้านบน** ทุกครั้งที่รันคำสั่ง terminal, ลบไฟล์, หรือแก้ path
 
 1) **อ่าน Skills พื้นฐานให้ครบ**
 - Frontend UI/UX: `frontend/.agents/skills/ui-ux-pro-max/SKILL.md`
 - Backend API: `backend/.agents/skills/backend-api-pro/SKILL.md`
 - Backend NestJS Patterns: `backend/.agents/skills/nestjs-best-practices/SKILL.md`
+- Debug: `frontend/.agents/skills/debug-mantra/SKILL.md` · `backend/.agents/skills/debug-mantra/SKILL.md`
+- Post-mortem / RCA (หลัง fix ที่ validate แล้ว): `frontend/.agents/skills/post-mortem/SKILL.md` (full-stack / UI) · `backend/.agents/skills/post-mortem/SKILL.md` (Nest/Prisma/MinIO)
 
 2) **เลือกขอบเขตงาน แล้วทำตาม workflow ของ skill**
 - งาน UI/UX: ต้องเริ่มจาก “Design System” (ตาม `ui-ux-pro-max`) ก่อน implement/แก้ UI
@@ -130,6 +146,7 @@ python .agents/skills/ui-ux-pro-max/scripts/search.py "accessibility" --domain u
 
 ## เอกสารโปรเจกต์ (อ้างอิงฟีเจอร์/API)
 
+- **Production:** `https://dtrs-app.forth.co.th` (API ที่ `/api`; ดูตัวแปร env ใน `README.md` และ `.gitlab-ci.yml`)
 - ภาพรวมและตาราง endpoint: `README.md` (บันทึกการอัปเดตล่าสุดที่ส่วนต้นไฟล์), `STATUS.md`
 - แผน/งาน: `PLAN.md`, `TASK.md` (Phase 6.4 = SMTP… · **6.7 = เทมเพลตอีเมล** · **6.8 = `CrudModal` (portal/z-100) + หน้า `/dashboard/roles` (`form-input-glass`)** · **6.9 = `/job-images`, `MINIO_SERVER_FETCH_BASE_URL`, 502 รูป** · **Private MinIO = `/user-images`, avatar API, `MINIO_ENSURE_PUBLIC_READ_POLICY` default false** — สรุปใน `docs/Project-Plan-Private-MinIO-Images.md`)
 - พิมพ์รายงาน + reverse proxy (NPM): `backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md` — รูปงาน **`/job-images/*`**, รูปโปรไฟล์ **`/user-images/*`** บน Next; ตัวแปร MinIO: `minio.md`
@@ -138,5 +155,6 @@ python .agents/skills/ui-ux-pro-max/scripts/search.py "accessibility" --domain u
 - RBAC: `backend/docs/RBAC-Setup.md`
 - สรุป API เป็น JSON: `backend/docs/api-endpoints.json`
 - Postman: `backend/postman/README.md`
+- ย้ายจาก `cctv-app_ticket`: `docs/DTRS-Migration-Checklist.md`
 
 **หมายเหตุ:** ไฟล์นี้อยู่ที่ `/AGENT_INSTRUCTIONS.md` ให้อ่านทุกครั้งก่อนเริ่มงาน

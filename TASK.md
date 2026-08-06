@@ -155,7 +155,7 @@
 ## 15. Phase 6.5 — GitLab CI, Docker, พอร์ต PRD, production URL, build (2026-03-23)
 
 ### CI / Deploy
-- [x] **`.gitlab-ci.yml`** — build แยก `frontend` / `backend`, deploy Docker บน PRD, SSH run; พอร์ต **8309→3000**, **8310→4000**; cleanup image แบบ manual
+- [x] **`.gitlab-ci.yml`** — build แยก `frontend` / `backend`, deploy Docker บน PRD, SSH run; พอร์ต **8404→3000**, **8405→4100**; cleanup image แบบ manual
 - [x] **`backend/Dockerfile`**, **`frontend/Dockerfile`**, **`docker-compose.yml`**, **`.dockerignore`** (ไม่ใช้ `docker/entrypoint.sh` รวมอีกต่อไป); backend CMD / `start:prod` → **`dist/src/main.js`**
 - [x] **GitLab Variables** — ใช้ **`FRONTEND_BASE_URL`** เดียว (เลิกใช้ `FRONTEND_URL_PRD` ใน pipeline)
 
@@ -299,3 +299,62 @@
 ### เอกสาร
 - [x] อัปเดต `STATUS.md`, `TASK.md`
 
+## 26. Migration — fork `cctv-app_ticket` → `dtrs-app` (2026-08-05)
+
+> Checklist เต็ม: [`docs/DTRS-Migration-Checklist.md`](docs/DTRS-Migration-Checklist.md)
+
+### Git / Infrastructure (โค้ด)
+- [x] `git remote` → `http://gitlab.forthcorp.local/FORTH/dtrs-app.git`
+- [x] `.gitlab-ci.yml` — UAT+PRD: `test` → `build` → `docker_build` → manual deploy; image/container/network `dtrs-app-*`; deploy path `/home/nurdin/dtrs-app` (UAT `.115` / PRD `.128`); PRD build `.115` → `transfer:prd:images` (`DOCKER_HOST_PRD` + `docker load`) → deploy `.128`; ไม่ `docker rm` container ของ `cctv-app_ticket`
+- [x] `.gitlab-ci.yml` hardening — **`.deploy_ssh_and_validate`** (กลุ่ม A ก่อน deploy); backend unit tests mock สำหรับ CI gate
+- [x] `docker-compose.yml` — `dtrs-app-frontend` / `dtrs-app-backend` / `dtrs-app-net`, ports **8404→3000**, **8405→4100**
+- [x] `backend/src/main.ts` — `PORT` default **4100**; `frontend/src/lib/serverApiBase.ts` — ตัวอย่าง `dtrs-app-backend:4100`
+
+### Environment templates
+- [x] `backend/.env.example` — `dtrs_app`, `MINIO_BUCKET_NAME=dtrs-app`, `PORT=4100`
+- [x] `frontend/.env.example` — local dev URLs + คอมเมนต์ Docker/PRD
+- [x] `frontend/.gitignore` — track `!.env.example`
+
+### Local dev (เครื่อง dev)
+- [x] `backend/.env` — DB `dtrs_app`, `MINIO_BUCKET_NAME=dtrs-app` (config), `PORT=4100`
+- [ ] ⏸️ **MinIO bucket `dtrs-app` บน server** — รอทีม infra สร้าง (block ทดสอบอัปโหลด)
+- [x] `frontend/.env` + `.env.local` sync — `API_INTERNAL_BASE_URL=http://localhost:4100/api`
+- [x] `npx prisma generate` + `npm run start:dev` → `GET http://localhost:4100/api` **200**
+- [x] `npm run dev` → `http://localhost:3000/login` **200**
+- [ ] Login E2E / seed admin ถ้ายังไม่มี user
+- [ ] `docker compose up --build` ทดสอบ container ชื่อ `dtrs-app-*`
+
+### ค้าง (infra / PRD)
+- [ ] GitLab CI/CD Variables กลุ่ม A — scope **`staging`** / **`production`** ([`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md); pipeline validate ก่อน manual deploy)
+- [ ] MinIO bucket **`dtrs-app-uat`** / **`dtrs-app`** + `MINIO_*` (กลุ่ม B — หลัง infra)
+- [ ] NPM — `dtrs-app.forth.co.th` → 8404/8405
+- [ ] ทดสอบ pipeline บน branch `staging` → manual deploy UAT → PRD
+- [ ] ยืนยันไม่ชน `cctv-app_ticket`
+- [ ] P3–P6 branding/docs/postman (optional)
+
+### เอกสาร
+- [x] `docs/DTRS-Migration-Checklist.md`, `docs/GitLab-CI-Plan.md`, `docs/GitLab-CI-Variables-Checklist.md`, `docs/README.md`, `README.md`, `STATUS.md`, `TASK.md`
+
+## 27. GitLab CI — UAT+PRD pipeline + hardening (2026-08-05)
+
+> แผน: [`docs/GitLab-CI-Plan.md`](docs/GitLab-CI-Plan.md) · Variables: [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md)
+
+### Pipeline
+- [x] **`.gitlab-ci.yml`** — UAT (`staging` → `.115`) + PRD (`main`/`master` → build `.115`, transfer, deploy `.128`)
+- [x] **`test:frontend`** / **`test:backend`** — FE lint + BE eslint (ห้าม `--fix`) + jest; fail = หยุด pipeline
+- [x] **Deploy health check** — หลัง `docker run -d` ตรวจ Running + logs เมื่อ fail (UAT+PRD)
+- [x] **`transfer:prd:images` verify** — `export DOCKER_HOST` ทั้ง session ก่อน `docker images`
+- [x] **cleanup `needs`** — ไม่ติดคิวรอ manual deploy
+- [x] **`docker_build:uat`** auto · **`deploy:uat:docker`** manual
+- [x] **`docker_build:prd`** → **`transfer:prd:images`** → **`deploy:prd:docker`** manual
+- [x] **`transfer:prd:images`** — `docker load` บน `.128` ผ่าน **`DOCKER_HOST_PRD`**
+- [x] **`.deploy_ssh_and_validate`** — ตรวจ `DATABASE_URL`, `JWT_SECRET`, `NEXTAUTH_*`, `FRONTEND_BASE_URL`, `ALLOWED_ORIGINS` ก่อน deploy
+
+### Backend tests (CI gate)
+- [x] Mock `PrismaService` / Guards ใน `areas` + `sites` spec ให้ `npm test` ผ่านใน CI
+
+### เอกสาร
+- [x] Sync `docs/GitLab-CI-Plan.md`, `docs/GitLab-CI-Variables-Checklist.md`, `docs/DTRS-Migration-Checklist.md`, `docs/README.md`, `README.md`, `TASK.md`
+
+### ค้าง
+- [ ] ตั้ง GitLab Variables บน UI + ทดสอบ pipeline / deploy จริง

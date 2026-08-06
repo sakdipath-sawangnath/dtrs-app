@@ -46,6 +46,14 @@ Backend API สำหรับ **ระบบแจ้งซ่อม CCTV** —
 
 ## Project setup
 
+คัดลอก env ครั้งแรก:
+
+```bash
+copy .env.example .env
+```
+
+แก้ `DATABASE_URL` (DB **`dtrs_app`**), `MINIO_BUCKET_NAME` (**`dtrs-app`**), secrets — ดู [`.env.example`](.env.example) และ [../docs/DTRS-Migration-Checklist.md](../docs/DTRS-Migration-Checklist.md)
+
 ```bash
 $ npm install
 ```

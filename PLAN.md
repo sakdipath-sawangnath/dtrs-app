@@ -22,7 +22,7 @@
 | **Seed – Areas** | `Area` (district, staffId) | Sheet **"พื้นที่ รับผิดชอบ"** (ในโค้ดใช้ชื่อ **"พื้นที่ รับผิชอบ"** — ตรวจสอบชื่อชีทจริงในไฟล์ Excel) |
 
 **ข้อควรทำ**
-- วางไฟล์ **`ระบบแจ้งซ่อม CCTV .xlsx`** ที่ root โปรเจกต์ (`d:\cctv-app.forth.co.th\`) เพื่อให้ seed script อ่านได้
+- วางไฟล์ **`ระบบแจ้งซ่อม CCTV .xlsx`** ที่ root โปรเจกต์ (เช่น `d:\dtrs-app\`) เพื่อให้ seed script อ่านได้
 - ให้ชื่อ Sheet ใน Excel ตรงกับที่ seed ใช้:
   - **"พื้นที่ ในโครงการ"** → Sites (จังหวัด, อำเภอ, หน่วยงาน)
   - **"พื้นที่ รับผิชอบ"** หรือ **"พื้นที่ รับผิดชอบ"** → Areas (อำเภอ, Site Engineer, เบอร์ติดต่อ)
@@ -130,7 +130,7 @@
 
 ## 4.5 GitLab CI, Docker, production URL & build (2026-03-23)
 
-- [x] **`.gitlab-ci.yml`** — stages: build (frontend+backend), deploy (สรุป), deploy_docker (build image + SSH `docker run`), cleanup (manual); map พอร์ต **8309:3000**, **8310:4000**; container แยก **`cctv-app-ticket-frontend`** / **`cctv-app-ticket-backend`**
+- [x] **`.gitlab-ci.yml`** — stages: build (frontend+backend), deploy (สรุป), deploy_docker (build image + SSH `docker run`), cleanup (manual); map พอร์ต **8404:3000**, **8405:4100**; container แยก **`dtrs-app-frontend`** / **`dtrs-app-backend`**; PRD **`https://dtrs-app.forth.co.th`**
 - [x] **`backend/Dockerfile` + `frontend/Dockerfile`** — multi-stage build; backend runtime `dumb-init` + **`node dist/src/main.js`** (สอดคล้องผล `nest build` ใต้ `dist/src/`)
 - [x] **ตัวแปร CI** — `FRONTEND_BASE_URL` รวมบทบาทเดิมของ `FRONTEND_URL_PRD` + ใช้กับ backend PDF
 - [x] **เอกสาร production** — โดเมนเดียว + `/api` + proxy **`/socket.io`**; ตัวอย่าง `MINIO_PUBLIC_URL` (เช่น minio-it.forth.co.th) ใน `README.md`
@@ -170,6 +170,15 @@
 - [x] Infra default: **`MINIO_ENSURE_PUBLIC_READ_POLICY=false`** — ลบ policy public เดิมบน MinIO ด้วยมือถ้าเคยเปิดไว้
 - [ ] ทดสอบ PRD ตาม checklist ใน **[`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md)**
 - [x] เอกสารประกอบ — `docs/README.md`, อัปเดต `README.md` / `AGENTS.md` / `AGENT_INSTRUCTIONS.md` / Postman / RBAC / Email-Notifications / CSV mapping
+
+## 4.11 Migration fork → `dtrs-app` (2026-08-05)
+
+> Checklist: [`docs/DTRS-Migration-Checklist.md`](docs/DTRS-Migration-Checklist.md)
+
+- [x] Remote GitLab `FORTH/dtrs-app`; แยกชื่อ container/image/network จาก `cctv-app_ticket`; CI ไม่ลบ container เก่า
+- [x] `backend/.env.example`, `frontend/.env.example`; local env → DB `dtrs_app`, MinIO `dtrs-app`, `API_INTERNAL_BASE_URL` สำหรับ dev
+- [x] ทดสอบ npm dev — backend `:4100`, frontend `:3000`
+- [ ] GitLab Variables + NPM (`dtrs-app.forth.co.th` → 8404/8405) + deploy ครั้งแรก
 
 ---
 

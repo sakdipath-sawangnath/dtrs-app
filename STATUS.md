@@ -1,8 +1,10 @@
 # Project Status - ระบบแจ้งซ่อม CCTV
 
-**วันที่อัปเดตสถานะ:** 2026-05-13
+**วันที่อัปเดตสถานะ:** 2026-08-05
 
-**ดัชนีเอกสาร:** [`README.md`](README.md) (ตารางสรุป), [`docs/README.md`](docs/README.md), [`minio.md`](minio.md), [`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md), [`docs/Job-Serial-Multi-Row.md`](docs/Job-Serial-Multi-Row.md), [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md)
+**Migration (`cctv-app_ticket` → `dtrs-app`):** ดู [`docs/DTRS-Migration-Checklist.md`](docs/DTRS-Migration-Checklist.md) — P0 โค้ด ✅ · GitLab CI UAT+PRD ✅ implement ใน [`.gitlab-ci.yml`](.gitlab-ci.yml) · ตั้ง Variables + NPM/deploy จริง ค้าง
+
+**ดัชนีเอกสาร:** [`README.md`](README.md) (ตารางสรุป), [`docs/README.md`](docs/README.md), [`docs/DTRS-Migration-Checklist.md`](docs/DTRS-Migration-Checklist.md), [`docs/GitLab-CI-Plan.md`](docs/GitLab-CI-Plan.md), [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md), [`minio.md`](minio.md), [`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md), [`docs/Job-Serial-Multi-Row.md`](docs/Job-Serial-Multi-Row.md), [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md)
 
 ---
 
@@ -78,7 +80,7 @@
 
 ---
 
-## 🔑 API Endpoints (localhost:4000/api)
+## 🔑 API Endpoints (localhost:4100/api)
 
 | Method | Path | Auth | คำอธิบาย |
 |--------|------|------|-----------|
@@ -180,7 +182,9 @@ npx ts-node scripts/seed-roles-permissions.ts
 - **ตั้งค่าอีเมล (SMTP) + Reopen (2026-03-22)**: API ตั้งค่า SMTP (ADMIN); **`PATCH /jobs/:id/fix`** และ **`PATCH /jobs/:id/reopen`** — เฉพาะผู้รับงาน; Frontend หน้า settings + Reopen ยืนยันก่อนเรียก API; `@nestjs/cli` v11; `JobsList` แท็บสัญญา/นอกสัญญาไม่ห่อ glass ชั้นนอก
 - **เทมเพลตอีเมลแจ้งงาน + Role (2026-03-24)**: `GET/PUT /settings/email-templates`, `JobEmailNotificationService`, HTML โทนสว่าง + badge สถานะ; เอกสาร flow: [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
 - **UI Modal + บทบาท (2026-03-24, อัปเดตล่าสุด 2026-05-13)**: `CrudModal` — `Dialog` + portal, `z-100`, Dark Glass; `/dashboard/roles` — `form-input-glass` + modal กำหนดสิทธิ์ (`size="lg"`)
-- **Deploy / CI (2026-03-23)**: **GitLab CI** (`.gitlab-ci.yml`) + **`Dockerfile`** — build แยก frontend/backend ใน pipeline, image production รัน Nest + Next; พอร์ต host ตัวอย่าง **8309→3000**, **8310→4000**; ตัวแปร **`FRONTEND_BASE_URL`** แทน `FRONTEND_URL_PRD`; คู่มือ production โดเมนเดียว + `/api` + `/socket.io` และ `MINIO_PUBLIC_URL` สรุปใน `README.md`; (2026-03-28) pipeline ส่ง **`MINIO_SERVER_FETCH_BASE_URL`** เข้า backend ได้เมื่อตั้งใน GitLab Variables
+- **Deploy / CI (2026-03-23)**: **GitLab CI** (`.gitlab-ci.yml`) + **`Dockerfile`** — build แยก frontend/backend; พอร์ต host **8404→3000**, **8405→4100**; **`FRONTEND_BASE_URL`**; production โดเมนเดียว + `/api` + `/socket.io`; pipeline ส่ง **`MINIO_SERVER_FETCH_BASE_URL`** เข้า backend เมื่อตั้งใน GitLab Variables — รายละเอียด PRD ใน `README.md`
+- **GitLab CI UAT+PRD (2026-08-05)**: pipeline **`test` → `build` → `deploy_docker`** — branch **`staging`** (UAT `nurdin@192.168.0.115`) / **`main`/`master`** (PRD build `.115` → **`transfer:prd:images`** ด้วย **`DOCKER_HOST_PRD`** + `docker load` → deploy `nurdin@192.168.0.128`); **`docker_build:uat`** auto · **`deploy:*:docker`** manual; **`.deploy_ssh_and_validate`** ตรวจกลุ่ม A ก่อน deploy; แผน [`docs/GitLab-CI-Plan.md`](docs/GitLab-CI-Plan.md) · Variables [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md)
+- **CI hardening (2026-08-06)**: deploy **health check** (container Running + logs); transfer verify ใช้ `export DOCKER_HOST`; **`test:backend`** รัน eslint ห้าม `--fix`; cleanup **`needs`** ไม่รอ manual deploy; docs บังคับ **`prisma migrate deploy`** ก่อนกด deploy ครั้งแรก
 - **RBAC คิวงาน (2026-03-30)**: `PATCH /jobs/:id/assign`, `PATCH /jobs/:id/out-of-contract`, และลบ `PENDING` ไม่มอบหมายใน **`DELETE /jobs/:id`** ใช้ **`getPermissionsForUser`** สอดคล้อง `/dashboard/roles`; `JobsList` แสดงปุ่มมอบหมาย/ย้ายนอกสัญญาตาม **`job.assign`**
 - **RBAC API เต็มชุด (2026-03-31)**: `roles` / `users` / `settings` → **`menu.roles`**, **`menu.users`**, **`menu.settings`**; `PATCH /jobs/:id/status` → **`job.updateStatus`**; ลบ IN_PROGRESS → **`job.deleteInProgress`**; `POST /areas` → **`site.create`**; `RBAC_ROLE_PERMISSION_CODES` ร่วมกับ `PermissionsGuard`; `JobsService` ใช้ `RolesService.getPermissionsForUser`
 - **Serial หลายอุปกรณ์ + MinIO orphan + พิมพ์ (2026-04-02)**: `oldSerialNumber`/`newSerialNumber` รองรับ JSON หลายแถว (สูงสุด 4) + migration `TEXT`; หน้า settings — `POST /settings/minio/orphans/scan|delete`, retention 7 วัน; PDF — หัวข้อรายการอุปกรณ์แยกบรรทัดจากแถวแรก; `GET /settings/default-pass` คืน `password` ให้หน้า settings — เอกสาร [`docs/Job-Serial-Multi-Row.md`](docs/Job-Serial-Multi-Row.md), [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md)
@@ -190,11 +194,16 @@ npx ts-node scripts/seed-roles-permissions.ts
 - **Backend Docker entry (Nest + nodenext)**: image backend ใช้ **`node dist/src/main.js`** — ไม่ใช่ `dist/main.js`; สาเหตุเดิมของ error PRD `MODULE_NOT_FOUND` คือ path entry ไม่ตรงกับผล compile
 - **Frontend build (2026-03-23)**: `apiResponse.ts`; **`/public/report`** ใช้ `<Suspense>` รอบ `useSearchParams` เพื่อให้ `next build` ผ่าน
 - **Deploy PRD (2026-03-23 ต่อ):** `next.config.mjs` (ไม่ต้องมี TypeScript ใน runner image); **`API_INTERNAL_BASE_URL`** สำหรับ `authorize()` → backend ใน Docker network; GitLab ส่ง **`ALLOWED_ORIGINS`** เข้า backend container
+- **MinIO bucket ใหม่ (`dtrs-app`):** ⏸️ **รอทีม infra สร้าง bucket บน MinIO server** — ชื่อตั้งใน `backend/.env` / `.env.example` แล้ว; ทดสอบอัปโหลดรูปและ deploy PRD ที่เกี่ยว MinIO ทำหลัง bucket พร้อม
 
 ---
 
 ## 🚀 แผนงานถัดไป (Phase 6)
 
+- [ ] ตั้ง GitLab CI/CD Variables กลุ่ม A (scope `staging` / `production`) — [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md)
+- [ ] ทดสอบ pipeline บน `staging` → manual deploy UAT → PRD (ยืนยันไม่ชน `cctv-app_ticket`)
+- [ ] NPM — `dtrs-app.forth.co.th` → 8404/8405
+- [ ] ⏸️ MinIO bucket **`dtrs-app-uat`** / **`dtrs-app`** — หลัง infra พร้อม
 - [ ] รัน Seed Script เพื่อเตรียมข้อมูลจริงเข้าสู่ Production (และ seed-admin ถ้ายังไม่มี admin)
 - [ ] ติดตั้ง Socket.io บน Frontend เพื่อ Real-time Notifications
 - [x] ระบบออกรายงาน PDF / พิมพ์ — ใช้หน้า `/print/jobs/[id]` + เทมเพลต + `print.css` (แทนการดาวน์โหลด html2canvas บนหน้ารายละเอียด); ปรับแต่ง layout เพิ่มเติมทำได้เป็นงานต่อยอด

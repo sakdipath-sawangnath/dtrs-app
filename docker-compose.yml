@@ -1,6 +1,6 @@
-# รันแยก Frontend + Backend สำหรับทดสอบ / ตรวจสอบ (พอร์ต: 8309 = Next, 8310 = Nest)
+# รันแยก Frontend + Backend สำหรับทดสอบ / ตรวจสอบ (พอร์ต: 8404 = Next, 8405 = Nest)
 # ตัวอย่าง: set NEXT_PUBLIC_API_BASE_URL แล้ว build
-#   set NEXT_PUBLIC_API_BASE_URL=http://localhost:8310/api
+#   set NEXT_PUBLIC_API_BASE_URL=http://localhost:8405/api
 #   docker compose build --build-arg NEXT_PUBLIC_API_BASE_URL=%NEXT_PUBLIC_API_BASE_URL%
 # หรือใช้ไฟล์ .env ข้าง compose (ดู README)
 #   docker compose --env-file .env.docker up -d --build
@@ -22,15 +22,15 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: cctv-app-ticket-backend
+    container_name: dtrs-app-backend
     restart: unless-stopped
     tmpfs:
       - /tmp:rw,noexec,nosuid
     ports:
-      - "8310:4000"
+      - "8405:4100"
     environment:
       NODE_ENV: production
-      PORT: "4000"
+      PORT: "4100"
     # ไม่มี volumes: — ไม่ผูก path บน host
     deploy:
       resources:
@@ -49,19 +49,20 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8310/api}
-    container_name: cctv-app-ticket-frontend
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8405/api}
+    container_name: dtrs-app-frontend
     restart: unless-stopped
-    # ลดความเสี่ยงรัน binary จาก /tmp (ให้ใช้คู่กับ deploy ผ่าน NPM + ปิดพอร์ต 8309 ที่ firewall)
+    # ลดความเสี่ยงรัน binary จาก /tmp (ให้ใช้คู่กับ deploy ผ่าน NPM + ปิดพอร์ต 8404 ที่ firewall)
     tmpfs:
       - /tmp:rw,noexec,nosuid
     ports:
-      - "8309:3000"
+      - "8404:3000"
     environment:
       NODE_ENV: production
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:8309}
-      # ให้ตรงกับ service name + PORT ของ backend ใน compose (server-side login)
-      API_INTERNAL_BASE_URL: ${API_INTERNAL_BASE_URL:-http://backend:4000/api}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:8404}
+      # service name ใน compose = `backend` (คนละแบบกับ CI ที่ใช้ชื่อ container `dtrs-app-backend`)
+      API_INTERNAL_BASE_URL: ${API_INTERNAL_BASE_URL:-http://backend:4100/api}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-}
     depends_on:
       - backend
     # ไม่มี volumes: — ไม่ผูก path บน host

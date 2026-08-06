@@ -1,6 +1,17 @@
-# CCTV Maintenance System
+# CCTV Maintenance System (dtrs-app)
 
 ระบบแจ้งปัญหาและระบบจัดการการซ่อมบำรุงกล้องวงจรปิด (CCTV) ซึ่งพัฒนาต่อเนื่องมาจากการใช้งานผ่าน AppSheet
+
+**Production:** [`https://dtrs-app.forth.co.th`](https://dtrs-app.forth.co.th) · API ที่ `/api` · GitLab `FORTH/dtrs-app`
+
+## บันทึกการอัปเดตล่าสุด (2026-08-05)
+
+- **Migration `cctv-app_ticket` → `dtrs-app`** — ดัชนีและสถานะ: [`docs/DTRS-Migration-Checklist.md`](docs/DTRS-Migration-Checklist.md) · แผน CI: [`docs/GitLab-CI-Plan.md`](docs/GitLab-CI-Plan.md) · Variables: [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md)
+- **GitLab CI/CD (UAT + PRD)** — [`.gitlab-ci.yml`](.gitlab-ci.yml): stages `test` → `build` → `deploy` → `deploy_docker` → `cleanup`; branch **`staging`** (UAT บน `nurdin@192.168.0.115`) / **`main`/`master`** (PRD บน `nurdin@192.168.0.128`); build image บน **`.115`**; PRD **transfer** (`save`/`scp`/`load` ด้วย **`DOCKER_HOST_PRD`**) แล้ว **manual deploy**; gate **`test:frontend`** (lint) + **`test:backend`** (jest); **`.deploy_ssh_and_validate`** ตรวจกลุ่ม A ก่อน deploy (ดู checklist Variables)
+- **P0 โค้ด** — Docker/CI/compose ใช้ชื่อ `dtrs-app-*`, host ports **8404/8405**, backend ภายใน container **4100**, deploy path UAT/PRD `/home/nurdin/dtrs-app`
+- **Local env** — `backend/.env.example`, `frontend/.env.example`; คัดลอกเป็น `.env` / `.env.local` แล้วตั้งค่า dev (DB `dtrs_app`, `API_INTERNAL_BASE_URL=http://localhost:4100/api`)
+- **MinIO bucket `dtrs-app`** — ⏸️ **รอทีม infra สร้าง bucket บน server** (ชื่อใน config แล้ว; ยังไม่ทดสอบอัปโหลด)
+- **ทดสอบ local (npm)** — `npx prisma generate`, backend `:4100/api`, frontend `:3000` ผ่าน; ขั้นถัดไป: ตั้ง GitLab Variables กลุ่ม A (scope `staging`/`production`) + NPM + ทดสอบ pipeline บน `staging`
 
 ## บันทึกการอัปเดตล่าสุด (2026-05-13)
 
@@ -22,7 +33,7 @@
 ## บันทึกการอัปเดตล่าสุด (2026-05-10)
 
 - **Docker / hardening — image** — [`frontend/Dockerfile`](frontend/Dockerfile) และ [`backend/Dockerfile`](backend/Dockerfile): หลัง `COPY` และ `chown -R node:node /app` ใช้ **`USER node`** (ไม่รัน process เป็น root ในแอป)
-- **`docker-compose.yml`** — นอกจาก **limits CPU/RAM** และ **`pids_limit`** แล้ว มี **`tmpfs: /tmp:rw,noexec,nosuid`** ทั้ง **frontend** และ **backend** (ลดความเสี่ยงรัน executable จาก `/tmp` ในแท็บเล็กเมื่อ expose public); ถ้าใช้ `docker run` แยก ให้เพิ่ม `--tmpfs /tmp:rw,noexec,nosuid` และจำกัดทรัพยากรตามนโยบาย (ตัวอย่าง frontend: **`--cpus=.5`**, **`--memory=512m`** คู่ map พอร์ต **8309:3000**)
+- **`docker-compose.yml`** — นอกจาก **limits CPU/RAM** และ **`pids_limit`** แล้ว มี **`tmpfs: /tmp:rw,noexec,nosuid`** ทั้ง **frontend** และ **backend** (ลดความเสี่ยงรัน executable จาก `/tmp` ในแท็บเล็กเมื่อ expose public); ถ้าใช้ `docker run` แยก ให้เพิ่ม `--tmpfs /tmp:rw,noexec,nosuid` และจำกัดทรัพยากรตามนโยบาย (ตัวอย่าง frontend: **`--cpus=.5`**, **`--memory=512m`** คู่ map พอร์ต **8404:3000**)
 - **`npm audit` / dependency** — รัน `npm run security:audit` / `security:audit:prod` ใน `frontend/` และ `backend/`; โปรเจกต์ใช้ **`overrides`** ใน [`frontend/package.json`](frontend/package.json) (เช่น `postcss` ให้อยู่ในเวอร์ชันที่ advisory ว่าแก้แล้ว) และ [`backend/package.json`](backend/package.json) (แก้ transitive + สคริปต์ seed/migrate ใช้ **exceljs** แทน `xlsx` ในเครื่อง dev) — รายละเอียดเชิงเทคนิคใน commit / log อย่าวาง credential ใน repo
 - **หน้า public ตรวจสอบสถานะ** — [`/public/status`](frontend/src/app/public/status/page.tsx): ค้นตามเบอร์หรือเลขที่ใบ; API **`GET /public/jobs/status-by-phone`** และ **`GET /public/jobs/status/:ticketNo`** คืนฟิลด์ **`cause`** และ **`fixMethod`** (จากผู้ซ่อมเมื่อปิดงาน) — UI แสดงปุ่มดูสาเหตุ/วิธีแก้และการ์ดรายละเอียด
 
@@ -68,14 +79,14 @@
 
 - **RBAC เมนู (Sidebar)** — `DashboardLayoutShell` ดึง `GET /roles/me/permissions` แล้ว **แกะ `data` ตาม ResponseInterceptor** (`unwrapApiData` ใน `src/lib/apiResponse.ts`); ถ้ากรองตาม permission แล้วไม่มีรายการใน sidebar (เช่น มีแค่ `menu.profile`) จะ **fallback ตามบทบาท**; role ใน session ใช้ **uppercase**; เมนูภาพรวม/กำลังแก้ไข/ประวัติ/นอกสัญญา รวม **SUPERVISOR** ให้สอดคล้อง STAFF
 - **Deploy PRD — Next.js** — ใช้ **`next.config.mjs`** แทน `.ts` เพื่อไม่ให้ image production (`npm prune --omit=dev`) ต้องมี `typescript` ตอน `next start`
-- **Deploy PRD — NextAuth → Backend** — ตั้ง **`API_INTERNAL_BASE_URL`** (เช่น `http://cctv-app-ticket-backend:4000/api`) ใน container frontend เพื่อให้ `authorize()` เรียก backend ใน Docker network แทน public URL (กัน **ConnectTimeout / hairpin** ไปโดเมน PRD)
+- **Deploy PRD — NextAuth → Backend** — ตั้ง **`API_INTERNAL_BASE_URL`** (เช่น `http://dtrs-app-backend:4100/api`) ใน container frontend เพื่อให้ `authorize()` เรียก backend ใน Docker network แทน public URL (กัน **ConnectTimeout / hairpin** ไปโดเมน PRD)
 - **Deploy PRD — CORS** — GitLab CI ส่ง **`ALLOWED_ORIGINS`** เข้า backend container; ตั้งค่าใน GitLab Variables เป็น origin จริงของเว็บ (คั่นด้วย comma)
-- **GitLab CI/CD** — `.gitlab-ci.yml`: stages `build` → `deploy` → `deploy_docker` → `cleanup`; build แยก `frontend` / `backend`; build image **สองตัว** บน Docker daemon PRD (`cctv-app-ticket-frontend`, `cctv-app-ticket-backend`); SSH รัน **สอง container** + network `cctv-app-ticket-net` — map **8309→3000** (Next.js), **8310→4000** (NestJS)
+- **GitLab CI/CD** — ดูบันทึก **2026-08-05** ด้านบน (UAT+PRD, manual deploy, validate env); รายละเอียดเต็มใน [`docs/GitLab-CI-Plan.md`](docs/GitLab-CI-Plan.md)
 - **Docker** — `backend/Dockerfile` + `frontend/Dockerfile` + `docker-compose.yml` (รันทดสอบแยกคอนเทนเนอร์); build frontend ใช้ `--build-arg NEXT_PUBLIC_API_BASE_URL=...`
 - **PDF บน PRD (Puppeteer)** — backend image ต้องมี **Chromium/Chrome** ใน runtime; ใน `JobsPdfService` จะ fallback หา Chrome/Edge ที่ติดตั้งในเครื่อง (ตรวจ env `PUPPETEER_EXECUTABLE_PATH`/`CHROME_BIN` ก่อน) เพื่อกัน error `Could not find Chrome ...` บน production และ local
 - **Backend ใน container** — รันด้วย `node dist/src/main.js` (และ `npm run start:prod` ชี้ path เดียวกัน) เพราะ TypeScript ใช้ `module: "nodenext"` ทำให้ผล `nest build` อยู่ใต้ `dist/src/` ไม่ใช่ `dist/main.js` — ถ้า PRD ขึ้น `Cannot find module '/app/dist/main.js'` ให้ตรวจว่า image มาจาก commit ที่แก้ Dockerfile แล้ว และไม่ override `command` เป็น path เก่า
 - **ตัวแปร CI (GitLab)** — ใช้ **`FRONTEND_BASE_URL`** เดียวสำหรับลิงก์ Environment, ส่งเข้า container และ `JobsPdfService` (ไม่แยก `FRONTEND_URL_PRD`); รายการตัวแปรอื่นดูคอมเมนต์ใน `.gitlab-ci.yml`
-- **Production โดเมนเดียว (ตัวอย่าง)** — เว็บ `https://cctv-app.forth.co.th` + API ที่ **`/api`**: ตั้ง `NEXT_PUBLIC_API_BASE_URL=https://cctv-app.forth.co.th/api`, `NEXTAUTH_URL`, `ALLOWED_ORIGINS`, `FRONTEND_BASE_URL` ให้สอดคล้อง origin จริง; reverse proxy ต้องส่งต่อ **`/socket.io`** ไป backend (Socket.IO ไม่อยู่ใต้ `/api`); รายละเอียด path **Nginx Proxy Manager** (แยก `/api/auth`, `/api/print-jobs` → Next **8309**; `/api/` + `/socket.io` → Nest **8310**) ดู `backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md` — รูปหน้าพิมพ์ใช้ **`/job-images/...`** บน Next (ไม่อยู่ใต้ `/api`) จึงไม่ต้องแยก NPM เพิ่ม; ถ้าต้องการ alias ใต้ `/api` ค่อยแยก **`/api/job-images`**
+- **Production โดเมนเดียว** — เว็บ **`https://dtrs-app.forth.co.th`** + API ที่ **`/api`**: ตั้ง `NEXT_PUBLIC_API_BASE_URL=https://dtrs-app.forth.co.th/api`, `NEXTAUTH_URL=https://dtrs-app.forth.co.th`, `ALLOWED_ORIGINS=https://dtrs-app.forth.co.th`, `FRONTEND_BASE_URL=https://dtrs-app.forth.co.th` ให้สอดคล้อง origin จริง; reverse proxy ต้องส่งต่อ **`/socket.io`** ไป backend (Socket.IO ไม่อยู่ใต้ `/api`); รายละเอียด path **Nginx Proxy Manager** (แยก `/api/auth`, `/api/print-jobs` → Next **8404**; `/api/` + `/socket.io` → Nest **8405**) ดู `backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md` — รูปหน้าพิมพ์ใช้ **`/job-images/...`** บน Next (ไม่อยู่ใต้ `/api`) จึงไม่ต้องแยก NPM เพิ่ม; ถ้าต้องการ alias ใต้ `/api` ค่อยแยก **`/api/job-images`**
 - **MINIO_PUBLIC_URL (ตัวอย่าง)** — เช่น `https://minio-it.forth.co.th` สำหรับ URL รูปที่ browser โหลดได้ (ค่าจริงใส่เฉพาะ `.env` / GitLab Variables)
 - **MINIO_SERVER_FETCH_BASE_URL (ถ้าจำเป็น)** — เช่น `http://192.168.0.71:9000` ให้ **Nest โหลดรูปจาก MinIO ภายใน LAN** เมื่อ DNS ภายในชี้ `MINIO_PUBLIC_URL` ไป IP ที่ไม่มี HTTPS :443 แต่ MinIO รับที่ :9000 (แก้ 502 ที่ `/jobs/.../image/...` บน PRD)
 - **Git** — `.gitignore` ที่ root กำหนดขอบเขตขึ้น repo: `backend/`, `frontend/`, `docs/`, `README.md`, `minio.md`, `PLAN.md`, `TASK.md`, `STATUS.md`, `AGENTS.md`, `AGENT_INSTRUCTIONS.md`, `.gitlab-ci.yml`, `docker-compose.yml`, `.dockerignore`, `docker/`
@@ -103,6 +114,9 @@
 | [`STATUS.md`](STATUS.md) | สถานะระบบและสรุป API |
 | [`PLAN.md`](PLAN.md), [`TASK.md`](TASK.md) | แผนและงาน |
 | [`docs/README.md`](docs/README.md) | ดัชนีโฟลเดอร์ `docs/` |
+| [`docs/DTRS-Migration-Checklist.md`](docs/DTRS-Migration-Checklist.md) | Checklist ย้ายจาก `cctv-app_ticket` |
+| [`docs/GitLab-CI-Plan.md`](docs/GitLab-CI-Plan.md) | แผน + implement GitLab CI (UAT+PRD) |
+| [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md) | Checklist ตั้ง GitLab CI/CD Variables |
 | [`docs/templates/README.md`](docs/templates/README.md) | เทมเพลตแอปใหม่ — AGENTS + Skills + checklist (คัดลอกทั้งโฟลเดอร์ได้) |
 | [`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md) | Private MinIO + proxy รูป + checklist QA |
 | [`minio.md`](minio.md) | ตัวแปร MinIO และหมายเหตุ bucket |
@@ -145,6 +159,7 @@
 
 เพื่อให้ AI Agent ทำงานได้ถูกต้องและสอดคล้องมาตรฐานโปรเจกต์ทุกครั้ง:
 
+- **CRITICAL SAFETY RULES** — อ่านส่วนนี้ใน [`AGENTS.md`](AGENTS.md) ก่อน (ลำดับความสำคัญสูงสุด: ขอบเขต workspace, โปรโตคอลก่อนลบ, ห้ามคำสั่งทำลาย/recursive, git safety)
 - อ่าน `AGENT_INSTRUCTIONS.md` ก่อนเริ่มงาน (มี bootstrap + security gate)
 - ใช้ checklist/Definition of Done ใน `AGENTS.md` เป็นเกณฑ์ก่อนส่งงาน
 - งาน UI/UX ให้ยึด `frontend/.agents/skills/ui-ux-pro-max/SKILL.md`
@@ -161,16 +176,21 @@
    ```bash
    npm install
    ```
-3. รัน Database Migration และ Generate Prisma Client (ระบบเชื่อมต่อ MySQL database `cctv_app_db` อัตโนมัติในไฟล์ `.env`):
+3. คัดลอก env และตั้งค่า (ครั้งแรก):
+   ```bash
+   copy .env.example .env
+   ```
+   แก้ `DATABASE_URL` → DB **`dtrs_app`**, `MINIO_BUCKET_NAME` → **`dtrs-app`**, secrets อื่นตาม [`../docs/DTRS-Migration-Checklist.md`](../docs/DTRS-Migration-Checklist.md)
+4. รัน Generate Prisma Client (ระบบเชื่อมต่อ MySQL database `dtrs_app` จาก `.env`):
    ```bash
    npx prisma generate
    npx prisma db push
    ```
-4. เริ่มต้นเซิร์ฟเวอร์ Backend:
+5. เริ่มต้นเซิร์ฟเวอร์ Backend:
    ```bash
    npm run start:dev
    ```
-   *เซิร์ฟเวอร์จะรันที่พอร์ต `http://localhost:4000/api`*
+   *เซิร์ฟเวอร์จะรันที่พอร์ต `http://localhost:4100/api`*
 
 ### 2. การตั้งค่า Frontend (Next.js)
 
@@ -182,7 +202,12 @@
    ```bash
    npm install
    ```
-3. เริ่มต้นเซิร์ฟเวอร์ Frontend:
+3. คัดลอก env (ครั้งแรก):
+   ```bash
+   copy .env.example .env.local
+   ```
+   ค่า dev แนะนำ: `NEXT_PUBLIC_API_BASE_URL=http://localhost:4100/api`, `NEXTAUTH_URL=http://localhost:3000`, `API_INTERNAL_BASE_URL=http://localhost:4100/api` (ดู `.env.example`)
+4. เริ่มต้นเซิร์ฟเวอร์ Frontend:
    ```bash
    npm run dev
    ```

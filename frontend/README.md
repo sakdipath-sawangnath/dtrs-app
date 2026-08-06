@@ -63,10 +63,21 @@ npm run build
 
 ```bash
 npm install
+copy .env.example .env.local
 npm run dev
 ```
 
-เปิด [http://localhost:3000](http://localhost:3000) (Backend ต้องรันที่ `http://localhost:4000/api`)
+เปิด [http://localhost:3000](http://localhost:3000) (Backend ต้องรันที่ `http://localhost:4100/api`)
+
+**ตัวแปร env (local):**
+
+| ตัวแปร | ค่า dev |
+|--------|---------|
+| `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:4100/api` |
+| `NEXTAUTH_URL` | `http://localhost:3000` |
+| `API_INTERNAL_BASE_URL` | `http://localhost:4100/api` (NextAuth / route ฝั่ง server) |
+
+PRD/Docker: ดูคอมเมนต์ใน [`.env.example`](.env.example) และ [../docs/DTRS-Migration-Checklist.md](../docs/DTRS-Migration-Checklist.md)
 
 ## เอกสารเพิ่มเติม
 

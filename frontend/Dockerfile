@@ -2,7 +2,7 @@
 # build-arg NEXT_PUBLIC_API_BASE_URL ต้องเป็น URL ที่เบราว์เซอร์เรียก API ได้
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
-ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:4000/api
+ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:4100/api
 ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY package*.json ./

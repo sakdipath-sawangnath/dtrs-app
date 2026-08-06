@@ -1,12 +1,23 @@
-# GitLab CI/CD — CCTV Maintenance (อ้างอิงโครงสร้าง usb-request-management)
-# ตั้งค่าใน GitLab: SSH_PRIVATE_KEY, DATABASE_URL, JWT_SECRET, NEXTAUTH_SECRET, NEXTAUTH_URL,
-#   NEXT_PUBLIC_API_BASE_URL (URL ที่ client เรียก API — ควรตรงพอร์ตที่ map ไป backend เช่น :8310/api),
-#   FRONTEND_BASE_URL (URL หน้าเว็บ PRD — ใช้ทั้ง GitLab Environment, คอนเทนเนอร์, และ backend PDF/Puppeteer)
-#   API_INTERNAL_BASE_URL (optional override — default ในไฟล์นี้ชี้ไป backend บน Docker network สำหรับ NextAuth authorize)
-#   ALLOWED_ORIGINS (คั่นด้วย comma — origin ของ frontend สำหรับ CORS ใน production)
-#   ตัวแปร MinIO/SMTP ตาม backend
+# GitLab CI/CD — dtrs-app
+# UAT: branch staging → http://192.168.0.115:8404 (manual deploy)
+# PRD: branch main/master → https://dtrs-app.forth.co.th (manual deploy)
+#
+# GitLab CI/CD Variables (ใช้ environment scope staging / production ตาม job):
+#   SSH_PRIVATE_KEY, DATABASE_URL, JWT_SECRET, NEXTAUTH_SECRET, NEXTAUTH_URL,
+#   NEXT_PUBLIC_API_BASE_URL (build-arg frontend image), FRONTEND_BASE_URL,
+#   ALLOWED_ORIGINS, MINIO_*, SMTP_TLS_REJECT_UNAUTHORIZED, CRON_SECRET
+#   API_INTERNAL_BASE_URL — default ในไฟล์นี้ (NextAuth server-side → backend บน Docker network)
+#
+# อ้างอิง: docs/GitLab-CI-Plan.md, docs/GitLab-CI-Variables-Checklist.md
+
+workflow:
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^feat\/.*$/'
+      when: never
+    - when: always
 
 stages:
+  - test
   - build
   - deploy
   - deploy_docker
@@ -14,29 +25,146 @@ stages:
 
 variables:
   NODE_VERSION: "20"
-  # Next.js server-side fetch (authorize → backend) ใช้ชื่อ service บน Docker network — กัน ConnectTimeout ไป public URL จากใน container
-  API_INTERNAL_BASE_URL: "http://cctv-app-ticket-backend:4000/api"
+  API_INTERNAL_BASE_URL: "http://dtrs-app-backend:4100/api"
 
-  # Docker / Server PRD — image แยก frontend / backend
+  # Docker build server (EAS pattern)
+  DOCKER_HOST_BUILD: "tcp://192.168.0.115:2375"
   DOCKER_HOST_PRD: "tcp://192.168.0.128:2375"
-  APP_IMAGE_BACKEND: "cctv-app-ticket-backend"
-  APP_IMAGE_FRONTEND: "cctv-app-ticket-frontend"
+  DOCKER_HOST_UAT: "tcp://192.168.0.115:2375"
+
+  APP_IMAGE_BACKEND: "dtrs-app-backend"
+  APP_IMAGE_FRONTEND: "dtrs-app-frontend"
   IMAGE_TAG: "$CI_COMMIT_SHORT_SHA"
 
-  # SSH / Deploy target
-  DEPLOY_SERVER_PRD: "newbie@192.168.0.128"
-  DEPLOY_PATH_PRD: "/home/newbie/cctv-app-ticket"
+  DEPLOY_SERVER_UAT: "nurdin@192.168.0.115"
+  DEPLOY_PATH_UAT: "/home/nurdin/dtrs-app"
+  DEPLOY_SERVER_PRD: "nurdin@192.168.0.128"
+  DEPLOY_PATH_PRD: "/home/nurdin/dtrs-app"
 
-cache:
-  key: ${CI_COMMIT_REF_SLUG}
-  paths:
-    - frontend/node_modules/
-    - backend/node_modules/
+  FRONTEND_HOST_PORT: "8404"
+  BACKEND_HOST_PORT: "8405"
 
-# 1) BUILD — ตรวจว่า frontend/backend build ผ่าน (artifact ไม่ส่งต่อให้ Docker; image build จาก backend/Dockerfile + frontend/Dockerfile)
+  # Resource limits — sync กับ docker-compose.yml
+  BACKEND_CPUS: "1.50"
+  BACKEND_MEMORY: "1536m"
+  BACKEND_PIDS_LIMIT: "512"
+  FRONTEND_CPUS: "0.50"
+  FRONTEND_MEMORY: "512m"
+  FRONTEND_PIDS_LIMIT: "256"
+
+  CLEANUP_KEEP_IMAGES: "2"
+
+# --- Reusable templates ---
+
+.runner_docker:
+  tags:
+    - docker
+    - forth
+
+.ssh_setup:
+  before_script:
+    - apk add --no-cache openssh-client bash
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - |
+      if [ -z "$SSH_PRIVATE_KEY" ]; then
+        echo "ERROR: SSH_PRIVATE_KEY is not set (check GitLab CI/CD Variables + environment scope)"
+        exit 1
+      fi
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ci
+    - chmod 600 ~/.ssh/id_ci
+    - |
+      printf '%s\n' \
+        'Host *' \
+        '  IdentityFile ~/.ssh/id_ci' \
+        '  IdentitiesOnly yes' \
+        > ~/.ssh/config
+      chmod 600 ~/.ssh/config
+    - ssh-keyscan -H "${DEPLOY_SERVER#*@}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+.validate_deploy_env:
+  before_script:
+    - |
+      missing=""
+      [ -z "$DATABASE_URL" ] && missing="$missing DATABASE_URL"
+      [ -z "$JWT_SECRET" ] && missing="$missing JWT_SECRET"
+      [ -z "$NEXTAUTH_SECRET" ] && missing="$missing NEXTAUTH_SECRET"
+      [ -z "$NEXTAUTH_URL" ] && missing="$missing NEXTAUTH_URL"
+      [ -z "$FRONTEND_BASE_URL" ] && missing="$missing FRONTEND_BASE_URL"
+      [ -z "$ALLOWED_ORIGINS" ] && missing="$missing ALLOWED_ORIGINS"
+      if [ -n "$missing" ]; then
+        echo "ERROR: Missing required GitLab CI/CD Variables (check environment scope):$missing"
+        echo "See docs/GitLab-CI-Variables-Checklist.md"
+        exit 1
+      fi
+
+.deploy_ssh_and_validate:
+  extends: .ssh_setup
+  before_script:
+    - !reference [.ssh_setup, before_script]
+    - !reference [.validate_deploy_env, before_script]
+
+.rules_ci_branches:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "staging" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+
+.rules_staging:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "staging"'
+
+.rules_prd:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+
+# --- TEST ---
+
+test:frontend:
+  stage: test
+  extends:
+    - .runner_docker
+    - .rules_ci_branches
+  image: node:${NODE_VERSION}
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-frontend-test
+    paths:
+      - frontend/node_modules/
+  script:
+    - cd frontend
+    - npm ci --prefer-offline --no-audit
+    - npm run lint -- .
+
+test:backend:
+  stage: test
+  extends:
+    - .runner_docker
+    - .rules_ci_branches
+  image: node:${NODE_VERSION}
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-backend-test
+    paths:
+      - backend/node_modules/
+  script:
+    - cd backend
+    - npm ci --prefer-offline --no-audit
+    - npx prisma generate
+    # CI: lint แบบอ่านอย่างเดียว (ห้าม --fix) — script npm run lint มี --fix ติดมา
+    - npx eslint "{src,apps,libs,test}/**/*.ts"
+    - npm test
+
+# --- BUILD ---
+
 build:frontend:
   stage: build
+  extends:
+    - .runner_docker
+    - .rules_ci_branches
   image: node:${NODE_VERSION}
+  needs:
+    - job: test:frontend
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-frontend
+    paths:
+      - frontend/node_modules/
   script:
     - cd frontend
     - npm ci --prefer-offline --no-audit
@@ -47,13 +175,19 @@ build:frontend:
       - frontend/package.json
       - frontend/package-lock.json
     expire_in: 1 hour
-  only:
-    - main
-    - master
 
 build:backend:
   stage: build
+  extends:
+    - .runner_docker
+    - .rules_ci_branches
   image: node:${NODE_VERSION}
+  needs:
+    - job: test:backend
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-backend
+    paths:
+      - backend/node_modules/
   script:
     - cd backend
     - npm ci --prefer-offline --no-audit
@@ -66,80 +200,98 @@ build:backend:
       - backend/package-lock.json
       - backend/prisma
     expire_in: 1 hour
-  only:
-    - main
-    - master
 
-# 2) DEPLOY — จุดเชื่อมระหว่าง build กับ Docker (รายงานสั้น ๆ; deploy จริงอยู่ที่ deploy_docker)
+# --- DEPLOY (summary) ---
+
 deploy:summary:
   stage: deploy
+  extends:
+    - .runner_docker
+    - .rules_ci_branches
   image: alpine:latest
-  script:
-    - echo "Deploy production ผ่าน stage deploy_docker (build image + SSH run container)"
   needs:
     - job: build:frontend
     - job: build:backend
-  only:
-    - main
-    - master
+  script:
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "staging" ]; then
+        echo "UAT: docker_build:uat (auto) → deploy:uat:docker (manual) บน ${DEPLOY_SERVER_UAT}"
+      else
+        echo "PRD: docker_build:prd → transfer:prd:images → deploy:prd:docker (manual) บน ${DEPLOY_SERVER_PRD}"
+      fi
 
-# 3) DEPLOY_DOCKER
-docker_build:prd:
+# --- DOCKER BUILD: UAT ---
+
+docker_build:uat:
   stage: deploy_docker
-  tags:
-    - docker
+  extends:
+    - .runner_docker
+    - .rules_staging
   image: docker:latest
+  environment:
+    name: staging
   needs:
     - job: build:frontend
     - job: build:backend
     - job: deploy:summary
   script:
-    - export DOCKER_HOST="$DOCKER_HOST_PRD"
-    - IMAGE_BACKEND="${APP_IMAGE_BACKEND}:${IMAGE_TAG}-prd"
-    - IMAGE_FRONTEND="${APP_IMAGE_FRONTEND}:${IMAGE_TAG}-prd"
+    - |
+      if [ -z "$NEXT_PUBLIC_API_BASE_URL" ]; then
+        echo "ERROR: NEXT_PUBLIC_API_BASE_URL is empty (required build-arg, scope staging)"
+        exit 1
+      fi
+    - export DOCKER_HOST="$DOCKER_HOST_BUILD"
+    - IMAGE_BACKEND="${APP_IMAGE_BACKEND}:${IMAGE_TAG}-uat"
+    - IMAGE_FRONTEND="${APP_IMAGE_FRONTEND}:${IMAGE_TAG}-uat"
     - docker build -t "$IMAGE_BACKEND" -f backend/Dockerfile ./backend
-    - docker tag "$IMAGE_BACKEND" "$APP_IMAGE_BACKEND:prd"
-    - docker tag "$IMAGE_BACKEND" "$APP_IMAGE_BACKEND:latest-prd"
+    - docker tag "$IMAGE_BACKEND" "${APP_IMAGE_BACKEND}:uat-latest"
+    - docker tag "$IMAGE_BACKEND" "${APP_IMAGE_BACKEND}:latest-uat"
     - |
       docker build -t "$IMAGE_FRONTEND" -f frontend/Dockerfile ./frontend \
         --build-arg NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL}"
-    - docker tag "$IMAGE_FRONTEND" "$APP_IMAGE_FRONTEND:prd"
-    - docker tag "$IMAGE_FRONTEND" "$APP_IMAGE_FRONTEND:latest-prd"
-    - docker images "$APP_IMAGE_BACKEND"
-    - docker images "$APP_IMAGE_FRONTEND"
-  only:
-    - main
-    - master
+    - docker tag "$IMAGE_FRONTEND" "${APP_IMAGE_FRONTEND}:uat-latest"
+    - docker tag "$IMAGE_FRONTEND" "${APP_IMAGE_FRONTEND}:latest-uat"
+    - docker images "${APP_IMAGE_BACKEND}"
+    - docker images "${APP_IMAGE_FRONTEND}"
 
-deploy:prd:docker:
+deploy:uat:docker:
   stage: deploy_docker
+  extends:
+    - .runner_docker
+    - .deploy_ssh_and_validate
+    - .rules_staging
   image: alpine:latest
+  variables:
+    DEPLOY_SERVER: "$DEPLOY_SERVER_UAT"
+    DEPLOY_PATH: "$DEPLOY_PATH_UAT"
+    DOCKER_HOST_REMOTE: "$DOCKER_HOST_UAT"
+    BACKEND_IMAGE: "${APP_IMAGE_BACKEND}:uat-latest"
+    FRONTEND_IMAGE: "${APP_IMAGE_FRONTEND}:uat-latest"
   needs:
-    - job: docker_build:prd
-  before_script:
-    - apk add --no-cache openssh-client bash
-    - mkdir -p ~/.ssh
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - ssh-keyscan -H ${DEPLOY_SERVER_PRD#*@} >> ~/.ssh/known_hosts
+    - job: docker_build:uat
+  when: manual
+  environment:
+    name: staging
+    url: $FRONTEND_BASE_URL
   script:
     - |
-      ssh $DEPLOY_SERVER_PRD "bash -s" << EOF
+      ssh "$DEPLOY_SERVER" "bash -s" << EOF
       set -e
-      export DEPLOY_PATH='${DEPLOY_PATH_PRD}'
-      export APP_IMAGE_BACKEND='${APP_IMAGE_BACKEND}'
-      export APP_IMAGE_FRONTEND='${APP_IMAGE_FRONTEND}'
-      export DOCKER_HOST='${DOCKER_HOST_PRD}'
-      mkdir -p "\$DEPLOY_PATH"
-      cd "\$DEPLOY_PATH"
-      docker network inspect cctv-app-ticket-net >/dev/null 2>&1 || docker network create cctv-app-ticket-net
-      docker rm -f cctv-app-ticket cctv-app-ticket-backend cctv-app-ticket-frontend 2>/dev/null || true
+      export DOCKER_HOST='${DOCKER_HOST_REMOTE}'
+      mkdir -p '${DEPLOY_PATH}'
+      cd '${DEPLOY_PATH}'
+      docker network inspect dtrs-app-net >/dev/null 2>&1 || docker network create dtrs-app-net
+      docker rm -f dtrs-app dtrs-app-backend dtrs-app-frontend 2>/dev/null || true
       docker run -d --restart unless-stopped \
-        --name cctv-app-ticket-backend \
-        --network cctv-app-ticket-net \
-        -p 8310:4000 \
+        --name dtrs-app-backend \
+        --network dtrs-app-net \
+        -p ${BACKEND_HOST_PORT}:4100 \
+        --cpus=${BACKEND_CPUS} \
+        --memory=${BACKEND_MEMORY} \
+        --pids-limit ${BACKEND_PIDS_LIMIT} \
+        --tmpfs /tmp:rw,noexec,nosuid \
         -e NODE_ENV=production \
-        -e PORT=4000 \
+        -e PORT=4100 \
         -e DATABASE_URL='${DATABASE_URL}' \
         -e JWT_SECRET='${JWT_SECRET}' \
         -e ALLOWED_ORIGINS='${ALLOWED_ORIGINS}' \
@@ -153,63 +305,241 @@ deploy:prd:docker:
         -e MINIO_SERVER_FETCH_BASE_URL='${MINIO_SERVER_FETCH_BASE_URL}' \
         -e SMTP_TLS_REJECT_UNAUTHORIZED='${SMTP_TLS_REJECT_UNAUTHORIZED}' \
         -e CRON_SECRET='${CRON_SECRET}' \
-        "\${APP_IMAGE_BACKEND}:latest-prd"
+        '${BACKEND_IMAGE}'
       docker run -d --restart unless-stopped \
-        --name cctv-app-ticket-frontend \
-        --network cctv-app-ticket-net \
-        -p 8309:3000 \
+        --name dtrs-app-frontend \
+        --network dtrs-app-net \
+        -p ${FRONTEND_HOST_PORT}:3000 \
+        --cpus=${FRONTEND_CPUS} \
+        --memory=${FRONTEND_MEMORY} \
+        --pids-limit ${FRONTEND_PIDS_LIMIT} \
+        --tmpfs /tmp:rw,noexec,nosuid \
         -e NODE_ENV=production \
         -e NEXTAUTH_SECRET='${NEXTAUTH_SECRET}' \
         -e NEXTAUTH_URL='${NEXTAUTH_URL}' \
         -e API_INTERNAL_BASE_URL='${API_INTERNAL_BASE_URL}' \
-        "\${APP_IMAGE_FRONTEND}:latest-prd"
+        '${FRONTEND_IMAGE}'
+      sleep 5
+      for c in dtrs-app-backend dtrs-app-frontend; do
+        running=\$(docker inspect -f '{{.State.Running}}' "\$c" 2>/dev/null || echo false)
+        if [ "\$running" != "true" ]; then
+          echo "ERROR: container \$c is not running after deploy"
+          docker logs --tail 80 "\$c" || true
+          exit 1
+        fi
+      done
+      docker ps --filter name=dtrs-app-
       EOF
-  only:
-    - main
-    - master
+
+# --- DOCKER BUILD + TRANSFER: PRD ---
+
+docker_build:prd:
+  stage: deploy_docker
+  extends:
+    - .runner_docker
+    - .rules_prd
+  image: docker:latest
+  environment:
+    name: production
+  needs:
+    - job: build:frontend
+    - job: build:backend
+    - job: deploy:summary
+  script:
+    - |
+      if [ -z "$NEXT_PUBLIC_API_BASE_URL" ]; then
+        echo "ERROR: NEXT_PUBLIC_API_BASE_URL is empty (required build-arg, scope production)"
+        exit 1
+      fi
+    - export DOCKER_HOST="$DOCKER_HOST_BUILD"
+    - IMAGE_BACKEND="${APP_IMAGE_BACKEND}:${IMAGE_TAG}-prd"
+    - IMAGE_FRONTEND="${APP_IMAGE_FRONTEND}:${IMAGE_TAG}-prd"
+    - docker build -t "$IMAGE_BACKEND" -f backend/Dockerfile ./backend
+    - docker tag "$IMAGE_BACKEND" "${APP_IMAGE_BACKEND}:prd"
+    - docker tag "$IMAGE_BACKEND" "${APP_IMAGE_BACKEND}:latest-prd"
+    - docker tag "$IMAGE_BACKEND" "${APP_IMAGE_BACKEND}:prd-latest"
+    - |
+      docker build -t "$IMAGE_FRONTEND" -f frontend/Dockerfile ./frontend \
+        --build-arg NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL}"
+    - docker tag "$IMAGE_FRONTEND" "${APP_IMAGE_FRONTEND}:prd"
+    - docker tag "$IMAGE_FRONTEND" "${APP_IMAGE_FRONTEND}:latest-prd"
+    - docker tag "$IMAGE_FRONTEND" "${APP_IMAGE_FRONTEND}:prd-latest"
+    - docker images "${APP_IMAGE_BACKEND}"
+    - docker images "${APP_IMAGE_FRONTEND}"
+
+transfer:prd:images:
+  stage: deploy_docker
+  extends:
+    - .runner_docker
+    - .ssh_setup
+    - .rules_prd
+  image: docker:latest
+  variables:
+    DEPLOY_SERVER: "$DEPLOY_SERVER_PRD"
+    DEPLOY_PATH: "$DEPLOY_PATH_PRD"
+    DOCKER_HOST_REMOTE: "$DOCKER_HOST_PRD"
+  needs:
+    - job: docker_build:prd
+  environment:
+    name: production
+  script:
+    - export DOCKER_HOST="$DOCKER_HOST_BUILD"
+    - ssh "$DEPLOY_SERVER" "mkdir -p '${DEPLOY_PATH}' && chmod 755 '${DEPLOY_PATH}'"
+    - |
+      transfer_image() {
+        local IMAGE="$1"
+        local TAR_NAME
+        TAR_NAME="$(echo "$IMAGE" | tr '/:' '_').tar"
+        local TAR_PATH="/tmp/${TAR_NAME}"
+        echo "=== Saving ${IMAGE} from build server (${DOCKER_HOST}) ==="
+        docker save "$IMAGE" -o "$TAR_PATH"
+        echo "=== Copying to ${DEPLOY_SERVER}:${DEPLOY_PATH}/ ==="
+        scp "$TAR_PATH" "${DEPLOY_SERVER}:${DEPLOY_PATH}/"
+        echo "=== Loading on PRD server (DOCKER_HOST=${DOCKER_HOST_REMOTE}) ==="
+        ssh "$DEPLOY_SERVER" "DOCKER_HOST='${DOCKER_HOST_REMOTE}' docker load -i '${DEPLOY_PATH}/${TAR_NAME}' && rm -f '${DEPLOY_PATH}/${TAR_NAME}'"
+        rm -f "$TAR_PATH"
+      }
+      transfer_image "${APP_IMAGE_BACKEND}:latest-prd"
+      transfer_image "${APP_IMAGE_FRONTEND}:latest-prd"
+      transfer_image "${APP_IMAGE_BACKEND}:${IMAGE_TAG}-prd"
+      transfer_image "${APP_IMAGE_FRONTEND}:${IMAGE_TAG}-prd"
+    - |
+      ssh "$DEPLOY_SERVER" "bash -s" << EOF
+      set -e
+      export DOCKER_HOST='${DOCKER_HOST_REMOTE}'
+      docker images '${APP_IMAGE_BACKEND}'
+      docker images '${APP_IMAGE_FRONTEND}'
+      EOF
+
+deploy:prd:docker:
+  stage: deploy_docker
+  extends:
+    - .runner_docker
+    - .deploy_ssh_and_validate
+    - .rules_prd
+  image: alpine:latest
+  variables:
+    DEPLOY_SERVER: "$DEPLOY_SERVER_PRD"
+    DEPLOY_PATH: "$DEPLOY_PATH_PRD"
+    DOCKER_HOST_REMOTE: "$DOCKER_HOST_PRD"
+    BACKEND_IMAGE: "${APP_IMAGE_BACKEND}:latest-prd"
+    FRONTEND_IMAGE: "${APP_IMAGE_FRONTEND}:latest-prd"
+  needs:
+    - job: transfer:prd:images
+  when: manual
   environment:
     name: production
     url: $FRONTEND_BASE_URL
-
-# 4) CLEANUP — ลบ image เก่าใน PRD (manual)
-cleanup:docker:prd:
-  stage: cleanup
-  tags:
-    - docker
-  image: docker:latest
-  before_script:
-    - apk add --no-cache openssh-client bash
-    - mkdir -p ~/.ssh
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - ssh-keyscan -H ${DEPLOY_SERVER_PRD#*@} >> ~/.ssh/known_hosts
   script:
     - |
-      ssh $DEPLOY_SERVER_PRD "DOCKER_HOST='$DOCKER_HOST_PRD' bash -c '
-        set -e
-        export DOCKER_HOST=\$DOCKER_HOST
-        echo \"Before cleanup:\"
-        docker system df || true
-        echo \"Cleaning dangling images...\"
-        docker image prune -f || true
-        echo \"Cleaning old images for backend/frontend (keep latest 2 each)...\"
-        KEEP=2
-        for APP_IMAGE in cctv-app-ticket-backend cctv-app-ticket-frontend; do
-          OLD=\$(docker images \"\$APP_IMAGE\" --format \"{{.ID}} {{.CreatedAt}}\" | sort -k2 -r | tail -n +\$((KEEP+1)) | cut -d\" \" -f1)
-          if [ -n \"\$OLD\" ]; then
-            echo \"Removing for \$APP_IMAGE:\"
-            echo \"\$OLD\" | xargs -r docker rmi -f || true
-          else
-            echo \"No old images to remove for \$APP_IMAGE\"
-          fi
-        done
-        echo \"After cleanup:\"
-        docker system df || true
-      '"
-  only:
-    - main
-    - master
+      ssh "$DEPLOY_SERVER" "bash -s" << EOF
+      set -e
+      export DOCKER_HOST='${DOCKER_HOST_REMOTE}'
+      mkdir -p '${DEPLOY_PATH}'
+      cd '${DEPLOY_PATH}'
+      docker network inspect dtrs-app-net >/dev/null 2>&1 || docker network create dtrs-app-net
+      docker rm -f dtrs-app dtrs-app-backend dtrs-app-frontend 2>/dev/null || true
+      docker run -d --restart unless-stopped \
+        --name dtrs-app-backend \
+        --network dtrs-app-net \
+        -p ${BACKEND_HOST_PORT}:4100 \
+        --cpus=${BACKEND_CPUS} \
+        --memory=${BACKEND_MEMORY} \
+        --pids-limit ${BACKEND_PIDS_LIMIT} \
+        --tmpfs /tmp:rw,noexec,nosuid \
+        -e NODE_ENV=production \
+        -e PORT=4100 \
+        -e DATABASE_URL='${DATABASE_URL}' \
+        -e JWT_SECRET='${JWT_SECRET}' \
+        -e ALLOWED_ORIGINS='${ALLOWED_ORIGINS}' \
+        -e FRONTEND_BASE_URL='${FRONTEND_BASE_URL}' \
+        -e MINIO_ENDPOINT='${MINIO_ENDPOINT}' \
+        -e MINIO_PORT='${MINIO_PORT}' \
+        -e MINIO_ACCESS_KEY='${MINIO_ACCESS_KEY}' \
+        -e MINIO_SECRET_KEY='${MINIO_SECRET_KEY}' \
+        -e MINIO_BUCKET_NAME='${MINIO_BUCKET_NAME}' \
+        -e MINIO_PUBLIC_URL='${MINIO_PUBLIC_URL}' \
+        -e MINIO_SERVER_FETCH_BASE_URL='${MINIO_SERVER_FETCH_BASE_URL}' \
+        -e SMTP_TLS_REJECT_UNAUTHORIZED='${SMTP_TLS_REJECT_UNAUTHORIZED}' \
+        -e CRON_SECRET='${CRON_SECRET}' \
+        '${BACKEND_IMAGE}'
+      docker run -d --restart unless-stopped \
+        --name dtrs-app-frontend \
+        --network dtrs-app-net \
+        -p ${FRONTEND_HOST_PORT}:3000 \
+        --cpus=${FRONTEND_CPUS} \
+        --memory=${FRONTEND_MEMORY} \
+        --pids-limit ${FRONTEND_PIDS_LIMIT} \
+        --tmpfs /tmp:rw,noexec,nosuid \
+        -e NODE_ENV=production \
+        -e NEXTAUTH_SECRET='${NEXTAUTH_SECRET}' \
+        -e NEXTAUTH_URL='${NEXTAUTH_URL}' \
+        -e API_INTERNAL_BASE_URL='${API_INTERNAL_BASE_URL}' \
+        '${FRONTEND_IMAGE}'
+      sleep 5
+      for c in dtrs-app-backend dtrs-app-frontend; do
+        running=\$(docker inspect -f '{{.State.Running}}' "\$c" 2>/dev/null || echo false)
+        if [ "\$running" != "true" ]; then
+          echo "ERROR: container \$c is not running after deploy"
+          docker logs --tail 80 "\$c" || true
+          exit 1
+        fi
+      done
+      docker ps --filter name=dtrs-app-
+      EOF
+
+# --- CLEANUP ---
+
+.cleanup_docker_images:
+  extends: .ssh_setup
+  stage: cleanup
+  image: docker:latest
   when: manual
   allow_failure: true
+  script:
+    - |
+      ssh "$DEPLOY_SERVER" "DOCKER_HOST='${DOCKER_HOST_REMOTE}' bash -s" << EOF
+      set -e
+      export DOCKER_HOST='${DOCKER_HOST_REMOTE}'
+      echo "Before cleanup:"
+      docker system df || true
+      docker image prune -f || true
+      KEEP=${CLEANUP_KEEP_IMAGES}
+      for APP_IMAGE in ${APP_IMAGE_BACKEND} ${APP_IMAGE_FRONTEND}; do
+        OLD=\$(docker images "\$APP_IMAGE" --format "{{.ID}} {{.CreatedAt}}" | sort -k2 -r | tail -n +\$((KEEP+1)) | awk '{print \$1}' | sort -u)
+        if [ -n "\$OLD" ]; then
+          echo "Removing old images for \$APP_IMAGE:"
+          echo "\$OLD" | xargs -r docker rmi -f || true
+        else
+          echo "No old images to remove for \$APP_IMAGE"
+        fi
+      done
+      echo "After cleanup:"
+      docker system df || true
+      EOF
+
+cleanup:docker:uat:
+  extends:
+    - .runner_docker
+    - .cleanup_docker_images
+    - .rules_staging
+  needs:
+    - job: docker_build:uat
+  variables:
+    DEPLOY_SERVER: "$DEPLOY_SERVER_UAT"
+    DOCKER_HOST_REMOTE: "$DOCKER_HOST_UAT"
+  environment:
+    name: staging
+
+cleanup:docker:prd:
+  extends:
+    - .runner_docker
+    - .cleanup_docker_images
+    - .rules_prd
+  needs:
+    - job: transfer:prd:images
+  variables:
+    DEPLOY_SERVER: "$DEPLOY_SERVER_PRD"
+    DOCKER_HOST_REMOTE: "$DOCKER_HOST_PRD"
   environment:
     name: production
