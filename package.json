@@ -1,0 +1,17 @@
+{
+  "name": "dtrs-app",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Root tooling: git hooks and changelog SemVer bumps for the CCTV maintenance app",
+  "scripts": {
+    "prepare": "husky",
+    "version:bump": "node scripts/changelog-version-bump.mjs"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# When CHANGELOG.md is staged: prompt major|minor|patch|skip (or CHANGELOG_VERSION_BUMP).
+node scripts/changelog-version-bump.mjs

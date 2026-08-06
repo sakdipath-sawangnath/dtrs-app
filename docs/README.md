@@ -19,7 +19,7 @@
 | [MinIO-Orphan-Cleanup.md](./MinIO-Orphan-Cleanup.md) | สแกน/ลบไฟล์ค้างใน bucket (settings, retention, API) |
 | [postmortems/](./postmortems/) | **RCA หลังแก้บั๊ก** — skill `post-mortem`; ห้าม secrets/PII |
 
-เอกสาร root ที่เกี่ยวข้อง: [`../README.md`](../README.md), [`../STATUS.md`](../STATUS.md), [`../PLAN.md`](../PLAN.md), [`../TASK.md`](../TASK.md), [`../minio.md`](../minio.md) (ตัวแปร MinIO)
+เอกสาร root ที่เกี่ยวข้อง: [`../CHANGELOG.md`](../CHANGELOG.md) (key changes), [`../README.md`](../README.md), [`../STATUS.md`](../STATUS.md), [`../PLAN.md`](../PLAN.md), [`../TASK.md`](../TASK.md), [`../minio.md`](../minio.md) (ตัวแปร MinIO)
 
 หมายเหตุสำหรับ AI Agent ฝั่ง frontend: งานที่เกี่ยวกับ `shadcn/ui` และ `@/components/ui/*` ให้อ้างอิง `frontend/.agents/skills/shadcn/SKILL.md` ควบคู่กับ `AGENTS.md`
 

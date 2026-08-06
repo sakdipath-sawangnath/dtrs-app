@@ -64,8 +64,17 @@
 - **DB**: เลี่ยง N+1, ใช้ transactions/migrations เมื่อเหมาะสม, list endpoints มี pagination/filter/sort ตามความจำเป็น
 - **Testing** (เมื่อ scope เอื้อ): service tests, e2e ด้วย supertest, mock external services
 
+## Changelog (key changes)
+
+เมื่อส่งงานที่มี **key change** ให้เพิ่ม bullet ใต้ **`## [Unreleased]`** ใน [`CHANGELOG.md`](CHANGELOG.md) ตามหมวด Added/Changed/Fixed/Security — ดูตารางในไฟล์นั้น  
+**Commit ที่ stage `CHANGELOG.md`:** husky จะถาม **major / minor / patch / skip** (หรือตั้ง `CHANGELOG_VERSION_BUMP`) → bump `frontend/package.json` + ตัด Unreleased เป็น `## [X.Y.Z] - วันที่`  
+Footer แสดงเวอร์ชันจาก **package.json** (หรือ `NEXT_PUBLIC_APP_VERSION`) — ไม่ใช้ DB  
+ครั้งแรกที่ clone: รัน `npm install` ที่ **root** เพื่อติดตั้ง husky  
+ไม่ใส่ secrets/PII · ไม่บันทึก refactor ภายในหรือ typo · รายละเอียดสถานะยาว ๆ ยังอยู่ที่ `STATUS.md` / `README.md`
+
 ## ไฟล์/เอกสารที่ควรรู้
 - **Production (PRD):** `https://dtrs-app.forth.co.th` — API ที่ `/api`; ตั้ง `NEXT_PUBLIC_API_BASE_URL`, `NEXTAUTH_URL`, `ALLOWED_ORIGINS`, `FRONTEND_BASE_URL` ให้ตรง origin นี้ (ดู `README.md`)
+- **Changelog + SemVer:** [`CHANGELOG.md`](CHANGELOG.md) · root [`package.json`](package.json) (husky) · [`scripts/changelog-version-bump.mjs`](scripts/changelog-version-bump.mjs)
 - **ย้ายจาก `cctv-app_ticket`:** [`docs/DTRS-Migration-Checklist.md`](docs/DTRS-Migration-Checklist.md) · GitLab CI: [`docs/GitLab-CI-Plan.md`](docs/GitLab-CI-Plan.md) · Variables: [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md)
 - **Env template:** `backend/.env.example`, `frontend/.env.example` (คัดลอกเป็น `.env` / `.env.local`)
 - ภาพรวมระบบ: `README.md` (มีตารางดัชนีเอกสารหลัก)

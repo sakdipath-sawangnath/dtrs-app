@@ -185,8 +185,13 @@ export default function SettingsPage() {
         setAppMetaForm({
           appName: appMeta.appName ?? "",
           companyName: appMeta.companyName ?? "",
-          version: appMeta.version ?? "",
+          version: FOOTER_ENV_FALLBACK.version,
         });
+      } else {
+        setAppMetaForm((prev) => ({
+          ...prev,
+          version: FOOTER_ENV_FALLBACK.version,
+        }));
       }
 
       const smtp = unwrapApiData<EmailSmtpResponse>(smtpRes.data);
@@ -313,7 +318,6 @@ export default function SettingsPage() {
       const body = {
         appName: appMetaForm.appName.trim(),
         companyName: appMetaForm.companyName.trim(),
-        version: appMetaForm.version.trim(),
       };
       const res = await axios.put(`${API}/settings/app-meta`, body, {
         headers: { Authorization: `Bearer ${token}` },
@@ -322,7 +326,7 @@ export default function SettingsPage() {
       setAppMetaForm({
         appName: updated?.appName ?? body.appName,
         companyName: updated?.companyName ?? body.companyName,
-        version: updated?.version ?? body.version,
+        version: FOOTER_ENV_FALLBACK.version,
       });
       toastSuccess("บันทึกข้อมูล Footer สำเร็จ");
     } catch (err: unknown) {
@@ -588,7 +592,10 @@ export default function SettingsPage() {
   };
 
   const disabledForm = sessionStatus !== "authenticated" || !token;
-  const resolvedFooterMeta = resolveFooterAppMeta(appMetaForm);
+  const resolvedFooterMeta = resolveFooterAppMeta({
+    appName: appMetaForm.appName,
+    companyName: appMetaForm.companyName,
+  });
 
   if (loadingSettings) {
     return (
@@ -661,18 +668,23 @@ export default function SettingsPage() {
             </div>
             <div>
               <Label className="mb-1.5 block text-sm font-medium text-slate-300" htmlFor="app-meta-version">
-                เวอร์ชันที่แสดง
+                เวอร์ชันที่แสดง (จาก build)
               </Label>
               <Input
                 id="app-meta-version"
                 type="text"
                 className="form-input-glass"
-                value={appMetaForm.version}
-                onChange={(e) => setAppMetaForm((prev) => ({ ...prev, version: e.target.value }))}
-                placeholder={FOOTER_ENV_FALLBACK.version}
-                disabled={disabledForm || savingAppMeta}
-                maxLength={40}
+                value={FOOTER_ENV_FALLBACK.version}
+                readOnly
+                disabled
+                aria-readonly="true"
+                title="กำหนดจาก frontend/package.json หรือ NEXT_PUBLIC_APP_VERSION — bump เมื่อ commit CHANGELOG.md"
               />
+              <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+                Source of truth: <code className="text-slate-300">frontend/package.json</code> (SemVer) ·
+                override ชั่วคราวด้วย <code className="text-slate-300">NEXT_PUBLIC_APP_VERSION</code> ·
+                ไม่บันทึกลง DB — ดู <code className="text-slate-300">CHANGELOG.md</code>
+              </p>
             </div>
           </div>
 
@@ -693,14 +705,16 @@ export default function SettingsPage() {
               </div>
             </div>
             <p className="text-xs leading-relaxed text-slate-500">
-              ลำดับ fallback: <code className="text-slate-300">DB</code> →{" "}
+              ชื่อระบบ / บริษัท: <code className="text-slate-300">DB</code> →{" "}
               <code className="text-slate-300">NEXT_PUBLIC_APP_NAME</code> /{" "}
-              <code className="text-slate-300">NEXT_PUBLIC_COMPANY_NAME</code> /{" "}
-              <code className="text-slate-300">NEXT_PUBLIC_APP_VERSION</code> →{" "}
-              <code className="text-slate-300">package.json</code> (ใช้กับ version เท่านั้น)
+              <code className="text-slate-300">NEXT_PUBLIC_COMPANY_NAME</code>
             </p>
             <p className="text-xs leading-relaxed text-slate-500">
-              เว้นว่างช่องใดไว้ ระบบจะ fallback ตามลำดับข้างต้นทันทีโดยไม่ต้องใส่ค่าซ้ำใน DB
+              เวอร์ชัน: <code className="text-slate-300">NEXT_PUBLIC_APP_VERSION</code> →{" "}
+              <code className="text-slate-300">frontend/package.json</code> (ไม่ใช้ค่าจาก DB)
+            </p>
+            <p className="text-xs leading-relaxed text-slate-500">
+              เว้นว่างช่องชื่อระบบ/บริษัทไว้ ระบบจะ fallback ตามลำดับข้างต้นทันทีโดยไม่ต้องใส่ค่าซ้ำใน DB
             </p>
           </div>
 

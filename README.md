@@ -4,7 +4,7 @@
 
 **Production:** [`https://dtrs-app.forth.co.th`](https://dtrs-app.forth.co.th) · API ที่ `/api` · GitLab `FORTH/dtrs-app`
 
-**Changelog (key changes):** [`CHANGELOG.md`](CHANGELOG.md) — อัปเดตเมื่อมีฟีเจอร์/บั๊กสำคัญ/security/deploy ที่กระทบผู้ใช้หรือ ops; รายละเอียดขยายด้านล่างและใน `STATUS.md`
+**Changelog + app version:** [`CHANGELOG.md`](CHANGELOG.md) — key changes; commit ที่แตะไฟล์นี้จะถาม SemVer bump (`frontend/package.json`) ผ่าน husky · footer แสดง `vX.Y.Z` จาก package (ไม่ใช่ DB) · ครั้งแรก: `npm install` ที่ root
 
 ## บันทึกการอัปเดตล่าสุด (2026-08-05)
 
@@ -21,7 +21,7 @@
 - **UI primitives rollout** — หน้า **`/login`**, **`/public/report`**, **`/public/status`**, **`/dashboard`**, **`/dashboard/settings`**, **`/dashboard/profile`** และ **`/print/jobs/[id]`** เปลี่ยนส่วนควบคุมหลักไปใช้ `@/components/ui/*` ที่มีในโปรเจกต์แล้ว (เช่น `Button`, `Input`, `Label`, `Alert`, `Textarea`)
 - **Dialog migration** — `CrudModal` เปลี่ยนเป็น wrapper ของ **`ui/Dialog`**; `JobsList` ย้าย modal รายละเอียด / มอบหมาย / อัปเดตการแก้ไขไปใช้ `Dialog` + `JobImageLightbox`; `alert-dialog` ปรับ overlay/popup เป็น **`z-100`**
 - **Loading pattern กลาง** — หน้า **`/public/report`**, **`/public/status`**, **`/dashboard/settings`**, **`/dashboard/users`**, **`/dashboard/roles`** และ **`/dashboard/sites`** ใช้ `PublicRouteLoading` / `DashboardRouteLoading` เป็น pattern กลางเดียวกัน แทน loading implementation ที่กระจายหลายแบบ
-- **Footer app metadata** — backend เพิ่ม setting คีย์ `app_meta`; หน้า **`/dashboard/settings`** เพิ่มฟอร์มแก้ `appName` / `companyName` / `version`; `SiteFooter` ใช้ fallback **DB → env → `package.json`** และอ่านค่าฝั่ง public ผ่าน `GET /public/settings/app-meta`
+- **Footer app metadata** — setting คีย์ `app_meta` สำหรับชื่อระบบ/บริษัท; เวอร์ชันที่ footer มาจาก **`frontend/package.json`** (หรือ `NEXT_PUBLIC_APP_VERSION`) ไม่ทับด้วย DB; `SiteFooter` อ่านชื่อจาก `GET /public/settings/app-meta`
 - **Image primitives กลาง** — frontend รวมการแสดงรูปด้วย `ManagedImage`, `ManagedImageFrame` และ preset `MANAGED_IMAGE_SIZES` เพื่อให้ avatar / preview / lightbox ใช้โครงสร้างเดียวกัน; template PDF ยังใช้ `forceRaw` ในจุดที่ต้องคง `<img>` สำหรับการ render
 - **Backfill วันที่ + modal polish** — หน้า **`/dashboard/jobs/[id]`** ปรับ card “ลงข้อมูลย้อนหลัง (Backfill วันที่)” ให้กรอกวันที่แบบ **`dd/mm/yyyy`** และ validate ก่อนบันทึกให้สอดคล้องบรรทัด preview “ปฏิทินไทย (พ.ศ.)”; `JobImageLightbox` ปรับขนาดพื้นที่แสดงผลให้รูปเปิดดูได้จริง; backdrop ของ report modal บนหน้า dashboard และปุ่ม `ghost` ใน modal/lightbox ถูกปรับมาตรฐานสี `hover` / `focus` เพื่อไม่ให้ข้อความจมหรือพื้นหลังสว่างผิด theme
 - **Frontend build** — ยืนยัน `npm run build` ใน `frontend/` ผ่านหลัง refactor รอบนี้ และ warnings กลุ่ม `<img>` / hooks / unused code ที่ตั้งใจเก็บได้ถูกเคลียร์แล้ว

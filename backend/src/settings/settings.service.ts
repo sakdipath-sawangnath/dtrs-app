@@ -93,14 +93,17 @@ export class SettingsService {
     const row = await this.prisma.setting.findUnique({
       where: { key: APP_META_SETTING_KEY },
     });
-    return this.parseAppMetaStored(row?.value ?? null);
+    const stored = this.parseAppMetaStored(row?.value ?? null);
+    // Do not expose legacy DB version — SemVer lives in frontend/package.json.
+    return { ...stored, version: '' };
   }
 
   async updateAppMeta(dto: UpdateAppMetaDto): Promise<AppMetaPublic> {
+    // Product SemVer is frontend/package.json only — clear any legacy DB version on save.
     const next: AppMetaPublic = {
       appName: dto.appName.trim().slice(0, 120),
       companyName: dto.companyName.trim().slice(0, 120),
-      version: dto.version.trim().slice(0, 40),
+      version: '',
     };
 
     await this.prisma.setting.upsert({
