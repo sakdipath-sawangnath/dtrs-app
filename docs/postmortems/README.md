@@ -29,8 +29,7 @@ Skills:
 
 ## รายการ
 
-ยังไม่มีไฟล์ RCA ใน repo — เพิ่มแถวในตารางนี้เมื่อ commit ฉบับแรก
-
 | ไฟล์ | สรุปสั้น |
 |------|----------|
-| — | — |
+| [`ci-env-scoped-vars-and-jest-mock-tdz.md`](ci-env-scoped-vars-and-jest-mock-tdz.md) | Pipeline staging แดง: Jest mock TDZ (`puppeteer-core`) + `NEXT_PUBLIC_API_BASE_URL` ไม่ inject เพราะ `build:frontend` ไม่มี `environment` — แก้ที่ `56bebfd` (validate: pipeline #2674 test+build เขียว) |
+| [`ci-runner-dockerignore-excludes-artifacts.md`](ci-runner-dockerignore-excludes-artifacts.md) | `docker_build:uat` COPY fail ทั้งที่ artifact gate ผ่าน — `.dockerignore` ตัด `node_modules`/`dist`/`.next` จาก context — แก้ที่ `5179c32` |
