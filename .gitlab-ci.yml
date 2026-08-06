@@ -140,6 +140,8 @@ variables:
       fi
     - export DOCKER_HOST="$DOCKER_HOST_BUILD"
     - sh scripts/docker-artifact-gate.sh .
+    # .dockerignore ปกติตัด node_modules/dist/.next — ต้องเปิดก่อน COPY ใน ci-runner
+    - sh scripts/docker-ci-allow-artifacts.sh .
     - docker build --target ci-runner -t "$IMAGE_BACKEND" -f backend/Dockerfile ./backend
     - docker tag "$IMAGE_BACKEND" "$TAG_BACKEND_LATEST"
     - docker tag "$IMAGE_BACKEND" "$TAG_BACKEND_ALT"

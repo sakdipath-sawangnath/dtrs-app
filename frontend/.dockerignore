@@ -1,3 +1,5 @@
+# Local `runner` build: อย่าส่ง host node_modules/.next เข้า context
+# CI `ci-runner`: scripts/docker-ci-allow-artifacts.sh จะลบ .next (และ node_modules) ก่อน docker build
 node_modules
 .next
 .env
