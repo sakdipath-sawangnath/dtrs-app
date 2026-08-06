@@ -203,7 +203,7 @@ CRON_SECRET=***
 | ☑ | `JWT_SECRET` | `staging` | **สร้างใหม่** — แยกจาก PRD | ✅ gen 2026-08-05 |
 | ☑ | `NEXTAUTH_SECRET` | `staging` | **สร้างใหม่** — แยกจาก PRD | ✅ gen 2026-08-05 |
 | ☑ | `NEXTAUTH_URL` | `staging` | `http://192.168.0.115:8404` | ✅ |
-| ☑ | `NEXT_PUBLIC_API_BASE_URL` | `staging` | `http://192.168.0.115:8405/api` (bake ตอน build) | ✅ |
+| ☑ | `NEXT_PUBLIC_API_BASE_URL` | `staging` | `http://192.168.0.115:8405/api` (bake ตอน **`build:frontend`** + docker build) | ✅ · job `build:frontend` ใช้ `environment: $DTRS_CI_ENV` + `action: prepare` เพื่อ inject scope |
 | ☑ | `FRONTEND_BASE_URL` | `staging` | `http://192.168.0.115:8404` | ✅ |
 | ☑ | `ALLOWED_ORIGINS` | `staging` | `http://192.168.0.115:8404` | ✅ |
 | ☐ | `MINIO_BUCKET_NAME` | `staging` | **`dtrs-app-uat`** (⏸️ รอ infra สร้าง bucket) | ☐ |

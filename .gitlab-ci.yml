@@ -112,6 +112,16 @@ variables:
   rules:
     - if: '$CI_COMMIT_BRANCH == "staging" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
 
+# map branch → GitLab Environment name (ให้ variables ที่ scope เป็น staging/production ถูก inject)
+.rules_ci_branches_with_env:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "staging"'
+      variables:
+        DTRS_CI_ENV: staging
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+      variables:
+        DTRS_CI_ENV: production
+
 .rules_staging:
   rules:
     - if: '$CI_COMMIT_BRANCH == "staging"'
@@ -205,8 +215,12 @@ build:frontend:
   stage: build
   extends:
     - .runner_docker
-    - .rules_ci_branches
+    - .rules_ci_branches_with_env
   image: node:${NODE_VERSION}
+  # action: prepare — อ่าน env-scoped vars โดยไม่สร้าง deployment record
+  environment:
+    name: $DTRS_CI_ENV
+    action: prepare
   needs:
     - job: test:frontend
   cache:
@@ -216,7 +230,7 @@ build:frontend:
   script:
     - |
       if [ -z "$NEXT_PUBLIC_API_BASE_URL" ]; then
-        echo "ERROR: NEXT_PUBLIC_API_BASE_URL is empty (required at next build, check CI/CD Variables + scope)"
+        echo "ERROR: NEXT_PUBLIC_API_BASE_URL is empty (required at next build, check CI/CD Variables + scope ${DTRS_CI_ENV})"
         exit 1
       fi
     - cd frontend

@@ -3,14 +3,16 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { JobsPdfService } from './jobs-pdf.service';
 
-const launchMock = jest.fn();
-
 jest.mock('puppeteer-core', () => ({
   __esModule: true,
   default: {
-    launch: launchMock,
+    launch: jest.fn(),
   },
 }));
+
+// jest.mock is hoisted — get the mock via requireMock (not outer const in factory)
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- jest mock shape
+const launchMock: jest.Mock = jest.requireMock('puppeteer-core').default.launch;
 
 describe('JobsPdfService (puppeteer-core / PDF)', () => {
   let service: JobsPdfService;
