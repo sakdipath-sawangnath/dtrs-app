@@ -179,7 +179,7 @@
 | 34 | Placeholder `publicBaseUrl` | `frontend/src/app/dashboard/settings/page.tsx` | ✅ `https://dtrs-app.forth.co.th` |
 | 35 | อีเมล HTML header/footer | `backend/src/jobs/job-email-html.ts` | ☐ |
 | 36 | อีเมล test subject | `backend/src/settings/mail.service.ts` | ☐ |
-| 37 | ชื่อไฟล์ PDF แนบอีเมล | `backend/src/jobs/job-email-notification.service.ts` — `CCTV-Job-*.pdf` | ☐ |
+| 37 | ชื่อไฟล์ PDF แนบอีเมล | `backend/src/jobs/job-email-notification.service.ts` — `DTRS-*.pdf` | ✅ |
 | 38 | หัวข้อ PDF รายงาน | `backend/src/jobs/jobs-pdf.service.ts` | ☐ |
 | 39 | ข้อความใน PDF template | `frontend/src/components/pdf/JobMaintenancePdfTemplate.tsx` (โครงการ CCTV 5 จังหวัด — **business copy**) | ☐ |
 | 40 | Public layout watermark | `frontend/src/components/PublicLayoutShell.tsx` (icon CCTV — OK ถ้ายังเป็นระบบ CCTV) | ☐ |

@@ -411,7 +411,7 @@ export class JobEmailNotificationService {
           attachments: pdf
             ? [
                 {
-                  filename: `CCTV-Job-${job.ticketNo ?? jobId}.pdf`,
+                  filename: `DTRS-${job.ticketNo ?? jobId}.pdf`,
                   content: pdf,
                   contentType: 'application/pdf',
                 },
