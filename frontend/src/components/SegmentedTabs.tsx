@@ -25,12 +25,11 @@ export default function SegmentedTabs<T extends string>({
 }) {
   return (
     <div
-      className={
-        "flex flex-nowrap items-stretch gap-1.5 sm:gap-2 shrink-0 p-1.5 sm:p-2 " +
-        "rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl " +
-        "w-full min-w-0 max-w-full overflow-x-auto " +
-        "[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-      }
+      className={cn(
+        "glass-card flex flex-nowrap items-stretch gap-1.5 sm:gap-2 shrink-0 p-1.5 sm:p-2",
+        "w-full min-w-0 max-w-full overflow-x-auto",
+        "[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
+      )}
       role="tablist"
       aria-label={ariaLabel}
     >
@@ -45,20 +44,19 @@ export default function SegmentedTabs<T extends string>({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(t.id)}
-            className={`relative flex min-h-[44px] flex-1 min-w-0 sm:flex-none items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:pl-3.5 sm:pr-7 text-sm font-medium transition-all rounded-xl active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 ${
+            className={cn(
+              "relative flex min-h-[44px] flex-1 min-w-0 sm:flex-none items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:pl-3.5 sm:pr-7 text-sm font-medium transition-all rounded-xl active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50",
               active
-                ? "border border-blue-500/35 bg-blue-500/15 text-blue-200 shadow-inner backdrop-blur-sm ring-1 ring-blue-400/20"
-                : "border border-transparent text-slate-400 hover:border-white/10 hover:bg-white/5 hover:text-slate-100 hover:backdrop-blur-sm"
-            }`}
+                ? "glass-nav-active border border-[var(--glass-input-focus-border)] shadow-inner backdrop-blur-sm ring-1 ring-[var(--glass-input-focus-border)]"
+                : "glass-nav-item border border-transparent hover:border-[var(--glass-card-border)] hover:bg-[var(--glass-hover)] hover:backdrop-blur-sm",
+            )}
           >
             {t.icon ? <t.icon size={16} className="shrink-0" aria-hidden /> : null}
             <span className="whitespace-nowrap">{t.label}</span>
             {badge > 0 ? (
               <Badge
                 variant="default"
-                className={cn(
-                  "absolute -top-1 -right-1 min-h-5 min-w-5 justify-center rounded-full border-0 bg-blue-600 px-1.5 py-0 text-[11px] font-bold text-white shadow",
-                )}
+                className="absolute -top-1 -right-1 min-h-5 min-w-5 justify-center rounded-full border-0 bg-blue-600 px-1.5 py-0 text-[11px] font-bold text-white shadow"
                 aria-label={`มีแจ้งเตือน ${badge} รายการ`}
               >
                 {badge > 99 ? "99+" : badge}

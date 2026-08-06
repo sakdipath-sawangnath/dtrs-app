@@ -542,14 +542,14 @@ export default function DashboardSitesPage() {
       noCard={true}
     >
       <div className="flex flex-col gap-4 min-h-0 flex-1">
-        <div className="rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl p-4 sm:p-5">
+        <div className="glass-card p-4 sm:p-5 text-slate-900 dark:text-slate-100">
           <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
             <div className="min-w-0">
-              <div className="flex items-center gap-2 text-white">
-                <Landmark className="h-5 w-5 text-emerald-400/90 shrink-0" aria-hidden />
+              <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                <Landmark className="h-5 w-5 text-emerald-600 dark:text-emerald-400/90 shrink-0" aria-hidden />
                 <h2 className="text-base font-bold tracking-tight">จังหวัดและอำเภอ (ข้อมูลหลัก)</h2>
               </div>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1.5 max-w-2xl leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1.5 max-w-2xl leading-relaxed">
                 อำเภอต้องอยู่ภายใต้จังหวัดหนึ่งเท่านั้น — ใช้เป็นฐานชื่อพื้นที่ร่วมกับรายการ Site ด้านล่าง (ข้อมูลคนละชุดกับ Site แต่ช่วยให้ชื่อสอดคล้องกัน)
               </p>
             </div>
@@ -558,7 +558,7 @@ export default function DashboardSitesPage() {
                 <button
                   type="button"
                   onClick={openProvinceModal}
-                  className="inline-flex items-center justify-center gap-2 min-h-[44px] px-4 rounded-xl text-sm font-medium border border-emerald-500/40 bg-emerald-950/30 text-emerald-100 hover:bg-emerald-900/40 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/45"
+                  className="inline-flex items-center justify-center gap-2 min-h-[44px] px-4 rounded-xl text-sm font-medium border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-emerald-100 dark:hover:bg-emerald-900/40 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/45"
                 >
                   <Plus size={16} aria-hidden /> เพิ่มจังหวัด
                 </button>
@@ -567,7 +567,7 @@ export default function DashboardSitesPage() {
                   onClick={openDistrictModal}
                   disabled={locationTree.length === 0}
                   title={locationTree.length === 0 ? "เพิ่มจังหวัดก่อน" : undefined}
-                  className="inline-flex items-center justify-center gap-2 min-h-[44px] px-4 rounded-xl text-sm font-medium border border-sky-500/40 bg-sky-950/25 text-sky-100 hover:bg-sky-900/35 transition-all cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/45"
+                  className="inline-flex items-center justify-center gap-2 min-h-[44px] px-4 rounded-xl text-sm font-medium border border-sky-300 bg-sky-50 text-sky-800 hover:bg-sky-100 dark:border-sky-500/40 dark:bg-sky-950/25 dark:text-sky-100 dark:hover:bg-sky-900/35 transition-all cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/45"
                 >
                   <MapPinned size={16} aria-hidden /> เพิ่มอำเภอ
                 </button>
@@ -580,7 +580,7 @@ export default function DashboardSitesPage() {
               <DashboardRouteLoading variant="overlay" />
             </div>
           ) : locationTree.length === 0 ? (
-            <p className="text-sm text-slate-500 mt-5">
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-5">
               {canCreate
                 ? "ยังไม่มีจังหวัดในระบบ — กด «เพิ่มจังหวัด» เพื่อเริ่ม แล้วค่อย «เพิ่มอำเภอ» ภายใต้จังหวัดนั้น"
                 : "ยังไม่มีข้อมูลจังหวัด–อำเภอในระบบ"}
@@ -593,23 +593,23 @@ export default function DashboardSitesPage() {
               {locationTree.map((p) => (
                 <li
                   key={p.id}
-                  className="rounded-xl border border-white/10 bg-slate-950/35 p-3 sm:p-3.5"
+                  className="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-3.5 dark:border-[var(--glass-card-border)] dark:bg-slate-950/35"
                 >
-                  <p className="text-sm font-semibold text-slate-100 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <MapPin size={14} className="text-emerald-400/90 shrink-0" aria-hidden />
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <MapPin size={14} className="text-emerald-600 dark:text-emerald-400/90 shrink-0" aria-hidden />
                     <span>{p.name}</span>
-                    <span className="text-xs font-normal text-slate-500">
+                    <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
                       {p.districts.length} อำเภอ
                     </span>
                   </p>
                   <div className="mt-2.5 flex flex-wrap gap-1.5">
                     {p.districts.length === 0 ? (
-                      <span className="text-xs text-slate-600">ยังไม่มีอำเภอ — ใช้ปุ่ม «เพิ่มอำเภอ» แล้วเลือกจังหวัดนี้</span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">ยังไม่มีอำเภอ — ใช้ปุ่ม «เพิ่มอำเภอ» แล้วเลือกจังหวัดนี้</span>
                     ) : (
                       p.districts.map((d) => (
                         <span
                           key={d.id}
-                          className="text-xs px-2.5 py-1 rounded-lg bg-slate-800/70 text-slate-300 border border-white/8"
+                          className="text-xs px-2.5 py-1 rounded-lg bg-white text-slate-700 border border-slate-200 dark:bg-slate-800/70 dark:text-slate-200 dark:border-white/8"
                         >
                           {d.name}
                         </span>
@@ -641,7 +641,7 @@ export default function DashboardSitesPage() {
           </>
         )}
 
-        <div className="rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl overflow-hidden flex flex-col min-h-0">
+        <div className="glass-card overflow-hidden flex flex-col min-h-0 text-slate-900 dark:text-slate-100">
           <DashboardFilterBar
             onRefresh={() => fetchSites()}
             searchPlaceholder="ค้นหา จังหวัด / อำเภอ / หน่วยงาน"
@@ -661,7 +661,7 @@ export default function DashboardSitesPage() {
           >
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <select
-                className="select-native-glass w-full sm:min-w-[180px]"
+                className="select-native-glass w-full sm:min-w-[180px] text-slate-900 dark:text-slate-100"
                 aria-label="กรองตามจังหวัด"
                 value={provinceFilter}
                 onChange={(e) => {
@@ -678,7 +678,7 @@ export default function DashboardSitesPage() {
                 ))}
               </select>
               <select
-                className="select-native-glass w-full sm:min-w-[180px]"
+                className="select-native-glass w-full sm:min-w-[180px] text-slate-900 dark:text-slate-100"
                 aria-label="กรองตามอำเภอ"
                 value={districtFilter}
                 disabled={!provinceFilter}
@@ -691,19 +691,23 @@ export default function DashboardSitesPage() {
                   </option>
                 ))}
               </select>
-              <DataTablePageSizeSelect value={pageSize} onChange={setPageSize} />
+              <DataTablePageSizeSelect
+                value={pageSize}
+                onChange={setPageSize}
+                className="select-native-glass w-full sm:w-32 md:min-w-[112px] text-slate-900 dark:text-slate-100"
+              />
             </div>
           </DashboardFilterBar>
 
           {canDelete && filtered.length > 0 && (
-            <div className="px-3 sm:px-4 py-2.5 border-b border-white/10 flex flex-wrap items-center gap-2 sm:gap-3 bg-slate-950/40">
+            <div className="px-3 sm:px-4 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] flex flex-wrap items-center gap-2 sm:gap-3 bg-slate-50 dark:bg-slate-950/40">
               {selectedIds.size === 0 ? (
-                <p className="text-xs sm:text-sm text-slate-400 flex flex-wrap items-center gap-2">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 flex flex-wrap items-center gap-2">
                   <span className="hidden sm:inline">เลือกแถวด้านล่างเพื่อลบหลายรายการ</span>
                   <button
                     type="button"
                     onClick={selectAllFiltered}
-                    className="text-amber-400/95 hover:text-amber-300 underline-offset-2 hover:underline cursor-pointer text-xs sm:text-sm font-medium min-h-[44px] sm:min-h-0 inline-flex items-center"
+                    className="text-amber-700 hover:text-amber-800 dark:text-amber-400/95 dark:hover:text-amber-300 underline-offset-2 hover:underline cursor-pointer text-xs sm:text-sm font-medium min-h-[44px] sm:min-h-0 inline-flex items-center"
                   >
                     เลือกทั้งหมดที่ตรงตัวกรอง ({filtered.length})
                   </button>
@@ -711,14 +715,14 @@ export default function DashboardSitesPage() {
               ) : (
                 <>
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="inline-flex items-center rounded-lg border border-amber-500/35 bg-amber-950/25 px-2.5 py-1.5 text-xs sm:text-sm font-medium text-amber-100 tabular-nums">
+                    <span className="inline-flex items-center rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs sm:text-sm font-medium text-amber-900 tabular-nums dark:border-amber-500/35 dark:bg-amber-950/25 dark:text-amber-100">
                       เลือกแล้ว {selectedIds.size} รายการ
                     </span>
                     <button
                       type="button"
                       onClick={selectAllFiltered}
                       disabled={bulkDeleting || allFilteredSelected}
-                      className="text-xs text-slate-400 hover:text-slate-200 underline-offset-2 hover:underline cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0 inline-flex items-center"
+                      className="text-xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 underline-offset-2 hover:underline cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0 inline-flex items-center"
                     >
                       + เลือกทั้งหมดที่กรอง ({filtered.length})
                     </button>
@@ -728,7 +732,7 @@ export default function DashboardSitesPage() {
                       type="button"
                       onClick={clearSelection}
                       disabled={bulkDeleting}
-                      className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded-xl text-sm font-medium border border-white/15 bg-slate-800/60 text-slate-200 hover:bg-slate-700/70 transition-colors cursor-pointer disabled:opacity-50"
+                      className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded-xl text-sm font-medium border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-white/15 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-700/70 transition-colors cursor-pointer disabled:opacity-50"
                     >
                       <X size={16} aria-hidden /> ยกเลิกการเลือก
                     </button>
@@ -753,11 +757,11 @@ export default function DashboardSitesPage() {
           )}
 
           {loadError ? (
-            <div className="p-8 text-center text-sm text-red-400">{loadError}</div>
+            <div className="p-8 text-center text-sm text-red-600 dark:text-red-400">{loadError}</div>
           ) : sites.length === 0 ? (
             <div className="p-12 flex flex-col items-center justify-center text-center">
-              <MapPin size={48} className="opacity-40 mb-3 text-slate-600" />
-              <p className="font-semibold text-slate-400">ยังไม่มีข้อมูล Site</p>
+              <MapPin size={48} className="opacity-40 mb-3 text-slate-400 dark:text-slate-600" />
+              <p className="font-semibold text-slate-600 dark:text-slate-400">ยังไม่มีข้อมูล Site</p>
               {canCreate && (
                 <button
                   type="button"
@@ -770,8 +774,8 @@ export default function DashboardSitesPage() {
             </div>
           ) : filtered.length === 0 ? (
             <div className="p-12 flex flex-col items-center justify-center text-center">
-              <Building2 size={44} className="opacity-40 mb-3 text-slate-600" />
-              <p className="font-semibold text-slate-400">ไม่พบรายการตามตัวกรอง</p>
+              <Building2 size={44} className="opacity-40 mb-3 text-slate-400 dark:text-slate-600" />
+              <p className="font-semibold text-slate-600 dark:text-slate-400">ไม่พบรายการตามตัวกรอง</p>
               <button
                 type="button"
                 onClick={() => {
@@ -779,7 +783,7 @@ export default function DashboardSitesPage() {
                   setProvinceFilter("");
                   setDistrictFilter("");
                 }}
-                className="mt-3 text-sm text-blue-400 hover:text-blue-300 underline-offset-2 hover:underline cursor-pointer"
+                className="mt-3 text-sm text-blue-700 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline-offset-2 hover:underline cursor-pointer"
               >
                 ล้างตัวกรอง
               </button>
@@ -787,9 +791,9 @@ export default function DashboardSitesPage() {
           ) : (
             <>
               <div className="flex-1 overflow-auto min-h-0">
-                <table className="w-full min-w-[720px] text-sm text-left">
+                <table className="w-full min-w-[720px] text-sm text-left text-slate-900 dark:text-slate-100">
                   <thead>
-                    <tr className="border-b border-white/10 bg-slate-950/40 text-slate-400 sticky top-0 z-10 backdrop-blur-sm">
+                    <tr className="border-b border-slate-200 dark:border-[var(--glass-card-border)] bg-white/95 dark:bg-slate-950/40 text-slate-600 dark:text-slate-400 sticky top-0 z-10 backdrop-blur-sm">
                       {canDelete && (
                         <th scope="col" className="w-12 px-3 py-3 align-middle">
                           <input
@@ -797,7 +801,7 @@ export default function DashboardSitesPage() {
                             type="checkbox"
                             checked={allPageSelected}
                             onChange={toggleSelectAllOnPage}
-                            className="h-4 w-4 rounded border-white/25 bg-slate-900/80 text-blue-600 focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
+                            className="h-4 w-4 rounded border-slate-300 bg-white text-blue-600 focus:ring-2 focus:ring-blue-500/50 cursor-pointer dark:border-white/25 dark:bg-slate-900/80"
                             aria-label="เลือกทั้งหมดในหน้านี้"
                           />
                         </th>
@@ -822,7 +826,7 @@ export default function DashboardSitesPage() {
                     {paginatedItems.map((row) => (
                       <tr
                         key={row.id}
-                        className="border-b border-white/5 hover:bg-white/3 transition-colors"
+                        className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/3 transition-colors"
                       >
                         {canDelete && (
                           <td className="w-12 px-3 py-2 align-middle">
@@ -830,14 +834,14 @@ export default function DashboardSitesPage() {
                               type="checkbox"
                               checked={selectedIds.has(row.id)}
                               onChange={() => toggleRow(row.id)}
-                              className="h-4 w-4 rounded border-white/25 bg-slate-900/80 text-blue-600 focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
+                              className="h-4 w-4 rounded border-slate-300 bg-white text-blue-600 focus:ring-2 focus:ring-blue-500/50 cursor-pointer dark:border-white/25 dark:bg-slate-900/80"
                               aria-label={`เลือก Site ${row.province} ${row.district}`}
                             />
                           </td>
                         )}
-                        <td className="px-4 py-3 text-slate-200">{row.province}</td>
-                        <td className="px-4 py-3 text-slate-200">{row.district}</td>
-                        <td className="px-4 py-3 text-slate-300">{row.agency}</td>
+                        <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{row.province}</td>
+                        <td className="px-4 py-3 text-slate-800 dark:text-slate-200">{row.district}</td>
+                        <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.agency}</td>
                         {(canUpdate || canDelete) && (
                           <td className="px-4 py-2 text-right">
                             <div className="flex items-center justify-end gap-1">
@@ -845,7 +849,7 @@ export default function DashboardSitesPage() {
                                 <button
                                   type="button"
                                   onClick={() => openEdit(row)}
-                                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-slate-400 hover:bg-white/10 hover:text-white transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
                                   aria-label={`แก้ไข Site ${row.province}`}
                                 >
                                   <Pencil size={16} aria-hidden />
@@ -855,7 +859,7 @@ export default function DashboardSitesPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleDelete(row)}
-                                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-red-400/90 hover:bg-red-500/10 hover:text-red-300 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40"
+                                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400/90 dark:hover:bg-red-500/10 dark:hover:text-red-300 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40"
                                   aria-label={`ลบ Site ${row.province}`}
                                 >
                                   <Trash2 size={16} aria-hidden />
@@ -893,7 +897,7 @@ export default function DashboardSitesPage() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1.5 text-slate-200" htmlFor="site-province">
+            <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="site-province">
               จังหวัด
             </label>
             <input
@@ -906,7 +910,7 @@ export default function DashboardSitesPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1.5 text-slate-200" htmlFor="site-district">
+            <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="site-district">
               อำเภอ
             </label>
             <input
@@ -919,7 +923,7 @@ export default function DashboardSitesPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1.5 text-slate-200" htmlFor="site-agency">
+            <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="site-agency">
               หน่วยงาน
             </label>
             <input
@@ -943,7 +947,7 @@ export default function DashboardSitesPage() {
         onSubmit={submitProvinceModal}
       >
         <div>
-          <label className="block text-sm font-medium mb-1.5 text-slate-200" htmlFor="master-province-name">
+          <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="master-province-name">
             ชื่อจังหวัด
           </label>
           <input
@@ -971,7 +975,7 @@ export default function DashboardSitesPage() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1.5 text-slate-200" htmlFor="master-district-province">
+            <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="master-district-province">
               จังหวัด (อำเภอสังกัดจังหวัดนี้)
             </label>
             <select
@@ -993,7 +997,7 @@ export default function DashboardSitesPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1.5 text-slate-200" htmlFor="master-district-name">
+            <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="master-district-name">
               ชื่ออำเภอ
             </label>
             <input

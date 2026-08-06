@@ -6,14 +6,20 @@
 
 **Changelog + app version:** [`CHANGELOG.md`](CHANGELOG.md) — key changes; commit ที่แตะไฟล์นี้จะถาม SemVer bump (`frontend/package.json`) ผ่าน husky · footer แสดง `vX.Y.Z` จาก package (ไม่ใช่ DB) · ครั้งแรก: `npm install` ที่ root
 
+## บันทึกการอัปเดตล่าสุด (2026-08-06)
+
+- **Frontend Light / Dark theme** — สลับโหมดจาก **Sun/Moon** ใน `SiteHeader` (`next-themes`, key `dtrs-theme`, ค่าเริ่มต้น **Dark**); tokens `--glass-*` + utilities ใน `globals.css`; `/print/*` บังคับ light ผ่าน `PrintThemeShell` (ไม่ซ้อน ThemeProvider); contrast ตาราง/ฟิลเตอร์ (JobsList, sites, roles ฯลฯ) — ดู [`CHANGELOG.md`](CHANGELOG.md) · [`frontend/README.md`](frontend/README.md) · [`AGENTS.md`](AGENTS.md)
+- **GitLab CI/CD Variables (UAT)** — กลุ่ม A scope **`staging` ✅** + กลุ่ม B **MinIO ✅** (`MINIO_PORT` / `MINIO_PUBLIC_URL` / `MINIO_SERVER_FETCH_BASE_URL` = scope **all**) · **`production` กลุ่ม A = pending** · รายละเอียด: [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md)
+- **โฟกัสถัดไป** — `prisma migrate deploy` (DB UAT) → push **`staging`** → Docker `:2375` บน `.115` → manual **`deploy:uat:docker`** → login / ทดสอบอัปโหลดรูป
+- **Migration `cctv-app_ticket` → `dtrs-app`** — ดัชนี: [`docs/DTRS-Migration-Checklist.md`](docs/DTRS-Migration-Checklist.md) · แผน CI: [`docs/GitLab-CI-Plan.md`](docs/GitLab-CI-Plan.md)
+- **GitLab CI/CD (UAT + PRD)** — [`.gitlab-ci.yml`](.gitlab-ci.yml): stages `test` → `build` → `deploy` → `deploy_docker` → `cleanup`; branch **`staging`** (UAT `.115`) / **`main`/`master`** (PRD `.128`); stage **`deploy_docker` ทั้งก้อน manual**; **`.deploy_ssh_and_validate`** ตรวจกลุ่ม A ก่อน deploy
+- **P0 โค้ด** — Docker/CI/compose ใช้ชื่อ `dtrs-app-*`, host ports **8404/8405**, backend ภายใน container **4100**, deploy path UAT/PRD `/home/nurdin/dtrs-app`
+- **Local env** — `backend/.env.example`, `frontend/.env.example`; DB `dtrs_app`, `API_INTERNAL_BASE_URL=http://localhost:4100/api`; npm dev backend `:4100` / frontend `:3000` ผ่านแล้ว
+- **MinIO** — Variables บน GitLab ครบแล้ว; ตรวจ bucket ตาม `MINIO_BUCKET_NAME` (UAT ควร **`dtrs-app-uat`**) หลัง deploy · NPM / Variables PRD ยัง **pending**
+
 ## บันทึกการอัปเดตล่าสุด (2026-08-05)
 
-- **Migration `cctv-app_ticket` → `dtrs-app`** — ดัชนีและสถานะ: [`docs/DTRS-Migration-Checklist.md`](docs/DTRS-Migration-Checklist.md) · แผน CI: [`docs/GitLab-CI-Plan.md`](docs/GitLab-CI-Plan.md) · Variables: [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md)
-- **GitLab CI/CD (UAT + PRD)** — [`.gitlab-ci.yml`](.gitlab-ci.yml): stages `test` → `build` → `deploy` → `deploy_docker` → `cleanup`; branch **`staging`** (UAT บน `nurdin@192.168.0.115`) / **`main`/`master`** (PRD บน `nurdin@192.168.0.128`); build image บน **`.115`**; stage **`deploy_docker` ทั้งก้อน manual** (UAT: `docker_build` → `deploy`; PRD: `docker_build` → `transfer` (`DOCKER_HOST_PRD`) → `deploy`); gate **`test:frontend`** (lint) + **`test:backend`** (eslint + jest); **`.deploy_ssh_and_validate`** ตรวจกลุ่ม A ก่อน deploy (ดู checklist Variables)
-- **P0 โค้ด** — Docker/CI/compose ใช้ชื่อ `dtrs-app-*`, host ports **8404/8405**, backend ภายใน container **4100**, deploy path UAT/PRD `/home/nurdin/dtrs-app`
-- **Local env** — `backend/.env.example`, `frontend/.env.example`; คัดลอกเป็น `.env` / `.env.local` แล้วตั้งค่า dev (DB `dtrs_app`, `API_INTERNAL_BASE_URL=http://localhost:4100/api`)
-- **MinIO bucket `dtrs-app`** — ⏸️ **รอทีม infra สร้าง bucket บน server** (ชื่อใน config แล้ว; ยังไม่ทดสอบอัปโหลด)
-- **ทดสอบ local (npm)** — `npx prisma generate`, backend `:4100/api`, frontend `:3000` ผ่าน; ขั้นถัดไป: ตั้ง GitLab Variables กลุ่ม A (scope `staging`/`production`) + NPM + ทดสอบ pipeline บน `staging`
+- **Migration / CI implement** — ดูบันทึก 2026-08-06 สำหรับสถานะ Variables ล่าสุด; checklist: [`docs/DTRS-Migration-Checklist.md`](docs/DTRS-Migration-Checklist.md)
 
 ## บันทึกการอัปเดตล่าสุด (2026-05-13)
 
@@ -71,7 +77,7 @@
 - **อีเมลแจ้งงาน (เทมเพลต + Role)** — เก็บใน `Setting` คีย์ `email_templates`; หน้า **`/dashboard/settings`** (ADMIN): โลโก้, **`publicBaseUrl`** สำหรับลิงก์ในอีเมล, เทมเพลต **แจ้งเหตุ / รับเรื่อง / ปิดงาน** (เปิดปิด, To เพิ่มเติม, CC, **แจ้งตามบทบาท** `notifyRoleIds`); HTML อีเมลโทนสว่าง สถานะเป็น badge — **flow ผู้รับ To/CC เริ่มต้น** ดู [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
 - **API:** `GET/PUT /api/settings/email-templates` (JWT + สิทธิ์ **`menu.settings`**)
 - **CC อีเมล** — CC มาจากช่องตั้งค่า + บทบาทที่เลือกเท่านั้น (ไม่แทรกผู้รับงานเป็น CC อัตโนมัติเมื่อปิดงาน) — สรุปใน [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
-- **Modal แดชบอร์ด (`CrudModal`)** — แสดงด้วย **`createPortal` → `document.body`**, **`z-100`** ให้อยู่เหนือ `SiteHeader`/`sidebar` (`z-50`); โทน **Dark Glassmorphism** (backdrop, `ring-1 ring-white/5`, พร็อพ **`size`**: `md` | `lg`); ล็อก scroll `body` ขณะเปิด
+- **Modal แดชบอร์ด (`CrudModal`)** — แสดงด้วย **`createPortal` → `document.body`**, **`z-100`** ให้อยู่เหนือ `SiteHeader`/`sidebar` (`z-50`); โทน **Glass ตาม theme** (Dark/Light); พร็อพ **`size`**: `md` | `lg`; ล็อก scroll `body` ขณะเปิด
 - **หน้า `/dashboard/roles`** — modal เพิ่ม/แก้ไขบทบาทและกำหนดสิทธิ์: ฟิลด์ใช้ **`form-input-glass`** (`globals.css`); รายการสิทธิ์ในกล่องแก้ว + checkbox สไตล์ dark
 - **RBAC งานซ่อม (แก้ไข/ปิดงาน + Reopen)** — คุมสิทธิ์ผ่าน `/dashboard/roles` ด้วย permission:
   - `job.fix.self` / `job.fix.any`
@@ -121,7 +127,7 @@
 | [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md) | Checklist ตั้ง GitLab CI/CD Variables |
 | [`docs/templates/README.md`](docs/templates/README.md) | เทมเพลตแอปใหม่ — AGENTS + Skills + checklist (คัดลอกทั้งโฟลเดอร์ได้) |
 | [`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md) | Private MinIO + proxy รูป + checklist QA |
-| [`minio.md`](minio.md) | ตัวแปร MinIO และหมายเหตุ bucket |
+| [`docs/minio.md`](docs/minio.md) | ตัวแปร MinIO และหมายเหตุ bucket (GitLab กลุ่ม B ✅) |
 | [`docs/Email-Notifications.md`](docs/Email-Notifications.md) | Flow อีเมลแจ้งงาน |
 | [`docs/CSV-vs-System-Mapping.md`](docs/CSV-vs-System-Mapping.md) | เทียบ CSV กับ schema |
 | [`backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md`](backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md) | Nginx Proxy Manager / path |
@@ -135,12 +141,12 @@
 
 ### 1. Frontend (Next.js 15)
 - **Framework:** Next.js (App Router)
-- **UI & Styling:** Tailwind CSS, Lucide React, Google Font (Sarabun)
+- **UI & Styling:** Tailwind CSS, Lucide React, Google Font (Sarabun), **next-themes**
 - **Design System / Primitive Library:** `shadcn/ui` (base) + local wrappers ใน `frontend/src/components/ui/`
-- **Standard Theme:** **Dark Glassmorphism** (slate-950 background, semi-transparent glass cards)
+- **Standard Theme:** **Glassmorphism** — ค่าเริ่มต้น **Dark** + สลับ **Light** จาก `SiteHeader` (`storageKey`: `dtrs-theme`); tokens `--glass-*` ใน `globals.css`; `/print/*` บังคับ light
 - **Layout Architecture:** **No-Card Layout** (แยกส่วน Content เป็น Glass Cards ย่อยๆ แทนการใช้ขอบขาวขนาดใหญ่)
-- **Components:** Unified Layout with `SiteHeader` (fixed), `SiteFooter`, `PublicLayoutShell`, `DashboardPageShell`, `DashboardFilterBar`, `CrudModal` (ภายในใช้ `ui/Dialog`), `UserMenuDropdown`, `SegmentedTabs` (แท็บสัญญา/นอกสัญญา + badge จำนวนงานค้าง), `JobsList` (ตารางงาน + modal รายละเอียด/มอบหมาย/อัปเดตผ่าน `Dialog` + `JobImageLightbox`)
-- **Shared UI Utilities:** `DashboardRouteLoading`, `PublicRouteLoading`, `ManagedImage`, `ManagedImageFrame`, `JobImageLightbox`, `MANAGED_IMAGE_SIZES`
+- **Components:** Unified Layout with `SiteHeader` (fixed + **ThemeToggle**), `SiteFooter`, `PublicLayoutShell`, `DashboardPageShell`, `DashboardFilterBar`, `CrudModal` (ภายในใช้ `ui/Dialog`), `UserMenuDropdown`, `SegmentedTabs` (แท็บสัญญา/นอกสัญญา + badge จำนวนงานค้าง), `JobsList` (ตารางงาน + modal รายละเอียด/มอบหมาย/อัปเดตผ่าน `Dialog` + `JobImageLightbox`)
+- **Shared UI Utilities:** `DashboardRouteLoading`, `PublicRouteLoading`, `ManagedImage`, `ManagedImageFrame`, `JobImageLightbox`, `PrintThemeShell`, `MANAGED_IMAGE_SIZES`
 - **Authentication:** NextAuth.js (login ด้วยอีเมลหรือชื่อผู้ใช้ + รหัสผ่าน, password toggle)
 - **State & Integration:** Axios, Socket.io-client, SweetAlert2 (Toast: success 1.2s, error, confirm)
 - **โฟลเดอร์หลัก:** `/frontend`

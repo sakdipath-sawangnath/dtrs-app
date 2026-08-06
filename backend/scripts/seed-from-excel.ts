@@ -10,7 +10,7 @@ import { PrismaClient } from '@prisma/client';
 import { loadWorkbookXlsx, worksheetToRecords } from './excel-sheet';
 
 const prisma = new PrismaClient();
-const EXCEL_PATH = path.resolve(__dirname, '../../ระบบแจ้งซ่อม CCTV .xlsx');
+const EXCEL_PATH = path.resolve(__dirname, '../../ระบบแจ้งซ่อม .xlsx');
 
 function readSheet<T extends Record<string, unknown>>(
   wb: ExcelJS.Workbook,
@@ -146,8 +146,8 @@ async function main() {
   }
   console.log(`   ✅ ${areaCount} Areas processed`);
 
-  // ─── 5. ระบบแจ้งซ่อม CCTV (main sheet) → Job ───
-  console.log('\n🛠️  Seeding Jobs (ระบบแจ้งซ่อม CCTV)...');
+  // ─── 5. ระบบแจ้งซ่อม (main sheet) → Job ───
+  console.log('\n🛠️  Seeding Jobs (ระบบแจ้งซ่อม)...');
   type JobRow = {
     'ID': number;
     'เลขที่ใบแจ้งซ่อม': string;
@@ -173,7 +173,7 @@ async function main() {
     'หมายเหตุการแก้ไข': string;
     'สถานะระบบ': string;
   };
-  const jobRows = readSheet<JobRow>(wb, 'ระบบแจ้งซ่อม CCTV ');
+  const jobRows = readSheet<JobRow>(wb, 'ระบบแจ้งซ่อม ');
   
   // Map Excel status → Prisma enum
   const statusMap = (s: string) => {

@@ -3,7 +3,7 @@
 > **Production:** `https://dtrs-app.forth.co.th` · API ที่ `/api`  
 > **อ้างอิง pipeline:** [`.gitlab-ci.yml`](../.gitlab-ci.yml) — UAT (`staging`) + PRD (`main`/`master`); แผน: [`GitLab-CI-Plan.md`](./GitLab-CI-Plan.md)  
 > **Migration รวม:** [`DTRS-Migration-Checklist.md`](./DTRS-Migration-Checklist.md)  
-> **สถานะ UAT (2026-08-05):** กลุ่ม A scope **`staging` ✅** ตั้งบน GitLab UI แล้ว · SSH/path `.115` พร้อม · **PRD / MinIO ยังไม่ตั้ง**
+> **สถานะ (2026-08-06):** กลุ่ม A scope **`staging` ✅** · กลุ่ม B **MinIO ✅** (ตั้งบน UI แล้ว) · SSH/path `.115` พร้อม · **โฟกัส = UAT (`staging`)** · scope **`production` กลุ่ม A = pending**
 
 **ที่ตั้งใน GitLab:** Project **`FORTH/dtrs-app`** → **Settings** → **CI/CD** → **Variables**
 
@@ -24,7 +24,7 @@
 ## กลุ่ม A — บังคับก่อน deploy (ตั้งได้เลย)
 
 > **Pipeline validate อัตโนมัติ:** job **`deploy:uat:docker`** และ **`deploy:prd:docker`** ใช้ template **`.deploy_ssh_and_validate`** — ถ้าตัวแปรด้านล่าง (ยกเว้น `SSH_PRIVATE_KEY` ที่เช็กใน `.ssh_setup`) ว่างใน scope ของ environment นั้น job จะ **fail ก่อน SSH/deploy** พร้อมข้อความชี้มาที่เอกสารนี้  
-> **`MINIO_*` ยังไม่ถูก validate** — deploy ได้แต่อัปโหลดรูปอาจ fail จนกว่าจะตั้งกลุ่ม B
+> **`MINIO_*` ไม่ถูก validate ก่อน deploy** — ตั้งแล้วก็ deploy ได้; อัปโหลดรูปต้องให้ bucket บน server มีจริง
 
 | ☐ | Variable | ส่งเข้า | ค่า PRD แนะนำ | Masked | validate ก่อน deploy |
 |---|----------|---------|---------------|--------|
@@ -41,19 +41,20 @@
 
 ---
 
-## กลุ่ม B — MinIO (⏸️ รอ bucket `dtrs-app` บน server)
+## กลุ่ม B — MinIO ✅ (ตั้งบน GitLab UI แล้ว — 2026-08-06)
 
-| ☐ | Variable | ส่งเข้า | ค่าแนะนำ | Masked |
-|---|----------|---------|----------|--------|
-| ☐ | `MINIO_ENDPOINT` | backend | IP/hostname MinIO (เช่น `192.168.0.71`) | |
-| ☐ | `MINIO_PORT` | backend | `9000` | |
-| ☐ | `MINIO_ACCESS_KEY` | backend | จากทีม infra | ✅ |
-| ☐ | `MINIO_SECRET_KEY` | backend | จากทีม infra | ✅ |
-| ☐ | `MINIO_BUCKET_NAME` | backend | **`dtrs-app`** (แยกจาก `cctv-app`) | |
-| ☐ | `MINIO_PUBLIC_URL` | backend (prefix URL ใน DB) | เช่น `https://minio-it.forth.co.th` | |
-| ☐ | `MINIO_SERVER_FETCH_BASE_URL` | backend (Nest โหลด object ภายใน LAN) | เช่น `http://192.168.0.71:9000` | |
+| ☐ | Variable | ส่งเข้า | Scope ที่ตั้ง | Masked |
+|---|----------|---------|---------------|--------|
+| ☑ | `MINIO_ENDPOINT` | backend | ตาม UI | |
+| ☑ | `MINIO_PORT` | backend | **`*` (all)** | |
+| ☑ | `MINIO_ACCESS_KEY` | backend | ตาม UI | ✅ |
+| ☑ | `MINIO_SECRET_KEY` | backend | ตาม UI | ✅ |
+| ☑ | `MINIO_BUCKET_NAME` | backend | ตาม UI (UAT ควรเป็น **`dtrs-app-uat`**; PRD แยก **`dtrs-app`** ทีหลังถ้ายัง scope all ค่าเดียว) | |
+| ☑ | `MINIO_PUBLIC_URL` | backend (prefix URL ใน DB) | **`*` (all)** | |
+| ☑ | `MINIO_SERVER_FETCH_BASE_URL` | backend (Nest โหลด object ภายใน LAN) | **`*` (all)** | |
 
-**หมายเหตุ:** pipeline ปัจจุบัน **ไม่ส่ง** `MINIO_USE_SSL` — backend ใช้ default ในโค้ด; ถ้า PRD ต้อง SSL อาจเพิ่มใน `.gitlab-ci.yml` ภายหลัง
+**หมายเหตุ:** pipeline ปัจจุบัน **ไม่ส่ง** `MINIO_USE_SSL` — backend ใช้ default ในโค้ด; ถ้า PRD ต้อง SSL อาจเพิ่มใน `.gitlab-ci.yml` ภายหลัง  
+**ตรวจหลัง deploy:** อัปโหลดรูปไป bucket ที่ตั้งใน `MINIO_BUCKET_NAME` จริงบน MinIO server (อย่าไป `cctv-app`)
 
 ---
 
@@ -86,10 +87,10 @@
 
 ## Checklist ตามลำดับทำ
 
-### 1) ตอนนี้ (ไม่รอ MinIO)
+### 1) โฟกัสตอนนี้ — scope **`staging`** (UAT) · ไม่ทำ PRD
 
 - [x] ตั้งกลุ่ม A ครบใน scope **`staging`** (UAT — 2026-08-05)
-- [ ] ตั้งกลุ่ม A ครบใน scope **`production`** (PRD)
+- [x] ตั้งกลุ่ม B **MinIO** ครบ (2026-08-06) — `MINIO_PORT` / `MINIO_PUBLIC_URL` / `MINIO_SERVER_FETCH_BASE_URL` = scope **all**
 - [x] `SSH_PRIVATE_KEY` (UAT) — คู่ key `dtrs-app-uat` · public append บน `.115` · **ยืนยันค่าใน GitLab เป็น private คู่ที่ทดสอบ SSH ผ่านแล้ว**
 - [x] `DATABASE_URL` (UAT) → `@192.168.0.11:3306/dtrs_app`
 - [x] `JWT_SECRET` (UAT) — gen ใหม่ แยกจาก PRD / `cctv-app_ticket`
@@ -98,26 +99,31 @@
 - [x] `NEXT_PUBLIC_API_BASE_URL` (UAT) → `http://192.168.0.115:8405/api`
 - [x] `FRONTEND_BASE_URL` (UAT) → `http://192.168.0.115:8404`
 - [x] `ALLOWED_ORIGINS` (UAT) → `http://192.168.0.115:8404`
-- [ ] ยืนยัน runner tag **`docker`** (+ `forth`) ใช้ได้กับ project นี้
-- [ ] Protected branch = **`main`** (หรือ `master`) — สำหรับ Variables PRD
+- [ ] ยืนยัน runner tag **`docker`** (+ `forth`) ใช้ได้กับ project นี้ (จำเป็นก่อน pipeline UAT)
 
-### 1b) ก่อนกด deploy UAT/PRD ครั้งแรก (DB schema)
+### 1b) ก่อนกด deploy UAT ครั้งแรก (DB schema)
 
 > Pipeline **ไม่** รัน `prisma migrate` — ต้อง sync schema กับ DB เป้าหมายก่อน ไม่เช่นนั้น container อาจขึ้นแต่ API 500
 
 - [ ] **UAT:** `cd backend && npx prisma migrate deploy` ชี้ `DATABASE_URL` ของ `@192.168.0.11:3306/dtrs_app` (หรือยืนยัน schema ครบแล้ว)
-- [ ] **PRD:** เช่นกันกับ `@192.168.0.126:3306/dtrs_app` ก่อน deploy production
-- [ ] มี admin user ใน DB (เช่น `seed-admin.ts`) สำหรับทดสอบ login
+- [ ] มี admin user ใน DB UAT (เช่น `seed-admin.ts`) สำหรับทดสอบ login
 
-### 2) หลังทีม infra สร้าง bucket `dtrs-app`
+### 1c) ⏸️ Pending — scope **`production`** (ยังไม่ทำรอบนี้)
 
-- [ ] `MINIO_ENDPOINT`
-- [ ] `MINIO_PORT`
-- [ ] `MINIO_ACCESS_KEY`
-- [ ] `MINIO_SECRET_KEY`
-- [ ] `MINIO_BUCKET_NAME` → `dtrs-app`
-- [ ] `MINIO_PUBLIC_URL`
-- [ ] `MINIO_SERVER_FETCH_BASE_URL` (ถ้า Nest โหลดรูปจาก LAN ไม่ได้ผ่าน public URL)
+- [ ] ตั้งกลุ่ม A ครบใน scope **`production`** (PRD)
+- [ ] Protected branch = **`main`** (หรือ `master`) — สำหรับ Variables PRD
+- [ ] **PRD:** `npx prisma migrate deploy` กับ `@192.168.0.126:3306/dtrs_app` ก่อน deploy production
+
+### 2) กลุ่ม B MinIO — ✅ ตั้งบน GitLab แล้ว (2026-08-06)
+
+- [x] `MINIO_ENDPOINT`
+- [x] `MINIO_PORT` — scope **all**
+- [x] `MINIO_ACCESS_KEY`
+- [x] `MINIO_SECRET_KEY`
+- [x] `MINIO_BUCKET_NAME` (ตรวจว่า UAT ใช้ **`dtrs-app-uat`** ตามที่ตกลง)
+- [x] `MINIO_PUBLIC_URL` — scope **all**
+- [x] `MINIO_SERVER_FETCH_BASE_URL` — scope **all**
+- [ ] ยืนยัน bucket มีจริงบน MinIO server + ทดสอบอัปโหลดหลัง deploy UAT
 
 ### 3) หลัง deploy ครั้งแรก (ตรวจ)
 
@@ -126,7 +132,7 @@
 - [ ] Container ชื่อ **`dtrs-app-*`** (ไม่ใช่ `cctv-app-ticket-*`) และ job deploy **ไม่ fail** ที่ health check
 - [ ] Login บน UAT `http://192.168.0.115:8404` / PRD `https://dtrs-app.forth.co.th`
 - [ ] Container **`cctv-app-ticket-*`** ยังทำงาน (ถ้ายังใช้ production เก่า)
-- [ ] อัปโหลดรูป → bucket **`dtrs-app`** (ไม่ไป `cctv-app`)
+- [ ] อัปโหลดรูป → bucket ตาม `MINIO_BUCKET_NAME` (UAT: **`dtrs-app-uat`** · PRD: **`dtrs-app`**) — ไม่ไป `cctv-app`
 
 ---
 
@@ -206,8 +212,13 @@ CRON_SECRET=***
 | ☑ | `NEXT_PUBLIC_API_BASE_URL` | `staging` | `http://192.168.0.115:8405/api` (bake ตอน **`build:frontend`** + docker build) | ✅ · job `build:frontend` ใช้ `environment: $DTRS_CI_ENV` + `action: prepare` เพื่อ inject scope |
 | ☑ | `FRONTEND_BASE_URL` | `staging` | `http://192.168.0.115:8404` | ✅ |
 | ☑ | `ALLOWED_ORIGINS` | `staging` | `http://192.168.0.115:8404` | ✅ |
-| ☐ | `MINIO_BUCKET_NAME` | `staging` | **`dtrs-app-uat`** (⏸️ รอ infra สร้าง bucket) | ☐ |
-| ☐ | `MINIO_*` (endpoint, keys, URLs) | `staging` | จากทีม infra — อาจชี้ MinIO เดียวกับ PRD แต่ bucket แยก | ☐ |
+| ☑ | `MINIO_ENDPOINT` | ตาม UI | endpoint MinIO | ✅ 2026-08-06 |
+| ☑ | `MINIO_PORT` | **`*` (all)** | เช่น `9000` | ✅ |
+| ☑ | `MINIO_ACCESS_KEY` | ตาม UI | จาก infra | ✅ |
+| ☑ | `MINIO_SECRET_KEY` | ตาม UI | จาก infra | ✅ |
+| ☑ | `MINIO_BUCKET_NAME` | ตาม UI | ควร **`dtrs-app-uat`** สำหรับ UAT | ✅ |
+| ☑ | `MINIO_PUBLIC_URL` | **`*` (all)** | เช่น `https://minio-it.forth.co.th` | ✅ |
+| ☑ | `MINIO_SERVER_FETCH_BASE_URL` | **`*` (all)** | เช่น `http://192.168.0.71:9000` | ✅ |
 
 ### Infra บน `.115` (คู่กับ Variables UAT)
 
@@ -217,7 +228,7 @@ CRON_SECRET=***
 - [ ] `DOCKER_HOST=tcp://127.0.0.1:2375 docker ps` บน `.115`
 
 **Deploy path บน `.115` (UAT):** `/home/nurdin/dtrs-app` ✅  
-**Deploy path บน `.128` (PRD):** `/home/nurdin/dtrs-app` (ยังไม่เตรียม SSH รอบนี้)
+**Deploy path บน `.128` (PRD):** `/home/nurdin/dtrs-app` — ⏸️ pending (ยังไม่เตรียม SSH / Variables รอบนี้)
 
 ---
 
@@ -228,5 +239,5 @@ CRON_SECRET=***
 - [`backend/.env.example`](../backend/.env.example) — local backend env
 - [`frontend/.env.example`](../frontend/.env.example) — local frontend env
 - [`backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md`](../backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md) — NPM 8404/8405
-- [`minio.md`](../minio.md) — ตัวแปร MinIO รายละเอียด
+- [`minio.md`](./minio.md) — ตัวแปร MinIO รายละเอียด
 - [`DTRS-Migration-Checklist.md`](./DTRS-Migration-Checklist.md) — checklist ย้ายจาก `cctv-app_ticket`

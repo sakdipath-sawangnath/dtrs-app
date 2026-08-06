@@ -49,12 +49,10 @@ export default function DataTablePagination({
       : "";
 
   const navBtnClass =
-    "min-h-9 rounded-lg border-white/10 bg-slate-800/50 px-3 text-xs font-medium text-slate-300 hover:bg-slate-700/60 cursor-pointer disabled:pointer-events-none disabled:opacity-40";
+    "min-h-9 rounded-lg border-[var(--glass-input-border)] bg-[var(--glass-input-bg)] px-3 text-xs font-medium glass-muted-text hover:bg-[var(--glass-hover)] hover:text-[var(--glass-text)] cursor-pointer disabled:pointer-events-none disabled:opacity-40";
 
   return (
-    <div
-      className="px-4 py-2.5 text-xs border-t border-white/10 text-slate-400 flex flex-wrap justify-between items-center gap-2"
-    >
+    <div className="px-4 py-2.5 text-xs border-t border-[var(--glass-card-border)] glass-muted-text flex flex-wrap justify-between items-center gap-2">
       <span>
         {summary}
         {extra}
@@ -72,7 +70,7 @@ export default function DataTablePagination({
           >
             ก่อนหน้า
           </Button>
-          <span className="text-sm text-slate-300">
+          <span className="text-sm glass-text">
             หน้า {page} / {totalPages}
           </span>
           <Button

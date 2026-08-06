@@ -1,14 +1,14 @@
-# Project Status - ระบบแจ้งซ่อม CCTV
+# Project Status - ระบบแจ้งซ่อม
 
-**วันที่อัปเดตสถานะ:** 2026-08-05
+**วันที่อัปเดตสถานะ:** 2026-08-06
 
-**Migration (`cctv-app_ticket` → `dtrs-app`):** ดู [`docs/DTRS-Migration-Checklist.md`](docs/DTRS-Migration-Checklist.md) — P0 โค้ด ✅ · GitLab CI UAT+PRD ✅ implement ใน [`.gitlab-ci.yml`](.gitlab-ci.yml) · ตั้ง Variables + NPM/deploy จริง ค้าง
+**Migration (`cctv-app_ticket` → `dtrs-app`):** ดู [`docs/DTRS-Migration-Checklist.md`](docs/DTRS-Migration-Checklist.md) — P0 โค้ด ✅ · GitLab CI ✅ · **Variables กลุ่ม A `staging` + MinIO กลุ่ม B ✅** · **`production` กลุ่ม A / NPM = pending** · โฟกัสถัดไป = deploy UAT
 
-**ดัชนีเอกสาร:** [`README.md`](README.md) (ตารางสรุป), [`docs/README.md`](docs/README.md), [`docs/DTRS-Migration-Checklist.md`](docs/DTRS-Migration-Checklist.md), [`docs/GitLab-CI-Plan.md`](docs/GitLab-CI-Plan.md), [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md), [`minio.md`](minio.md), [`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md), [`docs/Job-Serial-Multi-Row.md`](docs/Job-Serial-Multi-Row.md), [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md)
+**ดัชนีเอกสาร:** [`README.md`](README.md) (ตารางสรุป), [`docs/README.md`](docs/README.md), [`docs/DTRS-Migration-Checklist.md`](docs/DTRS-Migration-Checklist.md), [`docs/GitLab-CI-Plan.md`](docs/GitLab-CI-Plan.md), [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md), [`docs/minio.md`](docs/minio.md), [`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md), [`docs/Job-Serial-Multi-Row.md`](docs/Job-Serial-Multi-Row.md), [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md)
 
 ---
 
-## 🟢 สถานะภาพรวม: Phase 6.11 (shadcn rollout + docs sync) Complete
+## 🟢 สถานะภาพรวม: Phase 6.14 (Light/Dark theme) Complete
 
 ---
 
@@ -48,7 +48,8 @@
    - **พิมพ์รายงาน / รูปงาน / แดชบอร์ด**: หน้าพิมพ์ — **`/job-images/...`** → Nest; แดชบอร์ด/สถานะเจ้าหน้าที่ — รูปงานผ่าน **`dashboardJobImagePath`** (`/job-images/...`); รูปโปรไฟล์ผ่าน **`/user-images/:userId`**; เอกสาร NPM: `backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md`
    - **Public API**: `GET /public/users/reporter-by-phone` **ไม่ส่ง** `image` URL (กันเปิดรูป MinIO โดยไม่ login)
 
-3. 🖥️ **Frontend & UI Design (Modern Minimal Theme & UX Improvements): `🟢 สมบูรณ์`**
+3. 🖥️ **Frontend & UI Design (Glassmorphism Dark + Light): `🟢 สมบูรณ์`**
+   - **Theme (2026-08-06):** `next-themes` + ปุ่ม Sun/Moon ใน `SiteHeader`; default **Dark**, `localStorage` key **`dtrs-theme`**; `--glass-*` tokens / `.glass-page` / `.glass-card` / `form-input-glass`; `/print/*` บังคับ light ผ่าน `PrintThemeShell` (class `.light`, ไม่ซ้อน ThemeProvider); contrast ตาราง JobsList / sites / roles / status badges ใน light mode
    - **RBAC Sidebar (แก้แล้ว):** `DashboardLayoutShell` แกะ response `/roles/me/permissions` แบบเดียวกับ `ResponseInterceptor`; ถ้า permission ที่ได้ไม่ map กับรายการเมนูใน sidebar จะ fallback ตามบทบาท; เมนูสำหรับ **SUPERVISOR** ในหมวดเดียวกับ STAFF (ภาพรวม, กำลังแก้ไข, ประวัติ, นอกสัญญา) สอดคล้องเอกสาร
    - **Unified Public Template (`PublicLayoutShell`)**: หน้า `/public/report`, `/public/status` และ `/login` ใช้ Layout และ Background Glassmorphism แบบเดียวกันทั้งหมด (เส้นทางเดิม `/report` และ `/status` redirect) สร้างความเป็นเอกภาพ (Consistency)
    - **Global Font เปลี่ยนเป็น `Sarabun`**: แก้ไข Layout หลักให้ดึงฟอนต์ Sarabun แทน Prompt เพื่อเพิ่มความเป็นทางการและดูหน้าเชื่อถือ
@@ -62,14 +63,14 @@
    - **Dashboard ภาพรวม**: กราฟสัดส่วนสถานะ (Pie), จำนวนแจ้งซ่อมตามจังหวัด Top 8 (Bar), **แนวโน้มรายวัน 14 วัน** = แจ้งในวันนั้น vs เสร็จในวันนั้น (ใช้ `fixDate` สำหรับเสร็จ); เมนูด่วนอ้างอิง RBAC (permission); filter/report controls ใช้ `Button` / `Input` / `Label`
    - **หน้ารอดำเนินการ**: ปุ่ม **ดูรายละเอียด** → ไปหน้าเต็ม `/dashboard/jobs/:id` (ไม่ใช้ modal); ปุ่ม **มอบหมายงาน** และ **ย้ายนอกสัญญา** ตามสิทธิ์ **`job.assign`** (`/roles/me/permissions` + fallback บทบาท); ปุ่ม **รับงาน** (assign ตัวเองเมื่อ API อนุญาต); ปุ่ม **ลบงาน** ตาม **`job.deleteUnassigned`**
    - **งานที่รับผิดชอบ** (`/dashboard/my-jobs`): DataTable งานที่รับมอบหมายให้ผู้ใช้ปัจจุบัน พร้อม filter; ปุ่มดูรายละเอียดไปหน้า `/dashboard/jobs/:id`
-  - **หน้ารายละเอียดงาน** (`/dashboard/jobs/:id`): แสดงเต็มพื้นที่ — การ์ดซ้าย "ข้อมูลการแจ้งข้อขัดข้อง", การ์ดขวา "ข้อมูลการแก้ไข" + ฟอร์มบันทึกการแก้ไข (ลำดับ: `fixEnvironment` → `brokenPartType`; ฟิลด์บังคับ: cause, fixMethod และรูปการแก้ไขอย่างน้อย 2 รูปแรก; หมายเหตุและ Serial ไม่บังคับ); **บันทึก/ปิดงาน และ Reopen คุมสิทธิ์ด้วย RBAC** (`job.fix.*`, `job.reopen.*`) ผ่าน `/dashboard/roles`; มีปุ่ม Reopen เมื่อ `RESOLVED` (ยืนยันก่อนเรียก API); สไตล์ Dark Glassmorphism; มีการ์ด **ไทม์ไลน์งาน (ย่อ/ขยายแบบ smooth)** และใช้ `assignedById` เพื่อแยกผู้มอบหมาย/รับงานเอง; card **Backfill วันที่** กรอกวันที่แบบ **`dd/mm/yyyy`** พร้อม preview “ปฏิทินไทย (พ.ศ.)”; **พิมพ์/PDF รายงาน** ผ่านหน้า **`/print/jobs/[id]`** + `print.css` + เทมเพลต `JobMaintenancePdfTemplate`
+  - **หน้ารายละเอียดงาน** (`/dashboard/jobs/:id`): แสดงเต็มพื้นที่ — การ์ดซ้าย "ข้อมูลการแจ้งข้อขัดข้อง", การ์ดขวา "ข้อมูลการแก้ไข" + ฟอร์มบันทึกการแก้ไข (ลำดับ: `fixEnvironment` → `brokenPartType`; ฟิลด์บังคับ: cause, fixMethod และรูปการแก้ไขอย่างน้อย 2 รูปแรก; หมายเหตุและ Serial ไม่บังคับ); **บันทึก/ปิดงาน และ Reopen คุมสิทธิ์ด้วย RBAC** (`job.fix.*`, `job.reopen.*`) ผ่าน `/dashboard/roles`; มีปุ่ม Reopen เมื่อ `RESOLVED` (ยืนยันก่อนเรียก API); สไตล์ Glass ตาม theme; มีการ์ด **ไทม์ไลน์งาน (ย่อ/ขยายแบบ smooth)** และใช้ `assignedById` เพื่อแยกผู้มอบหมาย/รับงานเอง; card **Backfill วันที่** กรอกวันที่แบบ **`dd/mm/yyyy`** พร้อม preview “ปฏิทินไทย (พ.ศ.)”; **พิมพ์/PDF รายงาน** ผ่านหน้า **`/print/jobs/[id]`** + `print.css` + เทมเพลต `JobMaintenancePdfTemplate`
    - **หน้าแจ้งซ่อม** (`/report`): ผู้ใช้ทั่วไปยังต้องกด **ตรวจสอบ** ให้พบผู้แจ้งในระบบก่อนเลือกสถานที่; **เจ้าหน้าที่ที่ล็อกอิน** (บทบาท STAFF / ADMIN / SUPERVISOR) ใช้ flow แยก — โหลด `GET /sites` ทันที, กรอกเบอร์ 10 หลักแล้วดำเนินการต่อได้โดยไม่บังคับพบจากระบบ (กรอกชื่อ-สกุลเองเมื่อไม่พบ), ส่ง `POST /jobs` พร้อม **`Authorization: Bearer`** เมื่อมี session, หลังสำเร็จ redirect ไป **`/dashboard/jobs`**; แสดงข้อความ error จาก API ชัดเจน (`extractApiErrorMessage`)
-  - **Component ร่วม**: `DashboardPageShell`, `DashboardFilterBar`, **`CrudModal`** (wrapper ของ `ui/Dialog`, portal ไป `document.body`, `z-100`, Dark Glass, พร็อพ `size` md/lg; ใช้ที่ `/dashboard/users`, `/dashboard/roles` ฯลฯ), `JobsList` (รองรับ prop `assignedToMe`; modal รายละเอียด/มอบหมาย/อัปเดตการแก้ไขย้ายเป็น `Dialog` + `JobImageLightbox`), `modalGhostButtonStyles` (มาตรฐานปุ่ม `ghost` ใน modal/overlay), Toast (`toastSuccess` ปิดอัตโนมัติ 1.2 วินาที, `toastError`, `toastWarning`, `confirmDialog`)
-   - **ฟอร์มแดชบอร์ด (พื้นหลังเข้ม)**: ช่อง input แนะนำ class **`form-input-glass`** ใน `globals.css` (ไม่ใช้ `.form-input` คู่กับพื้นขาวบน dark layout)
-   - **หน้าจัดการบทบาท** (`/dashboard/roles`): modal สร้าง/แก้ไข/กำหนดสิทธิ์ — UI Dark Glass + `form-input-glass` + กล่องรายการ permission แบบ scroll
+  - **Component ร่วม**: `DashboardPageShell`, `DashboardFilterBar`, **`CrudModal`** (wrapper ของ `ui/Dialog`, portal ไป `document.body`, `z-100`, Glass ตาม theme, พร็อพ `size` md/lg; ใช้ที่ `/dashboard/users`, `/dashboard/roles` ฯลฯ), `JobsList` (รองรับ prop `assignedToMe`; modal รายละเอียด/มอบหมาย/อัปเดตการแก้ไขย้ายเป็น `Dialog` + `JobImageLightbox`), `modalGhostButtonStyles` (มาตรฐานปุ่ม `ghost` ใน modal/overlay), Toast (`toastSuccess` ปิดอัตโนมัติ 1.2 วินาที, `toastError`, `toastWarning`, `confirmDialog` — อ่าน theme จาก `html` class)
+   - **ฟอร์มแดชบอร์ด**: ช่อง input แนะนำ class **`form-input-glass`** ใน `globals.css` (อ่าน `--glass-input-*` ทั้ง Dark/Light; แยกจาก `.form-input` legacy)
+   - **หน้าจัดการบทบาท** (`/dashboard/roles`): modal สร้าง/แก้ไข/กำหนดสิทธิ์ — UI Glass ตาม theme + `form-input-glass` + กล่องรายการ permission แบบ scroll
    - **Sidebar**: ไม่แสดงเมนู "โปรไฟล์"; **เมนูผู้ใช้**: Dropdown ใน header มี โปรไฟล์ → `/dashboard/profile` และ ออกจากระบบ
    - **สัญญา/นอกสัญญา (Contract Tabs)**: `SegmentedTabs` บน `/dashboard/my-jobs`, `/dashboard/all`, `/dashboard/in-progress` — แยกตาม `Job.isOutOfContract`; **ไม่ห่อด้วย card/glass ชั้นนอก** (เหลือเฉพาะกล่องควบคุมในแท็บ); **badge สีน้ำเงิน** แสดงจำนวนงานที่ยังไม่เสร็จ (ไม่นับ `RESOLVED`) ต่อแท็บ
-   - **Modal อัปเดตจากรายการงาน**: modal “ข้อมูลการแก้ไข”, modal รายละเอียด, และ modal มอบหมายใน `JobsList` ใช้ `Dialog`/`JobImageLightbox` ธีม **Dark Glassmorphism** สอดคล้อง `AGENTS.md`; `AlertDialog` ใช้ `z-100`
+   - **Modal อัปเดตจากรายการงาน**: modal “ข้อมูลการแก้ไข”, modal รายละเอียด, และ modal มอบหมายใน `JobsList` ใช้ `Dialog`/`JobImageLightbox` ธีม **Glass ตาม theme** สอดคล้อง `AGENTS.md`; `AlertDialog` ใช้ `z-100`
    - **หน้าจัดการผู้ใช้**: คลิกรูปโปรไฟล์ในตารางเปิด lightbox ดูรูปใหญ่ (ปิดด้วยพื้นหลัง / X / Escape)
    - **Pending Table UX**:
      - ซ่อนคอลัมน์ “ผู้รับผิดชอบ” ใน `/dashboard/pending`
@@ -181,7 +182,7 @@ npx ts-node scripts/seed-roles-permissions.ts
 - **แจ้งซ่อม + รายการงาน**: Validation/API ชัดเจนขึ้น; รายการใน Dashboard ใช้ **`GET /jobs/list`**; flow เจ้าหน้าที่บน `/report` แยกจากผู้ใช้ทั่วไป
 - **ตั้งค่าอีเมล (SMTP) + Reopen (2026-03-22)**: API ตั้งค่า SMTP (ADMIN); **`PATCH /jobs/:id/fix`** และ **`PATCH /jobs/:id/reopen`** — เฉพาะผู้รับงาน; Frontend หน้า settings + Reopen ยืนยันก่อนเรียก API; `@nestjs/cli` v11; `JobsList` แท็บสัญญา/นอกสัญญาไม่ห่อ glass ชั้นนอก
 - **เทมเพลตอีเมลแจ้งงาน + Role (2026-03-24)**: `GET/PUT /settings/email-templates`, `JobEmailNotificationService`, HTML โทนสว่าง + badge สถานะ; เอกสาร flow: [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
-- **UI Modal + บทบาท (2026-03-24, อัปเดตล่าสุด 2026-05-13)**: `CrudModal` — `Dialog` + portal, `z-100`, Dark Glass; `/dashboard/roles` — `form-input-glass` + modal กำหนดสิทธิ์ (`size="lg"`)
+- **UI Modal + บทบาท (2026-03-24, อัปเดตล่าสุด 2026-05-13)**: `CrudModal` — `Dialog` + portal, `z-100`, Glass ตาม theme; `/dashboard/roles` — `form-input-glass` + modal กำหนดสิทธิ์ (`size="lg"`)
 - **Deploy / CI (2026-03-23)**: **GitLab CI** (`.gitlab-ci.yml`) + **`Dockerfile`** — build แยก frontend/backend; พอร์ต host **8404→3000**, **8405→4100**; **`FRONTEND_BASE_URL`**; production โดเมนเดียว + `/api` + `/socket.io`; pipeline ส่ง **`MINIO_SERVER_FETCH_BASE_URL`** เข้า backend เมื่อตั้งใน GitLab Variables — รายละเอียด PRD ใน `README.md`
 - **GitLab CI UAT+PRD (2026-08-05)**: pipeline **`test` → `build` → `deploy_docker`** — branch **`staging`** (UAT `nurdin@192.168.0.115`) / **`main`/`master`** (PRD build `.115` → **`transfer:prd:images`** ด้วย **`DOCKER_HOST_PRD`** + `docker load` → deploy `nurdin@192.168.0.128`); stage **`deploy_docker` ทุก job manual** (`docker_build` / `transfer` / `deploy:*:docker`); **`.deploy_ssh_and_validate`** ตรวจกลุ่ม A ก่อน deploy; แผน [`docs/GitLab-CI-Plan.md`](docs/GitLab-CI-Plan.md) · Variables [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md)
 - **CI hardening (2026-08-06)**: deploy **health check** (container Running + logs); transfer verify ใช้ `export DOCKER_HOST`; **`test:backend`** รัน eslint ห้าม `--fix`; cleanup **`needs`** ไม่รอ manual deploy; docs บังคับ **`prisma migrate deploy`** ก่อนกด deploy ครั้งแรก
@@ -190,20 +191,21 @@ npx ts-node scripts/seed-roles-permissions.ts
 - **Serial หลายอุปกรณ์ + MinIO orphan + พิมพ์ (2026-04-02)**: `oldSerialNumber`/`newSerialNumber` รองรับ JSON หลายแถว (สูงสุด 4) + migration `TEXT`; หน้า settings — `POST /settings/minio/orphans/scan|delete`, retention 7 วัน; PDF — หัวข้อรายการอุปกรณ์แยกบรรทัดจากแถวแรก; `GET /settings/default-pass` คืน `password` ให้หน้า settings — เอกสาร [`docs/Job-Serial-Multi-Row.md`](docs/Job-Serial-Multi-Row.md), [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md)
 - **shadcn rollout + docs sync (2026-05-13)**: ติดตั้ง `frontend/.agents/skills/shadcn`; audit `components.json`/`globals.css`/`package.json`; `CrudModal` ย้ายเป็น `Dialog`; `JobsList` modal รายละเอียด/มอบหมาย/อัปเดตย้ายเป็น `Dialog`; หน้า `login`, `/public/report`, `/public/status`, `/dashboard`, `/dashboard/settings`, `/dashboard/profile`, `/print/jobs/[id]` ใช้ primitive จาก `@/components/ui/*` มากขึ้น และ build ฝั่ง frontend ผ่านหลังปรับ
 - **งานเก็บ polish หน้า dashboard/jobs + modal overlay (2026-05-13)**: card backfill วันที่บน `/dashboard/jobs/:id` เปลี่ยนเป็นกรอก **`dd/mm/yyyy`** พร้อม validation/preview ปฏิทินไทย; `JobImageLightbox` ปรับความสูง container ให้รูปใน modal แสดงจริง; report modal บน `/dashboard` เปลี่ยน backdrop จาก `Button` เป็น overlay ปกติ; ปุ่ม `ghost` ใน `Dialog`/`JobAssignDialog`/`JobImageLightbox` รวมมาตรฐาน `hover` / `focus-visible` ผ่าน utility กลาง และ `npm run build` ฝั่ง frontend ผ่านหลังแก้
+- **Light / Dark theme (2026-08-06)**: `next-themes` + `ThemeToggle` ใน header; default Dark; `--glass-*` + contrast ตาราง/ฟิลเตอร์ใน light mode; print isolate ผ่าน `PrintThemeShell` — [`CHANGELOG.md`](CHANGELOG.md), [`frontend/README.md`](frontend/README.md)
 - **พิมพ์ + รูปงานบน PRD (2026-03-28)**: รูปในเทมเพลตผ่าน **`/job-images/...`** บน Next; Nest **`MINIO_SERVER_FETCH_BASE_URL`** แก้กรณี backend โหลด MinIO ทาง public URL ไม่ได้ → **502** พร้อม log `getJobImageBuffer failed` ถ้ายังไม่ตั้งค่า
 - **Backend Docker entry (Nest + nodenext)**: image backend ใช้ **`node dist/src/main.js`** — ไม่ใช่ `dist/main.js`; สาเหตุเดิมของ error PRD `MODULE_NOT_FOUND` คือ path entry ไม่ตรงกับผล compile
 - **Frontend build (2026-03-23)**: `apiResponse.ts`; **`/public/report`** ใช้ `<Suspense>` รอบ `useSearchParams` เพื่อให้ `next build` ผ่าน
 - **Deploy PRD (2026-03-23 ต่อ):** `next.config.mjs` (ไม่ต้องมี TypeScript ใน runner image); **`API_INTERNAL_BASE_URL`** สำหรับ `authorize()` → backend ใน Docker network; GitLab ส่ง **`ALLOWED_ORIGINS`** เข้า backend container
-- **MinIO bucket ใหม่ (`dtrs-app`):** ⏸️ **รอทีม infra สร้าง bucket บน MinIO server** — ชื่อตั้งใน `backend/.env` / `.env.example` แล้ว; ทดสอบอัปโหลดรูปและ deploy PRD ที่เกี่ยว MinIO ทำหลัง bucket พร้อม
+- **MinIO GitLab Variables (2026-08-06):** กลุ่ม B ครบบน UI — `MINIO_PORT` / `MINIO_PUBLIC_URL` / `MINIO_SERVER_FETCH_BASE_URL` = scope **all**; ตรวจ bucket ตาม `MINIO_BUCKET_NAME` หลัง deploy UAT
 
 ---
 
 ## 🚀 แผนงานถัดไป (Phase 6)
 
-- [ ] ตั้ง GitLab CI/CD Variables กลุ่ม A (scope `staging` / `production`) — [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md)
-- [ ] ทดสอบ pipeline บน `staging` → manual deploy UAT → PRD (ยืนยันไม่ชน `cctv-app_ticket`)
-- [ ] NPM — `dtrs-app.forth.co.th` → 8404/8405
-- [ ] ⏸️ MinIO bucket **`dtrs-app-uat`** / **`dtrs-app`** — หลัง infra พร้อม
+- [x] ตั้ง GitLab CI/CD Variables กลุ่ม A scope **`staging`** ✅ — [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md)
+- [ ] **โฟกัส UAT:** `prisma migrate deploy` (DB UAT) → push `staging` → ตรวจ Docker `:2375` บน `.115` → manual `deploy:uat:docker`
+- [ ] ⏸️ **pending:** Variables กลุ่ม A scope **`production`** · NPM — ทำหลัง UAT นิ่ง
+- [x] MinIO กลุ่ม B บน GitLab ✅ (2026-08-06) — ตรวจอัปโหลดหลัง deploy UAT
 - [ ] รัน Seed Script เพื่อเตรียมข้อมูลจริงเข้าสู่ Production (และ seed-admin ถ้ายังไม่มี admin)
 - [ ] ติดตั้ง Socket.io บน Frontend เพื่อ Real-time Notifications
 - [x] ระบบออกรายงาน PDF / พิมพ์ — ใช้หน้า `/print/jobs/[id]` + เทมเพลต + `print.css` (แทนการดาวน์โหลด html2canvas บนหน้ารายละเอียด); ปรับแต่ง layout เพิ่มเติมทำได้เป็นงานต่อยอด

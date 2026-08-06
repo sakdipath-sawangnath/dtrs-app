@@ -50,13 +50,15 @@
 - **Responsive**: ทดสอบ 375 / 768 / 1024 / 1440, ไม่มี horizontal scroll, content ไม่ถูกซ่อนหลัง fixed header
 - **Visual rules**: ไม่ใช้ emoji เป็น icons, ใช้ชุด icon เดียว (เช่น Lucide), hover ไม่ทำให้ layout shift
 - **Primitive rules**: งานที่ใช้ `shadcn/ui` ให้ใช้ `@/components/ui/*` ก่อน custom markup สำหรับปุ่ม/อินพุต/ป้าย/alert/dialog/textarea; ถ้ามี skill อยู่แล้วให้เช็ก context จาก `components.json` ก่อนเพิ่ม component ใหม่
-- **Standard Style**: ทุกหน้าต้องเป็น **Dark Glassmorphism** และโครงสร้างแบบ **No-Card Layout** (ยกเว้นหน้า Dashboard Overview)
-    - **Background**: `bg-[#020617]` หรือ `bg-slate-950`
-    - **Glass Card**: `rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl`
-    - **Inputs**: `rounded-xl bg-slate-900/40 border-white/10 focus:ring-blue-500/50` — บนแดชบอร์ดใช้ class **`form-input-glass`** ใน `frontend/src/app/globals.css` แทน `.form-input` ที่ไปคู่พื้นสว่าง
-    - **Buttons**: `rounded-xl transition-all active:scale-95 shadow-lg` (Confirm: Blue/Red, Cancel: Slate-800)
-    - **Modal แดชบอร์ด**: `CrudModal` / dialog บนแดชบอร์ดให้ใช้ `Dialog` / `AlertDialog` ของ `@/components/ui/*` (portal ไป `document.body` ผ่าน primitive), **`z-100`** (เหนือ header `z-50`), โทน Dark Glass ตามด้านบน
-
+- **Standard Style**: ทุกหน้าใช้ **Glassmorphism** (ค่าเริ่มต้น Dark + สลับ Light จาก header) และโครงสร้างแบบ **No-Card Layout** (ยกเว้นหน้า Dashboard Overview)
+    - **Theme**: `next-themes` (`storageKey`: `dtrs-theme`, default `dark`); ปุ่ม Sun/Moon ใน `SiteHeader`; route `/print/*` บังคับ light ผ่าน `PrintThemeShell` (class `.light`, ไม่ซ้อน ThemeProvider)
+    - **Token layers**: shadcn (`--background`, `--foreground`) สำหรับ `@/components/ui/*`; `--glass-*` + utilities (`.glass-page`, `.glass-card`, `.glass-text`) สำหรับ app chrome
+    - **Background**: `.glass-page` หรือ `var(--glass-page-bg)` — ไม่ hardcode `#0a1128` ใน component ใหม่
+    - **Glass Card**: class **`.glass-card`** (อ่าน `--glass-card-*`)
+    - **Inputs**: class **`form-input-glass`** ใน `frontend/src/app/globals.css` (อ่าน `--glass-input-*` ทั้งสองโหมด) — แยกจาก `.form-input` สำหรับฟอร์ม legacy สว่าง
+    - **Contrast (Light)**: ห้ามใช้สีโทนมืดอย่างเดียวบนพื้นขาว (เช่น `text-slate-200`, `text-slate-300`, `border-white/10` โดยไม่มีคู่ light/`dark:`) — ใช้ `text-slate-900 dark:text-slate-100` หรือเทียบเท่า
+    - **Buttons**: `rounded-xl transition-all active:scale-95 shadow-lg` (Confirm: Blue/Red, Cancel: semantic muted)
+    - **Modal แดชบอร์ด**: `CrudModal` / dialog ใช้ `Dialog` / `AlertDialog` ของ `@/components/ui/*` (portal → `document.body`), **`z-100`**, โทน glass ตาม theme
 ## Definition of Done — API/NestJS (Backend)
 - **Validation**: validate input ทุก endpoint (DTO + pipes/validators) ก่อนแตะ DB
 - **AuthZ/AuthN**: ใช้ Guards ตรวจสิทธิ์/บทบาทให้ถูกต้อง, endpoint public ต้องระบุเหตุผลชัด
@@ -75,13 +77,13 @@ Footer แสดงเวอร์ชันจาก **package.json** (หรื
 ## ไฟล์/เอกสารที่ควรรู้
 - **Production (PRD):** `https://dtrs-app.forth.co.th` — API ที่ `/api`; ตั้ง `NEXT_PUBLIC_API_BASE_URL`, `NEXTAUTH_URL`, `ALLOWED_ORIGINS`, `FRONTEND_BASE_URL` ให้ตรง origin นี้ (ดู `README.md`)
 - **Changelog + SemVer:** [`CHANGELOG.md`](CHANGELOG.md) · root [`package.json`](package.json) (husky) · [`scripts/changelog-version-bump.mjs`](scripts/changelog-version-bump.mjs)
-- **ย้ายจาก `cctv-app_ticket`:** [`docs/DTRS-Migration-Checklist.md`](docs/DTRS-Migration-Checklist.md) · GitLab CI: [`docs/GitLab-CI-Plan.md`](docs/GitLab-CI-Plan.md) · Variables: [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md)
+- **ย้ายจาก `cctv-app_ticket`:** [`docs/DTRS-Migration-Checklist.md`](docs/DTRS-Migration-Checklist.md) · GitLab CI: [`docs/GitLab-CI-Plan.md`](docs/GitLab-CI-Plan.md) · Variables: [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md) — **UAT กลุ่ม A+B ✅** · **`production` กลุ่ม A pending**
 - **Env template:** `backend/.env.example`, `frontend/.env.example` (คัดลอกเป็น `.env` / `.env.local`)
 - ภาพรวมระบบ: `README.md` (มีตารางดัชนีเอกสารหลัก)
 - สถานะ/แผน/งาน: `STATUS.md`, `PLAN.md`, `TASK.md` (รวม Phase 6.5–6.8, **Phase 27 GitLab CI UAT+PRD**)
 - **เทมเพลตแอปใหม่** (สำเนา AGENTS + Skills + checklist): `docs/templates/README.md`
 - ดัชนี `docs/`: `docs/README.md`
-- Private MinIO + รูปผ่านสิทธิ์: `docs/Project-Plan-Private-MinIO-Images.md`, `minio.md`
+- Private MinIO + รูปผ่านสิทธิ์: `docs/Project-Plan-Private-MinIO-Images.md`, `docs/minio.md` — GitLab กลุ่ม B ✅ (UAT); bucket UAT `dtrs-app-uat` / PRD `dtrs-app`
 - การแจ้งเตือนอีเมล (To/CC เริ่มต้น, `publicBaseUrl`, Role): `docs/Email-Notifications.md`
 - Mapping ข้อมูล CSV: `docs/CSV-vs-System-Mapping.md`
 - RBAC: `backend/docs/RBAC-Setup.md`

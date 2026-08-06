@@ -6,7 +6,7 @@ import { loadWorkbookXlsx, worksheetToRecords } from './excel-sheet';
 const prisma = new PrismaClient();
 
 async function run() {
-    const filePath = path.resolve(__dirname, '../../ระบบแจ้งซ่อม CCTV .xlsx');
+    const filePath = path.resolve(__dirname, '../../ระบบแจ้งซ่อม .xlsx');
 
     if (!fs.existsSync(filePath)) {
         console.error('File not found:', filePath);
@@ -43,7 +43,7 @@ async function run() {
 
     // Migrate Jobs
     const jobsData: any[] = worksheetToRecords(
-        workbook.getWorksheet('TEST ระบบแจ้งซ่อม CCTV '),
+        workbook.getWorksheet('TEST ระบบแจ้งซ่อม '),
     );
 
     for (const row of jobsData) {

@@ -22,10 +22,13 @@
 
 1) **อ่าน Skills พื้นฐานให้ครบ**
 - Frontend UI/UX: `frontend/.agents/skills/ui-ux-pro-max/SKILL.md`
+- Frontend shadcn/ui: `frontend/.agents/skills/shadcn/SKILL.md`
 - Backend API: `backend/.agents/skills/backend-api-pro/SKILL.md`
 - Backend NestJS Patterns: `backend/.agents/skills/nestjs-best-practices/SKILL.md`
 - Debug: `frontend/.agents/skills/debug-mantra/SKILL.md` · `backend/.agents/skills/debug-mantra/SKILL.md`
 - Post-mortem / RCA (หลัง fix ที่ validate แล้ว): `frontend/.agents/skills/post-mortem/SKILL.md` (full-stack / UI) · `backend/.agents/skills/post-mortem/SKILL.md` (Nest/Prisma/MinIO)
+- Review ก่อน merge: `frontend/.agents/skills/scrutinize/SKILL.md` (หรือ `backend/.agents/skills/scrutinize`)
+- UI theme: ดู [`AGENTS.md`](AGENTS.md) — Glassmorphism **Dark default + Light toggle** (`dtrs-theme`)
 
 2) **เลือกขอบเขตงาน แล้วทำตาม workflow ของ skill**
 - งาน UI/UX: ต้องเริ่มจาก “Design System” (ตาม `ui-ux-pro-max`) ก่อน implement/แก้ UI
@@ -149,7 +152,7 @@ python .agents/skills/ui-ux-pro-max/scripts/search.py "accessibility" --domain u
 - **Production:** `https://dtrs-app.forth.co.th` (API ที่ `/api`; ดูตัวแปร env ใน `README.md` และ `.gitlab-ci.yml`)
 - ภาพรวมและตาราง endpoint: `README.md` (บันทึกการอัปเดตล่าสุดที่ส่วนต้นไฟล์), `STATUS.md`
 - แผน/งาน: `PLAN.md`, `TASK.md` (Phase 6.4 = SMTP… · **6.7 = เทมเพลตอีเมล** · **6.8 = `CrudModal` (portal/z-100) + หน้า `/dashboard/roles` (`form-input-glass`)** · **6.9 = `/job-images`, `MINIO_SERVER_FETCH_BASE_URL`, 502 รูป** · **Private MinIO = `/user-images`, avatar API, `MINIO_ENSURE_PUBLIC_READ_POLICY` default false** — สรุปใน `docs/Project-Plan-Private-MinIO-Images.md`)
-- พิมพ์รายงาน + reverse proxy (NPM): `backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md` — รูปงาน **`/job-images/*`**, รูปโปรไฟล์ **`/user-images/*`** บน Next; ตัวแปร MinIO: `minio.md`
+- พิมพ์รายงาน + reverse proxy (NPM): `backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md` — รูปงาน **`/job-images/*`**, รูปโปรไฟล์ **`/user-images/*`** บน Next; ตัวแปร MinIO: `docs/minio.md` · GitLab Variables: `docs/GitLab-CI-Variables-Checklist.md` (UAT กลุ่ม A+B ✅ · `production` pending)
 - ดัชนีโฟลเดอร์เอกสาร: `docs/README.md`
 - อีเมลแจ้งงาน (To/CC, `publicBaseUrl`, Role): `docs/Email-Notifications.md`
 - RBAC: `backend/docs/RBAC-Setup.md`

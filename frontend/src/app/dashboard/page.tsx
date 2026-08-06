@@ -65,6 +65,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { countJobBreakdowns } from "@/lib/jobBreakdownCounts";
+import { useAppTheme } from "@/lib/useAppTheme";
 
 interface Job {
   id: number;
@@ -127,11 +128,11 @@ const TH_MONTHS = [
 
 /** ความสูงเดียวกับปุ่ม (44px) — ปรับ line-height / padding ให้ข้อความอยู่กลางดีทั้งบน Windows / macOS */
 const FILTER_SELECT_CLASS =
-  "h-11 min-h-11 box-border w-full max-w-full appearance-none rounded-xl border border-white/15 bg-slate-900/50 pl-4 pr-10 py-[6px] text-sm leading-5 text-slate-100 ring-1 ring-inset ring-white/10 transition-colors [color-scheme:dark] cursor-pointer";
+  "form-input-glass h-11 min-h-11 box-border w-full max-w-full appearance-none pl-4 pr-10 py-[6px] text-sm leading-5 cursor-pointer";
 const FILTER_INPUT_CLASS =
-  "h-11 min-h-11 box-border w-full max-w-full rounded-xl border border-white/10 bg-slate-900/50 px-3 py-[6px] text-sm leading-5 text-slate-100 shadow-inner shadow-black/20 transition-colors [color-scheme:dark]";
+  "form-input-glass h-11 min-h-11 box-border w-full max-w-full px-3 py-[6px] text-sm leading-5 shadow-inner";
 const FILTER_DATE_INPUT_CLASS =
-  `${FILTER_INPUT_CLASS} pr-9 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:brightness-0 [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:contrast-200 [&::-webkit-calendar-picker-indicator]:opacity-90 hover:[&::-webkit-calendar-picker-indicator]:opacity-100`;
+  `${FILTER_INPUT_CLASS} pr-9 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-90 hover:[&::-webkit-calendar-picker-indicator]:opacity-100`;
 
 type DashboardFilterMode = "all" | "year" | "month" | "last7" | "last30" | "custom";
 
@@ -162,6 +163,7 @@ const QUICK_LINKS = [
 
 export default function DashboardPage() {
   const { data: session } = useSession();
+  const { isDark, mounted } = useAppTheme();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [permissions, setPermissions] = useState<string[] | null>(null);
@@ -460,6 +462,28 @@ export default function DashboardPage() {
 
   const reportStats = stats;
 
+  const chartColors = useMemo(
+    () =>
+      mounted && !isDark
+        ? {
+            grid: "#e2e8f0",
+            axis: "#cbd5e1",
+            tick: "#475569",
+            tooltipBg: "#ffffff",
+            tooltipBorder: "#e2e8f0",
+            tooltipText: "#0f172a",
+          }
+        : {
+            grid: "#334155",
+            axis: "#334155",
+            tick: "#94a3b8",
+            tooltipBg: "#1e293b",
+            tooltipBorder: "rgba(255,255,255,0.1)",
+            tooltipText: "#e2e8f0",
+          },
+    [isDark, mounted],
+  );
+
   const cards = [
     { label: "ทั้งหมด", value: stats.total, icon: TrendingUp, color: "#94a3b8", bg: "rgba(71,85,105,0.15)", border: "rgba(255,255,255,0.1)", href: "/dashboard/all" },
     { label: "รอดำเนินการ", value: stats.pending, icon: AlertCircle, color: "#fb923c", bg: "rgba(230,81,0,0.12)", border: "rgba(251,146,60,0.25)", href: "/dashboard/pending" },
@@ -537,21 +561,21 @@ export default function DashboardPage() {
       {/* หัวข้อ + สรุปรายงาน — หลีกเลี่ยง w-full บนแถบขวาในโหมดแถว (กัน flex บีบคอลัมน์ซ้ายจนแคบเกินไป) */}
       <div className="flex flex-col gap-4 min-w-0 xl:flex-row xl:items-start xl:justify-between xl:gap-6">
         <div className="min-w-0 w-full xl:flex-1 xl:min-w-[min(100%,18rem)] xl:max-w-2xl">
-          <h1 className="text-lg sm:text-xl font-bold text-white wrap-break-word">
+          <h1 className="text-lg sm:text-xl font-bold glass-text wrap-break-word">
             สวัสดี, {session?.user?.name || "เจ้าหน้าที่"}
           </h1>
-          <p className="text-sm mt-0.5 text-slate-400 wrap-break-word leading-relaxed">
+          <p className="text-sm mt-0.5 glass-muted-text wrap-break-word leading-relaxed">
             ภาพรวมงานแจ้งซ่อม CCTV · สรุปผลและแนวโน้ม
           </p>
         </div>
         <div
-          className="w-full shrink-0 rounded-xl border border-white/10 bg-slate-900/30 p-2 sm:p-3 xl:w-auto xl:max-w-none xl:border-0 xl:bg-transparent xl:p-0"
+          className="w-full shrink-0 glass-card p-2 sm:p-3 xl:w-auto xl:max-w-none xl:border-0 xl:bg-transparent xl:p-0"
           role="region"
           aria-label="สรุปรายงานและส่งออก PDF"
         >
           <div className="min-w-max overflow-x-auto pb-1 flex flex-wrap items-end gap-x-2 gap-y-3 sm:gap-3 xl:flex-nowrap xl:justify-end">
             <Label className="relative flex w-[176px] shrink-0 flex-col gap-1">
-              <span className="text-[11px] font-medium text-slate-500">ช่วงสรุป</span>
+              <span className="text-[11px] font-medium glass-subtle-text">ช่วงสรุป</span>
               <select
                 value={filterMode}
                 onChange={(e) => setFilterMode(e.target.value as DashboardFilterMode)}
@@ -567,14 +591,14 @@ export default function DashboardPage() {
               </select>
               <ChevronDown
                 size={16}
-                className="pointer-events-none absolute right-3 top-[33px] text-slate-400"
+                className="pointer-events-none absolute right-3 top-[33px] glass-muted-text"
                 aria-hidden="true"
               />
             </Label>
             {filterMode === "month" && (
               <>
                 <Label className="relative flex w-[150px] shrink-0 flex-col gap-1">
-                  <span className="text-[11px] font-medium text-slate-500">เดือน</span>
+                  <span className="text-[11px] font-medium glass-subtle-text">เดือน</span>
                   <select
                     value={monthYear.month}
                     onChange={(e) => {
@@ -593,12 +617,12 @@ export default function DashboardPage() {
                   </select>
                   <ChevronDown
                     size={16}
-                    className="pointer-events-none absolute right-3 top-[33px] text-slate-400"
+                    className="pointer-events-none absolute right-3 top-[33px] glass-muted-text"
                     aria-hidden="true"
                   />
                 </Label>
                 <Label className="relative flex w-[120px] shrink-0 flex-col gap-1">
-                  <span className="text-[11px] font-medium text-slate-500">ปี (ค.ศ.)</span>
+                  <span className="text-[11px] font-medium glass-subtle-text">ปี (ค.ศ.)</span>
                   <select
                     value={monthYear.year}
                     onChange={(e) => {
@@ -620,7 +644,7 @@ export default function DashboardPage() {
                   </select>
                   <ChevronDown
                     size={16}
-                    className="pointer-events-none absolute right-3 top-[33px] text-slate-400"
+                    className="pointer-events-none absolute right-3 top-[33px] glass-muted-text"
                     aria-hidden="true"
                   />
                 </Label>
@@ -628,7 +652,7 @@ export default function DashboardPage() {
             )}
             {filterMode === "year" && (
               <Label className="flex w-[110px] shrink-0 flex-col gap-1">
-                <span className="text-[11px] font-medium text-slate-500">ปี (ค.ศ.)</span>
+                <span className="text-[11px] font-medium glass-subtle-text">ปี (ค.ศ.)</span>
                 <Input
                   type="number"
                   min={1990}
@@ -643,7 +667,7 @@ export default function DashboardPage() {
             {filterMode === "custom" && (
               <>
                 <Label className="flex w-[190px] shrink-0 flex-col gap-1">
-                  <span className="text-[11px] font-medium text-slate-500">เริ่ม</span>
+                  <span className="text-[11px] font-medium glass-subtle-text">เริ่ม</span>
                   <Input
                     type="datetime-local"
                     value={rangeStart}
@@ -653,7 +677,7 @@ export default function DashboardPage() {
                   />
                 </Label>
                 <Label className="flex w-[190px] shrink-0 flex-col gap-1">
-                  <span className="text-[11px] font-medium text-slate-500">สิ้นสุด</span>
+                  <span className="text-[11px] font-medium glass-subtle-text">สิ้นสุด</span>
                   <Input
                     type="datetime-local"
                     value={rangeEnd}
@@ -676,7 +700,7 @@ export default function DashboardPage() {
               variant="outline"
               onClick={runExportReportPdf}
               disabled={reportPrintBusy}
-              className="inline-flex h-11 min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/10 bg-slate-800/80 text-slate-200 shadow-lg transition-all hover:border-blue-500/30 hover:bg-slate-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500/45 focus:ring-inset"
+              className="inline-flex h-11 min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] glass-text shadow-lg transition-all hover:border-blue-500/30 hover:bg-[var(--glass-nav-hover-bg)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500/45 focus:ring-inset"
               aria-label="ส่งออก PDF จากเซิร์ฟเวอร์"
               title="ส่งออก PDF"
             >
@@ -705,7 +729,7 @@ export default function DashboardPage() {
               <p className="text-xl sm:text-2xl font-bold truncate" style={{ color: card.color }}>
                 {card.value}
               </p>
-              <p className="text-xs font-medium mt-0.5 truncate text-slate-400">
+              <p className="text-xs font-medium mt-0.5 truncate glass-muted-text">
                 {card.label}
               </p>
             </div>
@@ -716,58 +740,58 @@ export default function DashboardPage() {
       {/* สรุปแยกประเภท (ตรงกับ PDF summary-pdf) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <section
-          className="rounded-xl border border-white/10 p-4 sm:p-5 bg-slate-900/50 backdrop-blur-sm"
+          className="glass-card p-4 sm:p-5 bg-[var(--glass-input-bg)] backdrop-blur-sm"
           aria-labelledby="dash-breakdown-env-title"
         >
           <div className="flex items-center gap-2 mb-3">
-            <Building2 size={18} className="text-slate-400 shrink-0" aria-hidden />
-            <h3 id="dash-breakdown-env-title" className="font-bold text-sm text-slate-200">
+            <Building2 size={18} className="glass-muted-text shrink-0" aria-hidden />
+            <h3 id="dash-breakdown-env-title" className="font-bold text-sm glass-text">
               แยกตามสภาพแวดล้อมการแก้ไข
             </h3>
           </div>
-          <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+          <p className="text-xs glass-subtle-text mb-3 leading-relaxed">
             จากฟิลด์สถานที่ติดตั้งตอนปิดงาน — งานที่ยังไม่ปิดหรือยังไม่บันทึกจะอยู่ใน &quot;ไม่ระบุ&quot;
           </p>
           <dl className="space-y-2 text-sm">
-            <div className="flex justify-between gap-3 border-b border-white/5 pb-2">
-              <dt className="text-slate-400">ภายใน (ในอาคาร)</dt>
-              <dd className="tabular-nums font-semibold text-slate-100">{jobBreakdown.env.INDOOR}</dd>
+            <div className="flex justify-between gap-3 border-b border-[var(--glass-card-border)] pb-2">
+              <dt className="glass-muted-text">ภายใน (ในอาคาร)</dt>
+              <dd className="tabular-nums font-semibold glass-text">{jobBreakdown.env.INDOOR}</dd>
             </div>
-            <div className="flex justify-between gap-3 border-b border-white/5 pb-2">
-              <dt className="text-slate-400">ภายนอก (นอกอาคาร)</dt>
-              <dd className="tabular-nums font-semibold text-slate-100">{jobBreakdown.env.OUTDOOR}</dd>
+            <div className="flex justify-between gap-3 border-b border-[var(--glass-card-border)] pb-2">
+              <dt className="glass-muted-text">ภายนอก (นอกอาคาร)</dt>
+              <dd className="tabular-nums font-semibold glass-text">{jobBreakdown.env.OUTDOOR}</dd>
             </div>
             <div className="flex justify-between gap-3">
-              <dt className="text-slate-400">ไม่ระบุ</dt>
-              <dd className="tabular-nums font-semibold text-slate-100">{jobBreakdown.env.UNKNOWN}</dd>
+              <dt className="glass-muted-text">ไม่ระบุ</dt>
+              <dd className="tabular-nums font-semibold glass-text">{jobBreakdown.env.UNKNOWN}</dd>
             </div>
           </dl>
         </section>
         <section
-          className="rounded-xl border border-white/10 p-4 sm:p-5 bg-slate-900/50 backdrop-blur-sm"
+          className="glass-card p-4 sm:p-5 bg-[var(--glass-input-bg)] backdrop-blur-sm"
           aria-labelledby="dash-breakdown-part-title"
         >
           <div className="flex items-center gap-2 mb-3">
-            <Cpu size={18} className="text-slate-400 shrink-0" aria-hidden />
-            <h3 id="dash-breakdown-part-title" className="font-bold text-sm text-slate-200">
+            <Cpu size={18} className="glass-muted-text shrink-0" aria-hidden />
+            <h3 id="dash-breakdown-part-title" className="font-bold text-sm glass-text">
               แยกตามประเภทงาน (Hardware / Software)
             </h3>
           </div>
-          <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+          <p className="text-xs glass-subtle-text mb-3 leading-relaxed">
             จากฟิลด์ประเภทงานตอนปิดงาน — งานที่ยังไม่ปิดหรือยังไม่บันทึกจะอยู่ใน &quot;ไม่ระบุ&quot;
           </p>
           <dl className="space-y-2 text-sm">
-            <div className="flex justify-between gap-3 border-b border-white/5 pb-2">
-              <dt className="text-slate-400">Hardware (ฮาร์ดแวร์)</dt>
-              <dd className="tabular-nums font-semibold text-slate-100">{jobBreakdown.part.Hardware}</dd>
+            <div className="flex justify-between gap-3 border-b border-[var(--glass-card-border)] pb-2">
+              <dt className="glass-muted-text">Hardware (ฮาร์ดแวร์)</dt>
+              <dd className="tabular-nums font-semibold glass-text">{jobBreakdown.part.Hardware}</dd>
             </div>
-            <div className="flex justify-between gap-3 border-b border-white/5 pb-2">
-              <dt className="text-slate-400">Software (ซอฟต์แวร์)</dt>
-              <dd className="tabular-nums font-semibold text-slate-100">{jobBreakdown.part.Software}</dd>
+            <div className="flex justify-between gap-3 border-b border-[var(--glass-card-border)] pb-2">
+              <dt className="glass-muted-text">Software (ซอฟต์แวร์)</dt>
+              <dd className="tabular-nums font-semibold glass-text">{jobBreakdown.part.Software}</dd>
             </div>
             <div className="flex justify-between gap-3">
-              <dt className="text-slate-400">ไม่ระบุ</dt>
-              <dd className="tabular-nums font-semibold text-slate-100">{jobBreakdown.part.UNKNOWN}</dd>
+              <dt className="glass-muted-text">ไม่ระบุ</dt>
+              <dd className="tabular-nums font-semibold glass-text">{jobBreakdown.part.UNKNOWN}</dd>
             </div>
           </dl>
         </section>
@@ -777,18 +801,18 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* กราฟวง – สัดส่วนตามสถานะ */}
         <div
-          className="rounded-xl border border-white/10 p-4 sm:p-5 min-h-[280px] flex flex-col bg-slate-900/50 backdrop-blur-sm"
+          className="glass-card p-4 sm:p-5 min-h-[280px] flex flex-col"
         >
           <div className="flex items-center gap-2 mb-4 shrink-0">
-            <PieChartIcon size={18} className="text-slate-400" />
-            <h3 className="font-bold text-sm text-slate-200">
+            <PieChartIcon size={18} className="glass-muted-text" />
+            <h3 className="font-bold text-sm glass-text">
               สัดส่วนตามสถานะ
             </h3>
           </div>
           {/* ความสูงคงที่: Recharts ResponsiveContainer ต้องการ parent ที่มี height ชัดเจน ไม่ใช่แค่ min-height + flex-1 */}
           <div className="w-full min-w-0 h-[260px]">
             {pieData.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-sm text-slate-500">
+              <div className="h-full flex items-center justify-center text-sm glass-subtle-text">
                 ยังไม่มีข้อมูล
               </div>
             ) : (
@@ -809,7 +833,10 @@ export default function DashboardPage() {
                       <Cell key={i} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => [value, "รายการ"]} />
+                  <Tooltip
+                    formatter={(value: number) => [value, "รายการ"]}
+                    contentStyle={{ borderRadius: 8, border: `1px solid ${chartColors.tooltipBorder}`, background: chartColors.tooltipBg, color: chartColors.tooltipText }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -818,28 +845,28 @@ export default function DashboardPage() {
 
         {/* กราฟแท่ง – จำนวนแยกตามจังหวัด */}
         <div
-          className="rounded-xl border border-white/10 p-4 sm:p-5 min-h-[280px] flex flex-col bg-slate-900/50 backdrop-blur-sm"
+          className="glass-card p-4 sm:p-5 min-h-[280px] flex flex-col"
         >
           <div className="flex items-center gap-2 mb-4 shrink-0">
-            <MapPin size={18} className="text-slate-400" />
-            <h3 className="font-bold text-sm text-slate-200">
+            <MapPin size={18} className="glass-muted-text" />
+            <h3 className="font-bold text-sm glass-text">
               จำนวนแจ้งซ่อมแยกตามจังหวัด (Top 8)
             </h3>
           </div>
           <div className="w-full min-w-0 h-[260px]">
             {provinceData.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-sm text-slate-500">
+              <div className="h-full flex items-center justify-center text-sm glass-subtle-text">
                 ยังไม่มีข้อมูล
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={provinceData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} stroke="rgba(255,255,255,0.1)" />
-                  <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} stroke="rgba(255,255,255,0.1)" allowDecimals={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: chartColors.tick }} stroke={chartColors.axis} />
+                  <YAxis tick={{ fontSize: 11, fill: chartColors.tick }} stroke={chartColors.axis} allowDecimals={false} />
                   <Tooltip
                     formatter={(value: number) => [value, "รายการ"]}
-                    contentStyle={{ borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "#1e293b", color: "#e2e8f0" }}
+                    contentStyle={{ borderRadius: 8, border: `1px solid ${chartColors.tooltipBorder}`, background: chartColors.tooltipBg, color: chartColors.tooltipText }}
                   />
                   <Bar dataKey="value" name="รายการ" fill="#60a5fa" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -851,16 +878,16 @@ export default function DashboardPage() {
 
       {/* กราฟแนวโน้ม – 14 วัน: จำนวนที่แจ้ง vs จำนวนที่แก้ไขเสร็จในแต่ละวัน */}
       <div
-        className="rounded-xl border border-white/10 p-4 sm:p-5 min-h-[280px] flex flex-col bg-slate-900/50 backdrop-blur-sm"
+        className="glass-card p-4 sm:p-5 min-h-[280px] flex flex-col"
       >
           <div className="flex flex-col gap-1 mb-4 shrink-0">
           <div className="flex items-center gap-2">
-            <BarChart3 size={18} className="text-slate-400" />
-            <h3 className="font-bold text-sm text-slate-200">
+            <BarChart3 size={18} className="glass-muted-text" />
+            <h3 className="font-bold text-sm glass-text">
               {trendMeta.label} (ตามช่วงที่เลือก)
             </h3>
           </div>
-          <p className="text-xs text-slate-500 leading-relaxed">
+          <p className="text-xs glass-subtle-text leading-relaxed">
             <strong>ใช้ทำอะไร:</strong> ดูว่าแต่ละวันมีงาน<strong>เข้าใหม่</strong>กี่ใบ (เส้น/พื้นเทา — นับตามวันที่แจ้ง) เทียบกับงานที่<strong>ปิดเสร็จ</strong>กี่ใบ (เขียว — นับตามวันที่บันทึกแก้ไขเสร็จ) ถ้าเข้ามามากกว่าปิดต่อเนื่อง
             แปลว่าคิวงานสะสม (backlog) มีแนวโน้มเพิ่ม — ใช้ประกอบการวางคนและลำดับความสำคัญ ไม่ใช่ SLA ตามสัญญาโดยตรง
           </p>
@@ -878,11 +905,11 @@ export default function DashboardPage() {
                   <stop offset="95%" stopColor="#22c55e" stopOpacity={0.05} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} stroke="rgba(255,255,255,0.1)" />
-              <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} stroke="rgba(255,255,255,0.1)" allowDecimals={false} domain={[0, "auto"]} />
+              <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: chartColors.tick }} stroke={chartColors.axis} />
+              <YAxis tick={{ fontSize: 11, fill: chartColors.tick }} stroke={chartColors.axis} allowDecimals={false} domain={[0, "auto"]} />
               <Tooltip
-                contentStyle={{ borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "#1e293b", color: "#e2e8f0" }}
+                contentStyle={{ borderRadius: 8, border: `1px solid ${chartColors.tooltipBorder}`, background: chartColors.tooltipBg, color: chartColors.tooltipText }}
                 formatter={(value: number, name: string) => [value, name === "แจ้งในช่วง" ? "แจ้งในช่วง (รายการ)" : "ปิดในช่วง (รายการ)"]}
               />
               <Legend />
@@ -891,27 +918,27 @@ export default function DashboardPage() {
             </AreaChart>
           </ResponsiveContainer>
         </div>
-        <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 shrink-0">
-            <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5">
-              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">แจ้งรวม 14 วัน</p>
-              <p className="text-lg font-bold text-slate-200 tabular-nums">{trendSummary.reported}</p>
-              <p className="text-[11px] text-slate-500">เฉลี่ย {trendSummary.avgReported.toFixed(1)} ต่อจุด</p>
+        <div className="mt-4 pt-4 border-t border-[var(--glass-card-border)] grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 shrink-0">
+            <div className="glass-card px-3 py-2.5">
+              <p className="text-[10px] uppercase tracking-wide glass-subtle-text font-semibold">แจ้งรวม 14 วัน</p>
+              <p className="text-lg font-bold glass-text tabular-nums">{trendSummary.reported}</p>
+              <p className="text-[11px] glass-subtle-text">เฉลี่ย {trendSummary.avgReported.toFixed(1)} ต่อจุด</p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5">
-              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">ปิดรวม 14 วัน</p>
+            <div className="glass-card px-3 py-2.5">
+              <p className="text-[10px] uppercase tracking-wide glass-subtle-text font-semibold">ปิดรวม 14 วัน</p>
               <p className="text-lg font-bold text-emerald-300 tabular-nums">{trendSummary.resolved}</p>
-              <p className="text-[11px] text-slate-500">เฉลี่ย {trendSummary.avgResolved.toFixed(1)} ต่อจุด</p>
+              <p className="text-[11px] glass-subtle-text">เฉลี่ย {trendSummary.avgResolved.toFixed(1)} ต่อจุด</p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5 col-span-2 sm:col-span-1 lg:col-span-1">
-              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">สุทธิใน 14 วัน (เข้า − ปิด)</p>
-              <p className={`text-lg font-bold tabular-nums flex items-center gap-1.5 ${trendSummary.net > 0 ? "text-amber-300" : trendSummary.net < 0 ? "text-sky-300" : "text-slate-200"}`}>
+            <div className="glass-card px-3 py-2.5 col-span-2 sm:col-span-1 lg:col-span-1">
+              <p className="text-[10px] uppercase tracking-wide glass-subtle-text font-semibold">สุทธิใน 14 วัน (เข้า − ปิด)</p>
+              <p className={`text-lg font-bold tabular-nums flex items-center gap-1.5 ${trendSummary.net > 0 ? "text-amber-300" : trendSummary.net < 0 ? "text-sky-300" : "glass-text"}`}>
                 {trendSummary.net > 0 ? <TrendingUp size={18} className="shrink-0 opacity-90" aria-hidden /> : null}
                 {trendSummary.net < 0 ? <TrendingDown size={18} className="shrink-0 opacity-90" aria-hidden /> : null}
-                {trendSummary.net === 0 ? <Minus size={18} className="shrink-0 text-slate-500" aria-hidden /> : null}
+                {trendSummary.net === 0 ? <Minus size={18} className="shrink-0 glass-subtle-text" aria-hidden /> : null}
                 {trendSummary.net > 0 ? "+" : ""}
                 {trendSummary.net}
               </p>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] glass-subtle-text">
                 {trendSummary.net > 0
                   ? "งานเข้ามากกว่าปิดในช่วงนี้"
                   : trendSummary.net < 0
@@ -919,12 +946,12 @@ export default function DashboardPage() {
                     : "เข้าและปิดเท่ากัน"}
               </p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5 col-span-2 lg:col-span-2">
-              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">จุดสูงสุดในกราฟ 14 วัน</p>
-              <p className="text-xs text-slate-300 mt-1 leading-snug">
-                แจ้งสูงสุด <span className="font-semibold text-slate-100">{trendSummary.peakReported.v}</span> ใบ วันที่{" "}
+            <div className="glass-card px-3 py-2.5 col-span-2 lg:col-span-2">
+              <p className="text-[10px] uppercase tracking-wide glass-subtle-text font-semibold">จุดสูงสุดในกราฟ 14 วัน</p>
+              <p className="text-xs glass-muted-text mt-1 leading-snug">
+                แจ้งสูงสุด <span className="font-semibold glass-text">{trendSummary.peakReported.v}</span> ใบ วันที่{" "}
                 {trendSummary.peakReported.date}
-                <span className="text-slate-500"> · </span>
+                <span className="glass-subtle-text"> · </span>
                 ปิดสูงสุด <span className="font-semibold text-emerald-200/90">{trendSummary.peakResolved.v}</span> ใบ วันที่{" "}
                 {trendSummary.peakResolved.date}
               </p>
@@ -934,55 +961,55 @@ export default function DashboardPage() {
 
       {/* สรุปวิเคราะห์จากข้อมูลชุดเดียวกับรายการงาน */}
       <div className="space-y-3">
-        <h2 className="text-sm font-bold text-slate-200 tracking-tight">สรุปสำหรับวิเคราะห์เพิ่มเติม</h2>
+        <h2 className="text-sm font-bold glass-text tracking-tight">สรุปสำหรับวิเคราะห์เพิ่มเติม</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <div className="rounded-xl border border-white/10 p-4 bg-slate-900/50 backdrop-blur-sm flex gap-3 min-w-0">
+          <div className="glass-card p-4 bg-[var(--glass-card-bg)] backdrop-blur-sm flex gap-3 min-w-0">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 border border-amber-500/25 text-amber-300">
               <UserX size={20} aria-hidden />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-400">รอดำเนินการ · ยังไม่มีผู้รับ</p>
-              <p className="text-2xl font-bold text-slate-100 tabular-nums">{pendingUnassigned}</p>
-              <p className="text-[11px] text-slate-500 mt-0.5">ควรมอบหมายหรือรับงานเพื่อไม่ให้ค้างที่สถานะรอ</p>
+              <p className="text-xs font-semibold glass-muted-text">รอดำเนินการ · ยังไม่มีผู้รับ</p>
+              <p className="text-2xl font-bold glass-text tabular-nums">{pendingUnassigned}</p>
+              <p className="text-[11px] glass-subtle-text mt-0.5">ควรมอบหมายหรือรับงานเพื่อไม่ให้ค้างที่สถานะรอ</p>
             </div>
           </div>
-          <div className="rounded-xl border border-white/10 p-4 bg-slate-900/50 backdrop-blur-sm flex gap-3 min-w-0">
+          <div className="glass-card p-4 bg-[var(--glass-card-bg)] backdrop-blur-sm flex gap-3 min-w-0">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500/15 border border-orange-500/25 text-orange-300">
               <FileWarning size={20} aria-hidden />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-400">นอกสัญญา · ยังไม่ปิด</p>
-              <p className="text-2xl font-bold text-slate-100 tabular-nums">{openOutOfContract}</p>
-              <p className="text-[11px] text-slate-500 mt-0.5">PENDING / IN_PROGRESS ที่ทำเครื่องหมายนอกสัญญา</p>
+              <p className="text-xs font-semibold glass-muted-text">นอกสัญญา · ยังไม่ปิด</p>
+              <p className="text-2xl font-bold glass-text tabular-nums">{openOutOfContract}</p>
+              <p className="text-[11px] glass-subtle-text mt-0.5">PENDING / IN_PROGRESS ที่ทำเครื่องหมายนอกสัญญา</p>
             </div>
           </div>
-          <div className="rounded-xl border border-white/10 p-4 bg-slate-900/50 backdrop-blur-sm flex gap-3 min-w-0">
+          <div className="glass-card p-4 bg-[var(--glass-card-bg)] backdrop-blur-sm flex gap-3 min-w-0">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 border border-sky-500/25 text-sky-300">
               <Timer size={20} aria-hidden />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-400">เวลาแก้เฉลี่ย (งานปิดแล้ว)</p>
-              <p className="text-2xl font-bold text-slate-100 tabular-nums">
+              <p className="text-xs font-semibold glass-muted-text">เวลาแก้เฉลี่ย (งานปิดแล้ว)</p>
+              <p className="text-2xl font-bold glass-text tabular-nums">
                 {avgResolutionDays != null ? avgResolutionDays.toFixed(1) : "–"}
               </p>
-              <p className="text-[11px] text-slate-500 mt-0.5">วัน จากวันแจ้งถึงวันบันทึกแก้ไขเสร็จ (ทุกใบที่ RESOLVED)</p>
+              <p className="text-[11px] glass-subtle-text mt-0.5">วัน จากวันแจ้งถึงวันบันทึกแก้ไขเสร็จ (ทุกใบที่ RESOLVED)</p>
             </div>
           </div>
-          <div className="rounded-xl border border-white/10 p-4 bg-slate-900/50 backdrop-blur-sm min-w-0 sm:col-span-2 lg:col-span-1">
+          <div className="glass-card p-4 bg-[var(--glass-card-bg)] backdrop-blur-sm min-w-0 sm:col-span-2 lg:col-span-1">
             <div className="flex items-center gap-2 mb-2">
-              <MapPin size={16} className="text-slate-400 shrink-0" aria-hidden />
-              <p className="text-xs font-semibold text-slate-400">พื้นที่แจ้งถี่ (จังหวัด · อำเภอ Top 5)</p>
+              <MapPin size={16} className="glass-muted-text shrink-0" aria-hidden />
+              <p className="text-xs font-semibold glass-muted-text">พื้นที่แจ้งถี่ (จังหวัด · อำเภอ Top 5)</p>
             </div>
             {districtTop5.length === 0 ? (
-              <p className="text-sm text-slate-500">ยังไม่มีข้อมูล</p>
+              <p className="text-sm glass-subtle-text">ยังไม่มีข้อมูล</p>
             ) : (
               <ul className="space-y-1.5 text-xs">
                 {districtTop5.map((row, i) => (
-                  <li key={row.name} className="flex justify-between gap-2 text-slate-300">
+                  <li key={row.name} className="flex justify-between gap-2 glass-muted-text">
                     <span className="truncate" title={row.name}>
                       {i + 1}. {row.name}
                     </span>
-                    <span className="shrink-0 font-semibold text-slate-100 tabular-nums">{row.value}</span>
+                    <span className="shrink-0 font-semibold glass-text tabular-nums">{row.value}</span>
                   </li>
                 ))}
               </ul>
@@ -992,74 +1019,74 @@ export default function DashboardPage() {
 
         <div className="space-y-3">
           <div>
-            <h3 className="text-sm font-bold text-slate-200 tracking-tight">
+            <h3 className="text-sm font-bold glass-text tracking-tight">
               แนวทางขยายวิเคราะห์ในอนาคต (จากข้อมูลเดิมในระบบ)
             </h3>
-            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+            <p className="text-xs glass-subtle-text mt-1 leading-relaxed">
               เตรียมพื้นที่แสดงผลเมื่อระบบพร้อมส่งมอบรายงานเชิงลึกจากข้อมูลเดิม (เช่น คิวงาน สัญญา พื้นที่ SLA)
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div className="rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
+            <div className="glass-card backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 border border-amber-500/25 text-amber-300">
                   <Users size={20} aria-hidden />
                 </div>
-                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-white/10 bg-slate-800/80 px-2 py-0.5 text-slate-400">
+                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] px-2 py-0.5 glass-muted-text">
                   เร็วๆ นี้
                 </span>
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-200 leading-snug">ภาระงานต่อเจ้าหน้าที่</p>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                <p className="text-sm font-semibold glass-text leading-snug">ภาระงานต่อเจ้าหน้าที่</p>
+                <p className="text-xs glass-subtle-text mt-1 leading-relaxed">
                   นับจากผู้รับผิดชอบและงานค้าง เพื่อดูความหนาแน่นต่อคน
                 </p>
               </div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
+            <div className="glass-card backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 border border-violet-500/25 text-violet-300">
                   <PieChartIcon size={20} aria-hidden />
                 </div>
-                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-white/10 bg-slate-800/80 px-2 py-0.5 text-slate-400">
+                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] px-2 py-0.5 glass-muted-text">
                   เร็วๆ นี้
                 </span>
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-200 leading-snug">ใน / นอกสัญญา · รายเดือน</p>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                <p className="text-sm font-semibold glass-text leading-snug">ใน / นอกสัญญา · รายเดือน</p>
+                <p className="text-xs glass-subtle-text mt-1 leading-relaxed">
                   สัดส่วนและแนวโน้มรายเดือนจากข้อมูลสัญญาในระบบ
                 </p>
               </div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
+            <div className="glass-card backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 border border-sky-500/25 text-sky-300">
                   <Building2 size={20} aria-hidden />
                 </div>
-                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-white/10 bg-slate-800/80 px-2 py-0.5 text-slate-400">
+                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] px-2 py-0.5 glass-muted-text">
                   เร็วๆ นี้
                 </span>
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-200 leading-snug">เวลาแก้ตามจังหวัด / Site</p>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                <p className="text-sm font-semibold glass-text leading-snug">เวลาแก้ตามจังหวัด / Site</p>
+                <p className="text-xs glass-subtle-text mt-1 leading-relaxed">
                   เปรียบเทียบระยะเวลาแก้ตามพื้นที่หรือประเภทสถานที่
                 </p>
               </div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
+            <div className="glass-card backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/25 text-emerald-300">
                   <Target size={20} aria-hidden />
                 </div>
-                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-white/10 bg-slate-800/80 px-2 py-0.5 text-slate-400">
+                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] px-2 py-0.5 glass-muted-text">
                   เร็วๆ นี้
                 </span>
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-200 leading-snug">เป้า SLA vs วันปิดจริง</p>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                <p className="text-sm font-semibold glass-text leading-snug">เป้า SLA vs วันปิดจริง</p>
+                <p className="text-xs glass-subtle-text mt-1 leading-relaxed">
                   เปรียบเทียบนโยบายวันปิดกับวันที่บันทึกแก้ไขเสร็จจริง
                 </p>
               </div>
@@ -1070,11 +1097,11 @@ export default function DashboardPage() {
 
       {/* เมนูด่วน — แสดงตามสิทธิ์ RBAC */}
       <div
-        className="rounded-xl border border-white/10 p-4 sm:p-5 bg-slate-900/50 backdrop-blur-sm"
+        className="glass-card p-4 sm:p-5 backdrop-blur-sm"
       >
         <div className="flex items-center gap-2 mb-4">
           <div className="w-1 h-5 rounded-full bg-blue-500" />
-          <h3 className="font-bold text-sm text-slate-200">
+          <h3 className="font-bold text-sm glass-text">
             เมนูด่วน
           </h3>
         </div>
@@ -1086,18 +1113,18 @@ export default function DashboardPage() {
             <Link
               key={link.href}
               href={link.href}
-              className="group flex items-start gap-3 p-4 rounded-xl border border-white/10 bg-slate-800/30 transition-all hover:border-blue-500/30 hover:shadow-lg hover:bg-slate-800/60"
+              className="group flex items-start gap-3 p-4 glass-card transition-all hover:border-blue-500/30 hover:shadow-lg hover:bg-[var(--glass-card-bg)]"
             >
               {link.icon && (
-                <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-white/5 text-slate-400 group-hover:bg-blue-500/15 group-hover:text-blue-400 transition-colors shrink-0">
+                <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-white/5 glass-muted-text group-hover:bg-blue-500/15 group-hover:text-blue-400 transition-colors shrink-0">
                   <link.icon size={18} />
                 </span>
               )}
               <div className="flex-1 min-w-0">
-                <span className="font-semibold text-sm text-slate-300 group-hover:text-white block">
+                <span className="font-semibold text-sm glass-muted-text group-hover:text-[var(--glass-text)] block">
                   {link.label}
                 </span>
-                <span className="text-xs text-slate-500">{link.desc}</span>
+                <span className="text-xs glass-subtle-text">{link.desc}</span>
               </div>
             </Link>
           ))}
@@ -1113,93 +1140,93 @@ export default function DashboardPage() {
         >
           <button
             type="button"
-            className="absolute inset-0 cursor-pointer bg-slate-950/70 backdrop-blur-[2px] outline-none"
+            className="absolute inset-0 cursor-pointer bg-[var(--glass-card-bg)] backdrop-blur-[2px] outline-none"
             aria-label="ปิดหน้าต่างรายงาน"
             onClick={() => setReportDialogOpen(false)}
           />
-          <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-slate-900/95 backdrop-blur-md shadow-2xl p-5 sm:p-6">
+          <div className="relative w-full max-w-md rounded-2xl border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] backdrop-blur-md shadow-2xl p-5 sm:p-6">
             <div className="flex items-start justify-between gap-3 mb-3">
-              <h2 id="dashboard-report-dialog-title" className="text-base font-bold text-white pr-2">
+              <h2 id="dashboard-report-dialog-title" className="text-base font-bold glass-text pr-2">
                 สรุปรายงานในช่วงที่เลือก
               </h2>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setReportDialogOpen(false)}
-                className="inline-flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/10 bg-slate-800/80 text-slate-300 transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="inline-flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] glass-muted-text transition-colors hover:bg-[var(--glass-nav-hover-bg)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 aria-label="ปิด"
               >
                 <X size={18} aria-hidden />
               </Button>
             </div>
-            <p className="text-xs text-slate-400 mb-4 leading-relaxed">{activeRange.labelTh}</p>
+            <p className="text-xs glass-muted-text mb-4 leading-relaxed">{activeRange.labelTh}</p>
             <div className="grid grid-cols-2 gap-2 mb-6">
-              <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5">
-                <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">ทั้งหมด</p>
-                <p className="text-lg font-bold text-slate-100 tabular-nums">{reportStats.total}</p>
+              <div className="glass-card px-3 py-2.5">
+                <p className="text-[10px] uppercase tracking-wide glass-subtle-text font-semibold">ทั้งหมด</p>
+                <p className="text-lg font-bold glass-text tabular-nums">{reportStats.total}</p>
               </div>
-              <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5">
-                <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{STATUS_LABELS.PENDING}</p>
+              <div className="glass-card px-3 py-2.5">
+                <p className="text-[10px] uppercase tracking-wide glass-subtle-text font-semibold">{STATUS_LABELS.PENDING}</p>
                 <p className="text-lg font-bold text-amber-300 tabular-nums">{reportStats.pending}</p>
               </div>
-              <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5">
-                <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{STATUS_LABELS.IN_PROGRESS}</p>
+              <div className="glass-card px-3 py-2.5">
+                <p className="text-[10px] uppercase tracking-wide glass-subtle-text font-semibold">{STATUS_LABELS.IN_PROGRESS}</p>
                 <p className="text-lg font-bold text-sky-300 tabular-nums">{reportStats.in_progress}</p>
               </div>
-              <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5">
-                <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{STATUS_LABELS.RESOLVED}</p>
+              <div className="glass-card px-3 py-2.5">
+                <p className="text-[10px] uppercase tracking-wide glass-subtle-text font-semibold">{STATUS_LABELS.RESOLVED}</p>
                 <p className="text-lg font-bold text-emerald-300 tabular-nums">{reportStats.resolved}</p>
               </div>
-              <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2.5">
-                <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{STATUS_LABELS.CANCELLED}</p>
-                <p className="text-lg font-bold text-slate-300 tabular-nums">{reportStats.cancelled}</p>
+              <div className="glass-card px-3 py-2.5">
+                <p className="text-[10px] uppercase tracking-wide glass-subtle-text font-semibold">{STATUS_LABELS.CANCELLED}</p>
+                <p className="text-lg font-bold glass-muted-text tabular-nums">{reportStats.cancelled}</p>
               </div>
             </div>
 
             <div className="space-y-3 mb-4" aria-label="สรุปแยกประเภทตามช่วงที่เลือก">
-              <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-3">
-                <p className="text-xs font-semibold text-slate-300 mb-2">แยกตามสภาพแวดล้อมการแก้ไข</p>
-                <p className="text-[11px] text-slate-500 mb-2 leading-relaxed">
+              <div className="glass-card px-3 py-3">
+                <p className="text-xs font-semibold glass-muted-text mb-2">แยกตามสภาพแวดล้อมการแก้ไข</p>
+                <p className="text-[11px] glass-subtle-text mb-2 leading-relaxed">
                   จากฟิลด์ตอนปิดงาน — ยังไม่ปิดหรือยังไม่บันทึกจะอยู่ใน &quot;ไม่ระบุ&quot;
                 </p>
                 <div className="space-y-1.5 text-sm">
                   <div className="flex justify-between gap-2">
-                    <span className="text-slate-400">ภายใน (ในอาคาร)</span>
-                    <span className="tabular-nums font-medium text-slate-100">{jobBreakdown.env.INDOOR}</span>
+                    <span className="glass-muted-text">ภายใน (ในอาคาร)</span>
+                    <span className="tabular-nums font-medium glass-text">{jobBreakdown.env.INDOOR}</span>
                   </div>
                   <div className="flex justify-between gap-2">
-                    <span className="text-slate-400">ภายนอก (นอกอาคาร)</span>
-                    <span className="tabular-nums font-medium text-slate-100">{jobBreakdown.env.OUTDOOR}</span>
+                    <span className="glass-muted-text">ภายนอก (นอกอาคาร)</span>
+                    <span className="tabular-nums font-medium glass-text">{jobBreakdown.env.OUTDOOR}</span>
                   </div>
                   <div className="flex justify-between gap-2">
-                    <span className="text-slate-400">ไม่ระบุ</span>
-                    <span className="tabular-nums font-medium text-slate-100">{jobBreakdown.env.UNKNOWN}</span>
+                    <span className="glass-muted-text">ไม่ระบุ</span>
+                    <span className="tabular-nums font-medium glass-text">{jobBreakdown.env.UNKNOWN}</span>
                   </div>
                 </div>
               </div>
-              <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-3">
-                <p className="text-xs font-semibold text-slate-300 mb-2">แยกตามประเภทงาน (Hardware / Software)</p>
-                <p className="text-[11px] text-slate-500 mb-2 leading-relaxed">
+              <div className="glass-card px-3 py-3">
+                <p className="text-xs font-semibold glass-muted-text mb-2">แยกตามประเภทงาน (Hardware / Software)</p>
+                <p className="text-[11px] glass-subtle-text mb-2 leading-relaxed">
                   จากฟิลด์ตอนปิดงาน — ยังไม่ปิดหรือยังไม่บันทึกจะอยู่ใน &quot;ไม่ระบุ&quot;
                 </p>
                 <div className="space-y-1.5 text-sm">
                   <div className="flex justify-between gap-2">
-                    <span className="text-slate-400">Hardware (ฮาร์ดแวร์)</span>
-                    <span className="tabular-nums font-medium text-slate-100">{jobBreakdown.part.Hardware}</span>
+                    <span className="glass-muted-text">Hardware (ฮาร์ดแวร์)</span>
+                    <span className="tabular-nums font-medium glass-text">{jobBreakdown.part.Hardware}</span>
                   </div>
                   <div className="flex justify-between gap-2">
-                    <span className="text-slate-400">Software (ซอฟต์แวร์)</span>
-                    <span className="tabular-nums font-medium text-slate-100">{jobBreakdown.part.Software}</span>
+                    <span className="glass-muted-text">Software (ซอฟต์แวร์)</span>
+                    <span className="tabular-nums font-medium glass-text">{jobBreakdown.part.Software}</span>
                   </div>
                   <div className="flex justify-between gap-2">
-                    <span className="text-slate-400">ไม่ระบุ</span>
-                    <span className="tabular-nums font-medium text-slate-100">{jobBreakdown.part.UNKNOWN}</span>
+                    <span className="glass-muted-text">ไม่ระบุ</span>
+                    <span className="tabular-nums font-medium glass-text">{jobBreakdown.part.UNKNOWN}</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <p className="text-[11px] text-slate-500 mb-4 leading-relaxed">
+            <p className="text-[11px] glass-subtle-text mb-4 leading-relaxed">
               นับจากวันที่แจ้ง (หรือวันที่สร้างใบ) ให้ตรงกับช่วงที่เลือก — ใช้ปุ่มด้านล่างเพื่อดาวน์โหลดไฟล์ PDF ที่สร้างจากเซิร์ฟเวอร์
             </p>
             <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
@@ -1207,7 +1234,7 @@ export default function DashboardPage() {
                 type="button"
                 variant="secondary"
                 onClick={() => setReportDialogOpen(false)}
-                className="min-h-11 cursor-pointer rounded-xl border border-white/10 bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-200 transition-all hover:bg-slate-700 active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="min-h-11 cursor-pointer rounded-xl border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] px-4 py-2.5 text-sm font-medium glass-text transition-all hover:bg-[var(--glass-nav-hover-bg)] active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               >
                 ปิด
               </Button>

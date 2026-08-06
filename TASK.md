@@ -1,6 +1,6 @@
 # Task & Implementation Plan 
 
-รายการงานสำหรับการย้ายระบบแจ้งซ่อม CCTV จาก AppSheet มาสู่ Next.js และ NestJS
+รายการงานสำหรับการย้ายระบบแจ้งซ่อม จาก AppSheet มาสู่ Next.js และ NestJS
 
 ## 1. Project Setup
 - [x] Initialize NestJS backend in `backend/` directory.
@@ -10,7 +10,7 @@
 ## 2. Database & Backend Preparation
 - [x] Setup Prisma ORM and MySQL connection in `backend/`.
 - [x] Define Prisma Schema based on AppSheet data structure (Jobs, Users, Settings).
-- [x] Create data migration script to read `ระบบแจ้งซ่อม CCTV .xlsx` and populate MySQL database.
+- [x] Create data migration script to read `ระบบแจ้งซ่อม .xlsx` and populate MySQL database.
 - [x] Generate Prisma client and create initial migrations.
 
 ## 3. Backend Implementation (NestJS)
@@ -32,7 +32,7 @@
 - [x] Polish UI with SweetAlert2.
 
 ## 6. Phase 2 - Schema Alignment with Excel (2026-03-08)
-- [x] ตรวจสอบโครงสร้าง Excel (`ระบบแจ้งซ่อม CCTV .xlsx`) ทุกชีท
+- [x] ตรวจสอบโครงสร้าง Excel (`ระบบแจ้งซ่อม .xlsx`) ทุกชีท
 - [x] เพิ่มตาราง `Site` (พื้นที่ในโครงการ: จังหวัด, อำเภอ, หน่วยงาน)
 - [x] เพิ่มตาราง `Area` (พื้นที่รับผิดชอบ: อำเภอ, Site Engineer)
 - [x] ขยายตาราง `User` — เพิ่ม `position`, `image`, relation `areas`, `reportedJobs`
@@ -215,7 +215,7 @@
 
 ## 20. Private MinIO + รูปผ่านสิทธิ์ (2026-03-28) — implement แล้ว
 
-สรุป: **[`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md)** · ดัชนีเอกสาร: [`docs/README.md`](docs/README.md), [`minio.md`](minio.md)
+สรุป: **[`docs/Project-Plan-Private-MinIO-Images.md`](docs/Project-Plan-Private-MinIO-Images.md)** · ดัชนีเอกสาร: [`docs/README.md`](docs/README.md), [`docs/minio.md`](docs/minio.md)
 
 - [x] Phase 1: Nest SDK + `getJobImageBuffer`
 - [x] Phase 2: `/job-images` + `dashboardJobImagePath` — job detail, JobsList, status เจ้าหน้าที่
@@ -317,23 +317,23 @@
 
 ### Local dev (เครื่อง dev)
 - [x] `backend/.env` — DB `dtrs_app`, `MINIO_BUCKET_NAME=dtrs-app` (config), `PORT=4100`
-- [ ] ⏸️ **MinIO bucket `dtrs-app` บน server** — รอทีม infra สร้าง (block ทดสอบอัปโหลด)
+- [x] GitLab MinIO กลุ่ม B ✅ (2026-08-06) — ตรวจ bucket บน server + อัปโหลดหลัง deploy UAT
 - [x] `frontend/.env` + `.env.local` sync — `API_INTERNAL_BASE_URL=http://localhost:4100/api`
 - [x] `npx prisma generate` + `npm run start:dev` → `GET http://localhost:4100/api` **200**
 - [x] `npm run dev` → `http://localhost:3000/login` **200**
 - [ ] Login E2E / seed admin ถ้ายังไม่มี user
 - [ ] `docker compose up --build` ทดสอบ container ชื่อ `dtrs-app-*`
 
-### ค้าง (infra / PRD)
-- [ ] GitLab CI/CD Variables กลุ่ม A — scope **`staging`** / **`production`** ([`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md); pipeline validate ก่อน manual deploy)
-- [ ] MinIO bucket **`dtrs-app-uat`** / **`dtrs-app`** + `MINIO_*` (กลุ่ม B — หลัง infra)
-- [ ] NPM — `dtrs-app.forth.co.th` → 8404/8405
-- [ ] ทดสอบ pipeline บน branch `staging` → manual deploy UAT → PRD
-- [ ] ยืนยันไม่ชน `cctv-app_ticket`
+### ค้าง (โฟกัส UAT `staging` · PRD pending)
+- [x] GitLab CI/CD Variables กลุ่ม A — scope **`staging`** ✅ ([`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md))
+- [ ] **UAT:** `prisma migrate deploy` (DB `@192.168.0.11`) → push `staging` → Docker `:2375` บน `.115` → manual `deploy:uat:docker`
+- [ ] ⏸️ **pending:** Variables scope **`production`** กลุ่ม A · NPM · deploy PRD
+- [x] MinIO กลุ่ม B บน GitLab ✅ — ตรวจ bucket + อัปโหลดหลัง deploy UAT
+- [ ] ยืนยันไม่ชน `cctv-app_ticket` (หลัง deploy UAT)
 - [ ] P3–P6 branding/docs/postman (optional)
 
 ### เอกสาร
-- [x] `docs/DTRS-Migration-Checklist.md`, `docs/GitLab-CI-Plan.md`, `docs/GitLab-CI-Variables-Checklist.md`, `docs/README.md`, `README.md`, `STATUS.md`, `TASK.md`
+- [x] Sync docs 2026-08-06 — Variables UAT A+B ✅ · `production` pending: `docs/GitLab-CI-*`, `docs/DTRS-Migration-Checklist.md`, `docs/minio.md`, `docs/README.md`, `README.md`, `STATUS.md`, `PLAN.md`, `TASK.md`, `AGENTS.md`, `AGENT_INSTRUCTIONS.md`, `backend/README.md`
 
 ## 27. GitLab CI — UAT+PRD pipeline + hardening (2026-08-05)
 
@@ -354,7 +354,23 @@
 - [x] Mock `PrismaService` / Guards ใน `areas` + `sites` spec ให้ `npm test` ผ่านใน CI
 
 ### เอกสาร
-- [x] Sync `docs/GitLab-CI-Plan.md`, `docs/GitLab-CI-Variables-Checklist.md`, `docs/DTRS-Migration-Checklist.md`, `docs/README.md`, `README.md`, `TASK.md`
+- [x] Sync docs 2026-08-06 — Variables UAT A+B ✅ · `production` pending: `docs/GitLab-CI-Plan.md`, `docs/GitLab-CI-Variables-Checklist.md`, `docs/DTRS-Migration-Checklist.md`, `docs/minio.md`, `docs/README.md`, `README.md`, `STATUS.md`, `PLAN.md`, `TASK.md`, `AGENTS.md`, `AGENT_INSTRUCTIONS.md`
 
 ### ค้าง
-- [ ] ตั้ง GitLab Variables บน UI + ทดสอบ pipeline / deploy จริง
+- [x] ตั้ง GitLab Variables กลุ่ม A scope **`staging`** ✅
+- [ ] ทดสอบ pipeline / manual deploy UAT (`.115`)
+- [ ] ⏸️ **pending:** Variables **`production`** กลุ่ม A + NPM + deploy PRD
+- [x] MinIO กลุ่ม B บน GitLab ✅ (2026-08-06)
+
+## 28. Phase 6.14 — Frontend Light / Dark theme (2026-08-06)
+
+### Frontend
+- [x] ติดตั้ง `next-themes`; `ThemeProvider` (`defaultTheme=dark`, `storageKey=dtrs-theme`, `enableSystem=false`)
+- [x] `--glass-*` tokens + utilities; class `.light` สำหรับ subtree print
+- [x] `ThemeToggle` ใน `SiteHeader`; `useAppTheme` (mounted guard)
+- [x] Shells / shared: `PublicLayoutShell`, `DashboardLayoutShell`, `DashboardPageShell`, `CrudModal`, `JobsList`, toast, `DashboardStatCards`
+- [x] `PrintThemeShell` — บังคับ light โดยไม่ซ้อน ThemeProvider
+- [x] แก้ contrast light mode (ตาราง/ฟิลเตอร์/badge) — JobsList, sites, roles, public status
+
+### เอกสาร
+- [x] Sync: `CHANGELOG.md`, `README.md`, `STATUS.md`, `TASK.md`, `PLAN.md`, `docs/README.md`, `frontend/README.md`, `AGENTS.md`

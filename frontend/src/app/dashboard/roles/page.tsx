@@ -297,13 +297,13 @@ export default function RolesPage() {
         />
 
         {roles.length === 0 ? (
-          <div className="rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl p-12 flex flex-col items-center justify-center text-center">
-            <Shield size={48} className="opacity-40 mb-3 text-slate-600" />
-            <p className="font-semibold text-slate-400">
+          <div className="glass-card p-12 flex flex-col items-center justify-center text-center">
+            <Shield size={48} className="opacity-40 mb-3 text-slate-400 dark:text-slate-600" />
+            <p className="font-semibold text-slate-600 dark:text-slate-400">
               {loadError ? loadError : "ยังไม่มีบทบาท · รัน seed-roles-permissions ก่อน"}
             </p>
             {loadError == null && (
-              <p className="text-sm mt-2 text-slate-500">
+              <p className="text-sm mt-2 text-slate-600 dark:text-slate-400">
                 ถ้าเพิ่งเพิ่ม permission ใหม่ ให้รัน seed-roles-permissions อีกครั้ง
               </p>
             )}
@@ -313,7 +313,7 @@ export default function RolesPage() {
             {roles.map((role) => (
               <div
                 key={role.id}
-                className="rounded-2xl border border-white/10 p-5 flex flex-col bg-slate-900/50 backdrop-blur-md shadow-xl hover:border-blue-500/30 transition-all group"
+                className="glass-card p-5 flex flex-col hover:border-blue-500/30 transition-all group"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
@@ -323,16 +323,16 @@ export default function RolesPage() {
                       styleMap={roleStyleMap}
                       className="min-w-[112px] justify-center"
                     />
-                    <p className="text-xs font-mono mt-0.5 text-slate-400">{role.code}</p>
+                    <p className="text-xs font-mono mt-0.5 text-slate-600 dark:text-slate-400">{role.code}</p>
                     {role.description && (
-                      <p className="text-xs mt-1 line-clamp-2 text-slate-500">{role.description}</p>
+                      <p className="text-xs mt-1 line-clamp-2 text-slate-600 dark:text-slate-400">{role.description}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button
                       type="button"
                       onClick={() => openPermissions(role)}
-                      className="p-2 rounded-lg hover:bg-white/10 text-sm text-slate-400 hover:text-white transition-colors"
+                      className="p-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/10 dark:hover:text-white text-sm text-slate-600 dark:text-slate-400 transition-colors"
                       title="กำหนดสิทธิ์"
                     >
                       <Shield size={16} />
@@ -340,7 +340,7 @@ export default function RolesPage() {
                     <button
                       type="button"
                       onClick={() => openEdit(role)}
-                      className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                      className="p-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/10 dark:hover:text-white text-slate-600 dark:text-slate-400 transition-colors"
                       title="แก้ไข"
                     >
                       <Pencil size={14} />
@@ -348,14 +348,14 @@ export default function RolesPage() {
                     <button
                       type="button"
                       onClick={() => handleDelete(role)}
-                      className="p-2 rounded-lg hover:bg-red-500/10 text-red-400 hover:text-red-300 transition-colors"
+                      className="p-2 rounded-lg hover:bg-red-500/10 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
                       title="ลบ"
                     >
                       <Trash2 size={14} />
                     </button>
                   </div>
                 </div>
-                <div className="mt-3 pt-3 border-t border-white/10 flex items-center gap-2 text-xs text-slate-400">
+                <div className="mt-3 pt-3 border-t border-slate-200 dark:border-white/10 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
                   <span>ผู้ใช้: {(role as AppRole & { _count?: { users: number } })._count?.users ?? 0}</span>
                   <span>สิทธิ์: {(role as AppRole & { _count?: { permissions: number } })._count?.permissions ?? 0}</span>
                 </div>
@@ -382,28 +382,28 @@ export default function RolesPage() {
       >
         {modalMode === "permissions" ? (
           <div className="space-y-3">
-            <p className="text-sm text-slate-400 leading-relaxed">
+            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
               เลือกสิทธิ์เมนู/งานที่บทบาทนี้สามารถใช้งานได้
             </p>
             <div
-              className="rounded-xl border border-white/10 bg-slate-950/40 backdrop-blur-sm p-3 max-h-[min(22rem,50vh)] overflow-y-auto space-y-0.5 shadow-inner ring-1 ring-white/5"
+              className="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/40 backdrop-blur-sm p-3 max-h-[min(22rem,50vh)] overflow-y-auto space-y-0.5 shadow-inner ring-1 ring-slate-200/80 dark:ring-white/5"
               role="group"
               aria-label="รายการสิทธิ์"
             >
               {rolePerms.map((p) => (
                 <label
                   key={p.id}
-                  className="flex items-start gap-3 cursor-pointer rounded-lg px-2 py-2 hover:bg-white/5 transition-colors min-h-[44px]"
+                  className="flex items-start gap-3 cursor-pointer rounded-lg px-2 py-2 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors min-h-[44px]"
                 >
                   <input
                     type="checkbox"
                     checked={rolePermissionIds.includes(p.id)}
                     onChange={() => togglePermission(p.id)}
-                    className="mt-1 h-4 w-4 shrink-0 rounded border-white/20 bg-slate-900/60 text-blue-600 focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-0 focus:ring-offset-transparent cursor-pointer"
+                    className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 bg-white dark:border-white/20 dark:bg-slate-900/60 text-blue-600 focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-0 focus:ring-offset-transparent cursor-pointer"
                   />
                   <span className="flex-1 min-w-0">
-                    <span className="block text-sm text-slate-200">{p.name}</span>
-                    <span className="text-xs font-mono text-slate-500">({p.code})</span>
+                    <span className="block text-sm text-slate-900 dark:text-slate-100">{p.name}</span>
+                    <span className="text-xs font-mono text-slate-600 dark:text-slate-400">({p.code})</span>
                   </span>
                 </label>
               ))}
@@ -412,7 +412,7 @@ export default function RolesPage() {
         ) : (
           <>
             <div>
-              <label className="block text-sm font-medium mb-1.5 text-slate-200" htmlFor="role-code">
+              <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="role-code">
                 รหัสบทบาท (code)
               </label>
               <input
@@ -427,7 +427,7 @@ export default function RolesPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5 text-slate-200" htmlFor="role-name">
+              <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="role-name">
                 ชื่อบทบาท
               </label>
               <input
@@ -441,7 +441,7 @@ export default function RolesPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5 text-slate-200" htmlFor="role-desc">
+              <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="role-desc">
                 คำอธิบาย
               </label>
               <textarea
@@ -455,14 +455,14 @@ export default function RolesPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-slate-200" htmlFor="role-badge-bg">
+                <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="role-badge-bg">
                   สีพื้น Badge
                 </label>
                 <div className="flex items-center gap-2">
                   <input
                     id="role-badge-bg"
                     type="color"
-                    className="h-11 w-14 rounded-lg border border-white/10 bg-slate-900/40 cursor-pointer"
+                    className="h-11 w-14 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/40 cursor-pointer"
                     value={normalizeHexColorOrNull(form.badgeBgColor) ?? "#334155"}
                     onChange={(e) => setForm({ ...form, badgeBgColor: e.target.value.toUpperCase() })}
                     aria-label="เลือกสีพื้น Badge"
@@ -478,14 +478,14 @@ export default function RolesPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-slate-200" htmlFor="role-badge-text">
+                <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="role-badge-text">
                   สีตัวอักษร Badge
                 </label>
                 <div className="flex items-center gap-2">
                   <input
                     id="role-badge-text"
                     type="color"
-                    className="h-11 w-14 rounded-lg border border-white/10 bg-slate-900/40 cursor-pointer"
+                    className="h-11 w-14 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/40 cursor-pointer"
                     value={normalizeHexColorOrNull(form.badgeTextColor) ?? "#E2E8F0"}
                     onChange={(e) => setForm({ ...form, badgeTextColor: e.target.value.toUpperCase() })}
                     aria-label="เลือกสีตัวอักษร Badge"
@@ -501,8 +501,8 @@ export default function RolesPage() {
                 </div>
               </div>
             </div>
-            <div className="rounded-xl border border-white/10 bg-slate-900/30 p-3">
-              <p className="mb-2 text-xs text-slate-400">ตัวอย่าง Badge</p>
+            <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/30 p-3">
+              <p className="mb-2 text-xs text-slate-600 dark:text-slate-400">ตัวอย่าง Badge</p>
               <RoleBadge
                 roleCode={form.code || "CUSTOM"}
                 label={form.name || (form.code || "บทบาทตัวอย่าง")}

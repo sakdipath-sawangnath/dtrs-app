@@ -29,7 +29,8 @@ import ManagedImage, { MANAGED_IMAGE_SIZES } from "@/components/ManagedImage";
 import PersonAvatar from "@/components/PersonAvatar";
 import { confirmDialog, toastError, toastSuccess } from "@/lib/toast";
 import Select from "react-select";
-import { reactSelectGlassStyles } from "@/lib/reactSelectGlassStyles";
+import { getReactSelectGlassStyles } from "@/lib/reactSelectGlassStyles";
+import { useAppTheme } from "@/lib/useAppTheme";
 import { extractAssignableArray, unwrapApiData } from "@/lib/apiResponse";
 import { dashboardJobImagePath } from "@/lib/dashboardJobImageUrl";
 import {
@@ -120,6 +121,8 @@ function toDateTimeLocalInputValue(iso?: string | null): string {
 }
 
 export default function JobDetailPage() {
+  const { theme } = useAppTheme();
+  const selectStyles = getReactSelectGlassStyles(theme);
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { data: session } = useSession();
@@ -803,7 +806,7 @@ export default function JobDetailPage() {
             type="button"
             variant="outline"
             onClick={() => router.back()}
-            className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-xl border-white/10 bg-slate-800/50 px-3.5 py-2 text-xs font-medium text-slate-300 shadow-sm hover:bg-slate-700/60 hover:text-white focus-visible:ring-2 focus-visible:ring-slate-500/20 sm:text-sm"
+            className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-xl border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] px-3.5 py-2 text-xs font-medium glass-muted-text shadow-sm hover:bg-[var(--glass-nav-hover-bg)] hover:text-[var(--glass-text)] focus-visible:ring-2 focus-visible:ring-slate-500/20 sm:text-sm"
           >
             <ArrowLeft size={16} aria-hidden /> กลับไปหน้ารายการ
           </Button>
@@ -815,12 +818,12 @@ export default function JobDetailPage() {
           <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
             {/* คอลัมน์ซ้าย — No-Card: แยก Glass หลายก้อน */}
             <div className="space-y-4 min-w-0">
-              <h2 className="text-sm font-bold text-white tracking-tight">
+              <h2 className="text-sm font-bold glass-text tracking-tight">
                 ข้อมูลการแจ้งข้อขัดข้อง
               </h2>
               {loading ? (
                 <div className={GLASS_SECTION}>
-                  <div className="h-40 flex items-center justify-center text-sm text-slate-400">
+                  <div className="h-40 flex items-center justify-center text-sm glass-muted-text">
                     <span className="animate-pulse">กำลังโหลดข้อมูล...</span>
                   </div>
                 </div>
@@ -834,7 +837,7 @@ export default function JobDetailPage() {
                 <>
                   <div className={GLASS_SECTION}>
                     <div className="space-y-4">
-                      <div className="space-y-1 text-xs text-slate-400">
+                      <div className="space-y-1 text-xs glass-muted-text">
                         <div className="flex justify-between gap-2 items-center">
                           <span>สถานะปัจจุบัน:</span>
                           <JobStatusBadge status={job.status} />
@@ -842,7 +845,7 @@ export default function JobDetailPage() {
                         {(job.reportDate || job.createdAt) && (
                           <div className="flex justify-between gap-2">
                             <span>วันที่แจ้ง:</span>
-                            <span className="flex items-center gap-1 text-slate-300">
+                            <span className="flex items-center gap-1 glass-muted-text">
                               <Calendar size={12} aria-hidden />
                               {formatThaiDateTimeDisplay(
                                 job.reportDate || job.createdAt,
@@ -853,7 +856,7 @@ export default function JobDetailPage() {
                       </div>
 
                       <div>
-                        <p className="text-xs font-semibold mb-2 flex items-center gap-1 text-slate-400">
+                        <p className="text-xs font-semibold mb-2 flex items-center gap-1 glass-muted-text">
                           <User size={12} aria-hidden /> ผู้แจ้ง
                         </p>
                         <div className="flex items-start gap-3 min-w-0">
@@ -868,16 +871,16 @@ export default function JobDetailPage() {
                             size="md"
                           />
                           <div className="min-w-0 flex-1 space-y-0.5">
-                            <p className="text-sm text-slate-100 font-medium">
+                            <p className="text-sm glass-text font-medium">
                               {job.reporterName ?? "–"}
                             </p>
                             {job.reporterPhone && (
-                              <p className="text-xs flex items-center gap-1 text-slate-400">
+                              <p className="text-xs flex items-center gap-1 glass-muted-text">
                                 <Phone size={12} aria-hidden /> {job.reporterPhone}
                               </p>
                             )}
                             {job.reporterEmail && (
-                              <p className="text-xs flex items-center gap-1 text-slate-400">
+                              <p className="text-xs flex items-center gap-1 glass-muted-text">
                                 <Mail size={12} aria-hidden /> {job.reporterEmail}
                               </p>
                             )}
@@ -886,10 +889,10 @@ export default function JobDetailPage() {
                       </div>
 
                       <div>
-                        <p className="text-xs font-semibold mb-1 flex items-center gap-1 text-slate-400">
+                        <p className="text-xs font-semibold mb-1 flex items-center gap-1 glass-muted-text">
                           <MapPin size={12} aria-hidden /> สถานที่
                         </p>
-                        <p className="text-sm text-slate-200">
+                        <p className="text-sm glass-text">
                           {[job.province, job.district, job.location]
                             .filter(Boolean)
                             .join(" · ") || "–"}
@@ -898,7 +901,7 @@ export default function JobDetailPage() {
 
                       {job.assignedTo && (
                         <div>
-                          <p className="text-xs font-semibold mb-2 text-slate-400">
+                          <p className="text-xs font-semibold mb-2 glass-muted-text">
                             ผู้รับผิดชอบ
                           </p>
                           <div className="flex items-center gap-3 min-w-0">
@@ -912,7 +915,7 @@ export default function JobDetailPage() {
                               nameLabel={job.assignedTo.name}
                               size="md"
                             />
-                            <p className="text-sm text-slate-200 font-medium min-w-0 truncate">
+                            <p className="text-sm glass-text font-medium min-w-0 truncate">
                               {job.assignedTo.name}
                             </p>
                           </div>
@@ -922,17 +925,17 @@ export default function JobDetailPage() {
                   </div>
 
                   <div className={GLASS_SECTION}>
-                    <p className="text-xs font-semibold mb-2 flex items-center gap-1 text-slate-400">
+                    <p className="text-xs font-semibold mb-2 flex items-center gap-1 glass-muted-text">
                       <FileText size={12} aria-hidden /> รายละเอียดปัญหา
                     </p>
-                    <p className="text-sm text-slate-100 whitespace-pre-wrap wrap-break-word leading-relaxed">
+                    <p className="text-sm glass-text whitespace-pre-wrap wrap-break-word leading-relaxed">
                       {job.description || job.title || "–"}
                     </p>
                   </div>
 
                   {job.images && Array.isArray(job.images) && job.images.length > 0 && (
                     <div className={GLASS_SECTION}>
-                      <p className="text-xs font-semibold text-slate-400 mb-3">
+                      <p className="text-xs font-semibold glass-muted-text mb-3">
                         รูปภาพประกอบ
                       </p>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -960,7 +963,7 @@ export default function JobDetailPage() {
                               setPreviewImages(proxyUrls);
                               setPreviewIndex(pos);
                             }}
-                            className="relative w-full aspect-4/3 sm:aspect-video rounded-xl border border-white/10 overflow-hidden bg-slate-800/50 group cursor-pointer"
+                            className="relative w-full aspect-4/3 sm:aspect-video glass-card overflow-hidden bg-[var(--glass-card-bg)] group cursor-pointer"
                           >
                             <ManagedImage
                               src={dashboardJobImagePath(job.id, "issue", i)}
@@ -986,12 +989,12 @@ export default function JobDetailPage() {
 
             {/* คอลัมน์ขวา — No-Card: สถานะ / ฟอร์ม แยก Glass */}
             <div className="space-y-4 min-w-0">
-              <h2 className="text-sm font-bold text-white tracking-tight">
+              <h2 className="text-sm font-bold glass-text tracking-tight">
                 ข้อมูลการแก้ไข
               </h2>
 
               {job && (
-                <div className={`${GLASS_SECTION} space-y-3 text-xs text-slate-400`}>
+                <div className={`${GLASS_SECTION} space-y-3 text-xs glass-muted-text`}>
                   <div className="flex justify-between gap-2 items-center">
                     <span>สถานะปัจจุบัน:</span>
                     <JobStatusBadge status={job.status} />
@@ -999,7 +1002,7 @@ export default function JobDetailPage() {
                   {resolvedAtText && (
                     <div className="flex justify-between gap-2">
                       <span>วันที่แก้ไขล่าสุด:</span>
-                      <span className="font-semibold text-slate-200">{resolvedAtText}</span>
+                      <span className="font-semibold glass-text">{resolvedAtText}</span>
                     </div>
                   )}
                   {!job.assignedTo && job.status !== "CANCELLED" && (
@@ -1033,7 +1036,7 @@ export default function JobDetailPage() {
                             variant="outline"
                             onClick={handleTakeJob}
                             disabled={assignActionSaving || assignLoading}
-                            className="min-h-11 flex-1 cursor-pointer rounded-xl border-white/10 bg-slate-800 py-2.5 text-sm font-semibold text-slate-100 shadow-lg hover:bg-slate-700 focus-visible:ring-slate-500/25 active:scale-95"
+                            className="min-h-11 flex-1 cursor-pointer rounded-xl border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] py-2.5 text-sm font-semibold glass-text shadow-lg hover:bg-[var(--glass-nav-hover-bg)] focus-visible:ring-slate-500/25 active:scale-95"
                           >
                             <Wrench size={16} className="mr-1.5 inline-block -mt-0.5" aria-hidden /> รับงานด้วยตนเอง
                           </Button>
@@ -1044,7 +1047,7 @@ export default function JobDetailPage() {
                   {job.assignedTo && (
                     <div className="flex justify-between gap-2">
                       <span>ผู้รับงาน (ผู้แก้ไข):</span>
-                      <span className="font-semibold text-slate-200">
+                      <span className="font-semibold glass-text">
                         {job.assignedTo.name}
                       </span>
                     </div>
@@ -1057,7 +1060,7 @@ export default function JobDetailPage() {
                           href={`/print/jobs/${job.id}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 py-2 rounded-xl text-xs font-semibold border border-white/10 bg-slate-800/50 text-slate-100 hover:bg-slate-700/80 transition-all active:scale-95 shadow-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                          className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 py-2 rounded-xl text-xs font-semibold border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] glass-text hover:bg-[var(--glass-nav-hover-bg)] transition-all active:scale-95 shadow-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                         >
                           <Printer size={14} aria-hidden />
                           <span>เปิดหน้าพิมพ์ (เบราว์เซอร์)</span>
@@ -1083,7 +1086,7 @@ export default function JobDetailPage() {
                   )}
                   {job.fixImages && Array.isArray(job.fixImages) && job.fixImages.length > 0 && (
                     <div className="pt-3 space-y-2">
-                      <span className="text-xs font-semibold text-slate-400">
+                      <span className="text-xs font-semibold glass-muted-text">
                         รูปการแก้ไข
                       </span>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1111,7 +1114,7 @@ export default function JobDetailPage() {
                               setPreviewImages(proxyUrls);
                               setPreviewIndex(pos);
                             }}
-                            className="relative w-full aspect-4/3 rounded-xl border border-white/10 overflow-hidden bg-slate-800/50 group cursor-pointer"
+                            className="relative w-full aspect-4/3 glass-card overflow-hidden bg-[var(--glass-card-bg)] group cursor-pointer"
                           >
                             <ManagedImage
                               src={dashboardJobImagePath(job.id, "fix", i)}
@@ -1141,10 +1144,10 @@ export default function JobDetailPage() {
                       <Clock3 size={15} aria-hidden />
                     </div>
                     <div className="min-w-0">
-                      <h3 className="text-sm font-semibold text-slate-100">
+                      <h3 className="text-sm font-semibold glass-text">
                         ลงข้อมูลย้อนหลัง (Backfill วันที่)
                       </h3>
-                      <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      <p className="text-xs glass-muted-text mt-1 leading-relaxed">
                         ใช้สำหรับเคสเก่า: แก้ไขวันที่แจ้ง/วันที่ปิดให้ตรงข้อมูลจริงตามเอกสารอ้างอิง
                       </p>
                     </div>
@@ -1189,9 +1192,9 @@ export default function JobDetailPage() {
                         disabled={backfillSaving}
                       />
                     </div>
-                    <p className="text-xs text-slate-500 leading-relaxed">
+                    <p className="text-xs glass-subtle-text leading-relaxed">
                       หมายเหตุ: วันที่ปิดย้อนหลังตั้งได้เฉพาะงานสถานะ{" "}
-                      <span className="text-slate-300 font-medium">เสร็จสิ้น (RESOLVED)</span>{" "}
+                      <span className="glass-muted-text font-medium">เสร็จสิ้น (RESOLVED)</span>{" "}
                       และต้องไม่น้อยกว่าวันที่แจ้งย้อนหลัง
                     </p>
                     <Button
@@ -1209,25 +1212,25 @@ export default function JobDetailPage() {
               {job && (
                 <div className={`${GLASS_SECTION} space-y-4`}>
                 {job.status === "CANCELLED" ? (
-                  <p className="text-sm text-slate-300 text-center py-6 px-2">
+                  <p className="text-sm glass-muted-text text-center py-6 px-2">
                     งานนี้ถูกยกเลิกแล้ว — ไม่มีการดำเนินการซ่อมต่อ และไม่สามารถบันทึกการแก้ไขหรือ Reopen ได้
                   </p>
                 ) : (canEditFix || isReadOnlyFix) ? (
                   <form onSubmit={handleSubmitFix} className="space-y-4">
-                    <div className="rounded-xl border border-white/10 bg-slate-950/40 p-3 sm:p-4 space-y-3">
-                      <p className="text-xs text-slate-400 leading-relaxed">
+                    <div className="glass-card p-3 sm:p-4 space-y-3">
+                      <p className="text-xs glass-muted-text leading-relaxed">
                         <span className="text-red-400">*</span> บังคับกรอก:{" "}
-                        <span className="text-slate-300 font-medium">
+                        <span className="glass-muted-text font-medium">
                           ประเภทสถานที่ (Indoor / Outdoor)
                         </span>
                         ,{" "}
-                        <span className="text-slate-300 font-medium">
+                        <span className="glass-muted-text font-medium">
                           ประเภทงาน (Hardware / Software)
                         </span>{" "}
                         ,{" "}
-                        <span className="text-slate-300 font-medium">สาเหตุ</span>
+                        <span className="glass-muted-text font-medium">สาเหตุ</span>
                         ,{" "}
-                        <span className="text-slate-300 font-medium">วิธีแก้ไข</span>
+                        <span className="glass-muted-text font-medium">วิธีแก้ไข</span>
                         และแนบรูป 2 รูปแรก — เลือกประเภทสถานที่ก่อน จึงจะเลือกประเภทงานได้
                         หมายเหตุและ Serial ไม่บังคับ
                       </p>
@@ -1254,7 +1257,7 @@ export default function JobDetailPage() {
                             isDisabled={isReadOnlyFix}
                             isClearable
                             placeholder="เลือก Indoor / Outdoor"
-                            styles={reactSelectGlassStyles}
+                            styles={selectStyles}
                             menuPortalTarget={
                               typeof document !== "undefined"
                                 ? document.body
@@ -1288,7 +1291,7 @@ export default function JobDetailPage() {
                                 ? "เลือก Hardware / Software"
                                 : "เลือกประเภทสถานที่ก่อน"
                             }
-                            styles={reactSelectGlassStyles}
+                            styles={selectStyles}
                             menuPortalTarget={
                               typeof document !== "undefined"
                                 ? document.body
@@ -1344,9 +1347,9 @@ export default function JobDetailPage() {
                       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
                         <p
                           id="job-serial-hint"
-                          className="text-xs text-slate-500 leading-relaxed flex-1"
+                          className="text-xs glass-subtle-text leading-relaxed flex-1"
                         >
-                          <span className="text-slate-400 font-medium">S/N:</span>{" "}
+                          <span className="glass-muted-text font-medium">S/N:</span>{" "}
                           รับเฉพาะ A–Z / 0–9 / - (ตัวพิมพ์เล็กเป็นตัวใหญ่อัตโนมัติ อักขระอื่นถูกตัด)
                           — เพิ่มได้สูงสุด {JOB_SERIAL_ROWS_MAX} แถว
                         </p>
@@ -1355,7 +1358,7 @@ export default function JobDetailPage() {
                             type="button"
                             onClick={addSerialRow}
                             disabled={serialRows.length >= JOB_SERIAL_ROWS_MAX}
-                            className="inline-flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] sm:min-w-0 px-3 rounded-xl border border-white/15 bg-slate-800/80 text-slate-200 text-xs font-semibold hover:bg-slate-700/90 transition-all active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer shrink-0"
+                            className="inline-flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] sm:min-w-0 px-3 rounded-xl border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] glass-text text-xs font-semibold hover:bg-[var(--glass-nav-hover-bg)] transition-all active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer shrink-0"
                             aria-label="เพิ่มแถว Serial Number"
                           >
                             <Plus size={16} aria-hidden />
@@ -1367,17 +1370,17 @@ export default function JobDetailPage() {
                         {serialRows.map((row, idx) => (
                           <div
                             key={idx}
-                            className="rounded-xl border border-white/10 bg-slate-950/35 p-3 sm:p-4 space-y-3"
+                            className="glass-card p-3 sm:p-4 space-y-3"
                           >
                             <div className="flex items-center justify-between gap-2">
-                              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              <span className="text-[11px] font-semibold uppercase tracking-wide glass-subtle-text">
                                 อุปกรณ์ {idx + 1}
                               </span>
                               {!isReadOnlyFix && serialRows.length > 1 && (
                                 <button
                                   type="button"
                                   onClick={() => removeSerialRow(idx)}
-                                  className="inline-flex items-center justify-center min-h-10 min-w-10 rounded-lg border border-white/10 text-slate-400 hover:text-red-300 hover:border-red-500/30 hover:bg-red-950/20 transition-colors cursor-pointer"
+                                  className="inline-flex items-center justify-center min-h-10 min-w-10 rounded-lg border border-[var(--glass-card-border)] glass-muted-text hover:text-red-300 hover:border-red-500/30 hover:bg-red-950/20 transition-colors cursor-pointer"
                                   aria-label={`ลบแถวอุปกรณ์ ${idx + 1}`}
                                 >
                                   <Minus size={18} aria-hidden />
@@ -1470,14 +1473,14 @@ export default function JobDetailPage() {
                       <div>
                         <span className={GLASS_LABEL}>
                           รูปการแก้ไข{" "}
-                          <span className="text-slate-400 font-normal">
+                          <span className="glass-muted-text font-normal">
                             (บังคับ 2 รูปแรก — ใช้รูปเดิมได้ / อัปโหลดใหม่เพื่อเปลี่ยน)
                           </span>
                         </span>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mt-1">
                           {[0, 1, 2].map((i) => (
                             <div key={i} className="flex flex-col group">
-                              <p className="text-[11px] mb-1.5 font-medium text-slate-400">
+                              <p className="text-[11px] mb-1.5 font-medium glass-muted-text">
                                 รูปที่ {i + 1}{" "}
                                 {i < 2 && (
                                   <span className="text-red-400">*</span>
@@ -1488,11 +1491,11 @@ export default function JobDetailPage() {
                                 className={`relative aspect-square rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all duration-200 ${
                                   fixPreviews[i]
                                     ? "border-transparent bg-transparent"
-                                    : "border-white/20 bg-slate-900/30"
+                                    : "border-[var(--glass-card-border)] bg-[var(--glass-card-bg)]"
                                 }`}
                               >
                                 {!fixPreviews[i] && (
-                                  <div className="absolute inset-0 group-hover:bg-slate-800/40 transition-colors" />
+                                  <div className="absolute inset-0 group-hover:bg-[var(--glass-card-bg)] transition-colors" />
                                 )}
                                 {fixPreviews[i] ? (
                                   <>
@@ -1510,7 +1513,7 @@ export default function JobDetailPage() {
                                     </div>
                                   </>
                                 ) : (
-                                  <div className="flex flex-col items-center gap-1.5 z-10 text-slate-400 group-hover:text-sky-400 transition-colors">
+                                  <div className="flex flex-col items-center gap-1.5 z-10 glass-muted-text group-hover:text-sky-400 transition-colors">
                                     <Camera size={22} aria-hidden />
                                     <span className="text-[10px] font-medium uppercase tracking-wider">
                                       Upload
@@ -1540,16 +1543,16 @@ export default function JobDetailPage() {
                         type="submit"
                         variant="default"
                         disabled={saving || !fixFormReadyToSubmit}
-                        className="mt-3 w-full cursor-pointer rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white shadow-lg hover:bg-blue-700 focus-visible:ring-blue-500/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
+                        className="mt-3 w-full cursor-pointer rounded-xl bg-blue-600 py-3 text-sm font-semibold glass-text shadow-lg hover:bg-blue-700 focus-visible:ring-blue-500/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
                       >
                         {saving ? "กำลังบันทึก..." : "บันทึกและปิดงาน (สถานะ: เสร็จสิ้น)"}
                       </Button>
                     ) : isResolved && (canReopenAny || (canReopenSelf && isAssignee)) ? (
-                      <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-white/15 text-slate-300 bg-slate-800/40 backdrop-blur-sm">
+                      <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-[var(--glass-card-border)] glass-muted-text bg-[var(--glass-card-bg)] backdrop-blur-sm">
                         งานนี้ถูกปิดแล้ว — หากต้องการแก้ไขข้อมูลการแก้ไข ให้ใช้ขั้นตอน Reopen ด้านล่าง
                       </div>
                     ) : isResolved ? (
-                      <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-white/15 text-slate-400 bg-slate-800/40 backdrop-blur-sm">
+                      <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-[var(--glass-card-border)] glass-muted-text bg-[var(--glass-card-bg)] backdrop-blur-sm">
                         งานนี้ปิดแล้ว — ข้อมูลการแก้ไขเป็นโหมดอ่านอย่างเดียว — หากต้องการแก้ไข ให้ติดต่อผู้รับงานหรือผู้ดูแลระบบ
                       </div>
                     ) : job && job.status === "PENDING" ? (
@@ -1561,7 +1564,7 @@ export default function JobDetailPage() {
                         ยังไม่มีผู้รับผิดชอบงาน — มอบหมายหรือรับงานด้านบนก่อน จึงจะบันทึกการแก้ไขและปิดงานได้
                       </div>
                     ) : (
-                      <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-white/15 text-slate-400 bg-slate-800/40 backdrop-blur-sm">
+                      <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-[var(--glass-card-border)] glass-muted-text bg-[var(--glass-card-bg)] backdrop-blur-sm">
                         เฉพาะผู้รับงานที่ถูกมอบหมายเท่านั้นที่บันทึกและปิดงานได้
                       </div>
                     )}
@@ -1572,7 +1575,7 @@ export default function JobDetailPage() {
                           Reopen เพื่อเปลี่ยนสถานะเป็น &quot;กำลังแก้ไข&quot; แล้วจึงแก้ไขข้อมูลได้
                         </div>
                         <Textarea
-                          className="w-full rounded-xl border border-orange-500/30 bg-slate-900/50 px-3 py-2 text-xs text-slate-100 placeholder:text-orange-200/40 focus-visible:border-orange-400/60 focus-visible:ring-orange-500/25 sm:text-sm"
+                          className="w-full rounded-xl border border-orange-500/30 bg-[var(--glass-card-bg)] px-3 py-2 text-xs glass-text placeholder:text-orange-200/40 focus-visible:border-orange-400/60 focus-visible:ring-orange-500/25 sm:text-sm"
                           rows={2}
                           placeholder="ระบุเหตุผลในการ Reopen เช่น ต้องแก้ไขรายละเอียดวิธีการแก้ไข หรืออัปเดตรูปเพิ่มเติม"
                           value={reopenReason}
@@ -1597,7 +1600,7 @@ export default function JobDetailPage() {
                     )}
                   </form>
                 ) : (
-                  <p className="text-xs text-slate-400 text-center py-2">
+                  <p className="text-xs glass-muted-text text-center py-2">
                     ข้อมูลการแก้ไขถูกบันทึกแล้ว — การ Reopen/แก้ไขเพิ่มทำได้ตามสิทธิ์ที่กำหนดในบทบาท หากคุณไม่สามารถดำเนินการได้ โปรดติดต่อผู้ดูแลระบบ
                   </p>
                 )}

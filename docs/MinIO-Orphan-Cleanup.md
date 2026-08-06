@@ -31,5 +31,5 @@
 
 - `backend/src/settings/settings.service.ts` — orchestration สแกน/ลบ
 - `backend/src/minio/minio.service.ts` — `listObjectsRecursive`, `removeObjectByKey`
-- ตัวแปร MinIO ทั่วไป: [`../minio.md`](../minio.md)
+- ตัวแปร MinIO ทั่วไป: [`minio.md`](./minio.md)
 - แผน private bucket + proxy: [`Project-Plan-Private-MinIO-Images.md`](./Project-Plan-Private-MinIO-Images.md)

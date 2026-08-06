@@ -1,7 +1,7 @@
 # แผนโครงการ: ปิดการเข้าถึงรูป MinIO แบบสาธารณะ (Private Object + โหลดผ่านสิทธิ์)
 
 **สถานะ:** ดำเนินการในโค้ดแล้ว (2026-03-28) — ทดสอบบน PRD / ลบ policy เก่าที่ MinIO เป็นหน้าที่ ops  
-**Ops MinIO Console:** bucket → แท็บ **Anonymous** ควรไม่มี rule; **Access Policy** ใช้ **Private** หรือ Custom ที่ไม่เปิด `GetObject` ให้ทุกคน — สรุป env: [`../minio.md`](../minio.md)
+**Ops MinIO Console:** bucket → แท็บ **Anonymous** ควรไม่มี rule; **Access Policy** ใช้ **Private** หรือ Custom ที่ไม่เปิด `GetObject` ให้ทุกคน — สรุป env: [`minio.md`](./minio.md) · GitLab: [`GitLab-CI-Variables-Checklist.md`](./GitLab-CI-Variables-Checklist.md)
 
 ---
 

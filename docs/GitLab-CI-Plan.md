@@ -5,7 +5,7 @@
 > **Migration รวม:** [`DTRS-Migration-Checklist.md`](./DTRS-Migration-Checklist.md) · Variables: [`GitLab-CI-Variables-Checklist.md`](./GitLab-CI-Variables-Checklist.md)  
 > **Pipeline ปัจจุบัน:** [`.gitlab-ci.yml`](../.gitlab-ci.yml)
 
-**วันที่ตกลงแผน:** 2026-08-05 · **Grilling ปิดแล้ว:** 2026-08-05 (คำถามเปิด 6/6 ✅) · **Hardening CI:** 2026-08-05 · **UAT prep:** Variables กลุ่ม A + SSH/path `.115` ✅ (2026-08-05)
+**วันที่ตกลงแผน:** 2026-08-05 · **Grilling ปิดแล้ว:** 2026-08-05 (คำถามเปิด 6/6 ✅) · **Hardening CI:** 2026-08-05 · **UAT Variables:** กลุ่ม A + MinIO กลุ่ม B + SSH/path `.115` ✅ (2026-08-06) · **`production` กลุ่ม A = pending**
 
 ---
 
@@ -71,8 +71,8 @@
 | Host ports | **8404→3000**, **8405→4100** ✅ ([Migration P0 #9–10](./DTRS-Migration-Checklist.md#พอร์ต-host-ถ้ารันคู่กับ-prd-เดิมบนเครื่องเดียวกัน)) |
 | Domain | **`https://dtrs-app.forth.co.th`** ✅ |
 | MySQL | host **`192.168.0.126`**, db **`dtrs_app`** (grilling #3) |
-| MinIO bucket | **`dtrs-app`** — ⏸️ [รอ infra](./DTRS-Migration-Checklist.md#p2--environment--env-local--prd) |
-| NPM | `dtrs-app.forth.co.th` → 8404/8405 — ☐ ยังไม่ตั้ง ([Migration P0 #11](./DTRS-Migration-Checklist.md#พอร์ต-host-ถ้ารันคู่กับ-prd-เดิมบนเครื่องเดียวกัน)) |
+| MinIO bucket | **`dtrs-app`** — Variables กลุ่ม B ✅ · แยกจาก UAT `dtrs-app-uat` เมื่อทำ PRD ([P2](./DTRS-Migration-Checklist.md#p2--environment--env-local--prd)) |
+| NPM | `dtrs-app.forth.co.th` → 8404/8405 — ⏸️ **pending** ([Migration P0 #11](./DTRS-Migration-Checklist.md#พอร์ต-host-ถ้ารันคู่กับ-prd-เดิมบนเครื่องเดียวกัน)) |
 
 ### พอร์ตและชื่อ resource (sync กับ migration)
 
@@ -177,7 +177,7 @@ Template **`.validate_deploy_env`** + **`.deploy_ssh_and_validate`** (extends `.
 | `ALLOWED_ORIGINS` | |
 | `SSH_PRIVATE_KEY` | เช็กใน `.ssh_setup` (ก่อน validation ชุดนี้) |
 
-**ไม่ validate รอบนี้:** `MINIO_*` (กลุ่ม B — รอ bucket) · `NEXT_PUBLIC_API_BASE_URL` (build time)
+**ไม่ validate รอบนี้:** `MINIO_*` (กลุ่ม B ตั้งแล้วแต่ไม่บังคับใน gate) · `NEXT_PUBLIC_API_BASE_URL` (build time)
 
 รายละเอียดตัวแปร: [`GitLab-CI-Variables-Checklist.md` § กลุ่ม A](./GitLab-CI-Variables-Checklist.md#กลุ่ม-a--บังคับก่อน-deploy-ตั้งได้เลย)
 
@@ -215,7 +215,7 @@ Runner (.115, DOCKER_HOST=115:2375)
 | `NEXT_PUBLIC_API_BASE_URL` | `http://192.168.0.115:8405/api` (ชั่วคราว) | `https://dtrs-app.forth.co.th/api` |
 | `FRONTEND_BASE_URL` | `http://192.168.0.115:8404` | `https://dtrs-app.forth.co.th` |
 | `ALLOWED_ORIGINS` | `http://192.168.0.115:8404` | `https://dtrs-app.forth.co.th` |
-| `MINIO_BUCKET_NAME` | **`dtrs-app-uat`** | **`dtrs-app`** — ⏸️ [รอ infra PRD](./DTRS-Migration-Checklist.md#p2--environment--env-local--prd) |
+| `MINIO_BUCKET_NAME` | **`dtrs-app-uat`** ✅ (GitLab) | **`dtrs-app`** — ⏸️ pending แยกค่าตอนทำ PRD ถ้ายัง scope all ค่า UAT |
 | `JWT_SECRET` / `NEXTAUTH_SECRET` | rotate แยก UAT | rotate แยก PRD — [Migration P8 #67](./DTRS-Migration-Checklist.md#p8--security-แนะนำเมื่อ-fork) |
 | `SSH_PRIVATE_KEY` | key สำหรับ `nurdin@115` | key สำหรับ `nurdin@128` — **ชื่อตัวแปรเดียว แยก scope** (grilling #2) |
 
@@ -268,7 +268,7 @@ Runner (.115, DOCKER_HOST=115:2375)
 | 1 | Deploy path UAT | **`/home/nurdin/dtrs-app`** บน `.115` |
 | 2 | SSH key | **`SSH_PRIVATE_KEY`** ชื่อเดียว — **แยกค่าด้วย GitLab environment scope** (`staging` / `production`) |
 | 3 | Database | **UAT:** `192.168.0.11` / `dtrs_app` · **PRD:** `192.168.0.126` / `dtrs_app` |
-| 4 | MinIO bucket | **UAT:** `dtrs-app-uat` · **PRD:** `dtrs-app` (⏸️ รอ infra สร้าง) |
+| 4 | MinIO bucket | **UAT:** `dtrs-app-uat` · **PRD:** `dtrs-app` · Variables กลุ่ม B ✅ 2026-08-06 |
 | 5 | `docker_build:uat` | **Manual** ทั้ง `docker_build` + deploy (stage `deploy_docker`) |
 | 6 | Test stage | **`test:frontend`** = lint · **`test:backend`** = prisma generate + **eslint (ห้าม `--fix`)** + jest · **fail = pipeline หยุด** |
 
@@ -278,12 +278,13 @@ Runner (.115, DOCKER_HOST=115:2375)
 
 | Blocker | อ้างอิง migration | สถานะ |
 |---------|-------------------|--------|
-| MinIO bucket PRD `dtrs-app` + UAT `dtrs-app-uat` | [P2 MinIO](./DTRS-Migration-Checklist.md#p2--environment--env-local--prd) | ⏸️ รอ infra |
+| MinIO bucket PRD `dtrs-app` + UAT `dtrs-app-uat` | [P2 MinIO](./DTRS-Migration-Checklist.md#p2--environment--env-local--prd) | ✅ Variables ตั้งแล้ว · 🟡 ตรวจ bucket บน server หลัง deploy |
 | GitLab Variables UAT (`staging` กลุ่ม A) | [P1 #16](./DTRS-Migration-Checklist.md#p1--gitlab-project-settings-ทำบน-gitlab-ui) | ✅ 2026-08-05 |
-| GitLab Variables PRD (`production`) | [P1 #16](./DTRS-Migration-Checklist.md#p1--gitlab-project-settings-ทำบน-gitlab-ui) | ☐ |
+| GitLab Variables MinIO (กลุ่ม B) | [GitLab-CI-Variables-Checklist](./GitLab-CI-Variables-Checklist.md) | ✅ 2026-08-06 |
+| GitLab Variables PRD (`production`) | [P1 #16](./DTRS-Migration-Checklist.md#p1--gitlab-project-settings-ทำบน-gitlab-ui) | ⏸️ **pending** (โฟกัส staging ก่อน) |
 | SSH + path UAT `.115` | [P0 #12b–13c](./DTRS-Migration-Checklist.md#deploy-path--ssh) | ✅ append `authorized_keys` + `/home/nurdin/dtrs-app` |
-| NPM `dtrs-app.forth.co.th` | [P0 #11](./DTRS-Migration-Checklist.md#พอร์ต-host-ถ้ารันคู่กับ-prd-เดิมบนเครื่องเดียวกัน) | ☐ |
-| Runner `docker` + `forth` | [P1 #18](./DTRS-Migration-Checklist.md#p1--gitlab-project-settings-ทำบน-gitlab-ui) | ☐ |
+| NPM `dtrs-app.forth.co.th` | [P0 #11](./DTRS-Migration-Checklist.md#พอร์ต-host-ถ้ารันคู่กับ-prd-เดิมบนเครื่องเดียวกัน) | ⏸️ **pending** |
+| Runner `docker` + `forth` | [P1 #18](./DTRS-Migration-Checklist.md#p1--gitlab-project-settings-ทำบน-gitlab-ui) | ☐ (จำเป็นก่อน pipeline UAT) |
 
 ---
 
@@ -294,6 +295,7 @@ Runner (.115, DOCKER_HOST=115:2375)
 ### UAT (`staging`)
 
 - [x] GitLab Variables กลุ่ม A scope `staging`
+- [x] GitLab Variables กลุ่ม B MinIO (2026-08-06)
 - [x] SSH `nurdin@192.168.0.115` + path `/home/nurdin/dtrs-app` (key `dtrs-app-uat`, ไม่ทับ `authorized_keys` ของโปรเจกต์อื่น)
 - [ ] ยืนยัน Docker TCP `:2375` บน `.115` (`DOCKER_HOST=tcp://127.0.0.1:2375 docker ps`)
 - [ ] Push branch `staging` ขึ้น GitLab (โค้ด CI ยังอยู่เครื่อง dev)
@@ -317,8 +319,8 @@ Runner (.115, DOCKER_HOST=115:2375)
 2. ~~ขยาย [`GitLab-CI-Variables-Checklist.md`](./GitLab-CI-Variables-Checklist.md) — กลุ่ม UAT + environment scope~~ ✅
 3. ~~Hardening: validate env ก่อน deploy + `DOCKER_HOST` ใน PRD transfer~~ ✅ (2026-08-05)
 4. ~~ตั้ง GitLab Variables กลุ่ม A scope `staging` + SSH/path `.115`~~ ✅ (2026-08-05)
-5. **ถัดไป:** ยืนยัน `SSH_PRIVATE_KEY` ใน GitLab คู่กับ `dtrs-app-uat` → push `staging` → ตรวจ Docker `:2375` → manual deploy UAT
-6. ตั้ง Variables PRD + NPM → manual deploy PRD
+5. **ถัดไป (staging เท่านั้น):** ยืนยัน `SSH_PRIVATE_KEY` คู่ `dtrs-app-uat` → `prisma migrate deploy` (DB UAT) → push `staging` → ตรวจ Docker `:2375` → manual deploy UAT
+6. ⏸️ **Pending:** ตั้ง Variables PRD กลุ่ม A + NPM → manual deploy PRD (MinIO กลุ่ม B ตั้งแล้ว — แยก bucket PRD ถ้าจำเป็น)
 
 ---
 

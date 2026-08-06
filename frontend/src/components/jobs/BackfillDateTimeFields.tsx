@@ -85,12 +85,12 @@ export default function BackfillDateTimeFields({
             disabled={disabled}
             aria-invalid={!isDateValid}
           />
-          <p className="mt-1 text-[10px] text-slate-500">
-            กรอกเป็น <code className="font-mono text-slate-300">dd/mm/yyyy</code> เช่น 05/11/2026
+          <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-500">
+            กรอกเป็น <code className="font-mono text-slate-700 dark:text-slate-300">dd/mm/yyyy</code> เช่น 05/11/2026
           </p>
           {!isDateValid ? (
-            <p className="mt-1 text-[10px] text-red-300" role="alert">
-              รูปแบบวันที่ต้องเป็น <code className="font-mono text-red-200">dd/mm/yyyy</code> และต้องเป็นวันที่จริง
+            <p className="mt-1 text-[10px] text-red-600 dark:text-red-300" role="alert">
+              รูปแบบวันที่ต้องเป็น <code className="font-mono text-red-700 dark:text-red-200">dd/mm/yyyy</code> และต้องเป็นวันที่จริง
             </p>
           ) : null}
         </div>
@@ -114,9 +114,9 @@ export default function BackfillDateTimeFields({
         </div>
       </div>
       {preview ? (
-        <p className="text-xs text-slate-400 leading-relaxed pt-0.5" aria-live="polite">
-          <span className="text-slate-500">แสดงเป็นปฏิทินไทย (พ.ศ.): </span>
-          <span className="font-medium tabular-nums text-slate-200">{preview}</span>
+        <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed pt-0.5" aria-live="polite">
+          <span className="text-slate-500 dark:text-slate-500">แสดงเป็นปฏิทินไทย (พ.ศ.): </span>
+          <span className="font-medium tabular-nums text-slate-900 dark:text-slate-100">{preview}</span>
         </p>
       ) : null}
     </div>

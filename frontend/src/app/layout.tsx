@@ -18,7 +18,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="th" className={cn("font-sans", geist.variable)} data-scroll-behavior="smooth">
+    <html lang="th" className={cn("font-sans", geist.variable)} data-scroll-behavior="smooth" suppressHydrationWarning>
       <body className={sarabun.className}>
         <Providers>
           {children}

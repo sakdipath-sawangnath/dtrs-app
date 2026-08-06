@@ -31,7 +31,6 @@ function getApiPayload<T>(root: unknown): T | null {
 }
 
 function getSocketBaseUrl(apiBase: string): string {
-  // NEXT_PUBLIC_API_BASE_URL มักลงท้ายด้วย /api
   return apiBase.replace(/\/api\/?$/, "");
 }
 
@@ -84,7 +83,6 @@ export default function NotificationsBell({
 
     const base = getSocketBaseUrl(apiBase);
     const s = io(base, {
-      // ใช้ polling เพื่อลด error กรณี environment บล็อก websocket
       transports: ["polling"],
     });
     socketRef.current = s;
@@ -119,7 +117,7 @@ export default function NotificationsBell({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative flex items-center justify-center w-9 h-9 rounded-lg border border-white/15 bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700/60 hover:border-white/25 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+        className="relative flex items-center justify-center w-9 h-9 rounded-lg border border-[var(--glass-input-border)] bg-[var(--glass-input-bg)] glass-nav-item hover:text-[var(--glass-text)] hover:bg-[var(--glass-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30"
         aria-label="แจ้งเตือน"
         aria-expanded={open}
       >
@@ -135,18 +133,18 @@ export default function NotificationsBell({
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-[360px] max-w-[calc(100vw-24px)] rounded-2xl border border-white/10 bg-slate-900/95 backdrop-blur-xl shadow-2xl overflow-hidden z-50">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+        <div className="absolute right-0 mt-2 w-[360px] max-w-[calc(100vw-24px)] rounded-2xl glass-card shadow-2xl overflow-hidden z-50">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--glass-card-border)]">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-white">แจ้งเตือน</span>
-              <span className="text-xs font-semibold text-slate-400">
+              <span className="text-sm font-bold glass-text">แจ้งเตือน</span>
+              <span className="text-xs font-semibold glass-muted-text">
                 ({items.length})
               </span>
             </div>
             <button
               type="button"
               onClick={fetchNotifications}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white cursor-pointer px-2 py-1 rounded-lg hover:bg-white/10 transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold glass-muted-text hover:text-[var(--glass-text)] cursor-pointer px-2 py-1 rounded-lg hover:bg-[var(--glass-hover)] transition-colors"
               aria-label="รีเฟรชแจ้งเตือน"
               disabled={loading}
             >
@@ -156,7 +154,7 @@ export default function NotificationsBell({
           </div>
 
           {errorText && (
-            <div className="px-4 py-3 text-sm text-red-400 bg-red-500/10 border-b border-red-500/20">
+            <div className="px-4 py-3 text-sm text-red-500 bg-red-500/10 border-b border-red-500/20">
               {errorText}
             </div>
           )}
@@ -164,15 +162,15 @@ export default function NotificationsBell({
           <div className="max-h-[360px] overflow-auto">
             {items.length === 0 && !loading ? (
               <div className="px-4 py-10 text-center">
-                <div className="text-sm font-semibold text-slate-300">
+                <div className="text-sm font-semibold glass-text">
                   ยังไม่มีแจ้งเตือน
                 </div>
-                <div className="text-xs text-slate-500 mt-1">
+                <div className="text-xs glass-subtle-text mt-1">
                   เมื่อมีการแจ้งปัญหาใหม่ จะปรากฏที่นี่
                 </div>
               </div>
             ) : (
-              <ul className="divide-y divide-white/5">
+              <ul className="divide-y divide-[var(--glass-card-border)]">
                 {items.map((j) => {
                   const title = j.ticketNo ? `Ticket ${j.ticketNo}` : `Job #${j.id}`;
                   const place = [j.province, j.district, j.location].filter(Boolean).join(" · ");
@@ -182,33 +180,35 @@ export default function NotificationsBell({
                       <Link
                         href={`/dashboard/jobs/${j.id}`}
                         onClick={() => setOpen(false)}
-                        className="flex gap-3 px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer focus:outline-none focus:bg-white/5"
+                        className="flex gap-3 px-4 py-3 hover:bg-[var(--glass-hover)] transition-colors cursor-pointer focus:outline-none focus:bg-[var(--glass-hover)]"
                       >
                         <div className="pt-1">
                           {pending ? (
                             <Dot className="text-blue-400" size={22} aria-hidden="true" />
                           ) : (
-                            <Dot className="text-slate-600" size={22} aria-hidden="true" />
+                            <Dot className="glass-subtle-text" size={22} aria-hidden="true" />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
-                            <div className="text-sm font-bold text-slate-200 truncate">
+                            <div className="text-sm font-bold glass-text truncate">
                               {title}
                             </div>
                             <span
                               className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                                pending ? "bg-blue-500/15 text-blue-400" : "bg-slate-700/60 text-slate-400"
+                                pending
+                                  ? "bg-blue-500/15 text-blue-500 dark:text-blue-400"
+                                  : "bg-[var(--glass-hover)] glass-muted-text"
                               }`}
                             >
                               {pending ? "ใหม่" : j.status}
                             </span>
                           </div>
-                          <div className="text-xs text-slate-400 mt-1 line-clamp-2">
+                          <div className="text-xs glass-muted-text mt-1 line-clamp-2">
                             {place || "—"}
                           </div>
                           {j.reportDate && (
-                            <div className="text-[11px] text-slate-400 mt-1">
+                            <div className="text-[11px] glass-subtle-text mt-1">
                               {new Date(j.reportDate).toLocaleString("th-TH")}
                             </div>
                           )}
@@ -225,4 +225,3 @@ export default function NotificationsBell({
     </div>
   );
 }
-

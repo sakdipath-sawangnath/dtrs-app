@@ -1,5 +1,6 @@
 import "./print.css";
+import PrintThemeShell from "@/components/PrintThemeShell";
 
 export default function PrintLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return <PrintThemeShell>{children}</PrintThemeShell>;
 }

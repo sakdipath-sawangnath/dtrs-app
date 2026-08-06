@@ -39,8 +39,8 @@ export type JobMaintenancePdfJob = {
 const PROJECT_SUBTITLE =
   "โครงการค่าปรับปรุงระบบเครือข่ายกล้องโทรทัศน์วงจรปิด (CCTV) 5 จังหวัดชายแดนภาคใต้";
 
-/** โลโก้ใน `frontend/public/logo/dopa-logo.png` → ใช้ path สาธารณะของ Next.js */
-export const REPORT_LOGO_SRC = "/logo/dopa-logo.png";
+/** โลโก้ใน `frontend/public/logo/NBTC.png` → ใช้ path สาธารณะของ Next.js */
+export const REPORT_LOGO_SRC = "/logo/NBTC.png";
 
 /** สไตล์พื้นฐาน — ใช้เฉพาะ hex/rgb (ห้ามพึ่ง Tailwind สี theme เพราะ v4 ใช้ oklch แล้ว html2canvas parse ไม่ได้) */
 

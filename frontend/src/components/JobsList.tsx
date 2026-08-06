@@ -155,7 +155,7 @@ function ActionIconButton({
                 zIndex: 9999,
               }}
             >
-              <div className="bg-slate-900 text-white text-[11px] px-2 py-1 rounded-md shadow-lg whitespace-nowrap">
+              <div className="glass-card glass-text text-[11px] px-2 py-1 shadow-lg whitespace-nowrap">
                 {label}
               </div>
             </div>,
@@ -184,10 +184,8 @@ const FIX_CATEGORY_OPTIONS = [
   { value: "Software", label: "Software (ซอฟต์แวร์)" },
 ] as const;
 
-const GLASS_MODAL_LABEL =
-  "block text-xs font-semibold mb-1 text-slate-200";
-const GLASS_MODAL_FIELD =
-  "w-full text-xs sm:text-sm rounded-xl border border-white/10 bg-slate-900/40 px-3 py-2.5 text-slate-100 placeholder:text-slate-500 shadow-inner focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/50 outline-none transition-all disabled:cursor-not-allowed disabled:bg-slate-900/25 disabled:text-slate-500 disabled:opacity-80 [color-scheme:dark]";
+const GLASS_MODAL_LABEL = "glass-label font-semibold";
+const GLASS_MODAL_FIELD = "form-input-glass w-full text-xs sm:text-sm shadow-inner transition-all disabled:cursor-not-allowed disabled:opacity-80";
 const GLASS_MODAL_TEXTAREA = `${GLASS_MODAL_FIELD} min-h-[100px] resize-y`;
 
 interface Job {
@@ -238,23 +236,27 @@ const STATUS_CONFIG: Record<
 > = {
   PENDING: {
     label: "รอดำเนินการ",
-    badgeCls: "badge badge-pending",
-    icon: <AlertCircle size={14} className="text-orange-500" />,
+    badgeCls:
+      "border border-orange-200 bg-orange-50 text-orange-800 dark:border-orange-500/30 dark:bg-orange-500/15 dark:text-orange-300",
+    icon: <AlertCircle size={14} className="text-orange-600 dark:text-orange-400" />,
   },
   IN_PROGRESS: {
     label: "กำลังแก้ไข",
-    badgeCls: "badge badge-progress",
-    icon: <Clock size={14} className="text-blue-600" />,
+    badgeCls:
+      "border border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-500/30 dark:bg-blue-500/15 dark:text-blue-300",
+    icon: <Clock size={14} className="text-blue-600 dark:text-blue-400" />,
   },
   RESOLVED: {
     label: "เสร็จสิ้น",
-    badgeCls: "badge badge-resolved",
-    icon: <CheckCircle2 size={14} className="text-green-600" />,
+    badgeCls:
+      "border border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300",
+    icon: <CheckCircle2 size={14} className="text-green-600 dark:text-green-400" />,
   },
   CANCELLED: {
     label: "ยกเลิก",
-    badgeCls: "badge border border-slate-500/40 bg-slate-700/40 text-slate-200",
-    icon: <Ban size={14} className="text-slate-400" />,
+    badgeCls:
+      "badge border border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-500/40 dark:bg-slate-700/40 dark:text-slate-200",
+    icon: <Ban size={14} className="text-slate-500 dark:text-slate-400" />,
   },
 };
 
@@ -344,12 +346,15 @@ function compareJobsForList(
 }
 
 /** No-Card: แยก Glass ย่อย (AGENTS.md) */
-const GLASS_SECTION =
-  "rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-md shadow-2xl";
+const GLASS_SECTION = "glass-card";
 
 /** แท็บสัญญา/นอกสัญญา — ไม่ห่อ card ซ้อน (กล่องเดียวอยู่ใน SegmentedTabs) */
 const CONTRACT_TABS_ROW_WRAP =
   "shrink-0 w-full sm:w-fit max-w-full min-w-0 self-stretch sm:self-start";
+
+/** พื้นหลังรายการแบบ No-Card — glass-card ครอบทั้งแท็บ/ฟิลเตอร์/ตาราง (theme-aware) */
+const NO_CARD_SHELL =
+  "flex flex-col gap-4 flex-1 min-h-0 overflow-auto p-4 sm:p-5 w-full glass-card text-slate-900 dark:text-slate-100";
 
 export default function JobsList({
   statusFilter,
@@ -791,11 +796,11 @@ export default function JobsList({
   const showAssignedToColumn = statusFilter !== "PENDING";
 
   const filterBarChildren = (
-    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto text-slate-900 dark:text-slate-100">
       {enableAllBreakdownFilters && (
         <>
           <select
-            className="select-native-glass w-full sm:w-44 md:min-w-[160px]"
+            className="select-native-glass w-full sm:w-44 md:min-w-[160px] text-slate-900 dark:text-slate-100"
             value={statusSelect}
             onChange={(e) => setStatusSelect(e.target.value)}
           >
@@ -807,7 +812,7 @@ export default function JobsList({
           </select>
 
           <select
-            className="select-native-glass w-full sm:w-44 md:min-w-[160px]"
+            className="select-native-glass w-full sm:w-44 md:min-w-[160px] text-slate-900 dark:text-slate-100"
             value={fixEnvironmentSelect}
             onChange={(e) => setFixEnvironmentSelect(e.target.value)}
           >
@@ -818,7 +823,7 @@ export default function JobsList({
           </select>
 
           <select
-            className="select-native-glass w-full sm:w-44 md:min-w-[160px]"
+            className="select-native-glass w-full sm:w-44 md:min-w-[160px] text-slate-900 dark:text-slate-100"
             value={brokenPartSelect}
             onChange={(e) => setBrokenPartSelect(e.target.value)}
           >
@@ -829,7 +834,7 @@ export default function JobsList({
           </select>
 
           <select
-            className="select-native-glass w-full sm:w-44 md:min-w-[160px]"
+            className="select-native-glass w-full sm:w-44 md:min-w-[160px] text-slate-900 dark:text-slate-100"
             value={assignedToSelect}
             onChange={(e) => setAssignedToSelect(e.target.value)}
             aria-label="กรองตามผู้รับผิดชอบ"
@@ -845,7 +850,7 @@ export default function JobsList({
         </>
       )}
       <select
-        className="select-native-glass w-full sm:w-44 md:min-w-[160px]"
+        className="select-native-glass w-full sm:w-44 md:min-w-[160px] text-slate-900 dark:text-slate-100"
         value={provinceFilter}
         onChange={(e) => setProvinceFilter(e.target.value)}
       >
@@ -855,7 +860,7 @@ export default function JobsList({
         ))}
       </select>
       <select
-        className="select-native-glass w-full sm:w-44 md:min-w-[160px]"
+        className="select-native-glass w-full sm:w-44 md:min-w-[160px] text-slate-900 dark:text-slate-100"
         value={districtFilter}
         onChange={(e) => setDistrictFilter(e.target.value)}
         disabled={!provinceFilter && districts.length === 0}
@@ -866,7 +871,7 @@ export default function JobsList({
         ))}
       </select>
       <select
-        className="select-native-glass w-full sm:w-48 md:min-w-[180px]"
+        className="select-native-glass w-full sm:w-48 md:min-w-[180px] text-slate-900 dark:text-slate-100"
         value={jobSortField}
         onChange={(e) => {
           setPage(1);
@@ -879,7 +884,7 @@ export default function JobsList({
         <option value="fix">วันที่ปิดงาน</option>
       </select>
       <select
-        className="select-native-glass w-full sm:w-40 md:min-w-[140px]"
+        className="select-native-glass w-full sm:w-40 md:min-w-[140px] text-slate-900 dark:text-slate-100"
         value={jobSortDir}
         onChange={(e) => {
           setPage(1);
@@ -891,7 +896,7 @@ export default function JobsList({
         <option value="asc">เก่า → ใหม่</option>
       </select>
       <select
-        className="select-native-glass w-full sm:w-28 md:min-w-[112px]"
+        className="select-native-glass w-full sm:w-28 md:min-w-[112px] text-slate-900 dark:text-slate-100"
         value={pageSize}
         onChange={(e) => {
           const v = e.target.value;
@@ -924,7 +929,7 @@ export default function JobsList({
               disabled={sortedFilteredJobs.length === 0}
               aria-label="ส่งออกรายการเป็นไฟล์ CSV สำหรับตรวจสอบข้อมูล"
               title="ส่งออกทุกแถวที่ผ่านตัวกรองปัจจุบัน (ไม่จำกัดเฉพาะหน้าตาราง) — UTF-8 พร้อม BOM สำหรับ Excel"
-              className="size-11 shrink-0 cursor-pointer rounded-xl border-blue-500/40 bg-slate-800/60 text-slate-100 shadow-lg hover:bg-blue-500/15 hover:border-blue-500/50 focus-visible:ring-blue-500/50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
+              className="size-11 shrink-0 cursor-pointer rounded-xl border-[var(--glass-input-border)] bg-[var(--glass-input-bg)] glass-text shadow-sm hover:bg-[var(--glass-accent-soft)] hover:border-blue-500/50 focus-visible:ring-blue-500/50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
             >
               <Download size={18} className="shrink-0" aria-hidden />
             </Button>
@@ -1023,9 +1028,9 @@ export default function JobsList({
   }, [enableAllBreakdownFilters, jobsForPartCardCounts]);
 
   const breakdownCards = enableAllBreakdownFilters ? (
-    <div className="space-y-3 mb-2" aria-label="การกรองแบบการ์ด">
+    <div className="space-y-3 mb-2 text-slate-900 dark:text-slate-100" aria-label="การกรองแบบการ์ด">
       <div>
-        <p className="text-xs font-semibold text-slate-300 mb-2">สถานะ</p>
+        <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">สถานะ</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
             { value: "", label: "ทั้งหมด", count: statusCardCounts.total },
@@ -1053,16 +1058,16 @@ export default function JobsList({
                 aria-pressed={active}
                 onClick={() => setStatusSelect(it.value)}
                 className={[
-                  "rounded-xl border px-3 py-2.5 text-left transition-all active:scale-95 min-h-[44px]",
+                  "rounded-xl border px-3 py-2.5 text-left transition-all active:scale-95 min-h-[44px] cursor-pointer",
                   active
                     ? "border-blue-500/50 bg-blue-500/10"
-                    : "border-white/10 bg-slate-800/30 hover:border-blue-500/30",
+                    : "border-slate-200 dark:border-[var(--glass-card-border)] bg-white dark:bg-[var(--glass-input-bg)] hover:border-blue-500/30",
                 ].join(" ")}
               >
-                <div className="text-[11px] font-semibold text-slate-300 truncate">
+                <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 truncate">
                   {it.label}
                 </div>
-                <div className="text-lg font-bold tabular-nums text-slate-100 mt-0.5">
+                <div className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-100 mt-0.5">
                   {it.count}
                 </div>
               </button>
@@ -1072,7 +1077,7 @@ export default function JobsList({
       </div>
 
       <div>
-        <p className="text-xs font-semibold text-slate-300 mb-2">ประเภทสถานที่</p>
+        <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">ประเภทสถานที่</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
             { value: "", label: "ทั้งหมด", count: jobsForEnvCardCounts.length },
@@ -1096,16 +1101,16 @@ export default function JobsList({
                 aria-pressed={active}
                 onClick={() => setFixEnvironmentSelect(it.value)}
                 className={[
-                  "rounded-xl border px-3 py-2.5 text-left transition-all active:scale-95 min-h-[44px]",
+                  "rounded-xl border px-3 py-2.5 text-left transition-all active:scale-95 min-h-[44px] cursor-pointer",
                   active
                     ? "border-blue-500/50 bg-blue-500/10"
-                    : "border-white/10 bg-slate-800/30 hover:border-blue-500/30",
+                    : "border-slate-200 dark:border-[var(--glass-card-border)] bg-white dark:bg-[var(--glass-input-bg)] hover:border-blue-500/30",
                 ].join(" ")}
               >
-                <div className="text-[11px] font-semibold text-slate-300 truncate">
+                <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 truncate">
                   {it.label}
                 </div>
-                <div className="text-lg font-bold tabular-nums text-slate-100 mt-0.5">
+                <div className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-100 mt-0.5">
                   {it.count}
                 </div>
               </button>
@@ -1115,7 +1120,7 @@ export default function JobsList({
       </div>
 
       <div>
-        <p className="text-xs font-semibold text-slate-300 mb-2">ประเภทงาน</p>
+        <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">ประเภทงาน</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
             { value: "", label: "ทั้งหมด", count: jobsForPartCardCounts.length },
@@ -1139,16 +1144,16 @@ export default function JobsList({
                 aria-pressed={active}
                 onClick={() => setBrokenPartSelect(it.value)}
                 className={[
-                  "rounded-xl border px-3 py-2.5 text-left transition-all active:scale-95 min-h-[44px]",
+                  "rounded-xl border px-3 py-2.5 text-left transition-all active:scale-95 min-h-[44px] cursor-pointer",
                   active
                     ? "border-blue-500/50 bg-blue-500/10"
-                    : "border-white/10 bg-slate-800/30 hover:border-blue-500/30",
+                    : "border-slate-200 dark:border-[var(--glass-card-border)] bg-white dark:bg-[var(--glass-input-bg)] hover:border-blue-500/30",
                 ].join(" ")}
               >
-                <div className="text-[11px] font-semibold text-slate-300 truncate">
+                <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 truncate">
                   {it.label}
                 </div>
-                <div className="text-lg font-bold tabular-nums text-slate-100 mt-0.5">
+                <div className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-100 mt-0.5">
                   {it.count}
                 </div>
               </button>
@@ -1661,7 +1666,7 @@ export default function JobsList({
         <div
           className={
             noCard
-              ? "flex flex-col flex-1 min-h-0 overflow-auto p-4 sm:p-6 bg-[#020617] w-full gap-4"
+              ? NO_CARD_SHELL
               : "flex flex-col h-full"
           }
         >
@@ -1670,7 +1675,7 @@ export default function JobsList({
               className={
                 noCard
                   ? CONTRACT_TABS_ROW_WRAP
-                  : "p-4 sm:p-6 shrink-0 border-b border-white/10 bg-slate-800/20"
+                  : "p-4 sm:p-6 shrink-0 border-b border-[var(--glass-card-border)] bg-[var(--glass-input-bg)]"
               }
             >
               <SegmentedTabs
@@ -1689,11 +1694,11 @@ export default function JobsList({
             }
           >
             <div className="flex w-full max-w-lg flex-col gap-3 px-4 py-2" aria-busy="true" aria-label="กำลังโหลดรายการ">
-              <Skeleton className="h-4 w-[72%] bg-slate-700/45" />
-              <Skeleton className="h-4 w-[58%] bg-slate-700/45" />
-              <Skeleton className="h-4 w-[88%] bg-slate-700/45" />
-              <Skeleton className="h-4 w-[64%] bg-slate-700/45" />
-              <p className="text-xs text-slate-500 pt-1">กำลังโหลด...</p>
+              <Skeleton className="h-4 w-[72%] bg-[var(--glass-hover)]" />
+              <Skeleton className="h-4 w-[58%] bg-[var(--glass-hover)]" />
+              <Skeleton className="h-4 w-[88%] bg-[var(--glass-hover)]" />
+              <Skeleton className="h-4 w-[64%] bg-[var(--glass-hover)]" />
+              <p className="text-xs glass-subtle-text pt-1">กำลังโหลด...</p>
             </div>
           </div>
         </div>
@@ -1707,7 +1712,7 @@ export default function JobsList({
         <div
           className={
             noCard
-              ? "flex flex-col flex-1 min-h-0 overflow-auto p-4 sm:p-6 bg-[#020617] w-full gap-4"
+              ? NO_CARD_SHELL
               : "flex flex-col h-full"
           }
         >
@@ -1716,7 +1721,7 @@ export default function JobsList({
               className={
                 noCard
                   ? CONTRACT_TABS_ROW_WRAP
-                  : "p-4 sm:p-6 shrink-0 border-b border-white/10 bg-slate-800/20"
+                  : "p-4 sm:p-6 shrink-0 border-b border-[var(--glass-card-border)] bg-[var(--glass-input-bg)]"
               }
             >
               <SegmentedTabs
@@ -1735,16 +1740,16 @@ export default function JobsList({
               <div
                 className={`${GLASS_SECTION} flex flex-col flex-1 min-h-[280px] items-center justify-center px-4 py-12 text-center`}
               >
-                <CheckCircle2 size={48} className="opacity-40 mb-3 text-slate-400" aria-hidden />
-                <p className="font-semibold text-slate-300">ไม่พบรายการ</p>
-                <p className="text-sm mt-1 text-slate-400">
+                <CheckCircle2 size={48} className="opacity-40 mb-3 glass-muted-text" aria-hidden />
+                <p className="font-semibold glass-text">ไม่พบรายการ</p>
+                <p className="text-sm mt-1 glass-muted-text">
                   ไม่มีงานในสถานะนี้ในขณะนี้
                 </p>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={fetchJobs}
-                  className="mt-6 min-h-[44px] cursor-pointer gap-1.5 rounded-xl border-white/10 bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-200 shadow-lg hover:bg-slate-700 active:scale-95"
+                  className="mt-6 min-h-[44px] cursor-pointer gap-1.5 rounded-xl border-[var(--glass-input-border)] bg-[var(--glass-input-bg)] px-4 py-2.5 text-sm font-medium glass-text shadow-lg hover:bg-[var(--glass-hover)] active:scale-95"
                 >
                   <RefreshCw size={14} aria-hidden /> รีเฟรช
                 </Button>
@@ -1754,9 +1759,9 @@ export default function JobsList({
             <>
               <DashboardFilterBar {...filterBarProps} />
               <div className="flex-1 p-12 flex flex-col items-center justify-center text-center">
-                <CheckCircle2 size={48} className="opacity-40 mb-3 text-slate-400" aria-hidden />
+                <CheckCircle2 size={48} className="opacity-40 mb-3 glass-muted-text" aria-hidden />
                 <p className="font-semibold text-slate-500">ไม่พบรายการ</p>
-                <p className="text-sm mt-1 text-slate-400">
+                <p className="text-sm mt-1 glass-muted-text">
                   ไม่มีงานในสถานะนี้ในขณะนี้
                 </p>
                 <Button
@@ -1847,9 +1852,9 @@ export default function JobsList({
   const tableAndPagination = (
     <>
       {enableBulkAssign && bulkAssignableFiltered.length > 0 && (
-        <div className="px-3 sm:px-4 py-2.5 border-b border-white/10 flex flex-wrap items-center gap-2 sm:gap-3 bg-slate-950/40 shrink-0">
+        <div className="px-3 sm:px-4 py-2.5 border-b border-[var(--glass-card-border)] flex flex-wrap items-center gap-2 sm:gap-3 bg-[var(--glass-input-bg)] shrink-0">
           {bulkAssignSelectedIds.size === 0 ? (
-            <p className="text-xs sm:text-sm text-slate-400 flex flex-wrap items-center gap-2">
+            <p className="text-xs sm:text-sm glass-muted-text flex flex-wrap items-center gap-2">
               <span className="hidden sm:inline">
                 เลือกงานที่ยังไม่มีผู้รับผิดชอบเพื่อมอบหมายทีละหลายรายการ
               </span>
@@ -1871,7 +1876,7 @@ export default function JobsList({
                   type="button"
                   onClick={selectAllBulkAssignableFiltered}
                   disabled={allFilteredAssignableSelected || assignSubmitting}
-                  className="text-xs text-slate-400 hover:text-slate-200 underline-offset-2 hover:underline cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0 inline-flex items-center"
+                  className="text-xs glass-muted-text hover:text-[var(--glass-text)] underline-offset-2 hover:underline cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0 inline-flex items-center"
                 >
                   + เลือกทั้งหมดที่กรอง ({bulkAssignableFiltered.length})
                 </button>
@@ -1881,7 +1886,7 @@ export default function JobsList({
                   type="button"
                   onClick={clearBulkAssignSelection}
                   disabled={assignSubmitting}
-                  className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded-xl text-sm font-medium border border-white/15 bg-slate-800/60 text-slate-200 hover:bg-slate-700/70 transition-colors cursor-pointer disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded-xl text-sm font-medium border border-[var(--glass-input-border)] bg-[var(--glass-input-bg)] glass-text hover:bg-[var(--glass-hover)] transition-colors cursor-pointer disabled:opacity-50"
                 >
                   <X size={16} aria-hidden /> ยกเลิกการเลือก
                 </button>
@@ -1901,15 +1906,15 @@ export default function JobsList({
       )}
 
       <div className="flex-1 min-h-0 overflow-auto">
-        <table className="w-full min-w-full text-left border-collapse table-fixed">
+        <table className="w-full min-w-full text-left border-collapse table-fixed text-slate-900 dark:text-slate-100">
           <thead>
-            <tr className="text-xs font-semibold uppercase tracking-wide sticky top-0 z-10 bg-slate-800/80 backdrop-blur-sm text-slate-400">
+            <tr className="text-xs font-semibold uppercase tracking-wide sticky top-0 z-10 bg-white/95 dark:bg-[var(--glass-header-bg)] backdrop-blur-sm text-slate-600 dark:text-slate-400">
               {enableBulkAssign && (
-                <th className="px-2 py-2.5 border-b border-white/10 w-10">
+                <th className="px-2 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] w-10">
                   {pageAssignableIds.length > 0 ? (
                     <input
                       type="checkbox"
-                      className="size-4 rounded border-white/20 bg-slate-900/60 cursor-pointer accent-blue-500"
+                      className="size-4 rounded border-slate-300 dark:border-[var(--glass-card-border)] bg-white dark:bg-[var(--glass-input-bg)] cursor-pointer accent-blue-500"
                       checked={allPageAssignableSelected}
                       onChange={toggleBulkAssignPage}
                       aria-label="เลือกทุกแถวในหน้านี้ที่มอบหมายได้"
@@ -1917,30 +1922,30 @@ export default function JobsList({
                   ) : null}
                 </th>
               )}
-              <th className="px-2.5 py-2.5 border-b border-white/10 whitespace-nowrap w-24">เลขที่</th>
-              <th className="px-2.5 py-2.5 border-b border-white/10 whitespace-nowrap w-24">วันที่</th>
-              <th className="px-2.5 py-2.5 border-b border-white/10 whitespace-nowrap w-52">ผู้แจ้ง</th>
-              <th className="px-2.5 py-2.5 border-b border-white/10 whitespace-nowrap w-64">สถานที่</th>
+              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-24">เลขที่</th>
+              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-24">วันที่</th>
+              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-52">ผู้แจ้ง</th>
+              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-64">สถานที่</th>
               {enableAllBreakdownFilters && (
                 <>
-                  <th className="px-2.5 py-2.5 border-b border-white/10 whitespace-nowrap w-40">
+                  <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-40">
                     ประเภทสถานที่
                   </th>
-                  <th className="px-2.5 py-2.5 border-b border-white/10 whitespace-nowrap w-40">
+                  <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-40">
                     ประเภทงาน
                   </th>
                 </>
               )}
-              <th className="px-2.5 py-2.5 border-b border-white/10 whitespace-nowrap">รายละเอียดปัญหา</th>
-              <th className="px-2.5 py-2.5 border-b border-white/10 whitespace-nowrap w-28">สถานะ</th>
+              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap">รายละเอียดปัญหา</th>
+              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-28">สถานะ</th>
               {showAssignedToColumn && (
                 <th
-                  className="px-2.5 py-2.5 border-b border-white/10 whitespace-nowrap w-44"
+                  className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-44"
                 >
                   ผู้รับผิดชอบ
                 </th>
               )}
-              <th className="px-2.5 py-2.5 border-b border-white/10 text-right whitespace-nowrap w-44">
+              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] text-right whitespace-nowrap w-44">
                 จัดการ
               </th>
             </tr>
@@ -1965,10 +1970,10 @@ export default function JobsList({
                     : "ไม่ระบุ";
               const envBadgeCls =
                 envBucket === "INDOOR"
-                  ? "bg-sky-500/10 text-sky-300 border border-sky-500/20"
+                  ? "bg-sky-50 text-sky-800 border border-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/20"
                   : envBucket === "OUTDOOR"
-                    ? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
-                    : "bg-slate-700/30 text-slate-300 border border-white/10";
+                    ? "bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/20"
+                    : "bg-slate-100 text-slate-700 border border-slate-200 dark:bg-[var(--glass-hover)] dark:text-slate-200 dark:border-[var(--glass-card-border)]";
 
               const partLabel =
                 partBucket === "Hardware"
@@ -1978,22 +1983,22 @@ export default function JobsList({
                     : "ไม่ระบุ";
               const partBadgeCls =
                 partBucket === "Hardware"
-                  ? "bg-fuchsia-500/10 text-fuchsia-300 border border-fuchsia-500/20"
+                  ? "bg-fuchsia-50 text-fuchsia-800 border border-fuchsia-200 dark:bg-fuchsia-500/10 dark:text-fuchsia-300 dark:border-fuchsia-500/20"
                   : partBucket === "Software"
-                    ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
-                    : "bg-slate-700/30 text-slate-300 border border-white/10";
+                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/20"
+                    : "bg-slate-100 text-slate-700 border border-slate-200 dark:bg-[var(--glass-hover)] dark:text-slate-200 dark:border-[var(--glass-card-border)]";
               const canBulkSelectRow = enableBulkAssign && jobNeedsAssignee(job);
               return (
                 <tr
                   key={job.id}
-                  className="hover:bg-white/5 transition-colors text-sm border-b border-white/5"
+                  className="hover:bg-slate-50 dark:hover:bg-[var(--glass-hover)] transition-colors text-sm border-b border-slate-100 dark:border-[var(--glass-card-border)] text-slate-900 dark:text-slate-100"
                 >
                   {enableBulkAssign && (
                     <td className="px-2 py-2.5 align-middle">
                       {canBulkSelectRow ? (
                         <input
                           type="checkbox"
-                          className="size-4 rounded border-white/20 bg-slate-900/60 cursor-pointer accent-blue-500"
+                          className="size-4 rounded border-slate-300 dark:border-[var(--glass-card-border)] bg-white dark:bg-[var(--glass-input-bg)] cursor-pointer accent-blue-500"
                           checked={bulkAssignSelectedIds.has(job.id)}
                           onChange={() => toggleBulkAssignSelect(job.id)}
                           aria-label={`เลือกงาน ${job.ticketNo ?? job.id}`}
@@ -2001,11 +2006,11 @@ export default function JobsList({
                       ) : null}
                     </td>
                   )}
-                  <td className="px-2.5 py-2.5 font-mono text-sm text-slate-300">{job.ticketNo ?? "–"}</td>
-                  <td className="px-2.5 py-2.5 text-sm whitespace-nowrap text-slate-400">
+                  <td className="px-2.5 py-2.5 font-mono text-sm font-medium text-slate-900 dark:text-slate-100">{job.ticketNo ?? "–"}</td>
+                  <td className="px-2.5 py-2.5 text-sm whitespace-nowrap text-slate-600 dark:text-slate-400">
                     {dateStr ? format(new Date(dateStr), "dd/MM/yy", { locale: th }) : "–"}
                   </td>
-                  <td className="px-2.5 py-2.5 text-sm text-slate-300">
+                  <td className="px-2.5 py-2.5 text-sm text-slate-900 dark:text-slate-100">
                     <div className="flex items-start gap-2 min-w-0">
                       <PersonAvatar
                         imageUrl={job.reporter?.image}
@@ -2017,16 +2022,16 @@ export default function JobsList({
                         nameLabel={job.reporterName ?? undefined}
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="font-semibold truncate max-w-[140px]" title={job.reporterName ?? undefined}>
+                        <div className="font-semibold truncate max-w-[140px] text-slate-900 dark:text-slate-100" title={job.reporterName ?? undefined}>
                           {job.reporterName ?? "–"}
                         </div>
-                        <div className="text-xs text-slate-500 truncate max-w-[140px]" title={job.reporterPhone ?? undefined}>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[140px]" title={job.reporterPhone ?? undefined}>
                           {job.reporterPhone ?? ""}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-2.5 py-2.5 truncate text-sm text-slate-400" title={location || undefined}>{location || "–"}</td>
+                  <td className="px-2.5 py-2.5 truncate text-sm text-slate-700 dark:text-slate-300" title={location || undefined}>{location || "–"}</td>
                   {enableAllBreakdownFilters && (
                     <>
                       <td className="px-2.5 py-2.5">
@@ -2053,7 +2058,7 @@ export default function JobsList({
                       </td>
                     </>
                   )}
-                  <td className="px-2.5 py-2.5 truncate text-sm text-slate-300">
+                  <td className="px-2.5 py-2.5 truncate text-sm text-slate-800 dark:text-slate-200">
                     {desc.clipped && desc.full ? (
                       <TextHoverTooltip text={desc.full}>
                         <span className="truncate block">{desc.short}</span>
@@ -2068,7 +2073,7 @@ export default function JobsList({
                     <Badge
                       variant="outline"
                       className={cn(
-                        "h-auto border-0 bg-transparent px-2 py-1 text-xs font-semibold shadow-none ring-0",
+                        "h-auto px-2 py-1 text-xs font-semibold shadow-none ring-0",
                         cfg.badgeCls,
                       )}
                     >
@@ -2076,7 +2081,7 @@ export default function JobsList({
                     </Badge>
                   </td>
                   {showAssignedToColumn && (
-                    <td className="px-2.5 py-2.5 text-sm text-slate-300">
+                    <td className="px-2.5 py-2.5 text-sm text-slate-900 dark:text-slate-100">
                       <div className="flex items-center gap-2 min-w-0">
                         <PersonAvatar
                           imageUrl={job.assignedTo?.image}
@@ -2087,7 +2092,7 @@ export default function JobsList({
                           }
                           nameLabel={job.assignedTo?.name}
                         />
-                        <span className="truncate font-medium" title={job.assignedTo?.name ?? undefined}>
+                        <span className="truncate font-medium text-slate-900 dark:text-slate-100" title={job.assignedTo?.name ?? undefined}>
                           {job.assignedTo?.name ?? "–"}
                         </span>
                       </div>
@@ -2216,7 +2221,7 @@ export default function JobsList({
       <div
         className={
           noCard
-            ? "flex flex-col gap-4 flex-1 min-h-0 overflow-auto p-4 sm:p-6 bg-[#020617] w-full"
+            ? NO_CARD_SHELL
             : "flex flex-col h-full"
         }
       >
@@ -2225,7 +2230,7 @@ export default function JobsList({
             className={
               noCard
                 ? CONTRACT_TABS_ROW_WRAP
-                : "p-4 sm:p-6 shrink-0 border-b border-white/10 bg-slate-800/20"
+                : "p-4 sm:p-6 shrink-0 border-b border-[var(--glass-card-border)] bg-[var(--glass-input-bg)]"
             }
           >
             <SegmentedTabs
@@ -2500,16 +2505,16 @@ export default function JobsList({
       >
         <DialogContent
           showCloseButton={false}
-          overlayClassName="bg-slate-950/70 backdrop-blur-md"
+          overlayClassName="bg-[var(--glass-overlay)] backdrop-blur-md"
           className="max-h-[min(90dvh,calc(100dvh-2rem))] max-w-[calc(100%-1.5rem)] gap-0 overflow-hidden border-0 bg-transparent p-0 py-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] shadow-none ring-0 sm:max-w-5xl"
         >
           <div
             className={`${GLASS_SECTION} flex max-h-[min(90dvh,calc(100dvh-2rem))] w-full flex-col overflow-hidden shadow-2xl ring-1 ring-white/5`}
           >
-            <DialogHeader className="flex shrink-0 flex-row items-center justify-between space-y-0 border-b border-white/10 px-5 py-4">
+            <DialogHeader className="flex shrink-0 flex-row items-center justify-between space-y-0 border-b border-[var(--glass-card-border)] px-5 py-4">
               <DialogTitle
                 id="update-fix-modal-title"
-                className="font-bold text-base text-white sm:text-lg"
+                className="font-bold text-base glass-text sm:text-lg"
               >
                 ข้อมูลการแก้ไข {updateFixJob?.ticketNo && `· ${updateFixJob.ticketNo}`}
               </DialogTitle>
@@ -2519,7 +2524,7 @@ export default function JobsList({
                   setUpdateFixJob(null);
                   setUpdatePreviewImages(null);
                 }}
-                className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-xl p-2 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+                className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-xl p-2 glass-muted-text transition-colors hover:bg-[var(--glass-hover)] hover:text-[var(--glass-text)]"
                 aria-label="ปิด"
               >
                 <X size={20} />
@@ -2528,17 +2533,17 @@ export default function JobsList({
 
               <div className="px-5 sm:px-6 py-4 overflow-y-auto flex-1 min-h-0">
                 {updateFixLoading ? (
-                  <p className="text-sm text-slate-400">กำลังโหลด...</p>
+                  <p className="text-sm glass-muted-text">กำลังโหลด...</p>
                 ) : (
                   updateFixJob && (
                     <div className="space-y-4">
                       <div className={`${GLASS_SECTION} p-4 sm:p-6 h-fit`}>
-                        <h3 className="text-sm font-bold mb-3 text-white">
+                        <h3 className="text-sm font-bold mb-3 glass-text">
                           ข้อมูลการแก้ไข
                         </h3>
 
                         {/* หัวข้อสถานะ + ข้อมูลประกอบ */}
-                        <div className="space-y-3 text-xs text-slate-400">
+                        <div className="space-y-3 text-xs glass-muted-text">
                           <div className="flex justify-between gap-2 items-center">
                             <span>สถานะปัจจุบัน:</span>
                             <span
@@ -2553,7 +2558,7 @@ export default function JobsList({
                           </div>
 
                           {!updateFixJob.assignedTo && (
-                            <div className="rounded-xl border border-white/10 bg-slate-800/40 px-3 py-2 text-xs text-slate-300">
+                            <div className="rounded-xl border border-[var(--glass-card-border)] bg-[var(--glass-input-bg)] px-3 py-2 text-xs glass-text">
                               งานนี้ยังไม่มีผู้รับผิดชอบ
                             </div>
                           )}
@@ -2561,7 +2566,7 @@ export default function JobsList({
                           {updateFixJob.assignedTo && (
                             <div className="flex justify-between gap-2">
                               <span>ผู้แก้ไข (ผู้รับผิดชอบ):</span>
-                              <span className="font-semibold text-slate-200">
+                              <span className="font-semibold text-slate-900 dark:text-slate-200">
                                 {updateFixJob.assignedTo.name}
                               </span>
                             </div>
@@ -2571,7 +2576,7 @@ export default function JobsList({
                             Array.isArray(updateFixJob.fixImages) &&
                             updateFixJob.fixImages.length > 0 && (
                               <div className="pt-3 space-y-2">
-                                <span className="text-xs font-semibold text-slate-300">
+                                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                                   รูปการแก้ไข
                                 </span>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -2606,7 +2611,7 @@ export default function JobsList({
                                           setUpdatePreviewImages(proxyUrls);
                                           setUpdatePreviewIndex(pos);
                                         }}
-                                        className="relative w-full aspect-4/3 rounded-xl border border-white/10 overflow-hidden bg-slate-800/50 group cursor-pointer"
+                                        className="relative w-full aspect-4/3 rounded-xl border border-[var(--glass-card-border)] overflow-hidden bg-[var(--glass-input-bg)] group cursor-pointer"
                                       >
                                         <ManagedImage
                                           src={dashboardJobImagePath(
@@ -2633,22 +2638,22 @@ export default function JobsList({
                         </div>
 
                         {/* ฟอร์ม */}
-                        <div className="mt-4 border-t border-white/10 pt-4 space-y-4">
+                        <div className="mt-4 border-t border-[var(--glass-card-border)] pt-4 space-y-4">
                           <form onSubmit={handleSubmitUpdateFix} className="space-y-4">
-                            <div className="rounded-xl border border-white/10 bg-slate-950/40 p-3 sm:p-4 space-y-3">
-                              <p className="text-xs text-slate-400 leading-relaxed">
+                            <div className="rounded-xl border border-[var(--glass-card-border)] bg-[var(--glass-input-bg)] p-3 sm:p-4 space-y-3">
+                              <p className="text-xs glass-muted-text leading-relaxed">
                                 <span className="text-red-400">*</span> บังคับกรอก:{" "}
-                                <span className="text-slate-300 font-medium">
+                                <span className="text-slate-700 dark:text-slate-300 font-medium">
                                   ประเภทสถานที่ (Indoor / Outdoor)
                                 </span>
                                 ,{" "}
-                                <span className="text-slate-300 font-medium">
+                                <span className="text-slate-700 dark:text-slate-300 font-medium">
                                   ประเภทงาน (Hardware / Software)
                                 </span>
                                 ,{" "}
-                                <span className="text-slate-300 font-medium">สาเหตุ</span>
+                                <span className="text-slate-700 dark:text-slate-300 font-medium">สาเหตุ</span>
                                 ,{" "}
-                                <span className="text-slate-300 font-medium">วิธีแก้ไข</span>
+                                <span className="text-slate-700 dark:text-slate-300 font-medium">วิธีแก้ไข</span>
                                 และแนบรูป 2 รูปแรก — เลือกประเภทสถานที่ก่อน จึงจะเลือกประเภทงานได้
                                 หมายเหตุและ Serial ไม่บังคับ
                               </p>
@@ -2777,7 +2782,7 @@ export default function JobsList({
                                   id="modal-update-serial-hint"
                                   className="text-xs text-slate-500 leading-relaxed flex-1"
                                 >
-                                  <span className="text-slate-400 font-medium">S/N:</span>{" "}
+                                  <span className="glass-muted-text font-medium">S/N:</span>{" "}
                                   A–Z / 0–9 / - เท่านั้น — สูงสุด {JOB_SERIAL_ROWS_MAX} แถว
                                 </p>
                                 {!updateIsReadOnlyFix && (
@@ -2788,7 +2793,7 @@ export default function JobsList({
                                       updateFixSaving ||
                                       updateSerialRows.length >= JOB_SERIAL_ROWS_MAX
                                     }
-                                    className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded-xl border border-white/15 bg-slate-800/80 text-slate-200 text-xs font-semibold hover:bg-slate-700/90 transition-all active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer shrink-0"
+                                    className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded-xl border border-slate-300 dark:border-white/15 bg-slate-100 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700/90 transition-all active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer shrink-0"
                                     aria-label="เพิ่มแถว Serial Number"
                                   >
                                     <Plus size={16} aria-hidden />
@@ -2800,7 +2805,7 @@ export default function JobsList({
                                 {updateSerialRows.map((row, idx) => (
                                   <div
                                     key={idx}
-                                    className="rounded-xl border border-white/10 bg-slate-950/35 p-3 space-y-3"
+                                    className="rounded-xl border border-[var(--glass-card-border)] bg-[var(--glass-input-bg)] p-3 space-y-3"
                                   >
                                     <div className="flex items-center justify-between gap-2">
                                       <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
@@ -2811,7 +2816,7 @@ export default function JobsList({
                                           type="button"
                                           onClick={() => removeModalSerialRow(idx)}
                                           disabled={updateFixSaving}
-                                          className="inline-flex items-center justify-center min-h-10 min-w-10 rounded-lg border border-white/10 text-slate-400 hover:text-red-300 hover:border-red-500/30 hover:bg-red-950/20 transition-colors cursor-pointer disabled:opacity-50"
+                                          className="inline-flex items-center justify-center min-h-10 min-w-10 rounded-lg border border-[var(--glass-card-border)] glass-muted-text hover:text-red-500 hover:border-red-500/30 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
                                           aria-label={`ลบแถวอุปกรณ์ ${idx + 1}`}
                                         >
                                           <Minus size={18} aria-hidden />
@@ -2905,14 +2910,14 @@ export default function JobsList({
                               <div>
                                 <span className={GLASS_MODAL_LABEL}>
                                   รูปการแก้ไข{" "}
-                                  <span className="text-slate-400 font-normal">
+                                  <span className="glass-muted-text font-normal">
                                     (บังคับ 2 รูปแรก — ใช้รูปเดิมได้ / อัปโหลดใหม่เพื่อเปลี่ยน)
                                   </span>
                                 </span>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mt-1">
                                   {[0, 1, 2].map((i) => (
                                     <div key={i} className="flex flex-col group">
-                                      <p className="text-[11px] mb-1.5 font-medium text-slate-400">
+                                      <p className="text-[11px] mb-1.5 font-medium glass-muted-text">
                                         รูปที่ {i + 1}{" "}
                                         {i < 2 && (
                                           <span className="text-red-400">*</span>
@@ -2923,7 +2928,7 @@ export default function JobsList({
                                         className={`relative aspect-square rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all duration-200 ${
                                           updateFixPreviews[i]
                                             ? "border-transparent bg-transparent"
-                                            : "border-white/20 bg-slate-900/30"
+                                            : "border-[var(--glass-card-border)] bg-[var(--glass-input-bg)]"
                                         }`}
                                       >
                                         {!updateFixPreviews[i] && (
@@ -2945,7 +2950,7 @@ export default function JobsList({
                                             </div>
                                           </>
                                         ) : (
-                                          <div className="flex flex-col items-center gap-1.5 z-10 text-slate-400 group-hover:text-sky-400 transition-colors">
+                                          <div className="flex flex-col items-center gap-1.5 z-10 glass-muted-text group-hover:text-sky-500 transition-colors">
                                             <Camera size={22} aria-hidden />
                                             <span className="text-[10px] font-medium uppercase tracking-wider">
                                               Upload
@@ -2987,11 +2992,11 @@ export default function JobsList({
                                   : "บันทึกและปิดงาน (สถานะ: เสร็จสิ้น)"}
                               </button>
                             ) : isUpdateResolved && isUpdateAssignee ? (
-                              <div className="w-full mt-2 py-2.5 rounded-xl text-xs font-semibold text-center border border-dashed border-white/15 bg-slate-800/40 text-slate-400">
+                              <div className="w-full mt-2 py-2.5 rounded-xl text-xs font-semibold text-center border border-dashed border-[var(--glass-card-border)] bg-[var(--glass-input-bg)] glass-muted-text">
                                 งานนี้ถูกปิดแล้ว — หากต้องการแก้ไข ให้ใช้ขั้นตอน Reopen ด้านล่าง
                               </div>
                             ) : isUpdateResolved ? (
-                              <div className="w-full mt-2 py-2.5 rounded-xl text-xs font-semibold text-center border border-dashed border-white/15 bg-slate-800/40 text-slate-500">
+                              <div className="w-full mt-2 py-2.5 rounded-xl text-xs font-semibold text-center border border-dashed border-slate-300 dark:border-white/15 bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:text-slate-500">
                                 งานนี้ปิดแล้ว — โหมดอ่านอย่างเดียว — หากต้องการแก้ไข ให้ติดต่อผู้รับงานหรือผู้ดูแลระบบ
                               </div>
                             ) : updateFixJob && jobNeedsAssignee(updateFixJob) ? (
@@ -3019,7 +3024,7 @@ export default function JobsList({
                                       if (!updateFixJob) return;
                                       void handleTakeJob(updateFixJob.id);
                                     }}
-                                    className="flex-1 min-h-11 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-800 text-slate-100 cursor-pointer hover:bg-slate-700"
+                                    className="flex-1 min-h-11 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[var(--glass-input-bg)] glass-text cursor-pointer hover:bg-[var(--glass-hover)]"
                                   >
                                     <Wrench size={14} className="inline mr-1.5" aria-hidden />
                                     รับงานนี้
@@ -3027,7 +3032,7 @@ export default function JobsList({
                                 </div>
                               </div>
                             ) : (
-                              <div className="w-full mt-2 py-2.5 rounded-xl text-xs font-semibold text-center border border-dashed border-white/15 bg-slate-800/40 text-slate-500">
+                              <div className="w-full mt-2 py-2.5 rounded-xl text-xs font-semibold text-center border border-dashed border-slate-300 dark:border-white/15 bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:text-slate-500">
                                 เฉพาะผู้รับงานที่ถูกมอบหมายเท่านั้นที่บันทึกและปิดงานได้
                               </div>
                             )}
@@ -3038,7 +3043,7 @@ export default function JobsList({
                                     เฉพาะผู้รับงาน: Reopen เพื่อเปลี่ยนสถานะเป็น &quot;กำลังแก้ไข&quot; แล้วจึงแก้ไขข้อมูลได้
                                   </div>
                                   <textarea
-                                    className="w-full rounded-xl border border-orange-500/30 bg-slate-900/50 px-3 py-2 text-xs sm:text-sm text-slate-100 placeholder:text-orange-200/40 focus:border-orange-400/60 focus:ring-2 focus:ring-orange-500/25 outline-none transition-all min-h-[80px] resize-y"
+                                    className="w-full rounded-xl border border-orange-500/30 bg-white/80 dark:bg-slate-900/50 px-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-orange-700/50 dark:placeholder:text-orange-200/40 focus:border-orange-400/60 focus:ring-2 focus:ring-orange-500/25 outline-none transition-all min-h-[80px] resize-y"
                                     rows={2}
                                     placeholder="ระบุเหตุผลในการ Reopen เช่น ต้องแก้ไขรายละเอียดวิธีการแก้ไข หรืออัปเดตรูปเพิ่มเติม"
                                     value={updateReopenReason}
@@ -3087,9 +3092,9 @@ export default function JobsList({
           overlayClassName="bg-black/60 backdrop-blur-sm"
           className="max-w-md gap-0 overflow-visible border-0 bg-transparent p-3 shadow-none ring-0 sm:max-w-md"
         >
-          <div className="flex flex-col overflow-visible rounded-2xl border border-white/10 bg-slate-900/90 shadow-2xl backdrop-blur-xl">
-            <DialogHeader className="flex shrink-0 flex-row items-center justify-between space-y-0 border-b border-white/10 p-4">
-              <DialogTitle className="font-bold text-base text-white">
+          <div className="glass-card flex flex-col overflow-visible shadow-2xl">
+            <DialogHeader className="flex shrink-0 flex-row items-center justify-between space-y-0 border-b border-[var(--glass-card-border)] p-4">
+              <DialogTitle className="font-bold text-base glass-text">
                 {assignBulkIds.length > 0
                   ? `มอบหมายงาน ${assignBulkIds.length} รายการ`
                   : `เลขที่แจ้งซ่อม ${assignJob?.ticketNo ? `· ${assignJob.ticketNo}` : ""}`}
@@ -3100,15 +3105,15 @@ export default function JobsList({
                 className="cursor-pointer rounded-lg p-2 transition-colors hover:bg-white/5"
                 aria-label="ปิด"
               >
-                <X size={20} className="text-slate-400" />
+                <X size={20} className="glass-muted-text" />
               </button>
             </DialogHeader>
             <div className="space-y-5 p-5">
               {assignLoading ? (
-                <p className="text-sm text-slate-400">กำลังโหลดรายชื่อเจ้าหน้าที่...</p>
+                <p className="text-sm glass-muted-text">กำลังโหลดรายชื่อเจ้าหน้าที่...</p>
               ) : (
                 <>
-                  <p className="text-sm text-slate-300">
+                  <p className="text-sm text-slate-700 dark:text-slate-300">
                     {assignBulkIds.length > 0
                       ? "เลือกเจ้าหน้าที่ที่ต้องการมอบหมายให้ทุกงานที่เลือก — สถานะจะเป็น «กำลังแก้ไข» หลังมอบหมาย"
                       : "เลือกเจ้าหน้าที่ที่ต้องการมอบหมายงานนี้ให้ — สถานะจะเป็น «กำลังแก้ไข» หลังมอบหมาย"}
@@ -3138,7 +3143,7 @@ export default function JobsList({
                       variant="secondary"
                       onClick={closeAssignModal}
                       disabled={assignSubmitting}
-                      className="flex-1 cursor-pointer rounded-xl border border-white/10 bg-slate-800 text-slate-300 hover:bg-slate-700"
+                      className="flex-1 cursor-pointer rounded-xl border border-[var(--glass-input-border)] bg-[var(--glass-input-bg)] glass-muted-text hover:bg-[var(--glass-hover)] hover:text-[var(--glass-text)]"
                     >
                       ยกเลิก
                     </Button>

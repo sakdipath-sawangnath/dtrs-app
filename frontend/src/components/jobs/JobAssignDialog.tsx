@@ -43,12 +43,13 @@ export default function JobAssignDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[min(90vh,720px)] max-w-[calc(100%-2rem)] gap-0 overflow-visible rounded-2xl border-white/10 bg-slate-900/50 p-0 text-slate-100 shadow-2xl backdrop-blur-md sm:max-w-md"
+        overlayClassName="bg-[var(--glass-overlay)] backdrop-blur-md"
+        className="glass-card max-h-[min(90vh,720px)] max-w-[calc(100%-2rem)] gap-0 overflow-visible p-0 sm:max-w-md"
       >
-        <DialogHeader className="flex shrink-0 flex-row items-center justify-between gap-3 border-b border-white/10 p-4 sm:p-5">
+        <DialogHeader className="flex shrink-0 flex-row items-center justify-between gap-3 border-b border-[var(--glass-card-border)] p-4 sm:p-5">
           <DialogTitle
             id="assign-modal-title"
-            className="font-bold text-base text-white"
+            className="font-bold text-base glass-text"
           >
             มอบหมายงาน {ticketNo ? `· ${ticketNo}` : ""}
           </DialogTitle>
@@ -66,7 +67,7 @@ export default function JobAssignDialog({
 
         <div className="space-y-4 p-4 sm:p-5">
           {assignLoading ? (
-            <p className="text-sm text-slate-400">กำลังโหลดรายชื่อเจ้าหน้าที่...</p>
+            <p className="text-sm glass-muted-text">กำลังโหลดรายชื่อเจ้าหน้าที่...</p>
           ) : (
             <>
               <p className={`${GLASS_LABEL} mb-0`}>เลือกเจ้าหน้าที่ที่ต้องการมอบหมายงานนี้ให้</p>
@@ -95,11 +96,11 @@ export default function JobAssignDialog({
           )}
         </div>
 
-        <DialogFooter className="flex flex-col-reverse gap-2 border-t border-white/10 bg-slate-950/30 p-4 sm:flex-row sm:justify-end sm:gap-3 sm:p-5">
+        <DialogFooter className="flex flex-col-reverse gap-2 border-t border-[var(--glass-card-border)] p-4 sm:flex-row sm:justify-end sm:gap-3 sm:p-5">
           <Button
             type="button"
             variant="outline"
-            className="min-h-11 flex-1 cursor-pointer rounded-xl border-white/10 bg-slate-800 text-slate-200 hover:bg-slate-700/90 sm:flex-initial"
+            className="min-h-11 flex-1 cursor-pointer rounded-xl border-[var(--glass-input-border)] bg-[var(--glass-input-bg)] glass-muted-text hover:bg-[var(--glass-hover)] hover:text-[var(--glass-text)] sm:flex-initial"
             disabled={assignActionSaving}
             onClick={() => onOpenChange(false)}
           >

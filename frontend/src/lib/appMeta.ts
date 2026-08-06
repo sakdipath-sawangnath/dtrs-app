@@ -18,7 +18,7 @@ const packageVersion = firstNonEmpty(packageJson.version) ?? "0.1.0";
 
 /** Version badge SoT: NEXT_PUBLIC_APP_VERSION → frontend/package.json (never DB). */
 export const FOOTER_ENV_FALLBACK: AppMeta = {
-  appName: firstNonEmpty(process.env.NEXT_PUBLIC_APP_NAME, "ระบบแจ้งซ่อม CCTV") ?? "ระบบแจ้งซ่อม CCTV",
+  appName: firstNonEmpty(process.env.NEXT_PUBLIC_APP_NAME, "ระบบแจ้งซ่อม") ?? "ระบบแจ้งซ่อม",
   companyName:
     firstNonEmpty(process.env.NEXT_PUBLIC_COMPANY_NAME, "Forth Co., Ltd.") ?? "Forth Co., Ltd.",
   version: firstNonEmpty(process.env.NEXT_PUBLIC_APP_VERSION, packageVersion) ?? packageVersion,

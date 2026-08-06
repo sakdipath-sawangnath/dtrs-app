@@ -50,7 +50,7 @@ If a question can be answered by exploring the codebase, explore the codebase in
 - **Codebase over speculation.** If the repo already answers it, read first (`Read`, `Grep`, `Glob`, `Task explore`) and present findings instead of asking.
 - **No implementation during grill** unless the user explicitly asks to prototype one narrow spike to unblock a decision.
 
-**Repo rules (always):** follow [`AGENTS.md`](../../../AGENTS.md); no secrets in code/docs/commits; no logging JWT, SMTP passwords, `Authorization`, or PII; frontend UI must match **Dark Glassmorphism** + **No-Card Layout** (except Dashboard Overview); prefer `@/components/ui/*` via skill **`shadcn`** before custom markup.
+**Repo rules (always):** follow [`AGENTS.md`](../../../AGENTS.md); no secrets in code/docs/commits; no logging JWT, SMTP passwords, `Authorization`, or PII; frontend UI must match **Glassmorphism (Dark default + Light toggle)** + **No-Card Layout** (except Dashboard Overview); prefer `@/components/ui/*` via skill **`shadcn`** before custom markup.
 
 ---
 
@@ -70,7 +70,7 @@ Identify **frontend**, **backend**, **full-stack**, **infra/deploy**, or **share
 | `/dashboard/users`, `/dashboard/profile`, `/users/me` | **Users** | RBAC doc + `frontend/src/lib/auth.ts` |
 | `/dashboard/settings`, SMTP, email templates, `app_meta`, orphan cleanup | **Settings / admin** | [`docs/Email-Notifications.md`](../../../docs/Email-Notifications.md), [`docs/MinIO-Orphan-Cleanup.md`](../../../docs/MinIO-Orphan-Cleanup.md) |
 | `/dashboard/sites`, `Site`, `Area`, seed CSV/Excel | **Sites / areas** | [`docs/CSV-vs-System-Mapping.md`](../../../docs/CSV-vs-System-Mapping.md), [`PLAN.md`](../../../PLAN.md) |
-| `/job-images`, `/user-images`, `ManagedImage`, MinIO proxy | **Images / storage** | [`docs/Project-Plan-Private-MinIO-Images.md`](../../../docs/Project-Plan-Private-MinIO-Images.md), [`minio.md`](../../../minio.md) |
+| `/job-images`, `/user-images`, `ManagedImage`, MinIO proxy | **Images / storage** | [`docs/Project-Plan-Private-MinIO-Images.md`](../../../docs/Project-Plan-Private-MinIO-Images.md), [`minio.md`](../../../docs/minio.md) |
 | `/print/jobs`, `/api/print-jobs`, PDF, Puppeteer | **Print / PDF** | [`backend/postman/PRINT-PDF-DEBUG.md`](../../../backend/postman/PRINT-PDF-DEBUG.md), [`backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md`](../../../backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md) |
 | `CrudModal`, `Dialog`, `DashboardLayoutShell`, `form-input-glass` | **Dashboard UI** | skill **`ui-ux-pro-max`**, skill **`shadcn`**, [`AGENTS.md`](../../../AGENTS.md) |
 | Nest module, DTO, Guard, migration, `JobsService` | **Backend API** | skill **`backend-api-pro`**, skill **`nestjs-best-practices`**, [`backend/docs/api-endpoints.json`](../../../backend/docs/api-endpoints.json) |
@@ -181,7 +181,7 @@ Ask: **"พร้อมลงมือ implement หรือยังมี bra
 - ดัชนี docs: [`docs/README.md`](../../../docs/README.md)
 - RBAC: [`backend/docs/RBAC-Setup.md`](../../../backend/docs/RBAC-Setup.md)
 - API สรุป: [`backend/docs/api-endpoints.json`](../../../backend/docs/api-endpoints.json), [`backend/postman/README.md`](../../../backend/postman/README.md)
-- MinIO: [`minio.md`](../../../minio.md), [`docs/Project-Plan-Private-MinIO-Images.md`](../../../docs/Project-Plan-Private-MinIO-Images.md)
+- MinIO: [`minio.md`](../../../docs/minio.md), [`docs/Project-Plan-Private-MinIO-Images.md`](../../../docs/Project-Plan-Private-MinIO-Images.md)
 - อีเมล: [`docs/Email-Notifications.md`](../../../docs/Email-Notifications.md)
 - UI: skill [`ui-ux-pro-max`](../ui-ux-pro-max/SKILL.md), skill [`shadcn`](../shadcn/SKILL.md)
 - Backend: skill [`backend-api-pro`](../../../backend/.agents/skills/backend-api-pro/SKILL.md), skill [`nestjs-best-practices`](../../../backend/.agents/skills/nestjs-best-practices/SKILL.md)

@@ -56,7 +56,7 @@ Identify **frontend**, **backend**, **full-stack**, **infra/deploy**, **public**
 | `/dashboard/users`, `/dashboard/profile`, `/users/me` | **Users** | RBAC doc + [`frontend/src/lib/auth.ts`](../../../frontend/src/lib/auth.ts) |
 | `/dashboard/settings`, SMTP, email templates, orphan cleanup | **Settings / admin** | [`docs/Email-Notifications.md`](../../../docs/Email-Notifications.md), [`docs/MinIO-Orphan-Cleanup.md`](../../../docs/MinIO-Orphan-Cleanup.md) |
 | `/dashboard/sites`, `Site`, `Area`, CSV/Excel seed | **Sites / areas** | [`docs/CSV-vs-System-Mapping.md`](../../../docs/CSV-vs-System-Mapping.md) |
-| `/job-images`, `/user-images`, `ManagedImage`, MinIO proxy | **Images / storage** | [`docs/Project-Plan-Private-MinIO-Images.md`](../../../docs/Project-Plan-Private-MinIO-Images.md), [`minio.md`](../../../minio.md) |
+| `/job-images`, `/user-images`, `ManagedImage`, MinIO proxy | **Images / storage** | [`docs/Project-Plan-Private-MinIO-Images.md`](../../../docs/Project-Plan-Private-MinIO-Images.md), [`minio.md`](../../../docs/minio.md) |
 | `/print/jobs`, `/api/print-jobs`, PDF, Puppeteer | **Print / PDF** | [`postman/PRINT-PDF-DEBUG.md`](../../postman/PRINT-PDF-DEBUG.md) |
 | `CrudModal`, `Dialog`, `DashboardLayoutShell`, `form-input-glass` | **Dashboard UI** | skill **`ui-ux-pro-max`**, skill **`shadcn`**, [`AGENTS.md`](../../../AGENTS.md) |
 | Nest module, DTO, Guard, migration, `JobsService` | **Backend API** | skill **`backend-api-pro`**, skill **`nestjs-best-practices`**, [`docs/api-endpoints.json`](../../docs/api-endpoints.json) |
@@ -64,7 +64,7 @@ Identify **frontend**, **backend**, **full-stack**, **infra/deploy**, **public**
 | Socket.IO, realtime notifications | **Realtime** | `NotificationsBell`, backend gateway module |
 | NextAuth, `/api/auth`, `unwrapApiData`, Next API routes | **Frontend ↔ API seam** | [`frontend/src/lib/apiResponse.ts`](../../../frontend/src/lib/apiResponse.ts), [`frontend/src/lib/auth.ts`](../../../frontend/src/lib/auth.ts) |
 
-**Repo rules (always):** follow [`AGENTS.md`](../../../AGENTS.md); no secrets in code/docs/commits; no logging JWT, `NEXTAUTH_SECRET`, SMTP passwords, `Authorization`, or PII (phone, address); frontend UI must match **Dark Glassmorphism** + **No-Card Layout** (except Dashboard Overview); prefer `@/components/ui/*` via skill **`shadcn`** before custom markup; backend image entry is **`dist/src/main.js`** (not `dist/main.js`).
+**Repo rules (always):** follow [`AGENTS.md`](../../../AGENTS.md); no secrets in code/docs/commits; no logging JWT, `NEXTAUTH_SECRET`, SMTP passwords, `Authorization`, or PII (phone, address); frontend UI must match **Glassmorphism (Dark default + Light toggle)** + **No-Card Layout** (except Dashboard Overview); prefer `@/components/ui/*` via skill **`shadcn`** before custom markup; backend image entry is **`dist/src/main.js`** (not `dist/main.js`).
 
 ---
 
@@ -229,7 +229,7 @@ If verdict is `ship` or `fix-then-ship` on a **non-trivial change**, suggest opt
 - ดัชนี docs: [`docs/README.md`](../../../docs/README.md)
 - RBAC: [`docs/RBAC-Setup.md`](../../docs/RBAC-Setup.md)
 - API สรุป: [`docs/api-endpoints.json`](../../docs/api-endpoints.json), [`postman/README.md`](../../postman/README.md)
-- MinIO: [`minio.md`](../../../minio.md), [`docs/Project-Plan-Private-MinIO-Images.md`](../../../docs/Project-Plan-Private-MinIO-Images.md)
+- MinIO: [`minio.md`](../../../docs/minio.md), [`docs/Project-Plan-Private-MinIO-Images.md`](../../../docs/Project-Plan-Private-MinIO-Images.md)
 - อีเมล: [`docs/Email-Notifications.md`](../../../docs/Email-Notifications.md)
 - UI: skill [`ui-ux-pro-max`](../../../frontend/.agents/skills/ui-ux-pro-max/SKILL.md), skill [`shadcn`](../../../frontend/.agents/skills/shadcn/SKILL.md)
 - Backend: skill [`backend-api-pro`](../backend-api-pro/SKILL.md), skill [`nestjs-best-practices`](../nestjs-best-practices/SKILL.md)

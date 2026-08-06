@@ -141,7 +141,7 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
       <button
         type="button"
         onClick={() => setSidebarOpen(true)}
-        className="md:hidden flex items-center justify-center w-9 h-9 rounded-lg border border-white/20 bg-slate-800/50 text-slate-300 hover:bg-slate-700/50 transition-colors"
+        className="md:hidden flex items-center justify-center w-9 h-9 rounded-lg border border-[var(--glass-input-border)] bg-[var(--glass-input-bg)] glass-nav-item transition-colors"
         aria-label="เปิดเมนู"
       >
         <Menu size={18} />
@@ -172,19 +172,19 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
               aria-busy={rowLoading}
               className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 cursor-pointer disabled:opacity-80 disabled:cursor-wait ${
                 active
-                  ? "bg-blue-500/20 text-blue-400 font-semibold shadow-sm ring-1 ring-blue-500/30"
-                  : "text-slate-400 hover:bg-white/5 hover:text-white font-medium"
+                  ? "glass-nav-active font-semibold shadow-sm ring-1 ring-[var(--glass-input-focus-border)]"
+                  : "glass-nav-item font-medium"
               }`}
             >
               <item.icon
                 size={18}
-                className={`shrink-0 transition-colors ${active ? "text-blue-400" : "text-slate-500"}`}
+                className={`shrink-0 transition-colors ${active ? "text-glass-accent" : "text-glass-subtle"}`}
               />
               <span className="flex-1 truncate">{item.name}</span>
               {rowLoading ? (
-                <Loader2 size={16} className="shrink-0 text-blue-400 animate-spin" aria-hidden />
+                <Loader2 size={16} className="shrink-0 text-glass-accent animate-spin" aria-hidden />
               ) : active ? (
-                <ChevronRight size={14} className="text-blue-600 opacity-70 shrink-0" aria-hidden />
+                <ChevronRight size={14} className="text-glass-accent opacity-70 shrink-0" aria-hidden />
               ) : null}
             </button>
           );
@@ -194,40 +194,39 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
   );
 
   return (
-    <div className="dark h-screen flex flex-col overflow-hidden bg-[#0a1128] text-slate-200">
-      <SiteHeader right={headerRight} subtitle={currentPage?.name} isDark={true} />
+    <div className="h-screen flex flex-col overflow-hidden glass-page">
+      <SiteHeader right={headerRight} subtitle={currentPage?.name} />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {sidebarOpen && (
           <button
             type="button"
             onClick={() => setSidebarOpen(false)}
-            className="md:hidden fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-sm"
+            className="md:hidden fixed inset-0 z-40 backdrop-blur-sm"
+            style={{ backgroundColor: "var(--glass-overlay)" }}
             aria-label="ปิดเมนู"
           />
         )}
 
         <aside
           className={`
-            w-64 xl:w-72 shrink-0 bg-slate-900/60 backdrop-blur-xl border-r border-white/10 shadow-2xl flex flex-col z-50
+            w-64 xl:w-72 shrink-0 glass-sidebar-surface backdrop-blur-xl border-r shadow-2xl flex flex-col z-50
             fixed md:sticky left-0 top-[62px] md:top-0 transform transition-transform duration-300 ease-out
             h-[calc(100vh-62px)] md:h-full md:self-stretch
             ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
           `}
         >
-          <div
-            className="flex items-center justify-between p-3 border-b border-white/10 md:hidden bg-slate-900/80"
-          >
-            <span className="text-sm font-semibold text-slate-200">
+          <div className="flex items-center justify-between p-3 border-b border-[var(--glass-sidebar-border)] md:hidden glass-sidebar-surface">
+            <span className="text-sm font-semibold glass-text">
               เมนู
             </span>
             <button
               type="button"
               onClick={() => setSidebarOpen(false)}
-              className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+              className="p-2 rounded-lg glass-nav-item transition-colors"
               aria-label="ปิด"
             >
-              <X size={18} className="text-slate-400" />
+              <X size={18} className="text-glass-subtle" />
             </button>
           </div>
           {sidebarContent}
@@ -242,7 +241,8 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
           </div>
           {isNavPending && (
             <div
-              className="absolute inset-0 z-20 flex items-start justify-center pt-10 sm:pt-14 px-4 bg-[#0a1128]/65 backdrop-blur-sm"
+              className="absolute inset-0 z-20 flex items-start justify-center pt-10 sm:pt-14 px-4 backdrop-blur-sm"
+              style={{ backgroundColor: "var(--glass-overlay)" }}
               aria-busy="true"
               aria-label="กำลังเปลี่ยนหน้า"
             >
@@ -252,7 +252,7 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
         </main>
       </div>
 
-      <SiteFooter isDark={true} />
+      <SiteFooter />
     </div>
   );
 }

@@ -225,7 +225,7 @@ Maintain a running **ledger** of every experiment in this session. Each entry: w
 
 - ภาพรวมระบบ: [`README.md`](../../../README.md), [`STATUS.md`](../../../STATUS.md)
 - RBAC: [`docs/RBAC-Setup.md`](../../docs/RBAC-Setup.md)
-- MinIO + รูป: [`docs/Project-Plan-Private-MinIO-Images.md`](../../../docs/Project-Plan-Private-MinIO-Images.md), [`minio.md`](../../../minio.md)
+- MinIO + รูป: [`docs/Project-Plan-Private-MinIO-Images.md`](../../../docs/Project-Plan-Private-MinIO-Images.md), [`minio.md`](../../../docs/minio.md)
 - อีเมล: [`docs/Email-Notifications.md`](../../../docs/Email-Notifications.md)
 - Reverse proxy PRD: [`docs/Reverse-Proxy-Nginx-Proxy-Manager.md`](../../docs/Reverse-Proxy-Nginx-Proxy-Manager.md)
 - RCA หลัง fix ที่ validate แล้ว: skill [`post-mortem`](../post-mortem/SKILL.md)

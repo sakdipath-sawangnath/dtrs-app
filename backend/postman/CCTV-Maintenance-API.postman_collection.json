@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "CCTV Maintenance API",
-    "description": "API ระบบแจ้งซ่อม CCTV · Backend NestJS\n\n**วิธีใช้:**\n1. ตั้งค่า baseUrl = http://localhost:4100/api (หรือตาม server)\n2. ตั้ง jobId สำหรับ request ในโฟลเดอร์ Jobs\n3. รัน request \"Auth > Login\" แล้วใส่ access_token ใน Variables\n\n**รูปงาน** `GET /jobs/:id/image/:kind/:index` — **502** = โหลดจาก MinIO ไม่ได้; **404** = ไม่มีรูปในช่อง · Collection debug หน้าพิมพ์: `CCTV-Print-PDF-Debug.postman_collection.json`\n\n**อัปเดต:** Jobs — fix/reopen เฉพาะผู้รับงาน; Settings — SMTP (ADMIN); ดู `backend/docs/api-endpoints.json`",
+    "description": "API ระบบแจ้งซ่อม · Backend NestJS\n\n**วิธีใช้:**\n1. ตั้งค่า baseUrl = http://localhost:4100/api (หรือตาม server)\n2. ตั้ง jobId สำหรับ request ในโฟลเดอร์ Jobs\n3. รัน request \"Auth > Login\" แล้วใส่ access_token ใน Variables\n\n**รูปงาน** `GET /jobs/:id/image/:kind/:index` — **502** = โหลดจาก MinIO ไม่ได้; **404** = ไม่มีรูปในช่อง · Collection debug หน้าพิมพ์: `CCTV-Print-PDF-Debug.postman_collection.json`\n\n**อัปเดต:** Jobs — fix/reopen เฉพาะผู้รับงาน; Settings — SMTP (ADMIN); ดู `backend/docs/api-endpoints.json`",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [

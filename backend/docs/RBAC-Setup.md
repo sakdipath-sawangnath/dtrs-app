@@ -93,4 +93,4 @@
 
 - รูปโปรไฟล์ผู้ใช้ในแดชบอร์ดโหลดผ่าน **`GET /api/users/:id/avatar`** / **`GET /api/users/me/avatar`** (JWT) และฝั่ง Next ใช้ path **`/user-images/:userId`**
 - รูปประกอบงานโหลดผ่าน **`GET /api/jobs/:id/image/:kind/:index`** (JWT) และฝั่ง Next ใช้ **`/job-images/...`**
-- การตั้งค่า MinIO (bucket private, ตัวแปร env): [`../../minio.md`](../../minio.md), [`../../docs/Project-Plan-Private-MinIO-Images.md`](../../docs/Project-Plan-Private-MinIO-Images.md)
+- การตั้งค่า MinIO (bucket private, ตัวแปร env): [`../../docs/minio.md`](../../docs/minio.md), [`../../docs/Project-Plan-Private-MinIO-Images.md`](../../docs/Project-Plan-Private-MinIO-Images.md), [`../../docs/GitLab-CI-Variables-Checklist.md`](../../docs/GitLab-CI-Variables-Checklist.md)

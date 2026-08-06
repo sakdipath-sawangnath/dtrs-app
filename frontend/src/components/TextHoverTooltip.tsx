@@ -52,7 +52,7 @@ export function TextHoverTooltip({
           computePos();
         }}
         onBlur={() => setOpen(false)}
-        className="inline-block max-w-full outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 rounded"
+        className="inline-block max-w-full outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--glass-page-bg)] rounded"
       >
         {children}
       </span>
@@ -67,7 +67,7 @@ export function TextHoverTooltip({
                 zIndex: 9999,
               }}
             >
-              <div className="max-w-[min(520px,calc(100vw-24px))] bg-slate-900 text-white text-[11px] px-2 py-1 rounded-md shadow-lg whitespace-pre-wrap wrap-break-word border border-white/10">
+              <div className="glass-card max-w-[min(520px,calc(100vw-24px))] glass-text text-[11px] px-2 py-1 shadow-lg whitespace-pre-wrap wrap-break-word">
                 {text}
               </div>
             </div>,

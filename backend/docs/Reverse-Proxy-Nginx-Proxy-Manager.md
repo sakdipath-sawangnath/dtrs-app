@@ -65,7 +65,7 @@
 - `NEXTAUTH_URL=https://<โดเมน>`
 - `API_INTERNAL_BASE_URL=http://<ชื่อ-container-backend>:4100/api` (ภายใน Docker network)
 - Backend: `ALLOWED_ORIGINS=https://<โดเมน>`, `FRONTEND_BASE_URL=https://<โดเมน>`
-- Backend (ถ้าจำเป็น): **`MINIO_PUBLIC_URL`** = URL สาธารณะที่เก็บในลิงก์รูปใน DB (เช่น `https://minio-it.example.com`) คู่ **`MINIO_SERVER_FETCH_BASE_URL`** = ฐาน HTTP ภายใน LAN ที่ Nest ใช้โหลด object (เช่น `http://192.168.x.x:9000`) เมื่อจาก container backend ต่อไปโดเมนใน `MINIO_PUBLIC_URL` ไม่ได้ (เช่น :443 ปิด แต่ MinIO API รับที่พอร์ต 9000) — รายละเอียด `README.md`, `minio.md`
+- Backend (ถ้าจำเป็น): **`MINIO_PUBLIC_URL`** = URL สาธารณะที่เก็บในลิงก์รูปใน DB (เช่น `https://minio-it.example.com`) คู่ **`MINIO_SERVER_FETCH_BASE_URL`** = ฐาน HTTP ภายใน LAN ที่ Nest ใช้โหลด object (เช่น `http://192.168.x.x:9000`) เมื่อจาก container backend ต่อไปโดเมนใน `MINIO_PUBLIC_URL` ไม่ได้ (เช่น :443 ปิด แต่ MinIO API รับที่พอร์ต 9000) — รายละเอียด [`../../README.md`](../../README.md), [`../../docs/minio.md`](../../docs/minio.md), [`../../docs/GitLab-CI-Variables-Checklist.md`](../../docs/GitLab-CI-Variables-Checklist.md)
 
 ## Troubleshooting: รูปพิมพ์ได้ 502 แต่ browser เปิด MinIO ตรงๆ ได้
 

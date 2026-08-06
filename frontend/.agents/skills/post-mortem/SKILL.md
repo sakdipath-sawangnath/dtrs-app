@@ -245,7 +245,7 @@ If none: *"None — the fix is sufficient and no class-of-bug follow-up is warra
 - ปลายทางไฟล์: [`docs/postmortems/`](../../../../docs/postmortems/)
 - Unwrap / auth: [`src/lib/apiResponse.ts`](../../src/lib/apiResponse.ts), [`src/lib/auth.ts`](../../src/lib/auth.ts), [`src/lib/clientApiBase.ts`](../../src/lib/clientApiBase.ts), [`src/lib/serverApiBase.ts`](../../src/lib/serverApiBase.ts)
 - RBAC: [`backend/docs/RBAC-Setup.md`](../../../../backend/docs/RBAC-Setup.md)
-- MinIO: [`minio.md`](../../../../minio.md), [`docs/Project-Plan-Private-MinIO-Images.md`](../../../../docs/Project-Plan-Private-MinIO-Images.md)
+- MinIO: [`minio.md`](../../../../docs/minio.md), [`docs/Project-Plan-Private-MinIO-Images.md`](../../../../docs/Project-Plan-Private-MinIO-Images.md)
 - อีเมล: [`docs/Email-Notifications.md`](../../../../docs/Email-Notifications.md)
 - Reverse proxy: [`backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md`](../../../../backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md)
 - UI: skill [`ui-ux-pro-max`](../ui-ux-pro-max/SKILL.md), skill [`shadcn`](../shadcn/SKILL.md)

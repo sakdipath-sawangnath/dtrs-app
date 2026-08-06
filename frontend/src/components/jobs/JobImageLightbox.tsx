@@ -35,11 +35,11 @@ export default function JobImageLightbox({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        overlayClassName="bg-black/70 backdrop-blur-sm"
-        className="flex h-[min(92vh,900px)] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden rounded-2xl border border-white/10 bg-black/90 p-0 shadow-2xl sm:max-w-5xl"
+        overlayClassName="bg-[var(--glass-overlay)] backdrop-blur-sm"
+        className="flex h-[min(92vh,900px)] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden rounded-2xl border border-[var(--glass-card-border)] bg-black/90 p-0 shadow-2xl sm:max-w-5xl"
       >
-        <DialogHeader className="flex shrink-0 flex-row items-center justify-between gap-2 border-b border-white/10 bg-black/70 px-4 py-3 text-xs text-slate-200 sm:text-sm">
-          <DialogTitle className="text-xs font-medium text-slate-200 sm:text-sm">
+        <DialogHeader className="flex shrink-0 flex-row items-center justify-between gap-2 border-b border-[var(--glass-card-border)] bg-black/70 px-4 py-3 text-xs glass-muted-text sm:text-sm">
+          <DialogTitle className="text-xs font-medium glass-text sm:text-sm">
             รูปที่ {n > 0 ? safeIndex + 1 : 0} / {n}
           </DialogTitle>
           <Button

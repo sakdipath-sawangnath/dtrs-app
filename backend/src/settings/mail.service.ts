@@ -47,7 +47,7 @@ export class MailService {
       await transporter.sendMail({
         from: config.from.trim(),
         to: to.trim(),
-        subject: 'ทดสอบการเชื่อมต่ออีเมล — ระบบแจ้งซ่อม CCTV',
+        subject: 'ทดสอบการเชื่อมต่ออีเมล — ระบบแจ้งซ่อม',
         text: [
           'นี่คืออีเมลทดสอบจากระบบ',
           '',

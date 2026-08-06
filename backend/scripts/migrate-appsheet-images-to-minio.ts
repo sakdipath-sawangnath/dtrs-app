@@ -23,7 +23,7 @@ const prisma = new PrismaClient();
 const DRY_RUN = process.env.DRY_RUN !== 'false';
 
 // โฟลเดอร์เก็บไฟล์เดิมจาก AppSheet (ให้วางไฟล์/โฟลเดอร์จาก CCTVMaintenance จริงไว้ที่นี่)
-// ตัวอย่าง: d:\cctv-app.forth-co-th\CCTVMaintenance-641488446\ระบบแจ้งซ่อม CCTV_Images\...
+// ตัวอย่าง: d:\cctv-app.forth-co-th\CCTVMaintenance-641488446\ระบบแจ้งซ่อม_Images\...
 const APPSHEET_ROOT = path.resolve(__dirname, '../../CCTVMaintenance-641488446');
 
 // ตั้งค่าจาก .env / default ให้เหมือน MinioService

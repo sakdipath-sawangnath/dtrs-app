@@ -50,7 +50,7 @@ export default function UserMenuDropdown({ name, image, onClose }: UserMenuDropd
         onClick={() => !signingOut && setOpen((o) => !o)}
         disabled={signingOut}
         aria-busy={signingOut}
-        className="flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:min-h-[44px] rounded-lg border border-white/15 min-w-0 transition-colors bg-slate-800/50 text-slate-300 hover:bg-slate-700/60 hover:text-white disabled:opacity-85 disabled:cursor-wait disabled:hover:bg-slate-800/50"
+        className="flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:min-h-[44px] rounded-lg border border-[var(--glass-input-border)] min-w-0 transition-colors bg-[var(--glass-input-bg)] glass-nav-item hover:bg-[var(--glass-hover)] hover:text-[var(--glass-text)] disabled:opacity-85 disabled:cursor-wait"
         aria-expanded={open}
         aria-haspopup="true"
       >
@@ -78,30 +78,29 @@ export default function UserMenuDropdown({ name, image, onClose }: UserMenuDropd
                 onError={() => setImgError(true)}
               />
             ) : (
-              <div
-                className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 bg-slate-600"
-              >
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 bg-slate-600">
                 {name?.[0]?.toUpperCase() ?? "U"}
               </div>
             )}
             <span className="text-xs sm:text-sm font-medium truncate max-w-[100px] sm:max-w-[120px] hidden sm:inline">
               {name ?? "เจ้าหน้าที่"}
             </span>
-            <ChevronDown size={14} className={`shrink-0 transition-transform text-slate-500 ${open ? "rotate-180" : ""}`} />
+            <ChevronDown
+              size={14}
+              className={`shrink-0 transition-transform glass-subtle-text ${open ? "rotate-180" : ""}`}
+            />
           </>
         )}
       </button>
 
       {open && (
-        <div
-          className="absolute right-0 top-full mt-1 py-1 rounded-xl border border-white/10 shadow-2xl bg-slate-900/95 backdrop-blur-xl z-50 min-w-[160px]"
-        >
+        <div className="absolute right-0 top-full mt-1 py-1 rounded-xl glass-card shadow-2xl z-50 min-w-[160px]">
           <Link
             href="/dashboard/profile"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2 px-3 py-2.5 text-sm text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+            className="flex items-center gap-2 px-3 py-2.5 text-sm glass-nav-item transition-colors hover:bg-[var(--glass-hover)] hover:text-[var(--glass-text)]"
           >
-            <User size={16} className="text-slate-400" />
+            <User size={16} className="glass-subtle-text" />
             โปรไฟล์
           </Link>
           <button
@@ -126,9 +125,9 @@ export default function UserMenuDropdown({ name, image, onClose }: UserMenuDropd
                 setSigningOut(false);
               }
             }}
-            className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-left text-slate-400 transition-colors hover:bg-white/10 hover:text-red-400 disabled:opacity-60 disabled:cursor-not-allowed min-h-[44px]"
+            className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-left glass-muted-text transition-colors hover:bg-[var(--glass-hover)] hover:text-red-500 disabled:opacity-60 disabled:cursor-not-allowed min-h-[44px]"
           >
-            <LogOut size={16} className="text-slate-500 shrink-0" aria-hidden />
+            <LogOut size={16} className="glass-subtle-text shrink-0" aria-hidden />
             ออกจากระบบ
           </button>
         </div>

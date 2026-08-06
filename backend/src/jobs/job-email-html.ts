@@ -142,7 +142,7 @@ function wrapBody(opts: {
           </tr>
           <tr>
             <td style="padding:0 28px 24px;border-top:1px solid #e2e8f0;background:#ffffff;">
-              <p style="margin:16px 0 0;font-size:11px;color:#94a3b8;text-align:center;">Forth Co., Ltd. · ระบบแจ้งซ่อม CCTV</p>
+              <p style="margin:16px 0 0;font-size:11px;color:#94a3b8;text-align:center;">Forth Co., Ltd. · ระบบแจ้งซ่อม</p>
             </td>
           </tr>
         </table>

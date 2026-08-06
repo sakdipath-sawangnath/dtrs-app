@@ -10,6 +10,7 @@ import PublicLayoutShell from '@/components/PublicLayoutShell';
 import DashboardLayoutShell from '@/components/DashboardLayoutShell';
 import Select from 'react-select';
 import { getReactSelectGlassStyles } from '@/lib/reactSelectGlassStyles';
+import { useAppTheme } from '@/lib/useAppTheme';
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,6 +62,7 @@ function extractApiErrorMessage(err: unknown): string {
 }
 
 function ReportPageContent() {
+  const { theme } = useAppTheme();
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -525,20 +527,14 @@ function ReportPageContent() {
     !!images[0] &&
     !!images[1];
   
-  // Design Tokens (Standardized on Dark Glassmorphism)
-  const isDark = true;
-  const cardOuterClass = isDark
-    ? "bg-slate-900/60 backdrop-blur-md rounded-2xl border border-white/10 px-5 sm:px-7 py-5 sm:py-6 shadow-2xl transition-all duration-300"
-    : "bg-white/95 backdrop-blur-sm rounded-xl border border-slate-200 px-5 sm:px-7 py-5 sm:py-6 shadow-md transition-all duration-300";
-  const headerClass = isDark ? "flex items-center gap-2 mb-5 pb-3 border-b border-white/10" : "flex items-center gap-2 mb-5 pb-3 border-b border-slate-100";
-  const headerIconClass = isDark ? "text-blue-400" : "text-blue-600";
-  const headerTitleClass = isDark ? "text-base font-bold text-white" : "text-base font-bold text-slate-800";
-  const labelClass = isDark ? "block text-sm font-semibold mb-1.5 text-slate-300" : "block text-sm font-semibold mb-1.5 text-slate-700";
-  const inputClass = isDark 
-    ? "w-full rounded-xl border border-white/10 bg-slate-900/40 backdrop-blur-sm px-4 py-2.5 text-sm text-white focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder:text-slate-500"
-    : "w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder:text-slate-400";
+  const customStyles = getReactSelectGlassStyles(theme);
 
-  const customStyles = getReactSelectGlassStyles(isDark ? 'dark' : 'light');
+  const cardOuterClass = "glass-card px-5 sm:px-7 py-5 sm:py-6 transition-all duration-300";
+  const headerClass = "flex items-center gap-2 mb-5 pb-3 border-b border-[var(--glass-card-border)]";
+  const headerIconClass = "text-blue-500";
+  const headerTitleClass = "text-base font-bold glass-text";
+  const labelClass = "glass-label";
+  const inputClass = "form-input-glass w-full text-sm";
 
   const formInner = (
     <div
@@ -550,10 +546,10 @@ function ReportPageContent() {
       {/* Page Title for public view */}
       {!session && (
          <div className="text-center mb-8">
-           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-2 mt-4 drop-shadow-sm">
+           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight glass-text mb-2 mt-4 drop-shadow-sm">
              แจ้งปัญหาการใช้งาน
            </h1>
-           <p className="text-[13px] sm:text-sm text-slate-300 max-w-lg mx-auto leading-relaxed">
+           <p className="text-[13px] sm:text-sm glass-muted-text max-w-lg mx-auto leading-relaxed">
              กรุณากรอกข้อมูลเบื้องต้น เพื่อความรวดเร็วในการให้ทีมช่างเข้าตรวจสอบและแก้ไขปัญหา
            </p>
          </div>
@@ -587,17 +583,17 @@ function ReportPageContent() {
                 strokeWidth={2}
                 aria-hidden="true"
               />
-              <div className="min-w-0 space-y-2 text-[13px] sm:text-sm leading-snug text-slate-300">
+              <div className="min-w-0 space-y-2 text-[13px] sm:text-sm leading-snug glass-muted-text">
                 {isStaffFlow ? (
                   <p>
                     กด &quot;ตรวจสอบ&quot; เพื่อดึงข้อมูลจากระบบ หรือกรอกแทนได้ — ส่งแล้วจะอัปเดตผู้แจ้งและผูกกับใบแจ้งซ่อมนี้
                   </p>
                 ) : (
                   <>
-                    <p className="text-slate-200/95">
+                    <p className="glass-text">
                       กรอกเบอร์ → กด &quot;ตรวจสอบ&quot; — มีบัญชีในระบบจะดึงข้อมูลให้
                     </p>
-                    <p className="text-slate-400 border-t border-white/5 pt-2">
+                    <p className="glass-subtle-text border-t border-[var(--glass-card-border)] pt-2">
                       ยังไม่มีบัญชี: กรอกชื่อ อีเมล ตำแหน่ง และรูปโปรไฟล์ — ส่งแล้วระบบจะสร้าง/อัปเดตบัญชีผู้แจ้งซ่อมให้เอง
                     </p>
                   </>
@@ -618,7 +614,7 @@ function ReportPageContent() {
                       isStaffFlow ? "sm:max-w-[16rem]" : ""
                     }`}
                   >
-                    <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 glass-subtle-text" />
                     <Input
                       type="tel"
                       required
@@ -669,10 +665,10 @@ function ReportPageContent() {
                   </Button>
                 </div>
                 {!phoneSearched && isStaffFlow && (
-                  <p className="text-xs text-slate-500 mt-2">กรอกเบอร์ 10 หลักได้เลย หรือกด &quot;ตรวจสอบ&quot; หากต้องการดึงข้อมูลผู้แจ้งจากระบบ</p>
+                  <p className="text-xs glass-subtle-text mt-2">กรอกเบอร์ 10 หลักได้เลย หรือกด &quot;ตรวจสอบ&quot; หากต้องการดึงข้อมูลผู้แจ้งจากระบบ</p>
                 )}
                 {!phoneSearched && !isStaffFlow && (
-                  <p className="text-xs text-slate-500 mt-2">
+                  <p className="text-xs glass-subtle-text mt-2">
                     กรอกเบอร์ 10 หลักแล้วกด &quot;ตรวจสอบ&quot; — หากมีข้อมูลในระบบจะดึงชื่อให้อัตโนมัติ
                     หากยังไม่มีบัญชี ให้กรอกชื่อ-สกุลและอีเมล
                   </p>
@@ -690,11 +686,7 @@ function ReportPageContent() {
                           type="button"
                           variant="outline"
                           onClick={() => reporterAvatarRef.current?.click()}
-                          className={`relative flex h-28 w-28 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-dashed p-0 transition-colors min-h-[112px] min-w-[112px] ${
-                            isDark
-                              ? 'border-white/15 bg-slate-900/50 hover:border-blue-400/40'
-                              : 'border-slate-300 bg-slate-50 hover:border-blue-400'
-                          }`}
+                          className={`relative flex h-28 w-28 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-dashed p-0 transition-colors min-h-[112px] min-w-[112px] border-[var(--glass-card-border)] bg-[var(--glass-input-bg)] hover:border-blue-400/40`}
                           aria-label="เลือกรูปโปรไฟล์ผู้แจ้ง"
                         >
                           <ManagedImageFrame
@@ -703,7 +695,7 @@ function ReportPageContent() {
                             sizes={MANAGED_IMAGE_SIZES.avatar3xl}
                             frameClassName="absolute inset-0"
                             imageClassName="h-full w-full object-cover"
-                            fallback={<UserCircle className="h-14 w-14 text-slate-500" aria-hidden="true" />}
+                            fallback={<UserCircle className="h-14 w-14 glass-subtle-text" aria-hidden="true" />}
                           />
                         </Button>
                         <input
@@ -728,11 +720,7 @@ function ReportPageContent() {
                           className={cn(
                             inputClass,
                             "min-h-11 h-auto",
-                            isUserFound
-                              ? isDark
-                                ? "cursor-not-allowed border-white/5 bg-slate-800/30 text-slate-500 opacity-60"
-                                : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500 shadow-inner focus:ring-0"
-                              : "",
+                            isUserFound ? "cursor-not-allowed opacity-60" : "",
                           )}
                           value={form.reporterName}
                           onChange={(e) => setForm({ ...form, reporterName: e.target.value })}
@@ -755,9 +743,7 @@ function ReportPageContent() {
                             inputClass,
                             "min-h-11 h-auto",
                             isUserFound && !!form.reporterEmail.trim()
-                              ? isDark
-                                ? "cursor-not-allowed border-white/5 bg-slate-800/30 text-slate-500 opacity-60"
-                                : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500 shadow-inner focus:ring-0"
+                              ? "cursor-not-allowed opacity-60"
                               : "",
                             reporterEmailError ? "border-red-500/60 focus:ring-red-500/20" : "",
                           )}
@@ -769,7 +755,7 @@ function ReportPageContent() {
                           onBlur={() => void validateReporterEmailOnBlur()}
                         />
                         {emailChecking && (
-                          <p className="text-xs text-slate-500 mt-1.5" aria-live="polite">
+                          <p className="text-xs glass-subtle-text mt-1.5" aria-live="polite">
                             กำลังตรวจสอบอีเมลซ้ำ…
                           </p>
                         )}
@@ -781,7 +767,7 @@ function ReportPageContent() {
                       </div>
                       <div className="md:col-span-2">
                         <Label className={labelClass}>
-                          ตำแหน่ง <span className="text-slate-400 font-normal text-xs ml-1">(ถ้ามี)</span>
+                          ตำแหน่ง <span className="glass-subtle-text font-normal text-xs ml-1">(ถ้ามี)</span>
                         </Label>
                         <Input
                           type="text"
@@ -791,11 +777,7 @@ function ReportPageContent() {
                           className={cn(
                             inputClass,
                             "min-h-11 h-auto",
-                            isUserFound
-                              ? isDark
-                                ? "cursor-not-allowed border-white/5 bg-slate-800/30 text-slate-500 opacity-60"
-                                : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500 shadow-inner focus:ring-0"
-                              : "",
+                            isUserFound ? "cursor-not-allowed opacity-60" : "",
                           )}
                           value={form.reporterPosition}
                           onChange={(e) =>
@@ -880,9 +862,9 @@ function ReportPageContent() {
               </Label>
               <p
                 id="report-description-hint"
-                className="text-xs text-slate-500 leading-relaxed mb-2 max-w-3xl"
+                className="text-xs glass-subtle-text leading-relaxed mb-2 max-w-3xl"
               >
-                ระบบจะรับเมื่อมีอย่างน้อย <span className="text-slate-400 font-medium">10 ตัวอักษร</span>
+                ระบบจะรับเมื่อมีอย่างน้อย <span className="glass-muted-text font-medium">10 ตัวอักษร</span>
                 &nbsp;กรุณาเขียนให้ครบอย่างน้อยหนึ่งประโยค เช่น อาการที่เห็น (เสียง ภาพ ไฟ ฯลฯ) จุดที่เกิด
                 (ห้อง/ชั้น/อุปกรณ์) เวลาที่พบ หรือความถี่ของปัญหา
               </p>
@@ -906,21 +888,21 @@ function ReportPageContent() {
               <Camera size={18} className={headerIconClass} />
               <div className="flex flex-col">
                  <h2 className={headerTitleClass}>รูปภาพประกอบ</h2>
-                 <p className="text-xs text-slate-500 font-normal">ถ่ายรูปจุดที่เกิดปัญหา (บังคับ 2 รูปแรก)</p>
+                 <p className="text-xs glass-subtle-text font-normal">ถ่ายรูปจุดที่เกิดปัญหา (บังคับ 2 รูปแรก)</p>
               </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
               {[0, 1, 2].map(i => (
                 <div key={i} className="flex flex-col group">
-                  <p className={`text-xs mb-1.5 font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <p className={`text-xs mb-1.5 font-medium glass-muted-text`}>
                     รูปที่ {i + 1} {i < 2 && <span className="text-red-500">*</span>}
                   </p>
                     <div
                       onClick={() => fileRefs[i].current?.click()}
-                      className={`relative aspect-square rounded-2xl border-2 border-dashed flex flex-col items-center justify-center overflow-hidden transition-all duration-200 cursor-pointer group ${isDark ? 'hover:border-blue-400/50' : 'hover:border-blue-400'}`}
+                      className={`relative aspect-square rounded-2xl border-2 border-dashed flex flex-col items-center justify-center overflow-hidden transition-all duration-200 cursor-pointer group hover:border-blue-400/50`}
                     style={{ 
-                      borderColor: previews[i] ? 'transparent' : (isDark ? 'rgba(255,255,255,0.15)' : '#cbd5e1'), 
-                      background: previews[i] ? 'transparent' : (isDark ? 'rgba(30,41,59,0.3)' : '#f8fafc') 
+                      borderColor: previews[i] ? 'transparent' : undefined, 
+                      background: previews[i] ? 'transparent' : 'var(--glass-input-bg)' 
                     }}
                     role="button"
                       tabIndex={0}
@@ -933,7 +915,7 @@ function ReportPageContent() {
                     }}
                   >
                     {!previews[i] && (
-                        <div className={`absolute inset-0 transition-colors ${isDark ? 'group-hover:bg-blue-400/10' : 'group-hover:bg-blue-50/50'}`} />
+                        <div className="absolute inset-0 transition-colors group-hover:bg-blue-400/10" />
                     )}
                     {previews[i] ? (
                       <>
@@ -949,7 +931,7 @@ function ReportPageContent() {
                         </div>
                       </>
                     ) : (
-                      <div className={`flex flex-col items-center gap-1.5 z-10 transition-colors ${isDark ? 'text-slate-500 group-hover:text-blue-400/80' : 'text-slate-400 group-hover:text-blue-500'}`}>
+                      <div className="flex flex-col items-center gap-1.5 z-10 transition-colors glass-subtle-text group-hover:text-blue-500">
                          <Camera size={24} />
                          <span className="text-[10px] font-medium uppercase tracking-wider">Upload</span>
                       </div>
@@ -1006,10 +988,10 @@ function ReportPageContent() {
       <DashboardLayoutShell>
         <div className="animate-fade-up w-full min-w-0 space-y-6">
           <div className="min-w-0">
-            <h1 className="text-lg sm:text-xl font-bold truncate text-white">
+            <h1 className="text-lg sm:text-xl font-bold truncate glass-text">
               แจ้งปัญหาจากผู้ใช้งาน
             </h1>
-            <p className="text-sm mt-0.5 text-slate-400">
+            <p className="text-sm mt-0.5 glass-muted-text">
               สำหรับเจ้าหน้าที่บันทึกการแจ้งซ่อมแทนผู้ใช้งาน / ตรวจสอบข้อมูลก่อนสร้างใบงาน
             </p>
           </div>

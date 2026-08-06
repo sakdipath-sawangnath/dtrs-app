@@ -49,6 +49,24 @@ npm install
 
 ---
 
+## [0.1.0] - 2026-08-06
+
+### Added
+
+- Frontend: สลับ Dark/Light จาก SiteHeader (`next-themes`, storage key `dtrs-theme`, ค่าเริ่มต้น Dark) พร้อม `--glass-*` tokens และ utilities
+- Print (`/print/*`): บังคับโทนสว่างผ่าน `PrintThemeShell` โดยไม่ซ้อน ThemeProvider กับ root
+
+### Fixed
+
+- Light mode: contrast ข้อความตาราง/ฟิลเตอร์/การ์ดบน JobsList (`/dashboard/all` และหน้าที่เกี่ยวข้อง) และ `/dashboard/sites`
+- Light mode: ปรับ badge/สถานะและพื้นผิว dashboard (roles, stat cards, toast ตาม theme) ให้อ่านได้บนพื้นขาว
+
+### Changed
+
+- Sync docs มาตรฐาน UI: `README.md`, `STATUS.md`, `TASK.md`, `PLAN.md`, `docs/README.md`, `frontend/README.md`, `AGENTS.md` — Glassmorphism Dark default + Light toggle
+
+---
+
 ## [0.0.1] - 2026-08-06
 
 ### Added

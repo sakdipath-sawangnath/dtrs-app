@@ -1,19 +1,20 @@
-# Frontend - ระบบแจ้งซ่อม CCTV
+# Frontend - ระบบแจ้งซ่อม
 
 Next.js 15 (App Router) สำหรับระบบแจ้งปัญหาและจัดการการซ่อมบำรุง CCTV
 
 ## Tech Stack
 
 - **Framework:** Next.js 15 (App Router)
-- **UI:** Tailwind CSS, Lucide React, recharts
+- **UI:** Tailwind CSS, Lucide React, recharts, **next-themes** (Dark/Light toggle)
 - **Auth:** NextAuth.js (Credentials + JWT จาก Backend)
 - **HTTP:** Axios; แจ้งเตือน: SweetAlert2 (Toast ผ่าน `@/lib/toast`)
 
 ## โครงสร้างหลัก
 
 - `src/app/` — หน้าและ layout (report, status, login, dashboard)
-- `src/components/` — SiteHeader, SiteFooter, PublicLayoutShell, DashboardPageShell, DashboardFilterBar, **`CrudModal`** (portal → `document.body`, **`z-100`**, Dark Glass, พร็อพ `size` md/lg — ใช้ที่ `/dashboard/users`, `/dashboard/roles` ฯลฯ), UserMenuDropdown, SegmentedTabs, JobsList (ตารางงาน + แท็บสัญญา/นอกสัญญา **ไม่ห่อ glass ชั้นนอก** + badge งานค้าง + modal อัปเดตการแก้ไขแบบ Dark Glass + ดูรายละเอียด full page `/dashboard/jobs/:id` + มอบหมายงาน react-select / รับงาน — ปุ่มมอบหมายและย้ายนอกสัญญาอิงสิทธิ์ **`job.assign`** จาก `/roles/me/permissions`; ลบงาน PENDING ไม่มอบหมายอิง **`job.deleteUnassigned`**; รองรับ `assignedToMe` สำหรับงานที่รับผิดชอบ; ลบงาน IN_PROGRESS ที่หน้า `/dashboard/in-progress` อิง **`job.deleteInProgress`**)
-- `src/app/globals.css` — class **`form-input-glass`** สำหรับ input/textarea บนพื้นหลังแดชบอร์ดเข้ม (แยกจาก `.form-input` ที่ใช้บนฟอร์มสว่าง)
+- `src/components/` — SiteHeader (**ThemeToggle** Sun/Moon), SiteFooter, PublicLayoutShell, DashboardPageShell, DashboardFilterBar, **`CrudModal`** (portal → `document.body`, **`z-100`**, Glass theme-aware, พร็อพ `size` md/lg — ใช้ที่ `/dashboard/users`, `/dashboard/roles` ฯลฯ), UserMenuDropdown, SegmentedTabs, JobsList (ตารางงาน + แท็บสัญญา/นอกสัญญา **ไม่ห่อ glass ชั้นนอก** + badge งานค้าง + modal อัปเดตการแก้ไขแบบ Glass + ดูรายละเอียด full page `/dashboard/jobs/:id` + มอบหมายงาน react-select / รับงาน — ปุ่มมอบหมายและย้ายนอกสัญญาอิงสิทธิ์ **`job.assign`** จาก `/roles/me/permissions`; ลบงาน PENDING ไม่มอบหมายอิง **`job.deleteUnassigned`**; รองรับ `assignedToMe` สำหรับงานที่รับผิดชอบ; ลบงาน IN_PROGRESS ที่หน้า `/dashboard/in-progress` อิง **`job.deleteInProgress`**)
+- `src/app/globals.css` — **`--glass-*` tokens** + utilities (`.glass-page`, `.glass-card`, `.glass-text`) และ class **`form-input-glass`** (อ่าน `--glass-input-*` ทั้ง Dark/Light; แยกจาก `.form-input` legacy)
+- `src/lib/useAppTheme.ts` — hook อ่าน theme จาก `next-themes` (มี `mounted` guard สำหรับ hydration)
 - `src/lib/` — auth.ts (NextAuth; รูปผู้ใช้ใน session ใช้ path **`/user-images/:id`** เมื่อมีรูปในระบบ), toast.ts, **apiResponse.ts**, **`jobImageProxy.ts`** + route **`/job-images/...`**, **`userImageProxy.ts`** + route **`/user-images/[userId]`**, **`dashboardJobImageUrl.ts`** — helper path รูปงานสำหรับ `<img>` บนแดชบอร์ด
 
 ### Flow สำคัญ
@@ -79,9 +80,17 @@ npm run dev
 
 PRD/Docker: ดูคอมเมนต์ใน [`.env.example`](.env.example) และ [../docs/DTRS-Migration-Checklist.md](../docs/DTRS-Migration-Checklist.md)
 
+## Theme (Dark / Light)
+
+- สลับโหมดจากไอคอน **Sun/Moon** ใน `SiteHeader` (ทุกหน้า)
+- ค่าเริ่มต้น: **Dark**; เก็บใน `localStorage` key **`dtrs-theme`**
+- Implementation: [`next-themes`](https://github.com/pacocoursey/next-themes) + CSS variables `--glass-*` ใน [`src/app/globals.css`](src/app/globals.css)
+- Hook: [`src/lib/useAppTheme.ts`](src/lib/useAppTheme.ts) (`isDark`, `theme`, `mounted`) — ใช้เมื่อต้องการค่า theme ใน JS (เช่น react-select); UI ส่วนใหญ่พึ่ง CSS tokens / `dark:` classes
+- **ข้อยกเว้น:** `/print/jobs/*` บังคับ light เสมอผ่าน [`PrintThemeShell`](src/components/PrintThemeShell.tsx) (class `.light` บน subtree — **ไม่**ซ้อน `ThemeProvider`)
+- **Contrast:** ใน light mode หลีกเลี่ยง `text-slate-100/200/300` หรือ `border-white/10` แบบไม่มีคู่ `dark:`; ใช้ `text-slate-900 dark:text-slate-100` (หรือ glass utilities ที่อ่านได้บนพื้นขาว)
 ## เอกสารเพิ่มเติม
 
 - สถานะโปรเจกต์และ API: root [STATUS.md](../STATUS.md), [README.md](../README.md) (ดัชนีเอกสาร)
-- Private MinIO + proxy รูป: [../docs/Project-Plan-Private-MinIO-Images.md](../docs/Project-Plan-Private-MinIO-Images.md), [../minio.md](../minio.md)
+- Private MinIO + proxy รูป: [../docs/Project-Plan-Private-MinIO-Images.md](../docs/Project-Plan-Private-MinIO-Images.md), [../docs/minio.md](../docs/minio.md)
 - Reverse proxy (NPM): [../backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md](../backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md)
 - ดัชนีโฟลเดอร์ `docs/`: [../docs/README.md](../docs/README.md)

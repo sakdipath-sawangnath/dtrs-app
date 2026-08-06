@@ -1,12 +1,12 @@
-# แผนปรับปรุงระบบแจ้งซ่อม CCTV
+# แผนปรับปรุงระบบแจ้งซ่อม
 
-**อัปเดต:** 2026-03-28 (ส่วน 4.10 — Private MinIO implement แล้ว)
+**อัปเดต:** 2026-08-06 (ส่วน 4.12 — Frontend Light/Dark theme)
 
 ---
 
 ## 1. บริบทจากเอกสาร Project
 
-- **ดัชนีเอกสารใน `docs/`**: [`docs/README.md`](docs/README.md) · ตัวแปร MinIO: [`minio.md`](minio.md)
+- **ดัชนีเอกสารใน `docs/`**: [`docs/README.md`](docs/README.md) · ตัวแปร MinIO: [`docs/minio.md`](docs/minio.md) · Variables: [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md)
 - **TASK.md / STATUS.md**: ระบบย้ายจาก AppSheet มา Next.js + NestJS แล้ว Phase 2–3 เสร็จ
 - **ข้อมูลพื้นที่**: Backend มีตาราง `Site` (จังหวัด, อำเภอ, หน่วยงาน) และ `Area` (อำเภอ, Site Engineer); การสร้าง Job ตรวจสอบ Site ก่อน (existsByLocation)
 - **Seed Script**: `backend/scripts/seed-from-excel.ts` (Excel), `backend/scripts/seed-from-csv.ts` (CSV), `backend/scripts/seed-admin.ts` (สร้าง admin ครั้งแรก)
@@ -22,7 +22,7 @@
 | **Seed – Areas** | `Area` (district, staffId) | Sheet **"พื้นที่ รับผิดชอบ"** (ในโค้ดใช้ชื่อ **"พื้นที่ รับผิชอบ"** — ตรวจสอบชื่อชีทจริงในไฟล์ Excel) |
 
 **ข้อควรทำ**
-- วางไฟล์ **`ระบบแจ้งซ่อม CCTV .xlsx`** ที่ root โปรเจกต์ (เช่น `d:\dtrs-app\`) เพื่อให้ seed script อ่านได้
+- วางไฟล์ **`ระบบแจ้งซ่อม .xlsx`** ที่ root โปรเจกต์ (เช่น `d:\dtrs-app\`) เพื่อให้ seed script อ่านได้
 - ให้ชื่อ Sheet ใน Excel ตรงกับที่ seed ใช้:
   - **"พื้นที่ ในโครงการ"** → Sites (จังหวัด, อำเภอ, หน่วยงาน)
   - **"พื้นที่ รับผิชอบ"** หรือ **"พื้นที่ รับผิดชอบ"** → Areas (อำเภอ, Site Engineer, เบอร์ติดต่อ)
@@ -178,13 +178,24 @@
 - [x] Remote GitLab `FORTH/dtrs-app`; แยกชื่อ container/image/network จาก `cctv-app_ticket`; CI ไม่ลบ container เก่า
 - [x] `backend/.env.example`, `frontend/.env.example`; local env → DB `dtrs_app`, MinIO `dtrs-app`, `API_INTERNAL_BASE_URL` สำหรับ dev
 - [x] ทดสอบ npm dev — backend `:4100`, frontend `:3000`
-- [ ] GitLab Variables + NPM (`dtrs-app.forth.co.th` → 8404/8405) + deploy ครั้งแรก
+- [x] GitLab Variables กลุ่ม A scope **`staging`** (UAT) ✅ · กลุ่ม B MinIO ✅
+- [ ] โฟกัส UAT: migrate DB + push `staging` + manual deploy `.115`
+- [ ] ⏸️ **pending:** Variables **`production`** กลุ่ม A · NPM · deploy PRD
+
+## 4.12 Frontend Light / Dark theme (2026-08-06)
+
+- [x] **`next-themes`** — `ThemeProvider` ใน `Providers`, `storageKey` `dtrs-theme`, default **dark**, ไม่ใช้ system preference
+- [x] **`--glass-*` tokens** + utilities (`.glass-page`, `.glass-card`, `.glass-text`, `.light` subtree) ใน `globals.css`; `form-input-glass` / `select-native-glass`
+- [x] **`ThemeToggle`** ใน `SiteHeader`; hook `useAppTheme` (hydration-safe)
+- [x] **Print isolate** — `PrintThemeShell` บังคับ light โดยไม่ซ้อน ThemeProvider กับ root
+- [x] **Contrast light mode** — JobsList / sites / roles / status badges / toast ตาม theme
+- [x] **เอกสาร** — `CHANGELOG.md`, `README.md`, `STATUS.md`, `TASK.md`, `PLAN.md`, `docs/README.md`, `frontend/README.md`, `AGENTS.md`
 
 ---
 
 ## 5. หมายเหตุการตรวจสอบ Excel / CSV
 
-- **Excel:** เปิดไฟล์ `ระบบแจ้งซ่อม CCTV .xlsx` แล้วตรวจสอบชื่อ Tab แต่ละ Sheet  
+- **Excel:** เปิดไฟล์ `ระบบแจ้งซ่อม .xlsx` แล้วตรวจสอบชื่อ Tab แต่ละ Sheet  
   ถ้า Sheet พื้นที่รับผิดชอบชื่อ **"พื้นที่ รับผิดชอบ"** (สะกดถูก) ให้แก้ใน `seed-from-excel.ts` บรรทัดที่อ่าน Area จาก `'พื้นที่ รับผิชอบ'` เป็น `'พื้นที่ รับผิดชอบ'`
 - **CSV:** ถ้าใช้ไฟล์ CSV จากโปรเจกต์ root ให้ดูการเทียบโครงสร้างใน **`docs/CSV-vs-System-Mapping.md`** และรัน seed จาก CSV:
   ```bash

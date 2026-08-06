@@ -152,7 +152,7 @@ If none: *"None — the fix is sufficient and no class-of-bug follow-up is warra
 >
 > **Symptom.** `/dashboard/jobs/[id]` โหลดรูปไม่ขึ้น. Network: `GET /job-images/:jobId/before/0` → 502. Nest upstream `GET /api/jobs/:id/image/before/0` ก็ 502. Local `:3000`+`:4100` ผ่าน. `ticketNo` / `jobId` ใน repro (redacted).
 >
-> **Root cause.** [`frontend/src/app/api/job-images/[id]/[kind]/[index]/route.ts`](../../../../frontend/src/app/api/job-images/[id]/[kind]/[index]/route.ts) และ Nest image handler ใช้ public MinIO base สำหรับ server-side GET. บน PRD ค่า `MINIO_PUBLIC_URL` ชี้ endpoint ที่ container/host นี้ route ไม่ถึง (LAN / hairpin). ไม่มี `MINIO_SERVER_FETCH_BASE_URL`. ดู [`docs/Project-Plan-Private-MinIO-Images.md`](../../../../docs/Project-Plan-Private-MinIO-Images.md), [`minio.md`](../../../../minio.md).
+> **Root cause.** [`frontend/src/app/api/job-images/[id]/[kind]/[index]/route.ts`](../../../../frontend/src/app/api/job-images/[id]/[kind]/[index]/route.ts) และ Nest image handler ใช้ public MinIO base สำหรับ server-side GET. บน PRD ค่า `MINIO_PUBLIC_URL` ชี้ endpoint ที่ container/host นี้ route ไม่ถึง (LAN / hairpin). ไม่มี `MINIO_SERVER_FETCH_BASE_URL`. ดู [`docs/Project-Plan-Private-MinIO-Images.md`](../../../../docs/Project-Plan-Private-MinIO-Images.md), [`minio.md`](../../../../docs/minio.md).
 >
 > **Why it produced the symptom.** Browser เรียก Next proxy (`/job-images/...` ไม่ได้อยู่ใต้ `/api`) → Next เรียก Nest → Nest/MinIO client GET object ล้ม → 502 กลับทั้งสาย. Local MinIO อยู่บนเครือข่ายเดียวกันจึงไม่โผล่.
 >
@@ -199,7 +199,7 @@ If none: *"None — the fix is sufficient and no class-of-bug follow-up is warra
 - ปลายทางไฟล์: [`docs/postmortems/`](../../../../docs/postmortems/)
 - RBAC: [`docs/RBAC-Setup.md`](../../docs/RBAC-Setup.md)
 - API / Postman: [`docs/api-endpoints.json`](../../docs/api-endpoints.json), [`postman/README.md`](../../postman/README.md)
-- MinIO: [`minio.md`](../../../../minio.md), [`docs/Project-Plan-Private-MinIO-Images.md`](../../../../docs/Project-Plan-Private-MinIO-Images.md)
+- MinIO: [`minio.md`](../../../../docs/minio.md), [`docs/Project-Plan-Private-MinIO-Images.md`](../../../../docs/Project-Plan-Private-MinIO-Images.md)
 - อีเมล: [`docs/Email-Notifications.md`](../../../../docs/Email-Notifications.md)
 - Reverse proxy: [`docs/Reverse-Proxy-Nginx-Proxy-Manager.md`](../../docs/Reverse-Proxy-Nginx-Proxy-Manager.md)
 - CI: [`.gitlab-ci.yml`](../../../../.gitlab-ci.yml), [`docs/GitLab-CI-Plan.md`](../../../../docs/GitLab-CI-Plan.md)

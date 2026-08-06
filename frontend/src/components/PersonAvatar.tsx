@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { User } from "lucide-react";
 import ManagedImageFrame from "@/components/ManagedImageFrame";
 import { MANAGED_IMAGE_SIZES } from "@/components/ManagedImage";
+import { useAppTheme } from "@/lib/useAppTheme";
 
 /** วงกลมรูปโปรไฟล์ / fallback ไอคอน — ใช้ใน JobsList, หน้ารายละเอียดงาน */
 export default function PersonAvatar({
@@ -12,7 +13,7 @@ export default function PersonAvatar({
   avatarUserId,
   nameLabel,
   size = "sm",
-  variant = "dark",
+  variant,
 }: {
   imageUrl?: string | null;
   avatarUserId?: number | null;
@@ -20,6 +21,7 @@ export default function PersonAvatar({
   size?: "sm" | "md";
   variant?: "dark" | "light";
 }) {
+  const { isDark, mounted } = useAppTheme();
   const [imgErr, setImgErr] = useState(false);
   const trimmed = imageUrl?.trim();
   const proxySrc =
@@ -34,13 +36,15 @@ export default function PersonAvatar({
     setImgErr(false);
   }, [proxySrc, legacySrc]);
 
+  const resolvedVariant = variant ?? (mounted && !isDark ? "light" : "dark");
+
   const dim = size === "md" ? "h-10 w-10" : "h-8 w-8";
   const iconSz = size === "md" ? 18 : 16;
   const shell =
-    variant === "light"
+    resolvedVariant === "light"
       ? "border border-slate-200 bg-slate-100 ring-1 ring-slate-200/60"
-      : "border border-white/10 bg-slate-800/80 ring-1 ring-white/5";
-  const iconCls = variant === "light" ? "text-slate-400" : "text-slate-500";
+      : "border border-[var(--glass-card-border)] bg-[var(--glass-input-bg)] ring-1 ring-[var(--glass-card-border)]";
+  const iconCls = resolvedVariant === "light" ? "text-slate-400" : "glass-subtle-text";
   return (
     <ManagedImageFrame
       src={showImg && url ? url : null}
