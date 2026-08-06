@@ -140,10 +140,10 @@ flowchart TD
 | `build:frontend` | build | `staging`, `main`, `master` | ไม่ | ขยายจาก PRD-only ปัจจุบัน |
 | `build:backend` | build | `staging`, `main`, `master` | ไม่ | ขยายจาก PRD-only ปัจจุบัน |
 | `deploy:summary` | deploy | ทั้งสองกลุ่ม branch | ไม่ | รายงานสั้น ๆ (optional) |
-| `docker_build:uat` | deploy_docker | `staging` | **ไม่** | build 2 images บน `.115` — **auto** (grilling #5) |
+| `docker_build:uat` | deploy_docker | `staging` | **ใช่** | build 2 images บน `.115` — **manual** |
 | `deploy:uat:docker` | deploy_docker | `staging` | **ใช่** | `docker run` บน `.115` — **manual** · extends **`.deploy_ssh_and_validate`** · ตรวจ container Running หลัง sleep 5s |
-| `docker_build:prd` | deploy_docker | `main`, `master` | ไม่ | build 2 images บน `.115` |
-| `transfer:prd:images` | deploy_docker | `main`, `master` | ไม่ | `docker save` ×2 → scp → **`DOCKER_HOST_PRD` + `docker load`** บน `.128` · verify images ด้วย `export DOCKER_HOST` |
+| `docker_build:prd` | deploy_docker | `main`, `master` | **ใช่** | build 2 images บน `.115` — **manual** |
+| `transfer:prd:images` | deploy_docker | `main`, `master` | **ใช่** | `docker save` ×2 → scp → **`DOCKER_HOST_PRD` + `docker load`** บน `.128` · verify images ด้วย `export DOCKER_HOST` — **manual** |
 | `deploy:prd:docker` | deploy_docker | `main`, `master` | **ใช่** | `docker run` บน `.128` — **manual** · extends **`.deploy_ssh_and_validate`** · ตรวจ container Running |
 | `cleanup:docker:uat` | cleanup | `staging` | ใช่ | `needs: docker_build:uat` — ไม่ต้องรอ manual deploy |
 | `cleanup:docker:prd` | cleanup | `main`, `master` | ใช่ | `needs: transfer:prd:images` |
@@ -244,7 +244,7 @@ Runner (.115, DOCKER_HOST=115:2375)
 - [x] **PRD image transfer** build `.115` → deploy `.128`
 - [x] **คง `docker run`** (ไม่ใช้ docker compose แบบ EAS)
 
-- [x] **`docker_build:uat` auto** + **`deploy:uat:docker` manual** (grilling #5)
+- [x] **`docker_build:uat` / `deploy:uat:docker` / PRD build+transfer — manual ทั้ง stage `deploy_docker`** (ปรับ 2026-08-06; เดิม grilling #5 เป็น build auto)
 - [x] **Test gate:** frontend lint + backend eslint (ห้าม `--fix`) + `npm test` — fail หยุด pipeline (grilling #6)
 
 - [x] **Deploy env validation** — `.deploy_ssh_and_validate` ก่อน manual deploy (2026-08-05)
@@ -269,7 +269,7 @@ Runner (.115, DOCKER_HOST=115:2375)
 | 2 | SSH key | **`SSH_PRIVATE_KEY`** ชื่อเดียว — **แยกค่าด้วย GitLab environment scope** (`staging` / `production`) |
 | 3 | Database | **UAT:** `192.168.0.11` / `dtrs_app` · **PRD:** `192.168.0.126` / `dtrs_app` |
 | 4 | MinIO bucket | **UAT:** `dtrs-app-uat` · **PRD:** `dtrs-app` (⏸️ รอ infra สร้าง) |
-| 5 | `docker_build:uat` | **Auto** หลัง test+build · **deploy manual** |
+| 5 | `docker_build:uat` | **Manual** ทั้ง `docker_build` + deploy (stage `deploy_docker`) |
 | 6 | Test stage | **`test:frontend`** = lint · **`test:backend`** = prisma generate + **eslint (ห้าม `--fix`)** + jest · **fail = pipeline หยุด** |
 
 ---

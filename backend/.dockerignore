@@ -5,5 +5,10 @@ dist
 !.env.example
 *.log
 coverage
+.agents
+scripts
+test
 **/*.md
 !prisma/**/*.md
+.git
+postman

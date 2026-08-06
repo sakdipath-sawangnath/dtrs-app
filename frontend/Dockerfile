@@ -1,5 +1,10 @@
 # Next.js — production (พอร์ตภายใน 3000)
 # build-arg NEXT_PUBLIC_API_BASE_URL ต้องเป็น URL ที่เบราว์เซอร์เรียก API ได้
+#
+# Targets:
+#   runner     — default (stage สุดท้าย); build ภายใน Docker (docker compose / local)
+#   ci-runner  — copy artifacts จาก CI (build:frontend) โดยไม่ rebuild
+
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:4100/api
@@ -8,7 +13,24 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY package*.json ./
 RUN npm ci
 COPY . .
-RUN npm run build && npm prune --omit=dev
+RUN npm run build
+
+# CI: ใช้เมื่อ build:frontend ส่ง .next/standalone มาแล้ว
+FROM node:20-bookworm-slim AS ci-runner
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends dumb-init \
+  && rm -rf /var/lib/apt/lists/*
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
+USER node
+COPY --chown=node:node .next/standalone ./
+COPY --chown=node:node .next/static ./.next/static
+COPY --chown=node:node public ./public
+EXPOSE 3000
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "server.js"]
 
 FROM node:20-bookworm-slim AS runner
 WORKDIR /app
@@ -16,15 +38,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends dumb-init \
   && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/package-lock.json ./package-lock.json
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/next.config.mjs ./next.config.mjs
-# รันเป็น non-root (image node มีผู้ใช้ `node` uid 1000)
-RUN chown -R node:node /app
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
 USER node
+COPY --from=builder --chown=node:node /app/.next/standalone ./
+COPY --from=builder --chown=node:node /app/.next/static ./.next/static
+COPY --from=builder --chown=node:node /app/public ./public
 EXPOSE 3000
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["./node_modules/.bin/next", "start", "-H", "0.0.0.0", "-p", "3000"]
+CMD ["node", "server.js"]

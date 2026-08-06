@@ -54,6 +54,10 @@ variables:
 
   CLEANUP_KEEP_IMAGES: "2"
 
+  # TC-CI-02 image size gate (MB) — ปรับได้เมื่อ optimize image ต่อ
+  FRONTEND_IMAGE_MAX_MB: "500"
+  BACKEND_IMAGE_MAX_MB: "1126"
+
 # --- Reusable templates ---
 
 .runner_docker:
@@ -116,6 +120,50 @@ variables:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
 
+.docker_build_ci_runner:
+  image: docker:latest
+  script:
+    - |
+      if [ -z "$NEXT_PUBLIC_API_BASE_URL" ]; then
+        echo "ERROR: NEXT_PUBLIC_API_BASE_URL is empty (required build-arg, check CI/CD Variables + scope)"
+        exit 1
+      fi
+    - export DOCKER_HOST="$DOCKER_HOST_BUILD"
+    - sh scripts/docker-artifact-gate.sh .
+    - docker build --target ci-runner -t "$IMAGE_BACKEND" -f backend/Dockerfile ./backend
+    - docker tag "$IMAGE_BACKEND" "$TAG_BACKEND_LATEST"
+    - docker tag "$IMAGE_BACKEND" "$TAG_BACKEND_ALT"
+    - |
+      if [ -n "${TAG_BACKEND_EXTRA:-}" ]; then
+        docker tag "$IMAGE_BACKEND" "$TAG_BACKEND_EXTRA"
+      fi
+    - sh scripts/docker-image-size-gate.sh "$IMAGE_BACKEND" "$BACKEND_IMAGE_MAX_MB" "backend"
+    - docker build --target ci-runner -t "$IMAGE_FRONTEND" -f frontend/Dockerfile ./frontend
+    - docker tag "$IMAGE_FRONTEND" "$TAG_FRONTEND_LATEST"
+    - docker tag "$IMAGE_FRONTEND" "$TAG_FRONTEND_ALT"
+    - |
+      if [ -n "${TAG_FRONTEND_EXTRA:-}" ]; then
+        docker tag "$IMAGE_FRONTEND" "$TAG_FRONTEND_EXTRA"
+      fi
+    - sh scripts/docker-image-size-gate.sh "$IMAGE_FRONTEND" "$FRONTEND_IMAGE_MAX_MB" "frontend"
+    - docker images "${APP_IMAGE_BACKEND}"
+    - docker images "${APP_IMAGE_FRONTEND}"
+
+.smoke_deployed:
+  stage: deploy_docker
+  extends:
+    - .runner_docker
+  image: alpine:latest
+  script:
+    - apk add --no-cache curl bash
+    - export SMOKE_FRONTEND_URL="${SMOKE_FRONTEND_URL:-$FRONTEND_BASE_URL}"
+    - |
+      if [ -z "$SMOKE_FRONTEND_URL" ]; then
+        echo "ERROR: SMOKE_FRONTEND_URL / FRONTEND_BASE_URL is empty"
+        exit 1
+      fi
+    - sh scripts/docker-regression-smoke.sh
+
 # --- TEST ---
 
 test:frontend:
@@ -166,12 +214,18 @@ build:frontend:
     paths:
       - frontend/node_modules/
   script:
+    - |
+      if [ -z "$NEXT_PUBLIC_API_BASE_URL" ]; then
+        echo "ERROR: NEXT_PUBLIC_API_BASE_URL is empty (required at next build, check CI/CD Variables + scope)"
+        exit 1
+      fi
     - cd frontend
     - npm ci --prefer-offline --no-audit
     - npm run build
   artifacts:
     paths:
       - frontend/.next
+      - frontend/public
       - frontend/package.json
       - frontend/package-lock.json
     expire_in: 1 hour
@@ -193,9 +247,11 @@ build:backend:
     - npm ci --prefer-offline --no-audit
     - npx prisma generate
     - npm run build
+    - npm prune --omit=dev
   artifacts:
     paths:
       - backend/dist
+      - backend/node_modules
       - backend/package.json
       - backend/package-lock.json
       - backend/prisma
@@ -215,9 +271,9 @@ deploy:summary:
   script:
     - |
       if [ "$CI_COMMIT_BRANCH" = "staging" ]; then
-        echo "UAT: docker_build:uat (auto) → deploy:uat:docker (manual) บน ${DEPLOY_SERVER_UAT}"
+        echo "UAT: docker_build:uat (manual) → deploy:uat:docker (manual) → smoke:uat:docker (auto) บน ${DEPLOY_SERVER_UAT}"
       else
-        echo "PRD: docker_build:prd → transfer:prd:images → deploy:prd:docker (manual) บน ${DEPLOY_SERVER_PRD}"
+        echo "PRD: docker_build:prd (manual) → transfer:prd:images (manual) → deploy:prd:docker (manual) → smoke:prd:docker (auto) บน ${DEPLOY_SERVER_PRD}"
       fi
 
 # --- DOCKER BUILD: UAT ---
@@ -227,32 +283,21 @@ docker_build:uat:
   extends:
     - .runner_docker
     - .rules_staging
-  image: docker:latest
+    - .docker_build_ci_runner
   environment:
     name: staging
   needs:
     - job: build:frontend
     - job: build:backend
     - job: deploy:summary
-  script:
-    - |
-      if [ -z "$NEXT_PUBLIC_API_BASE_URL" ]; then
-        echo "ERROR: NEXT_PUBLIC_API_BASE_URL is empty (required build-arg, scope staging)"
-        exit 1
-      fi
-    - export DOCKER_HOST="$DOCKER_HOST_BUILD"
-    - IMAGE_BACKEND="${APP_IMAGE_BACKEND}:${IMAGE_TAG}-uat"
-    - IMAGE_FRONTEND="${APP_IMAGE_FRONTEND}:${IMAGE_TAG}-uat"
-    - docker build -t "$IMAGE_BACKEND" -f backend/Dockerfile ./backend
-    - docker tag "$IMAGE_BACKEND" "${APP_IMAGE_BACKEND}:uat-latest"
-    - docker tag "$IMAGE_BACKEND" "${APP_IMAGE_BACKEND}:latest-uat"
-    - |
-      docker build -t "$IMAGE_FRONTEND" -f frontend/Dockerfile ./frontend \
-        --build-arg NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL}"
-    - docker tag "$IMAGE_FRONTEND" "${APP_IMAGE_FRONTEND}:uat-latest"
-    - docker tag "$IMAGE_FRONTEND" "${APP_IMAGE_FRONTEND}:latest-uat"
-    - docker images "${APP_IMAGE_BACKEND}"
-    - docker images "${APP_IMAGE_FRONTEND}"
+  when: manual
+  variables:
+    IMAGE_BACKEND: "${APP_IMAGE_BACKEND}:${IMAGE_TAG}-uat"
+    IMAGE_FRONTEND: "${APP_IMAGE_FRONTEND}:${IMAGE_TAG}-uat"
+    TAG_BACKEND_LATEST: "${APP_IMAGE_BACKEND}:uat-latest"
+    TAG_BACKEND_ALT: "${APP_IMAGE_BACKEND}:latest-uat"
+    TAG_FRONTEND_LATEST: "${APP_IMAGE_FRONTEND}:uat-latest"
+    TAG_FRONTEND_ALT: "${APP_IMAGE_FRONTEND}:latest-uat"
 
 deploy:uat:docker:
   stage: deploy_docker
@@ -331,6 +376,16 @@ deploy:uat:docker:
       docker ps --filter name=dtrs-app-
       EOF
 
+smoke:uat:docker:
+  extends:
+    - .smoke_deployed
+    - .rules_staging
+  needs:
+    - job: deploy:uat:docker
+  environment:
+    name: staging
+    url: $FRONTEND_BASE_URL
+
 # --- DOCKER BUILD + TRANSFER: PRD ---
 
 docker_build:prd:
@@ -338,34 +393,23 @@ docker_build:prd:
   extends:
     - .runner_docker
     - .rules_prd
-  image: docker:latest
+    - .docker_build_ci_runner
   environment:
     name: production
   needs:
     - job: build:frontend
     - job: build:backend
     - job: deploy:summary
-  script:
-    - |
-      if [ -z "$NEXT_PUBLIC_API_BASE_URL" ]; then
-        echo "ERROR: NEXT_PUBLIC_API_BASE_URL is empty (required build-arg, scope production)"
-        exit 1
-      fi
-    - export DOCKER_HOST="$DOCKER_HOST_BUILD"
-    - IMAGE_BACKEND="${APP_IMAGE_BACKEND}:${IMAGE_TAG}-prd"
-    - IMAGE_FRONTEND="${APP_IMAGE_FRONTEND}:${IMAGE_TAG}-prd"
-    - docker build -t "$IMAGE_BACKEND" -f backend/Dockerfile ./backend
-    - docker tag "$IMAGE_BACKEND" "${APP_IMAGE_BACKEND}:prd"
-    - docker tag "$IMAGE_BACKEND" "${APP_IMAGE_BACKEND}:latest-prd"
-    - docker tag "$IMAGE_BACKEND" "${APP_IMAGE_BACKEND}:prd-latest"
-    - |
-      docker build -t "$IMAGE_FRONTEND" -f frontend/Dockerfile ./frontend \
-        --build-arg NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL}"
-    - docker tag "$IMAGE_FRONTEND" "${APP_IMAGE_FRONTEND}:prd"
-    - docker tag "$IMAGE_FRONTEND" "${APP_IMAGE_FRONTEND}:latest-prd"
-    - docker tag "$IMAGE_FRONTEND" "${APP_IMAGE_FRONTEND}:prd-latest"
-    - docker images "${APP_IMAGE_BACKEND}"
-    - docker images "${APP_IMAGE_FRONTEND}"
+  when: manual
+  variables:
+    IMAGE_BACKEND: "${APP_IMAGE_BACKEND}:${IMAGE_TAG}-prd"
+    IMAGE_FRONTEND: "${APP_IMAGE_FRONTEND}:${IMAGE_TAG}-prd"
+    TAG_BACKEND_LATEST: "${APP_IMAGE_BACKEND}:latest-prd"
+    TAG_BACKEND_ALT: "${APP_IMAGE_BACKEND}:prd-latest"
+    TAG_BACKEND_EXTRA: "${APP_IMAGE_BACKEND}:prd"
+    TAG_FRONTEND_LATEST: "${APP_IMAGE_FRONTEND}:latest-prd"
+    TAG_FRONTEND_ALT: "${APP_IMAGE_FRONTEND}:prd-latest"
+    TAG_FRONTEND_EXTRA: "${APP_IMAGE_FRONTEND}:prd"
 
 transfer:prd:images:
   stage: deploy_docker
@@ -380,6 +424,7 @@ transfer:prd:images:
     DOCKER_HOST_REMOTE: "$DOCKER_HOST_PRD"
   needs:
     - job: docker_build:prd
+  when: manual
   environment:
     name: production
   script:
@@ -487,6 +532,18 @@ deploy:prd:docker:
       done
       docker ps --filter name=dtrs-app-
       EOF
+
+smoke:prd:docker:
+  extends:
+    - .smoke_deployed
+    - .rules_prd
+  needs:
+    - job: deploy:prd:docker
+  variables:
+    SMOKE_BACKEND_URL: "${FRONTEND_BASE_URL}/api"
+  environment:
+    name: production
+    url: $FRONTEND_BASE_URL
 
 # --- CLEANUP ---
 

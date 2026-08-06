@@ -345,7 +345,7 @@
 - [x] **Deploy health check** — หลัง `docker run -d` ตรวจ Running + logs เมื่อ fail (UAT+PRD)
 - [x] **`transfer:prd:images` verify** — `export DOCKER_HOST` ทั้ง session ก่อน `docker images`
 - [x] **cleanup `needs`** — ไม่ติดคิวรอ manual deploy
-- [x] **`docker_build:uat`** auto · **`deploy:uat:docker`** manual
+- [x] **`docker_build:uat`** / **`deploy:uat:docker`** / PRD build+transfer+deploy — **manual ทั้ง stage `deploy_docker`** (2026-08-06)
 - [x] **`docker_build:prd`** → **`transfer:prd:images`** → **`deploy:prd:docker`** manual
 - [x] **`transfer:prd:images`** — `docker load` บน `.128` ผ่าน **`DOCKER_HOST_PRD`**
 - [x] **`.deploy_ssh_and_validate`** — ตรวจ `DATABASE_URL`, `JWT_SECRET`, `NEXTAUTH_*`, `FRONTEND_BASE_URL`, `ALLOWED_ORIGINS` ก่อน deploy

@@ -17,6 +17,10 @@
 !/docker/
 !/docker/**
 
+# CI / Docker smoke + size gates
+!/scripts/
+!/scripts/**
+
 # เอกสาร root (เช่น flow อีเมล, mapping CSV)
 !/docs/
 !/docs/**

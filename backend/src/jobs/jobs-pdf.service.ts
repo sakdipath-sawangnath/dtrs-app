@@ -6,13 +6,13 @@ import {
 } from '@nestjs/common';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
 import { PrismaService } from '../prisma/prisma.service';
 import type { DashboardSummaryPdfQueryDto } from './dto/create-job.dto';
 
 /**
  * ค้นหา Chrome / Edge ที่ติดตั้งในเครื่อง — แก้กรณี Puppeteer ยังไม่ได้รัน
- * `npx puppeteer browsers install chrome` (cache ว่าง)
+ * `npx @puppeteer/browsers install chrome` (cache ว่าง — local dev)
  *
  * ตั้งค่าได้: PUPPETEER_EXECUTABLE_PATH หรือ CHROME_BIN
  */
