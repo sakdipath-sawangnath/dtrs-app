@@ -4,7 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import type { CreateDistrictDto, CreateProvinceDto } from './dto/province-district.dto';
+import type {
+  CreateDistrictDto,
+  CreateProvinceDto,
+} from './dto/province-district.dto';
 
 @Injectable()
 export class LocationsService {

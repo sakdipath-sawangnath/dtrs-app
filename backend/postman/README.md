@@ -16,7 +16,7 @@
 
 | ตัวแปร | ค่าเริ่มต้น | คำอธิบาย |
 |--------|-------------|----------|
-| `baseUrl` | `http://localhost:4000/api` | URL ฐานของ API (เปลี่ยนตาม server) |
+| `baseUrl` | `http://localhost:4100/api` | URL ฐานของ API (เปลี่ยนตาม server) |
 | `jobId` | `1` | เลขงานสำหรับ request ในโฟลเดอร์ Jobs |
 | `access_token` | (ว่าง) | JWT ที่ได้จาก Login · ใส่หลังรัน request Login |
 

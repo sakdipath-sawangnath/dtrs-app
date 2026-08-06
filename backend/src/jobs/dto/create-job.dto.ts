@@ -15,7 +15,9 @@ function normalizeOptionalEmail(val: unknown): string {
   if (val === undefined || val === null) return '';
   if (Array.isArray(val)) {
     const nonEmpty = val
-      .map((v) => (v === undefined || v === null ? '' : collapseSpaces(String(v).trim())))
+      .map((v) =>
+        v === undefined || v === null ? '' : collapseSpaces(String(v).trim()),
+      )
       .filter((s) => s.length > 0);
     return nonEmpty.length ? nonEmpty[nonEmpty.length - 1] : '';
   }
@@ -26,10 +28,16 @@ export const CreateJobSchema = z.object({
   province: z.string().trim().min(1, 'กรุณาระบุจังหวัด'),
   district: z.string().trim().min(1, 'กรุณาระบุอำเภอ'),
   location: z.string().trim().min(1, 'กรุณาระบุสถานที่'),
-  description: z.string().trim().min(10, 'รายละเอียดต้องมีอย่างน้อย 10 ตัวอักษร'),
+  description: z
+    .string()
+    .trim()
+    .min(10, 'รายละเอียดต้องมีอย่างน้อย 10 ตัวอักษร'),
   title: z.string().trim().optional(),
   reporterName: z.string().trim().min(1, 'กรุณาระบุชื่อผู้แจ้ง'),
-  reporterPhone: z.string().trim().regex(/^[0-9]{9,10}$/, 'เบอร์โทรต้องเป็นตัวเลข 9-10 หลัก'),
+  reporterPhone: z
+    .string()
+    .trim()
+    .regex(/^[0-9]{9,10}$/, 'เบอร์โทรต้องเป็นตัวเลข 9-10 หลัก'),
   /**
    * multipart อาจส่ง '' / ไม่มีฟิลด์ / หรือซ้ำชื่อ → Multer ให้เป็น string[]
    * ห้ามใช้ String(array) ตรงๆ — เช่น ['', 'a@b.com'] กลายเป็น ',a@b.com' แล้ว email() fail
@@ -40,7 +48,10 @@ export const CreateJobSchema = z.object({
   ),
   /** ตำแหน่งงาน — เก็บที่ User ตอนสร้าง/อัปเดตผู้แจ้งจากหน้า public/report */
   reporterPosition: z
-    .preprocess((v) => (v === undefined || v === null ? '' : String(v).trim()), z.string().max(200, 'ตำแหน่งยาวเกินไป'))
+    .preprocess(
+      (v) => (v === undefined || v === null ? '' : String(v).trim()),
+      z.string().max(200, 'ตำแหน่งยาวเกินไป'),
+    )
     .optional(),
   isOutOfContract: z.any().optional(),
 });
@@ -49,7 +60,9 @@ export type CreateJobDto = z.infer<typeof CreateJobSchema>;
 
 export const UpdateJobStatusSchema = z.object({
   status: z.enum(['PENDING', 'IN_PROGRESS', 'RESOLVED'], {
-    errorMap: () => ({ message: 'สถานะต้องเป็น PENDING, IN_PROGRESS หรือ RESOLVED' }),
+    errorMap: () => ({
+      message: 'สถานะต้องเป็น PENDING, IN_PROGRESS หรือ RESOLVED',
+    }),
   }),
 });
 
@@ -70,9 +83,7 @@ export type ReopenJobDto = z.infer<typeof ReopenJobSchema>;
 function fixInfoMultipartString(val: unknown): string | undefined {
   if (val === undefined || val === null) return undefined;
   if (Array.isArray(val)) {
-    const parts = val
-      .map((v) => String(v).trim())
-      .filter((s) => s.length > 0);
+    const parts = val.map((v) => String(v).trim()).filter((s) => s.length > 0);
     return parts.length ? parts[parts.length - 1] : undefined;
   }
   const s = String(val).trim();
@@ -100,17 +111,17 @@ export const UpdateFixInfoSchema = z
       },
       z.union([z.enum(['INDOOR', 'OUTDOOR']), z.null()]).optional(),
     ),
-    cause: z
-      .string()
-      .trim()
-      .min(1, 'กรุณาระบุสาเหตุ'),
-    fixMethod: z
-      .string()
-      .trim()
-      .min(1, 'กรุณาระบุวิธีแก้ไข'),
+    cause: z.string().trim().min(1, 'กรุณาระบุสาเหตุ'),
+    fixMethod: z.string().trim().min(1, 'กรุณาระบุวิธีแก้ไข'),
     note: z.string().optional(),
-    oldSerialNumber: z.preprocess(preprocessFixSerialField, z.string().optional()),
-    newSerialNumber: z.preprocess(preprocessFixSerialField, z.string().optional()),
+    oldSerialNumber: z.preprocess(
+      preprocessFixSerialField,
+      z.string().optional(),
+    ),
+    newSerialNumber: z.preprocess(
+      preprocessFixSerialField,
+      z.string().optional(),
+    ),
   })
   .superRefine((data, ctx) => {
     const o = data.oldSerialNumber;
@@ -254,7 +265,11 @@ export type BackfillJobDatesDto = z.infer<typeof BackfillJobDatesSchema>;
 export const DashboardSummaryPdfQuerySchema = z
   .object({
     periodType: z.enum(['month', 'year', 'range']),
-    month: z.string().trim().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
+    month: z
+      .string()
+      .trim()
+      .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
+      .optional(),
     year: z
       .string()
       .trim()
@@ -305,18 +320,18 @@ export const MinioOrphansScanSchema = z.object({
   continuationToken: z.string().trim().max(1024).optional(),
   olderThanDays: z.preprocess(
     (v) =>
-      v === undefined || v === null || v === ""
+      v === undefined || v === null || v === ''
         ? 7
-        : typeof v === "number"
+        : typeof v === 'number'
           ? v
           : Number.parseInt(String(v), 10),
     z.number().int().min(7).max(3650),
   ),
   limit: z.preprocess(
     (v) =>
-      v === undefined || v === null || v === ""
+      v === undefined || v === null || v === ''
         ? 200
-        : typeof v === "number"
+        : typeof v === 'number'
           ? v
           : Number.parseInt(String(v), 10),
     z.number().int().min(1).max(1000),
@@ -328,9 +343,9 @@ export type MinioOrphansScanDto = z.infer<typeof MinioOrphansScanSchema>;
 export const MinioOrphansDeleteSchema = z.object({
   keys: z
     .array(z.string().trim().min(1).max(1024))
-    .min(1, "กรุณาเลือกไฟล์อย่างน้อย 1 รายการ")
-    .max(1000, "เลือกไฟล์มากเกินไป"),
-  confirmText: z.string().trim().min(1, "กรุณายืนยันการลบ"),
+    .min(1, 'กรุณาเลือกไฟล์อย่างน้อย 1 รายการ')
+    .max(1000, 'เลือกไฟล์มากเกินไป'),
+  confirmText: z.string().trim().min(1, 'กรุณายืนยันการลบ'),
 });
 
 export type MinioOrphansDeleteDto = z.infer<typeof MinioOrphansDeleteSchema>;

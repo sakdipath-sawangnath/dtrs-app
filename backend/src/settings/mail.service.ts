@@ -115,9 +115,7 @@ export class MailService {
       },
     });
 
-    const cc = (options.cc ?? [])
-      .map((e) => e.trim())
-      .filter(Boolean);
+    const cc = (options.cc ?? []).map((e) => e.trim()).filter(Boolean);
 
     try {
       await transporter.sendMail({
@@ -144,9 +142,7 @@ export class MailService {
         rejectUnauthorized
           ? ' ลองปิดตัวเลือก «ตรวจสอบใบรับรอง TLS» ในหน้าตั้งค่า'
           : '';
-      throw new BadRequestException(
-        `ส่งอีเมลไม่สำเร็จ (${msg})${certHint}`,
-      );
+      throw new BadRequestException(`ส่งอีเมลไม่สำเร็จ (${msg})${certHint}`);
     }
   }
 }

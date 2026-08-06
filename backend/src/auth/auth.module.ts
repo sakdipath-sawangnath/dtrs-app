@@ -8,17 +8,17 @@ import { JwtStrategy } from './jwt.strategy';
 import { RolesGuard } from './roles.guard';
 
 @Module({
-    imports: [
-        UsersModule,
-        PassportModule,
-        JwtModule.register({
-            secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
-            // ปรับให้อยู่ได้นานขึ้นสำหรับการใช้งาน Dashboard จริง
-            signOptions: { expiresIn: '7d' },
-        }),
-    ],
-    providers: [AuthService, JwtStrategy, RolesGuard],
-    controllers: [AuthController],
-    exports: [AuthService, RolesGuard, JwtModule],
+  imports: [
+    UsersModule,
+    PassportModule,
+    JwtModule.register({
+      secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+      // ปรับให้อยู่ได้นานขึ้นสำหรับการใช้งาน Dashboard จริง
+      signOptions: { expiresIn: '7d' },
+    }),
+  ],
+  providers: [AuthService, JwtStrategy, RolesGuard],
+  controllers: [AuthController],
+  exports: [AuthService, RolesGuard, JwtModule],
 })
-export class AuthModule { }
+export class AuthModule {}

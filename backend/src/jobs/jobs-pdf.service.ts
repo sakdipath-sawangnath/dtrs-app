@@ -69,8 +69,7 @@ function findChromeExecutable(): string | undefined {
     }
   }
   if (process.platform === 'darwin') {
-    const p =
-      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+    const p = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
     if (fs.existsSync(p)) return p;
   }
   return undefined;
@@ -149,7 +148,8 @@ export class JobsPdfService {
         args: [...this.launchArgs],
       });
     } catch (firstErr: unknown) {
-      const msg = firstErr instanceof Error ? firstErr.message : String(firstErr);
+      const msg =
+        firstErr instanceof Error ? firstErr.message : String(firstErr);
       throw new InternalServerErrorException(
         `ไม่สามารถสร้าง PDF ได้: ${msg} — ติดตั้ง Google Chrome หรือ Microsoft Edge หรือตั้ง PUPPETEER_EXECUTABLE_PATH ชี้ไปที่ chrome.exe / msedge.exe หรือรันในโฟลเดอร์ backend: npx puppeteer browsers install chrome`,
       );
@@ -290,7 +290,9 @@ export class JobsPdfService {
       .replace(/'/g, '&#39;');
   }
 
-  async generateDashboardSummaryPdf(query: DashboardSummaryPdfQueryDto): Promise<{
+  async generateDashboardSummaryPdf(
+    query: DashboardSummaryPdfQueryDto,
+  ): Promise<{
     buffer: Buffer;
     filename: string;
   }> {
@@ -300,7 +302,10 @@ export class JobsPdfService {
         OR: [
           { reportDate: { gte: start, lte: end } },
           {
-            AND: [{ reportDate: null }, { createdAt: { gte: start, lte: end } }],
+            AND: [
+              { reportDate: null },
+              { createdAt: { gte: start, lte: end } },
+            ],
           },
         ],
       },
@@ -460,7 +465,10 @@ export class JobsPdfService {
     const browser = await this.launchBrowser();
     try {
       const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle0', timeout: 120_000 });
+      await page.setContent(html, {
+        waitUntil: 'networkidle0',
+        timeout: 120_000,
+      });
       await page.emulateMediaType('print');
       const pdf = await page.pdf({
         format: 'A4',

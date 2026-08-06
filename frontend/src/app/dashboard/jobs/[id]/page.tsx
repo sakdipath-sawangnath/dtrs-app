@@ -128,7 +128,7 @@ export default function JobDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   const API =
-    process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
+    process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4100/api";
   const token = (session as { accessToken?: string })?.accessToken;
 
   const [permissions, setPermissions] = useState<string[] | null>(null);

@@ -4,19 +4,19 @@ import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AreasService {
-    constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {}
 
-    async findAll() {
-        return this.prisma.area.findMany({
-            include: {
-                staff: {
-                    select: { id: true, name: true, username: true }
-                }
-            }
-        });
-    }
+  async findAll() {
+    return this.prisma.area.findMany({
+      include: {
+        staff: {
+          select: { id: true, name: true, username: true },
+        },
+      },
+    });
+  }
 
-    async create(data: Prisma.AreaCreateInput) {
-        return this.prisma.area.create({ data });
-    }
+  async create(data: Prisma.AreaCreateInput) {
+    return this.prisma.area.create({ data });
+  }
 }

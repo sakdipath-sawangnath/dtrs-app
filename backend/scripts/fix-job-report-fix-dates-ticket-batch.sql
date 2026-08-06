@@ -8,7 +8,7 @@
 -- แนะนำ: สำรองตาราง Job ก่อนรัน UPDATE
 -- =============================================================================
 
--- USE `cctv_app_db`;
+-- USE `dtrs_app`;
 
 SELECT id, ticketNo, status, reportDate, fixDate, updatedAt
 FROM `Job`

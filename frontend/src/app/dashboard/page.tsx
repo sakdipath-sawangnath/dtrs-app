@@ -173,7 +173,7 @@ export default function DashboardPage() {
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [reportPrintBusy, setReportPrintBusy] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
-  const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
+  const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4100/api";
   const token = (session as { accessToken?: string })?.accessToken;
   const userRole = (session?.user as { role?: string })?.role ?? "USER";
 

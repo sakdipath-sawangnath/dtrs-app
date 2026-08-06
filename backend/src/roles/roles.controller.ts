@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
 import { RolesService } from './roles.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
@@ -60,8 +69,14 @@ export class RolesController {
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions('menu.roles')
   @Patch(':id/permissions')
-  async setRolePermissions(@Param('id') id: string, @Body() body: { permissionIds: number[] }) {
-    return this.rolesService.setRolePermissions(+id, Array.isArray(body.permissionIds) ? body.permissionIds : []);
+  async setRolePermissions(
+    @Param('id') id: string,
+    @Body() body: { permissionIds: number[] },
+  ) {
+    return this.rolesService.setRolePermissions(
+      +id,
+      Array.isArray(body.permissionIds) ? body.permissionIds : [],
+    );
   }
 
   /** สร้างบทบาทใหม่ */
@@ -87,7 +102,13 @@ export class RolesController {
   @Patch(':id')
   async update(
     @Param('id') id: string,
-    @Body() body: { name?: string; description?: string; badgeTextColor?: string; badgeBgColor?: string },
+    @Body()
+    body: {
+      name?: string;
+      description?: string;
+      badgeTextColor?: string;
+      badgeBgColor?: string;
+    },
   ) {
     return this.rolesService.updateRole(+id, body);
   }

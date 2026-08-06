@@ -14,7 +14,10 @@ import {
   CreateDistrictSchema,
   CreateProvinceSchema,
 } from './dto/province-district.dto';
-import type { CreateDistrictDto, CreateProvinceDto } from './dto/province-district.dto';
+import type {
+  CreateDistrictDto,
+  CreateProvinceDto,
+} from './dto/province-district.dto';
 import { Permissions } from '../auth/permissions.decorator';
 import { PermissionsGuard } from '../auth/permissions.guard';
 

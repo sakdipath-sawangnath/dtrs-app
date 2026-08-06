@@ -27,7 +27,7 @@ import { useDashboardTablePaging } from "@/hooks/useDashboardTablePaging";
 import { toastSuccess, toastError, confirmDialog } from "@/lib/toast";
 import { unwrapApiData } from "@/lib/apiResponse";
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
+const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4100/api";
 
 const CARD_ALL = "__all__";
 const provCardId = (p: string) => `prov:${p}`;

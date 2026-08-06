@@ -47,4 +47,4 @@ import { LocationsModule } from './locations/locations.module';
     },
   ],
 })
-export class AppModule { }
+export class AppModule {}

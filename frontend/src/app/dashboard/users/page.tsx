@@ -193,7 +193,7 @@ export default function UsersPage() {
   const [pageSize, setPageSize] = useState<DataTablePageSize>(15);
   const [page, setPage] = useState(1);
   const { data: session } = useSession();
-  const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
+  const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4100/api";
   const token = (session as { accessToken?: string })?.accessToken;
   const userRole = (session?.user as { role?: string })?.role ?? "STAFF";
   const sessionUserId = Number((session?.user as { id?: string })?.id);

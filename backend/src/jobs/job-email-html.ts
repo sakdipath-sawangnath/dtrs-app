@@ -84,15 +84,22 @@ function wrapBody(opts: {
   payload: JobEmailPayload;
   extraRows?: string;
 }): string {
-  const { brandingLogoUrl, accentTitle, subtitle, payload, extraRows = '' } = opts;
+  const {
+    brandingLogoUrl,
+    accentTitle,
+    subtitle,
+    payload,
+    extraRows = '',
+  } = opts;
   const logoBlock =
     brandingLogoUrl && /^https?:\/\//i.test(brandingLogoUrl.trim())
       ? `<img src="${esc(brandingLogoUrl.trim())}" alt="Logo" width="160" style="max-width:200px;height:auto;display:block;margin:0 auto 20px;border:0;" />`
       : `<div style="text-align:center;font-size:20px;font-weight:700;color:#0369a1;letter-spacing:0.02em;margin-bottom:16px;">CCTV Maintenance</div>`;
 
   const loc =
-    [payload.province, payload.district, payload.location].filter(Boolean).join(' · ') ||
-    '—';
+    [payload.province, payload.district, payload.location]
+      .filter(Boolean)
+      .join(' · ') || '—';
 
   return `<!DOCTYPE html>
 <html lang="th">

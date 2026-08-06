@@ -2,5 +2,5 @@
 export function getClientApiBaseUrl(): string {
   const pub = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
   if (pub) return pub.replace(/\/$/, "");
-  return "http://localhost:4000/api";
+  return "http://localhost:4100/api";
 }

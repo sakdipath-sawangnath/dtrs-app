@@ -7,18 +7,18 @@ import { Permissions } from '../auth/permissions.decorator';
 
 @Controller('areas')
 export class AreasController {
-    constructor(private readonly areasService: AreasService) {}
+  constructor(private readonly areasService: AreasService) {}
 
-    @UseGuards(JwtAuthGuard)
-    @Get()
-    async findAll() {
-        return this.areasService.findAll();
-    }
+  @UseGuards(JwtAuthGuard)
+  @Get()
+  async findAll() {
+    return this.areasService.findAll();
+  }
 
-    @UseGuards(JwtAuthGuard, PermissionsGuard)
-    @Permissions('site.create')
-    @Post()
-    async create(@Body() createAreaDto: Prisma.AreaCreateInput) {
-        return this.areasService.create(createAreaDto);
-    }
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('site.create')
+  @Post()
+  async create(@Body() createAreaDto: Prisma.AreaCreateInput) {
+    return this.areasService.create(createAreaDto);
+  }
 }

@@ -33,7 +33,7 @@ interface Permission {
   category: string | null;
 }
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
+const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4100/api";
 
 function unwrapApiData<T>(root: unknown): T | null {
   if (!root) return null;

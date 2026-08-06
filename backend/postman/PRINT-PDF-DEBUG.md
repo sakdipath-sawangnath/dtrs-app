@@ -12,8 +12,8 @@
 
 ตั้งค่าที่ Collection Variables:
 
-- `publicBaseUrl` เช่น `https://cctv-app.forth.co.th`
-- `apiBase` เช่น `https://cctv-app.forth.co.th/api`
+- `publicBaseUrl` เช่น `https://dtrs-app.forth.co.th`
+- `apiBase` เช่น `https://dtrs-app.forth.co.th/api`
 - `minioBaseUrl` เช่น `https://minio-it.forth.co.th` (สำหรับ request 07 — ปรับ path object ให้ตรง DB)
 - `jobId` เช่น `251` หรือ `284`
 - `emailOrUsername` และ `password` ของผู้ใช้ที่มีสิทธิ์ดูงาน
@@ -77,7 +77,7 @@
 ## 7) หมายเหตุ
 
 - ถ้า PRD ใช้โดเมนเดียวกับหน้าเว็บ ให้ใช้ `apiBase=https://<domain>/api` ตาม proxy จริง
-- ถ้าทดสอบ local ให้ปรับเป็น `http://localhost:3000/api` (Next) หรือ `http://localhost:4000/api` (Backend) ตามที่รันอยู่
+- ถ้าทดสอบ local ให้ปรับเป็น `http://localhost:3000/api` (Next) หรือ `http://localhost:4100/api` (Backend) ตามที่รันอยู่
 
 ## 8) แก้ 502 ที่รูป — ตัวแปร backend `MINIO_SERVER_FETCH_BASE_URL`
 

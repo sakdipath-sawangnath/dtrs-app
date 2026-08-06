@@ -27,7 +27,9 @@ function pickIssueSummary(
   return d || null;
 }
 
-function formatFixEnvironmentLabel(v: string | null | undefined): string | null {
+function formatFixEnvironmentLabel(
+  v: string | null | undefined,
+): string | null {
   if (!v?.trim()) return null;
   const u = v.trim().toUpperCase();
   if (u === 'INDOOR') return 'Indoor (ในอาคาร)';
@@ -171,7 +173,9 @@ export class JobEmailNotificationService {
 
   /** อีเมลผู้ใช้ที่ผูก roleId ตามที่เลือกในการตั้งค่า (ส่งเป็น CC) */
   private async getEmailsForUserRoles(roleIds: number[]): Promise<string[]> {
-    const ids = [...new Set(roleIds)].filter((n) => Number.isInteger(n) && n > 0);
+    const ids = [...new Set(roleIds)].filter(
+      (n) => Number.isInteger(n) && n > 0,
+    );
     if (!ids.length) return [];
     const users = await this.prisma.user.findMany({
       where: { roleId: { in: ids } },
@@ -244,7 +248,13 @@ export class JobEmailNotificationService {
         payload,
         templates.brandingLogoUrl,
       );
-      await this.mailService.sendHtmlMail(smtp, { to, cc, subject, html, text });
+      await this.mailService.sendHtmlMail(smtp, {
+        to,
+        cc,
+        subject,
+        html,
+        text,
+      });
     } catch (e) {
       this.logger.warn(
         `notifyReported(${jobId}): ${e instanceof Error ? e.message : String(e)}`,
@@ -302,7 +312,13 @@ export class JobEmailNotificationService {
         payload,
         templates.brandingLogoUrl,
       );
-      await this.mailService.sendHtmlMail(smtp, { to, cc, subject, html, text });
+      await this.mailService.sendHtmlMail(smtp, {
+        to,
+        cc,
+        subject,
+        html,
+        text,
+      });
     } catch (e) {
       this.logger.warn(
         `notifyAssigned(${jobId}): ${e instanceof Error ? e.message : String(e)}`,
@@ -347,7 +363,10 @@ export class JobEmailNotificationService {
         block.notifyRoleIds ?? [],
       );
       // ผู้รับ CC ตามตั้งค่า + บทบาท (ต้องแนบ PDF ตาม requirement) — ต้องแยกส่งคนละฉบับ
-      const ccRecipients = this.filterCc([...block.cc, ...roleEmails], toReporter);
+      const ccRecipients = this.filterCc(
+        [...block.cc, ...roleEmails],
+        toReporter,
+      );
 
       const payload = await this.buildPayload(jobId);
       if (!payload) return;

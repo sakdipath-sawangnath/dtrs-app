@@ -26,13 +26,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       httpStatus = exception.getStatus();
       const response = exception.getResponse();
-      
+
       // Handle standard HttpException structure including ValidationPipe responses
-      if (typeof response === 'object' && response !== null && 'message' in response) {
-        message = Array.isArray((response as any).message) 
+      if (
+        typeof response === 'object' &&
+        response !== null &&
+        'message' in response
+      ) {
+        message = Array.isArray((response as any).message)
           ? (response as any).message.join(', ')
           : (response as any).message;
-          
+
         if (Array.isArray((response as any).message)) {
           details = (response as any).message;
           code = 'VALIDATION_ERROR';

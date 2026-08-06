@@ -68,7 +68,7 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
     (session?.user as { role?: string })?.role ?? "USER"
   ).toUpperCase();
   const token = (session as { accessToken?: string })?.accessToken;
-  const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
+  const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4100/api";
 
   useEffect(() => {
     if (!token || status !== "authenticated") {

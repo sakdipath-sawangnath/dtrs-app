@@ -7,6 +7,6 @@ import { PermissionsGuard } from '../auth/permissions.guard';
 @Module({
   imports: [PrismaModule],
   controllers: [AreasController],
-  providers: [AreasService, PermissionsGuard]
+  providers: [AreasService, PermissionsGuard],
 })
 export class AreasModule {}

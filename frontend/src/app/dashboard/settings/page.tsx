@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
+const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4100/api";
 
 function unwrapApiData<T>(root: unknown): T | null {
   if (!root) return null;
@@ -946,7 +946,7 @@ export default function SettingsPage() {
                     publicBaseUrl: e.target.value,
                   })
                 }
-                placeholder="https://cctv-app.forth.co.th"
+                placeholder="https://dtrs-app.forth.co.th"
                 disabled={disabledForm}
               />
               <p className="text-xs text-slate-500 mt-1.5">

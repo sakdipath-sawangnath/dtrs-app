@@ -15,7 +15,7 @@ export type EmailTemplatesSettings = {
   /** URL โลโก้แสดงในอีเมล (https แนะนำ) */
   brandingLogoUrl: string;
   /**
-   * Origin ของหน้าเว็บสำหรับลิงก์ในอีเมล (เช่น https://cctv-app.forth.co.th)
+   * Origin ของหน้าเว็บสำหรับลิงก์ในอีเมล (เช่น https://dtrs-app.forth.co.th)
    * ถ้าว่าง → ใช้ FRONTEND_BASE_URL ของ backend (บน dev มักเป็น localhost)
    */
   publicBaseUrl: string;

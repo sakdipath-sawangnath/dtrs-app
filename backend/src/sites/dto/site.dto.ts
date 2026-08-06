@@ -14,10 +14,9 @@ export const UpdateSiteSchema = z
     district: z.string().trim().min(1, 'กรุณาระบุอำเภอ').optional(),
     agency: z.string().trim().min(1, 'กรุณาระบุหน่วยงาน').optional(),
   })
-  .refine(
-    (v) => v.province != null || v.district != null || v.agency != null,
-    { message: 'กรุณาระบุอย่างน้อย 1 ฟิลด์' },
-  );
+  .refine((v) => v.province != null || v.district != null || v.agency != null, {
+    message: 'กรุณาระบุอย่างน้อย 1 ฟิลด์',
+  });
 
 export type UpdateSiteDto = z.infer<typeof UpdateSiteSchema>;
 
@@ -29,4 +28,3 @@ export const BulkDeleteSitesSchema = z.object({
 });
 
 export type BulkDeleteSitesDto = z.infer<typeof BulkDeleteSitesSchema>;
-

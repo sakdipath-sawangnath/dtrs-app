@@ -5,8 +5,8 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "publicBaseUrl", "value": "https://cctv-app.forth.co.th" },
-    { "key": "apiBase", "value": "https://cctv-app.forth.co.th/api" },
+    { "key": "publicBaseUrl", "value": "https://dtrs-app.forth.co.th" },
+    { "key": "apiBase", "value": "https://dtrs-app.forth.co.th/api" },
     { "key": "minioBaseUrl", "value": "https://minio-it.forth.co.th" },
     { "key": "jobId", "value": "251" },
     { "key": "emailOrUsername", "value": "admin" },

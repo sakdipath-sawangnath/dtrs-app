@@ -64,7 +64,7 @@ function ReportPageContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const API = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api';
+  const API = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4100/api';
 
   const [sites, setSites] = useState<Site[]>([]);
   const [districts, setDistricts] = useState<string[]>([]);
