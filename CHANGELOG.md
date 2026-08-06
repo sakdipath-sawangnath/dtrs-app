@@ -49,6 +49,14 @@ npm install
 
 ---
 
+## [0.1.3] - 2026-08-06
+
+### Fixed
+
+- UAT/โดเมน: เมื่อ reverse proxy ส่ง `/api/*` มา Next โดยไม่ตั้ง `/api/` → Nest ให้ catch-all proxy ไป `API_INTERNAL_BASE_URL` (แก้ 404 ของ `/api/public/...`) — ยังแนะนำตั้ง NPM ให้ถูก และ `/socket.io` ต้องชี้ Nest โดยตรง
+
+---
+
 ## [0.1.2] - 2026-08-06
 
 ### Fixed

@@ -26,6 +26,14 @@
 
 ตัวอย่างค่าใน UI ตรงกับรูปที่ตั้งค่าไว้: scheme **http**, forward ไป **192.168.0.128** แยกพอร์ต **8404** / **8405** ตามตารางด้านบน
 
+### Safety-net ฝั่งแอป (เมื่อ `/api/` ยังชี้ไป Next)
+
+ถ้า Custom Location `/api/` ยังไม่ตั้งหรือชี้ผิด ไปที่ Next แทน Nest แล้วเบราว์เซอร์ได้ **404 จาก Next.js** สำหรับ เช่น `/api/public/jobs/...`:
+
+- Frontend มี catch-all `frontend/src/app/api/[[...path]]/route.ts` ทำหน้าที่ **proxy ไป Nest** ผ่าน `API_INTERNAL_BASE_URL` (เช่น `http://dtrs-app-backend:4100/api` ใน Docker)
+- **ไม่แทนที่** การตั้ง NPM ที่ถูกต้อง — โดยเฉพาะ **`/socket.io` ยังต้องชี้ Nest โดยตรง** (proxy นี้ไม่ครอบ Socket.IO)
+- ต้องมี `API_INTERNAL_BASE_URL` ใน container frontend (CI ส่งค่านี้ตอน deploy อยู่แล้ว)
+
 ### หมายเหตุสำคัญ
 
 1. **`/api/jobs/...` ไป Nest โดยตรง**  
