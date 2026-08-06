@@ -769,7 +769,7 @@ export default function UsersPage() {
                     <td className="px-4 py-3 text-center align-middle">
                       {u.isLocked ? (
                         <span
-                          className="inline-flex items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium bg-red-950/35 text-red-200 border border-red-500/25"
+                          className="inline-flex items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium bg-red-50 text-red-800 border border-red-300 dark:bg-red-950/35 dark:text-red-200 dark:border-red-500/25"
                           title="ล็อกการเข้าสู่ระบบ"
                         >
                           <Lock size={12} className="shrink-0" aria-hidden />
@@ -840,14 +840,14 @@ export default function UsersPage() {
           <button
             type="button"
             onClick={() => setModalTab("account")}
-            className={`flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${modalTab === "account" ? "bg-blue-500/20 text-blue-300 border border-blue-500/30 shadow-inner" : "glass-muted-text hover:glass-text hover:bg-white/5"}`}
+            className={`flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${modalTab === "account" ? "bg-blue-100 text-blue-800 border border-blue-300 shadow-inner dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/30" : "glass-muted-text hover:glass-text hover:bg-slate-100 dark:hover:bg-white/5"}`}
           >
             <User size={14} aria-hidden /> ข้อมูลบัญชี
           </button>
           <button
             type="button"
             onClick={() => setModalTab("role")}
-            className={`flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${modalTab === "role" ? "bg-blue-500/20 text-blue-300 border border-blue-500/30 shadow-inner" : "glass-muted-text hover:glass-text hover:bg-white/5"}`}
+            className={`flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${modalTab === "role" ? "bg-blue-100 text-blue-800 border border-blue-300 shadow-inner dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/30" : "glass-muted-text hover:glass-text hover:bg-slate-100 dark:hover:bg-white/5"}`}
           >
             <Shield size={14} aria-hidden /> บทบาท (Role)
           </button>
@@ -942,7 +942,7 @@ export default function UsersPage() {
                       <button
                         type="button"
                         onClick={() => setForm((f) => ({ ...f, password: generateRandomPassword(12) }))}
-                        className="h-10 px-3 rounded-lg border border-[var(--glass-card-border)] bg-blue-600/20 text-xs text-blue-200 hover:bg-blue-600/30 transition-colors cursor-pointer"
+                        className="h-10 px-3 rounded-lg border border-blue-300 bg-blue-50 text-xs text-blue-800 hover:bg-blue-100 transition-colors cursor-pointer dark:border-[var(--glass-card-border)] dark:bg-blue-600/20 dark:text-blue-200 dark:hover:bg-blue-600/30"
                       >
                         สุ่ม
                       </button>

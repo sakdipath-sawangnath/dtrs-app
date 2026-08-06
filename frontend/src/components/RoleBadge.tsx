@@ -5,6 +5,7 @@ import {
   resolveRoleBadgePalette,
   type RoleBadgeStyleMap,
 } from "@/lib/roleBadge";
+import { useAppTheme } from "@/lib/useAppTheme";
 
 type RoleBadgeProps = {
   roleCode: string;
@@ -21,6 +22,7 @@ export default function RoleBadge({
   className,
   title,
 }: RoleBadgeProps) {
+  const { isDark } = useAppTheme();
   const code = String(roleCode || "").trim().toUpperCase();
   const palette = resolveRoleBadgePalette(code, styleMap);
   const classes = [
@@ -30,16 +32,21 @@ export default function RoleBadge({
     .filter(Boolean)
     .join(" ");
 
-  return (
-    <span
-      className={classes}
-      style={{
+  // Light: ใช้สีหลัก (bgColor) เป็นตัวอักษร + พื้นโปร่งใสอ่อน — Dark: คงแพทเทิร์นเดิม (ข้อความอ่อนบนพื้นมืดโปร่ง)
+  const style = isDark
+    ? {
         color: palette.textColor,
         backgroundColor: hexToRgba(palette.bgColor, 0.34),
         borderColor: hexToRgba(palette.textColor, 0.36),
-      }}
-      title={title}
-    >
+      }
+    : {
+        color: palette.bgColor,
+        backgroundColor: hexToRgba(palette.bgColor, 0.12),
+        borderColor: hexToRgba(palette.bgColor, 0.35),
+      };
+
+  return (
+    <span className={classes} style={style} title={title}>
       {label || code || "UNKNOWN"}
     </span>
   );

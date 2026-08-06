@@ -347,7 +347,7 @@ export default function JobTimelineCard({ job }: { job: JobTimelineJob }) {
         className={`flex items-start justify-between gap-3 ${expanded ? "mb-4" : "mb-0"}`}
       >
         <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1">
-          <History className="h-5 w-5 shrink-0 text-sky-400" aria-hidden />
+          <History className="h-5 w-5 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden />
           <h2
             id="job-timeline-heading"
             className="text-sm font-bold glass-text tracking-tight"
@@ -425,7 +425,7 @@ export default function JobTimelineCard({ job }: { job: JobTimelineJob }) {
                     {step.title}
                   </h3>
                   {step.state === "current" && (
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-sky-300/90">
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-sky-700 dark:text-sky-300/90">
                       ปัจจุบัน
                     </span>
                   )}
@@ -444,8 +444,8 @@ export default function JobTimelineCard({ job }: { job: JobTimelineJob }) {
                 {isReportStep ? (
                   <>
                     {issueTitle ? (
-                      <div className="mt-2 rounded-lg border border-sky-500/20 bg-sky-950/25 px-3 py-2">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-sky-400/90 mb-1">
+                      <div className="mt-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 dark:border-sky-500/20 dark:bg-sky-950/25">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-sky-700 mb-1 dark:text-sky-400/90">
                           หัวข้อที่แจ้ง
                         </p>
                         <p className="text-sm glass-text leading-snug">
@@ -459,8 +459,8 @@ export default function JobTimelineCard({ job }: { job: JobTimelineJob }) {
                 {isAssignStep && step.id === "assign" ? (
                   <>
                     {step.assignMode === "delegate" && step.assigner ? (
-                      <div className="mt-2 rounded-xl border border-amber-500/20 bg-amber-950/25 p-3">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-200/85 mb-2">
+                      <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/20 dark:bg-amber-950/25">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-800 mb-2 dark:text-amber-200/85">
                           ผู้มอบหมาย
                         </p>
                         <div className="flex items-center gap-3 min-w-0">

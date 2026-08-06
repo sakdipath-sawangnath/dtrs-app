@@ -926,12 +926,12 @@ export default function DashboardPage() {
             </div>
             <div className="glass-card px-3 py-2.5">
               <p className="text-[10px] uppercase tracking-wide glass-subtle-text font-semibold">ปิดรวม 14 วัน</p>
-              <p className="text-lg font-bold text-emerald-300 tabular-nums">{trendSummary.resolved}</p>
+              <p className="text-lg font-bold text-emerald-700 tabular-nums dark:text-emerald-300">{trendSummary.resolved}</p>
               <p className="text-[11px] glass-subtle-text">เฉลี่ย {trendSummary.avgResolved.toFixed(1)} ต่อจุด</p>
             </div>
             <div className="glass-card px-3 py-2.5 col-span-2 sm:col-span-1 lg:col-span-1">
               <p className="text-[10px] uppercase tracking-wide glass-subtle-text font-semibold">สุทธิใน 14 วัน (เข้า − ปิด)</p>
-              <p className={`text-lg font-bold tabular-nums flex items-center gap-1.5 ${trendSummary.net > 0 ? "text-amber-300" : trendSummary.net < 0 ? "text-sky-300" : "glass-text"}`}>
+              <p className={`text-lg font-bold tabular-nums flex items-center gap-1.5 ${trendSummary.net > 0 ? "text-amber-700 dark:text-amber-300" : trendSummary.net < 0 ? "text-sky-700 dark:text-sky-300" : "glass-text"}`}>
                 {trendSummary.net > 0 ? <TrendingUp size={18} className="shrink-0 opacity-90" aria-hidden /> : null}
                 {trendSummary.net < 0 ? <TrendingDown size={18} className="shrink-0 opacity-90" aria-hidden /> : null}
                 {trendSummary.net === 0 ? <Minus size={18} className="shrink-0 glass-subtle-text" aria-hidden /> : null}
@@ -952,7 +952,7 @@ export default function DashboardPage() {
                 แจ้งสูงสุด <span className="font-semibold glass-text">{trendSummary.peakReported.v}</span> ใบ วันที่{" "}
                 {trendSummary.peakReported.date}
                 <span className="glass-subtle-text"> · </span>
-                ปิดสูงสุด <span className="font-semibold text-emerald-200/90">{trendSummary.peakResolved.v}</span> ใบ วันที่{" "}
+                ปิดสูงสุด <span className="font-semibold text-emerald-700 dark:text-emerald-200/90">{trendSummary.peakResolved.v}</span> ใบ วันที่{" "}
                 {trendSummary.peakResolved.date}
               </p>
             </div>
@@ -964,7 +964,7 @@ export default function DashboardPage() {
         <h2 className="text-sm font-bold glass-text tracking-tight">สรุปสำหรับวิเคราะห์เพิ่มเติม</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div className="glass-card p-4 bg-[var(--glass-card-bg)] backdrop-blur-sm flex gap-3 min-w-0">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 border border-amber-500/25 text-amber-300">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 border border-amber-200 text-amber-700 dark:bg-amber-500/15 dark:border-amber-500/25 dark:text-amber-300">
               <UserX size={20} aria-hidden />
             </div>
             <div className="min-w-0">
@@ -974,7 +974,7 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="glass-card p-4 bg-[var(--glass-card-bg)] backdrop-blur-sm flex gap-3 min-w-0">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500/15 border border-orange-500/25 text-orange-300">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 border border-orange-200 text-orange-700 dark:bg-orange-500/15 dark:border-orange-500/25 dark:text-orange-300">
               <FileWarning size={20} aria-hidden />
             </div>
             <div className="min-w-0">
@@ -984,7 +984,7 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="glass-card p-4 bg-[var(--glass-card-bg)] backdrop-blur-sm flex gap-3 min-w-0">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 border border-sky-500/25 text-sky-300">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 border border-sky-200 text-sky-700 dark:bg-sky-500/15 dark:border-sky-500/25 dark:text-sky-300">
               <Timer size={20} aria-hidden />
             </div>
             <div className="min-w-0">
@@ -1029,7 +1029,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <div className="glass-card backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
               <div className="flex items-start justify-between gap-2">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 border border-amber-500/25 text-amber-300">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 border border-amber-200 text-amber-700 dark:bg-amber-500/15 dark:border-amber-500/25 dark:text-amber-300">
                   <Users size={20} aria-hidden />
                 </div>
                 <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] px-2 py-0.5 glass-muted-text">
@@ -1045,7 +1045,7 @@ export default function DashboardPage() {
             </div>
             <div className="glass-card backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
               <div className="flex items-start justify-between gap-2">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 border border-violet-500/25 text-violet-300">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 border border-violet-200 text-violet-700 dark:bg-violet-500/15 dark:border-violet-500/25 dark:text-violet-300">
                   <PieChartIcon size={20} aria-hidden />
                 </div>
                 <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] px-2 py-0.5 glass-muted-text">
@@ -1061,7 +1061,7 @@ export default function DashboardPage() {
             </div>
             <div className="glass-card backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
               <div className="flex items-start justify-between gap-2">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 border border-sky-500/25 text-sky-300">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 border border-sky-200 text-sky-700 dark:bg-sky-500/15 dark:border-sky-500/25 dark:text-sky-300">
                   <Building2 size={20} aria-hidden />
                 </div>
                 <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] px-2 py-0.5 glass-muted-text">
@@ -1077,7 +1077,7 @@ export default function DashboardPage() {
             </div>
             <div className="glass-card backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
               <div className="flex items-start justify-between gap-2">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/25 text-emerald-300">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 border border-emerald-200 text-emerald-700 dark:bg-emerald-500/15 dark:border-emerald-500/25 dark:text-emerald-300">
                   <Target size={20} aria-hidden />
                 </div>
                 <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] px-2 py-0.5 glass-muted-text">

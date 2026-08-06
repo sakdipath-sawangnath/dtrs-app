@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { MODAL_GHOST_BUTTON_CLASS } from "@/components/ui/modalGhostButtonStyles";
-import { reactSelectGlassStyles } from "@/lib/reactSelectGlassStyles";
+import { getReactSelectGlassStyles } from "@/lib/reactSelectGlassStyles";
+import { useAppTheme } from "@/lib/useAppTheme";
 import { GLASS_LABEL } from "./jobDetailStyles";
 
 export type AssignOption = { value: number; label: string };
@@ -39,6 +40,9 @@ export default function JobAssignDialog({
   assignActionSaving,
   onSubmit,
 }: JobAssignDialogProps) {
+  const { theme } = useAppTheme();
+  const selectStyles = getReactSelectGlassStyles(theme);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -74,7 +78,7 @@ export default function JobAssignDialog({
 
               <Select
                 instanceId="assign-staff-select-detail"
-                styles={reactSelectGlassStyles}
+                styles={selectStyles}
                 menuPortalTarget={typeof document !== "undefined" ? document.body : null}
                 menuPosition="fixed"
                 options={assignOptions}

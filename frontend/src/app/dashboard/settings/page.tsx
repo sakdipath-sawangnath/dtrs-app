@@ -1282,7 +1282,7 @@ export default function SettingsPage() {
               </div>
               <div className="rounded-lg border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] p-2.5">
                 <p className="glass-subtle-text">Orphan candidates</p>
-                <p className="text-amber-300 font-semibold tabular-nums">{orphanScan.stats.orphanCandidates}</p>
+                <p className="text-amber-700 font-semibold tabular-nums dark:text-amber-300">{orphanScan.stats.orphanCandidates}</p>
               </div>
               <div className="rounded-lg border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] p-2.5">
                 <p className="glass-subtle-text">Skipped by retention</p>
@@ -1299,7 +1299,7 @@ export default function SettingsPage() {
                   type="button"
                   onClick={() => void handlePrevOrphanPage()}
                   disabled={scanLoading || orphanTokenHistory.length === 0}
-                  className="inline-flex items-center rounded-lg border border-[var(--glass-card-border)] px-2.5 py-1 glass-muted-text hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center rounded-lg border border-[var(--glass-card-border)] px-2.5 py-1 glass-muted-text hover:bg-slate-100 dark:hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   ก่อนหน้า
                 </Button>
@@ -1307,7 +1307,7 @@ export default function SettingsPage() {
                   type="button"
                   onClick={() => void handleNextOrphanPage()}
                   disabled={scanLoading || !orphanScan.meta.nextContinuationToken}
-                  className="inline-flex items-center rounded-lg border border-[var(--glass-card-border)] px-2.5 py-1 glass-muted-text hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center rounded-lg border border-[var(--glass-card-border)] px-2.5 py-1 glass-muted-text hover:bg-slate-100 dark:hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   ถัดไป
                 </Button>
@@ -1334,7 +1334,7 @@ export default function SettingsPage() {
                       {orphanScan.items.map((item) => {
                         const checked = selectedOrphanKeys.includes(item.key);
                         return (
-                          <tr key={item.key} className="border-b border-[var(--glass-card-border)] glass-muted-text hover:bg-white/5">
+                          <tr key={item.key} className="border-b border-[var(--glass-card-border)] glass-muted-text hover:bg-slate-100 dark:hover:bg-white/5">
                             <td className="px-3 py-2 align-top">
                               <input
                                 type="checkbox"
@@ -1356,8 +1356,8 @@ export default function SettingsPage() {
               </div>
             )}
 
-            <div className="rounded-xl border border-red-500/20 bg-red-950/20 p-3 space-y-2">
-              <Label className="mb-1.5 block text-xs font-medium text-red-200" htmlFor="confirm-delete-orphans">
+            <div className="rounded-xl border border-red-300 bg-red-50 p-3 space-y-2 dark:border-red-500/20 dark:bg-red-950/20">
+              <Label className="mb-1.5 block text-xs font-medium text-red-800 dark:text-red-200" htmlFor="confirm-delete-orphans">
                 ยืนยันการลบ (พิมพ์ DELETE)
               </Label>
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center">

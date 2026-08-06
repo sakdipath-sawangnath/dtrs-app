@@ -43,7 +43,8 @@ import { cn } from "@/lib/utils";
 import DashboardPageShell from "./DashboardPageShell";
 import DashboardFilterBar from "./DashboardFilterBar";
 import Select from "react-select";
-import { reactSelectGlassStyles } from "@/lib/reactSelectGlassStyles";
+import { getReactSelectGlassStyles } from "@/lib/reactSelectGlassStyles";
+import { useAppTheme } from "@/lib/useAppTheme";
 import { useRouter } from "next/navigation";
 import { io, Socket } from "socket.io-client";
 import DataTablePagination, { DataTablePageSize } from "./DataTablePagination";
@@ -383,6 +384,8 @@ export default function JobsList({
    */
   enableAllBreakdownFilters?: boolean;
 }) {
+  const { theme } = useAppTheme();
+  const selectStyles = getReactSelectGlassStyles(theme);
   const { title: derivedTitle, subtitle: derivedSubtitle } = getPageTitle(
     statusFilter,
     showOutOfContract,
@@ -1861,7 +1864,7 @@ export default function JobsList({
               <button
                 type="button"
                 onClick={selectAllBulkAssignableFiltered}
-                className="text-blue-400/95 hover:text-blue-300 underline-offset-2 hover:underline cursor-pointer text-xs sm:text-sm font-medium min-h-[44px] sm:min-h-0 inline-flex items-center"
+                className="text-blue-700 hover:text-blue-800 underline-offset-2 hover:underline cursor-pointer text-xs sm:text-sm font-medium min-h-[44px] sm:min-h-0 inline-flex items-center dark:text-blue-400/95 dark:hover:text-blue-300"
               >
                 เลือกทั้งหมดที่ตรงตัวกรอง ({bulkAssignableFiltered.length})
               </button>
@@ -1869,7 +1872,7 @@ export default function JobsList({
           ) : (
             <>
               <div className="flex items-center gap-2 min-w-0 flex-1">
-                <span className="inline-flex items-center rounded-lg border border-blue-500/35 bg-blue-950/25 px-2.5 py-1.5 text-xs sm:text-sm font-medium text-blue-100 tabular-nums">
+                <span className="inline-flex items-center rounded-lg border border-blue-300 bg-blue-50 px-2.5 py-1.5 text-xs sm:text-sm font-medium text-blue-800 tabular-nums dark:border-blue-500/35 dark:bg-blue-950/25 dark:text-blue-100">
                   เลือกแล้ว {bulkAssignSelectedIds.size} รายการ
                 </span>
                 <button
@@ -2680,7 +2683,7 @@ export default function JobsList({
                                     isDisabled={updateFixSaving || updateIsReadOnlyFix}
                                     isClearable
                                     placeholder="เลือก Indoor / Outdoor"
-                                    styles={reactSelectGlassStyles}
+                                    styles={selectStyles}
                                     menuPortalTarget={
                                       typeof document !== "undefined"
                                         ? document.body
@@ -2720,7 +2723,7 @@ export default function JobsList({
                                         ? "เลือก Hardware / Software"
                                         : "เลือกประเภทสถานที่ก่อน"
                                     }
-                                    styles={reactSelectGlassStyles}
+                                    styles={selectStyles}
                                     menuPortalTarget={
                                       typeof document !== "undefined"
                                         ? document.body
@@ -3001,7 +3004,7 @@ export default function JobsList({
                               </div>
                             ) : updateFixJob && jobNeedsAssignee(updateFixJob) ? (
                               <div className="w-full mt-2 space-y-2">
-                                <div className="py-2.5 rounded-xl text-xs font-semibold text-center border border-dashed border-amber-500/25 bg-amber-950/20 text-amber-100/90">
+                                <div className="py-2.5 rounded-xl text-xs font-semibold text-center border border-dashed border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/25 dark:bg-amber-950/20 dark:text-amber-100/90">
                                   ยังไม่มีผู้รับผิดชอบ — มอบหมายหรือรับงานก่อน จึงจะบันทึกการแก้ไขได้
                                 </div>
                                 <div className="flex flex-col sm:flex-row gap-2">
@@ -3012,7 +3015,7 @@ export default function JobsList({
                                         if (!updateFixJob) return;
                                         void openAssignModal(updateFixJob);
                                       }}
-                                      className="flex-1 min-h-11 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border border-sky-500/50 bg-sky-950/40 text-sky-100 cursor-pointer hover:bg-sky-900/50"
+                                      className="flex-1 min-h-11 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border border-sky-400/60 bg-sky-100 text-sky-900 cursor-pointer hover:bg-sky-200/80 dark:border-sky-500/50 dark:bg-sky-950/40 dark:text-sky-100 dark:hover:bg-sky-900/50"
                                     >
                                       <UserPlus size={14} className="inline mr-1.5" aria-hidden />
                                       มอบหมายงาน
@@ -3038,8 +3041,8 @@ export default function JobsList({
                             )}
 
                             {isUpdateResolved && isUpdateAssignee && updateFixJob && (
-                                <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-3 flex flex-col gap-2 text-xs sm:text-sm mt-3 text-amber-100">
-                                  <div className="font-semibold text-amber-200">
+                                <div className="rounded-xl border border-orange-300 bg-orange-50 px-3 py-3 flex flex-col gap-2 text-xs sm:text-sm mt-3 text-orange-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-100">
+                                  <div className="font-semibold text-orange-900 dark:text-amber-200">
                                     เฉพาะผู้รับงาน: Reopen เพื่อเปลี่ยนสถานะเป็น &quot;กำลังแก้ไข&quot; แล้วจึงแก้ไขข้อมูลได้
                                   </div>
                                   <textarea
@@ -3120,7 +3123,7 @@ export default function JobsList({
                   </p>
                   <Select
                     instanceId="assign-staff-select"
-                    styles={reactSelectGlassStyles}
+                    styles={selectStyles}
                     menuPortalTarget={typeof document !== "undefined" ? document.body : null}
                     menuPosition="fixed"
                     options={assignOptions}

@@ -4,12 +4,13 @@ import { Providers } from '@/components/Providers';
 import { sarabun } from '@/lib/fonts';
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { FOOTER_ENV_FALLBACK } from "@/lib/appMeta";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
-  title: 'CCTV Maintenance',
-  description: 'ระบบแจ้งซ่อมและจัดการปัญหา CCTV',
+  title: FOOTER_ENV_FALLBACK.appName,
+  description: 'ระบบแจ้งซ่อมและจัดการปัญหา — กรมการปกครอง',
 };
 
 export default function RootLayout({

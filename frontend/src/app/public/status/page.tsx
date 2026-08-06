@@ -198,7 +198,7 @@ function CauseFixFields({
       <div
         className={`rounded-xl border border-[var(--glass-card-border)] border-l-4 border-l-amber-400/90 bg-[var(--glass-card-bg)] backdrop-blur-sm shadow-inner ${blockPad}`}
       >
-        <p className="text-sm sm:text-[0.9375rem] font-bold tracking-wide text-amber-100">
+        <p className="text-sm sm:text-[0.9375rem] font-bold tracking-wide text-amber-800 dark:text-amber-100">
           สาเหตุ
         </p>
         <p className={c ? bodyCls : dashCls} role={c ? undefined : 'status'}>
@@ -208,7 +208,7 @@ function CauseFixFields({
       <div
         className={`rounded-xl border border-[var(--glass-card-border)] border-l-4 border-l-emerald-400/90 bg-[var(--glass-card-bg)] backdrop-blur-sm shadow-inner ${blockPad}`}
       >
-        <p className="text-sm sm:text-[0.9375rem] font-bold tracking-wide text-emerald-100">
+        <p className="text-sm sm:text-[0.9375rem] font-bold tracking-wide text-emerald-800 dark:text-emerald-100">
           วิธีการแก้ไข
         </p>
         <p className={m ? bodyCls : dashCls} role={m ? undefined : 'status'}>
@@ -514,24 +514,24 @@ function StatusPageInner() {
             <section
               role="alert"
               aria-live="polite"
-              className="rounded-2xl border border-amber-500/45 bg-amber-950/55 backdrop-blur-md px-4 py-3.5 sm:px-5 sm:py-4 shadow-lg shadow-amber-950/40 ring-1 ring-amber-400/15"
+              className="rounded-2xl border border-amber-300 bg-amber-50 backdrop-blur-md px-4 py-3.5 sm:px-5 sm:py-4 shadow-lg ring-1 ring-amber-200/80 dark:border-amber-500/45 dark:bg-amber-950/55 dark:shadow-amber-950/40 dark:ring-amber-400/15"
             >
               <div className="flex gap-3 sm:gap-4">
                 <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-500/35 bg-amber-500/15 text-amber-300"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-500/35 dark:bg-amber-500/15 dark:text-amber-300"
                   aria-hidden
                 >
                   <AlertTriangle size={22} strokeWidth={2} className="drop-shadow-sm" />
                 </div>
                 <div className="min-w-0 flex-1 pt-0.5">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-200/95">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200/95">
                     มุมมองสาธารณะ
                   </p>
-                  <p className="mt-1 text-sm leading-snug text-amber-50/95">
+                  <p className="mt-1 text-sm leading-snug text-amber-900/90 dark:text-amber-50/95">
                     ข้อมูลส่วนตัวและรูปถูกมาสก์ —{' '}
                     <Link
                       href="/login"
-                      className="font-semibold text-amber-200 underline decoration-amber-400/70 underline-offset-2 hover:text-[var(--glass-text)] hover:decoration-amber-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400/80"
+                      className="font-semibold text-amber-800 underline decoration-amber-500/70 underline-offset-2 hover:text-[var(--glass-text)] hover:decoration-amber-700 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500/80 dark:text-amber-200 dark:decoration-amber-400/70 dark:hover:decoration-amber-200 dark:focus-visible:outline-amber-400/80"
                     >
                       เข้าสู่ระบบ
                     </Link>{' '}
@@ -674,12 +674,12 @@ function StatusPageInner() {
             <section
               role="note"
               aria-label="คำแนะนำการดูข้อมูลแบบสาธารณะ"
-              className="rounded-2xl border border-sky-500/25 bg-sky-950/35 backdrop-blur-md px-4 py-3 shadow-lg shadow-sky-950/30 ring-1 ring-sky-400/10"
+              className="rounded-2xl border border-sky-300 bg-sky-50 backdrop-blur-md px-4 py-3 shadow-lg ring-1 ring-sky-200/80 dark:border-sky-500/25 dark:bg-sky-950/35 dark:shadow-sky-950/30 dark:ring-sky-400/10"
             >
               <div className="flex gap-3 sm:gap-4 items-start">
                 <Info
                   size={18}
-                  className="text-sky-300 shrink-0 mt-0.5"
+                  className="text-sky-700 shrink-0 mt-0.5 dark:text-sky-300"
                   aria-hidden
                 />
                 <div className="min-w-0 space-y-1 text-[13px] sm:text-sm leading-relaxed">
@@ -693,7 +693,7 @@ function StatusPageInner() {
                     {" "}
                     <Link
                       href="/login"
-                      className="font-semibold text-sky-200 underline decoration-sky-400/60 underline-offset-2 hover:text-[var(--glass-text)] hover:decoration-sky-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400/80"
+                      className="font-semibold text-sky-800 underline decoration-sky-500/60 underline-offset-2 hover:text-[var(--glass-text)] hover:decoration-sky-700 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500/80 dark:text-sky-200 dark:decoration-sky-400/60 dark:hover:decoration-sky-200 dark:focus-visible:outline-sky-400/80"
                     >
                       ที่นี่
                     </Link>
@@ -707,9 +707,9 @@ function StatusPageInner() {
           {phoneSearchError && !loading && searchMode === 'phone' && (
             <section
               role="alert"
-              className={`${cardOuterClass} border-rose-500/30 bg-rose-950/25 text-left py-4`}
+              className={`${cardOuterClass} border-rose-300 bg-rose-50 text-left py-4 dark:border-rose-500/30 dark:bg-rose-950/25`}
             >
-              <p className="text-sm text-rose-100">{phoneSearchError}</p>
+              <p className="text-sm text-rose-800 dark:text-rose-100">{phoneSearchError}</p>
             </section>
           )}
 
@@ -1093,7 +1093,7 @@ function StatusPageInner() {
                     {Array.from({ length: maskedImageSlots }).map((_, i) => (
                       <div
                         key={`placeholder-${i}`}
-                        className="relative w-full aspect-video rounded-xl border border-[var(--glass-card-border)] bg-[#0a0f1a] shadow-inner"
+                        className="relative w-full aspect-video rounded-xl border border-[var(--glass-card-border)] bg-slate-100 shadow-inner dark:bg-[#0a0f1a]"
                         aria-hidden
                       />
                     ))}

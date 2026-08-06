@@ -171,7 +171,7 @@
 
 | # | รายการ | ไฟล์ | สถานะ |
 |---|--------|------|--------|
-| 29 | ชื่อแอป (browser tab) | `frontend/src/app/layout.tsx` — `CCTV Maintenance` | ☐ |
+| 29 | ชื่อแอป (browser tab) | `frontend/src/app/layout.tsx` — ใช้ `FOOTER_ENV_FALLBACK.appName` (`NEXT_PUBLIC_APP_NAME` / ค่าเริ่มต้น ระบบแจ้งซ่อม) | ✅ |
 | 30 | คำอธิบาย meta | `frontend/src/app/layout.tsx` | ☐ |
 | 31 | Header / footer default | `frontend/src/components/SiteHeader.tsx`, `frontend/src/lib/appMeta.ts` | ☐ |
 | 32 | หน้า login | `frontend/src/app/login/page.tsx` | ☐ |

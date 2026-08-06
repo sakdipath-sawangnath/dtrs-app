@@ -49,6 +49,17 @@ npm install
 
 ---
 
+## [0.1.2] - 2026-08-06
+
+### Fixed
+
+- Light mode: หน้ารายละเอียดข้อขัดข้อง (`/dashboard/jobs/[id]`) ไม่บังคับพื้นหลังมืด และปรับ contrast ของ alert/ปุ่มสถานะ
+- Light mode: dropdown มอบหมายงาน (react-select) ใน Dialog รายละเอียดงานและ JobsList ตาม theme แทน hardcode dark
+- Light mode: ปรับ contrast บน `/public/status`, `/public/report`, `/login`, JobsList CTA, RoleBadge, users, settings (orphan), และ dashboard overview
+- Browser tab title: จาก `CCTV Maintenance` เป็นชื่อจาก `NEXT_PUBLIC_APP_NAME` (ค่าเริ่มต้น ระบบแจ้งซ่อม)
+
+---
+
 ## [0.1.1] - 2026-08-06
 
 ### Changed

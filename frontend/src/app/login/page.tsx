@@ -107,7 +107,7 @@ export default function LoginPage() {
                 aria-label="กำลังเข้าสู่ระบบ"
               >
                 <span
-                  className="login-loading-spin inline-flex animate-spin text-blue-400"
+                  className="login-loading-spin inline-flex animate-spin text-blue-600 dark:text-blue-400"
                   aria-hidden
                 >
                   <LoaderCircle
@@ -124,7 +124,7 @@ export default function LoginPage() {
 
             <div className="p-6 sm:p-8 sm:py-10">
               <div className="mb-6 text-center">
-                <p className="text-[11px] font-semibold tracking-[0.25em] uppercase text-blue-400/90 mb-2">
+                <p className="text-[11px] font-semibold tracking-[0.25em] uppercase text-blue-700/90 mb-2 dark:text-blue-400/90">
                   STAFF &amp; ADMIN
                 </p>
                 <h1 className="text-2xl font-semibold tracking-tight glass-text mb-1">
@@ -138,14 +138,14 @@ export default function LoginPage() {
               {error ? (
                 <Alert
                   variant="destructive"
-                  className="mb-6 rounded-xl border-red-500/25 bg-red-950/40 text-red-200 backdrop-blur-sm"
+                  className="mb-6 rounded-xl border-red-300 bg-red-50 text-red-800 backdrop-blur-sm dark:border-red-500/25 dark:bg-red-950/40 dark:text-red-200"
                 >
                   <AlertCircle
                     size={18}
-                    className="shrink-0 text-red-400"
+                    className="shrink-0 text-red-600 dark:text-red-400"
                     aria-hidden
                   />
-                  <AlertDescription className="text-red-200">{error}</AlertDescription>
+                  <AlertDescription className="text-red-800 dark:text-red-200">{error}</AlertDescription>
                 </Alert>
               ) : null}
 

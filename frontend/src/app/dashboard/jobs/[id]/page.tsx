@@ -800,7 +800,7 @@ export default function JobDetailPage() {
 
   return (
     <DashboardPageShell title={title} subtitle={subtitle} noCard>
-      <div className="flex-1 overflow-auto p-4 sm:p-6 bg-[#020617] min-h-0">
+      <div className="flex-1 overflow-auto p-4 sm:p-6 min-h-0">
         <div className="space-y-4 max-w-[1600px] mx-auto w-full">
           <Button
             type="button"
@@ -829,7 +829,7 @@ export default function JobDetailPage() {
                 </div>
               ) : error || !job ? (
                 <div className={GLASS_SECTION}>
-                  <div className="h-40 flex items-center justify-center text-sm text-red-400">
+                  <div className="h-40 flex items-center justify-center text-sm text-red-600 dark:text-red-400">
                     {error ?? "ไม่พบข้อมูลใบแจ้งซ่อมนี้"}
                   </div>
                 </div>
@@ -1007,12 +1007,12 @@ export default function JobDetailPage() {
                   )}
                   {!job.assignedTo && job.status !== "CANCELLED" && (
                     <div className="space-y-4">
-                      <Alert className="animate-pulse-slow border-amber-500/35 bg-amber-950/30 text-amber-100/85 shadow-inner backdrop-blur-sm [&>svg]:text-amber-400">
+                      <Alert className="animate-pulse-slow border-amber-300 bg-amber-50 text-amber-950 shadow-inner backdrop-blur-sm [&>svg]:text-amber-600 dark:border-amber-500/35 dark:bg-amber-950/30 dark:text-amber-100/85 dark:[&>svg]:text-amber-400">
                         <AlertTriangle size={18} aria-hidden />
-                        <AlertTitle className="text-sm font-bold text-amber-200">
+                        <AlertTitle className="text-sm font-bold text-amber-900 dark:text-amber-200">
                           สถานะ: รอผู้รับผิดชอบ
                         </AlertTitle>
-                        <AlertDescription className="text-xs leading-relaxed text-amber-100/85">
+                        <AlertDescription className="text-xs leading-relaxed text-amber-900/90 dark:text-amber-100/85">
                           กรุณามอบหมายงานหรือรับงานนี้ก่อน จึงจะสามารถปลดล็อคแบบฟอร์มเพื่อบันทึกการแก้ไขและปิดงานได้
                         </AlertDescription>
                       </Alert>
@@ -1024,7 +1024,7 @@ export default function JobDetailPage() {
                             variant="outline"
                             onClick={openAssignModal}
                             disabled={assignActionSaving || assignLoading}
-                            className="min-h-11 flex-1 cursor-pointer rounded-xl border-sky-500/50 bg-sky-950/40 py-2.5 text-sm font-semibold text-sky-100 shadow-lg hover:bg-sky-900/50 focus-visible:ring-sky-500/30 active:scale-95"
+                            className="min-h-11 flex-1 cursor-pointer rounded-xl border-sky-400/60 bg-sky-100 py-2.5 text-sm font-semibold text-sky-900 shadow-lg hover:bg-sky-200/80 focus-visible:ring-sky-500/30 active:scale-95 dark:border-sky-500/50 dark:bg-sky-950/40 dark:text-sky-100 dark:hover:bg-sky-900/50"
                           >
                             <UserPlus size={16} className="mr-1.5 inline-block -mt-0.5" aria-hidden /> มอบหมายงาน
                           </Button>
@@ -1072,7 +1072,7 @@ export default function JobDetailPage() {
                           disabled={serverPdfDownloading || !token}
                           aria-label="ดาวน์โหลด PDF จากเซิร์ฟเวอร์ Chromium"
                           aria-busy={serverPdfDownloading}
-                          className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl border-sky-500/40 bg-sky-900/40 px-3 py-2 text-xs font-semibold text-sky-100 shadow-lg hover:bg-sky-800/50 focus-visible:ring-sky-500/40 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl border-sky-400/60 bg-sky-100 px-3 py-2 text-xs font-semibold text-sky-900 shadow-lg hover:bg-sky-200/80 focus-visible:ring-sky-500/40 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:border-sky-500/40 dark:bg-sky-900/40 dark:text-sky-100 dark:hover:bg-sky-800/50"
                         >
                           <FileDown size={14} aria-hidden />
                           <span>
@@ -1140,7 +1140,7 @@ export default function JobDetailPage() {
               {job && canBackfillDate && (
                 <div className={`${GLASS_SECTION} space-y-4`}>
                   <div className="flex items-start gap-2.5">
-                    <div className="mt-0.5 rounded-lg border border-cyan-500/25 bg-cyan-950/25 p-2 text-cyan-300">
+                    <div className="mt-0.5 rounded-lg border border-cyan-300 bg-cyan-50 p-2 text-cyan-700 dark:border-cyan-500/25 dark:bg-cyan-950/25 dark:text-cyan-300">
                       <Clock3 size={15} aria-hidden />
                     </div>
                     <div className="min-w-0">
@@ -1157,13 +1157,13 @@ export default function JobDetailPage() {
                     {backfillPolicyWarnings.length > 0 ? (
                       <Alert
                         role="status"
-                        className="border-amber-500/35 bg-amber-950/25 text-amber-100/95 [&>svg]:text-amber-400"
+                        className="border-amber-300 bg-amber-50 text-amber-950 [&>svg]:text-amber-600 dark:border-amber-500/35 dark:bg-amber-950/25 dark:text-amber-100/95 dark:[&>svg]:text-amber-400"
                       >
                         <AlertTriangle size={16} aria-hidden />
-                        <AlertTitle className="text-amber-100">
+                        <AlertTitle className="text-amber-900 dark:text-amber-100">
                           ตรวจสอบวันที่ก่อนบันทึก
                         </AlertTitle>
-                        <AlertDescription className="text-amber-100/95">
+                        <AlertDescription className="text-amber-900/90 dark:text-amber-100/95">
                           <ul className="mt-1 list-inside list-disc space-y-0.5">
                             {backfillPolicyWarnings.map((w, idx) => (
                               <li key={`${idx}-${w.slice(0, 40)}`}>{w}</li>
@@ -1201,7 +1201,7 @@ export default function JobDetailPage() {
                       type="submit"
                       variant="outline"
                       disabled={backfillSaving || backfillPolicyWarnings.length > 0}
-                      className="min-h-11 cursor-pointer rounded-xl border-cyan-500/35 bg-cyan-900/40 px-4 py-2.5 text-xs font-semibold text-cyan-100 shadow-lg hover:bg-cyan-800/45 focus-visible:ring-cyan-500/40 disabled:opacity-60 sm:text-sm"
+                      className="min-h-11 cursor-pointer rounded-xl border-cyan-400/50 bg-cyan-100 px-4 py-2.5 text-xs font-semibold text-cyan-900 shadow-lg hover:bg-cyan-200/80 focus-visible:ring-cyan-500/40 disabled:opacity-60 sm:text-sm dark:border-cyan-500/35 dark:bg-cyan-900/40 dark:text-cyan-100 dark:hover:bg-cyan-800/45"
                     >
                       {backfillSaving ? "กำลังบันทึกวันเวลาย้อนหลัง..." : "บันทึกวันเวลาย้อนหลัง"}
                     </Button>
@@ -1219,7 +1219,7 @@ export default function JobDetailPage() {
                   <form onSubmit={handleSubmitFix} className="space-y-4">
                     <div className="glass-card p-3 sm:p-4 space-y-3">
                       <p className="text-xs glass-muted-text leading-relaxed">
-                        <span className="text-red-400">*</span> บังคับกรอก:{" "}
+                        <span className="text-red-600 dark:text-red-400">*</span> บังคับกรอก:{" "}
                         <span className="glass-muted-text font-medium">
                           ประเภทสถานที่ (Indoor / Outdoor)
                         </span>
@@ -1240,7 +1240,7 @@ export default function JobDetailPage() {
                             className={GLASS_LABEL}
                             htmlFor="job-fix-environment"
                           >
-                            ประเภทสถานที่ <span className="text-red-400">*</span>
+                            ประเภทสถานที่ <span className="text-red-600 dark:text-red-400">*</span>
                           </Label>
                           <Select
                             inputId="job-fix-environment"
@@ -1272,7 +1272,7 @@ export default function JobDetailPage() {
                             className={GLASS_LABEL}
                             htmlFor="job-fix-category"
                           >
-                            ประเภทงาน <span className="text-red-400">*</span>
+                            ประเภทงาน <span className="text-red-600 dark:text-red-400">*</span>
                           </Label>
                           <Select
                             inputId="job-fix-category"
@@ -1305,7 +1305,7 @@ export default function JobDetailPage() {
                     </div>
                     <div>
                       <Label className={GLASS_LABEL} htmlFor="job-cause">
-                        สาเหตุ <span className="text-red-400">*</span>
+                        สาเหตุ <span className="text-red-600 dark:text-red-400">*</span>
                       </Label>
                       <Input
                         id="job-cause"
@@ -1319,7 +1319,7 @@ export default function JobDetailPage() {
                     </div>
                     <div>
                       <Label className={GLASS_LABEL} htmlFor="job-fix-method">
-                        วิธีแก้ไข <span className="text-red-400">*</span>
+                        วิธีแก้ไข <span className="text-red-600 dark:text-red-400">*</span>
                       </Label>
                       <Textarea
                         id="job-fix-method"
@@ -1380,7 +1380,7 @@ export default function JobDetailPage() {
                                 <button
                                   type="button"
                                   onClick={() => removeSerialRow(idx)}
-                                  className="inline-flex items-center justify-center min-h-10 min-w-10 rounded-lg border border-[var(--glass-card-border)] glass-muted-text hover:text-red-300 hover:border-red-500/30 hover:bg-red-950/20 transition-colors cursor-pointer"
+                                  className="inline-flex items-center justify-center min-h-10 min-w-10 rounded-lg border border-[var(--glass-card-border)] glass-muted-text hover:text-red-600 hover:border-red-400/50 hover:bg-red-50 transition-colors cursor-pointer dark:hover:text-red-300 dark:hover:border-red-500/30 dark:hover:bg-red-950/20"
                                   aria-label={`ลบแถวอุปกรณ์ ${idx + 1}`}
                                 >
                                   <Minus size={18} aria-hidden />
@@ -1483,7 +1483,7 @@ export default function JobDetailPage() {
                               <p className="text-[11px] mb-1.5 font-medium glass-muted-text">
                                 รูปที่ {i + 1}{" "}
                                 {i < 2 && (
-                                  <span className="text-red-400">*</span>
+                                  <span className="text-red-600 dark:text-red-400">*</span>
                                 )}
                               </p>
                               <div
@@ -1513,7 +1513,7 @@ export default function JobDetailPage() {
                                     </div>
                                   </>
                                 ) : (
-                                  <div className="flex flex-col items-center gap-1.5 z-10 glass-muted-text group-hover:text-sky-400 transition-colors">
+                                  <div className="flex flex-col items-center gap-1.5 z-10 glass-muted-text group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
                                     <Camera size={22} aria-hidden />
                                     <span className="text-[10px] font-medium uppercase tracking-wider">
                                       Upload
@@ -1543,7 +1543,7 @@ export default function JobDetailPage() {
                         type="submit"
                         variant="default"
                         disabled={saving || !fixFormReadyToSubmit}
-                        className="mt-3 w-full cursor-pointer rounded-xl bg-blue-600 py-3 text-sm font-semibold glass-text shadow-lg hover:bg-blue-700 focus-visible:ring-blue-500/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
+                        className="mt-3 w-full cursor-pointer rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white shadow-lg hover:bg-blue-700 focus-visible:ring-blue-500/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
                       >
                         {saving ? "กำลังบันทึก..." : "บันทึกและปิดงาน (สถานะ: เสร็จสิ้น)"}
                       </Button>
@@ -1556,11 +1556,11 @@ export default function JobDetailPage() {
                         งานนี้ปิดแล้ว — ข้อมูลการแก้ไขเป็นโหมดอ่านอย่างเดียว — หากต้องการแก้ไข ให้ติดต่อผู้รับงานหรือผู้ดูแลระบบ
                       </div>
                     ) : job && job.status === "PENDING" ? (
-                      <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-amber-500/25 text-amber-100/90 bg-amber-950/20 backdrop-blur-sm">
+                      <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-amber-300 text-amber-900 bg-amber-50 backdrop-blur-sm dark:border-amber-500/25 dark:text-amber-100/90 dark:bg-amber-950/20">
                         งานสถานะรอดำเนินการ (PENDING) ยังปิดงานไม่ได้ — กรุณามอบหมายงานก่อนเพื่อเปลี่ยนเป็นกำลังแก้ไข
                       </div>
                     ) : job && !job.assignedTo ? (
-                      <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-amber-500/25 text-amber-100/90 bg-amber-950/20 backdrop-blur-sm">
+                      <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-amber-300 text-amber-900 bg-amber-50 backdrop-blur-sm dark:border-amber-500/25 dark:text-amber-100/90 dark:bg-amber-950/20">
                         ยังไม่มีผู้รับผิดชอบงาน — มอบหมายหรือรับงานด้านบนก่อน จึงจะบันทึกการแก้ไขและปิดงานได้
                       </div>
                     ) : (
@@ -1570,12 +1570,12 @@ export default function JobDetailPage() {
                     )}
 
                     {job && isResolved && (canReopenAny || (canReopenSelf && isAssignee)) && (
-                      <div className="rounded-xl border border-orange-500/35 bg-orange-950/25 backdrop-blur-md p-4 flex flex-col gap-3 text-xs sm:text-sm mt-4 shadow-lg">
-                        <div className="font-semibold text-orange-200">
+                      <div className="rounded-xl border border-orange-300 bg-orange-50 backdrop-blur-md p-4 flex flex-col gap-3 text-xs sm:text-sm mt-4 shadow-lg dark:border-orange-500/35 dark:bg-orange-950/25">
+                        <div className="font-semibold text-orange-900 dark:text-orange-200">
                           Reopen เพื่อเปลี่ยนสถานะเป็น &quot;กำลังแก้ไข&quot; แล้วจึงแก้ไขข้อมูลได้
                         </div>
                         <Textarea
-                          className="w-full rounded-xl border border-orange-500/30 bg-[var(--glass-card-bg)] px-3 py-2 text-xs glass-text placeholder:text-orange-200/40 focus-visible:border-orange-400/60 focus-visible:ring-orange-500/25 sm:text-sm"
+                          className="w-full rounded-xl border border-orange-300 bg-[var(--glass-card-bg)] px-3 py-2 text-xs glass-text placeholder:text-orange-700/50 focus-visible:border-orange-400/60 focus-visible:ring-orange-500/25 sm:text-sm dark:border-orange-500/30 dark:placeholder:text-orange-200/40"
                           rows={2}
                           placeholder="ระบุเหตุผลในการ Reopen เช่น ต้องแก้ไขรายละเอียดวิธีการแก้ไข หรืออัปเดตรูปเพิ่มเติม"
                           value={reopenReason}

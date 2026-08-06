@@ -558,7 +558,7 @@ function ReportPageContent() {
       {sitesError ? (
         <Alert
           variant="destructive"
-          className="alert-error rounded-2xl border-red-500/30 bg-red-950/35 text-red-100"
+          className="alert-error rounded-2xl border-red-300 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-950/35 dark:text-red-100"
         >
           <AlertCircle size={18} aria-hidden />
           <AlertDescription>{sitesError}</AlertDescription>
@@ -576,10 +576,10 @@ function ReportPageContent() {
             <div
               role="note"
               aria-label="คำแนะนำการกรอกข้อมูลผู้แจ้ง"
-              className="mb-5 flex gap-3 rounded-xl border border-sky-500/25 bg-sky-950/35 px-3.5 py-3 sm:px-4 sm:py-3.5 backdrop-blur-sm"
+              className="mb-5 flex gap-3 rounded-xl border border-sky-300 bg-sky-50 px-3.5 py-3 sm:px-4 sm:py-3.5 backdrop-blur-sm dark:border-sky-500/25 dark:bg-sky-950/35"
             >
               <Info
-                className="h-5 w-5 shrink-0 text-sky-400 mt-0.5"
+                className="h-5 w-5 shrink-0 text-sky-700 mt-0.5 dark:text-sky-400"
                 strokeWidth={2}
                 aria-hidden="true"
               />

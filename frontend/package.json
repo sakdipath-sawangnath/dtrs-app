@@ -1,6 +1,6 @@
 {
   "name": "frontend",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "engines": {
     "node": ">=20.0.0",
@@ -13,6 +13,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "npx --yes tsx --test src/lib/reactSelectGlassStyles.test.ts",
+    "test:react-select": "npx --yes tsx --test src/lib/reactSelectGlassStyles.test.ts",
     "security:audit": "npm audit --audit-level=moderate",
     "security:audit:prod": "npm audit --omit=dev --audit-level=moderate",
     "security:outdated": "npm outdated"
