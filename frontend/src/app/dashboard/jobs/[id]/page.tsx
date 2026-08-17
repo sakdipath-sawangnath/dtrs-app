@@ -16,6 +16,7 @@ import {
   Camera,
   FileDown,
   Printer,
+  Stamp,
   Wrench,
   AlertTriangle,
   Loader2,
@@ -27,11 +28,16 @@ import DashboardPageShell from "@/components/DashboardPageShell";
 import JobTimelineCard from "@/components/JobTimelineCard";
 import ManagedImage, { MANAGED_IMAGE_SIZES } from "@/components/ManagedImage";
 import PersonAvatar from "@/components/PersonAvatar";
-import { confirmDialog, toastError, toastSuccess } from "@/lib/toast";
+import { confirmDialog, toastError, toastSuccess, toastWarning } from "@/lib/toast";
 import Select from "react-select";
 import { getReactSelectGlassStyles } from "@/lib/reactSelectGlassStyles";
 import { useAppTheme } from "@/lib/useAppTheme";
-import { extractAssignableArray, unwrapApiData } from "@/lib/apiResponse";
+import {
+  axiosErrorData,
+  extractAssignableArray,
+  formatApiErrorDetail,
+  unwrapApiData,
+} from "@/lib/apiResponse";
 import { dashboardJobImagePath } from "@/lib/dashboardJobImageUrl";
 import {
   JOB_SERIAL_ROWS_MAX,
@@ -46,8 +52,27 @@ import { formatThaiDateTimeDisplay } from "@/lib/formatThaiDateTimeDisplay";
 import BackfillDateTimeFields from "@/components/jobs/BackfillDateTimeFields";
 import JobStatusBadge from "@/components/jobs/JobStatusBadge";
 import JobAssignDialog from "@/components/jobs/JobAssignDialog";
+import JobClassifyDocDialog from "@/components/jobs/JobClassifyDocDialog";
 import JobImageLightbox from "@/components/jobs/JobImageLightbox";
+import IssueImagesUploadPanel, {
+  countNonemptyIssueImages,
+  jobStatusAllowsIssueImageUpload,
+} from "@/components/jobs/IssueImagesUploadPanel";
+import SignaturePad, {
+  type SignaturePadHandle,
+} from "@/components/SignaturePad";
 import { GLASS_FIELD, GLASS_LABEL, GLASS_SECTION } from "@/components/jobs/jobDetailStyles";
+import { ensureStaffSignatureOrToast } from "@/lib/ensureStaffSignature";
+import {
+  clearFileInput,
+  JOB_IMAGE_ACCEPT,
+  JOB_IMAGE_HINT,
+  validateJobImageFile,
+} from "@/lib/jobImageUpload";
+import {
+  formatJobImageUploadError,
+  runMultipartUploadWithProxyFallback,
+} from "@/lib/jobImageProxyFallback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -55,9 +80,11 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { jobNeedsAssignee } from "@/lib/jobAssignEligibility";
+import { isFormalDocTicketNo } from "@/lib/docTicketNo";
 import {
   buildFixPreviewUrlsFromJob,
   hasRequiredFixImageSlots,
+  isFixInfoComplete,
 } from "@/lib/jobFixImageSlots";
 
 interface JobDetail {
@@ -71,6 +98,7 @@ interface JobDetail {
   reporterEmail?: string;
   province?: string;
   district?: string;
+  agency?: string;
   location?: string;
   description?: string;
   title?: string;
@@ -168,6 +196,7 @@ export default function JobDetailPage() {
     useRef<HTMLInputElement>(null),
   ];
   const [saving, setSaving] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [previewImages, setPreviewImages] = useState<string[] | null>(null);
   const [previewIndex, setPreviewIndex] = useState(0);
 
@@ -180,6 +209,8 @@ export default function JobDetailPage() {
   const [assignSelectedId, setAssignSelectedId] = useState<number | null>(null);
   const [assignActionSaving, setAssignActionSaving] = useState(false);
   const [serverPdfDownloading, setServerPdfDownloading] = useState(false);
+  const [classifyOpen, setClassifyOpen] = useState(false);
+  const [classifySubmitting, setClassifySubmitting] = useState(false);
 
   useEffect(() => {
     const id = Number(params?.id);
@@ -237,6 +268,18 @@ export default function JobDetailPage() {
   const canReopenSelf = Array.isArray(permissions) && permissions.includes("job.reopen.self");
   const canBackfillDate =
     Array.isArray(permissions) && permissions.includes("job.backfillDate");
+  const canClassifyDoc =
+    Array.isArray(permissions) && permissions.includes("job.classifyDoc");
+  const canUploadIssueImages =
+    Array.isArray(permissions) &&
+    permissions.includes("job.issue.upload") &&
+    jobStatusAllowsIssueImageUpload(job?.status);
+  const showClassifyDoc =
+    !!job &&
+    isResolved &&
+    canClassifyDoc &&
+    !isFormalDocTicketNo(job.ticketNo) &&
+    !!token;
 
   /** ผู้รับงาน (Owner) = ผู้ที่ถูกมอบหมายในงาน (assignedTo) — Reopen/บันทึกแก้ไขได้เฉพาะคนนี้ */
   const isAssignee =
@@ -251,6 +294,8 @@ export default function JobDetailPage() {
   const [backfillFixDate, setBackfillFixDate] = useState("");
   const [backfillFixDateValid, setBackfillFixDateValid] = useState(true);
   const [backfillSaving, setBackfillSaving] = useState(false);
+  const [reporterSigReady, setReporterSigReady] = useState(false);
+  const reporterSigRef = useRef<SignaturePadHandle | null>(null);
 
   /** แก้ไข/บันทึกได้เมื่อยังไม่ปิดงาน — หลังปิดต้อง Reopen (API) ให้เป็นกำลังแก้ไขก่อน */
   const canEditFix =
@@ -328,17 +373,17 @@ export default function JobDetailPage() {
     );
   }, [brokenPartType]);
 
-  /** บังคับ: ประเภทสถานที่ + ประเภทงาน + สาเหตุ + วิธีแก้ไข + รูป 2 รูปแรก — ใช้ปิดปุ่มบันทึก */
-  const fixFormReadyToSubmit = useMemo(() => {
+  /** บังคับก่อนบันทึกการแก้ไข (ไม่รวมลายเซ็นผู้แจ้ง) */
+  const fixSaveReady = useMemo(() => {
     if (!canEditFix) return true;
-    const envOk =
-      fixEnvironment === "INDOOR" || fixEnvironment === "OUTDOOR";
-    const catOk =
-      brokenPartType === "Hardware" || brokenPartType === "Software";
-    const causeOk = cause.trim().length > 0;
-    const methodOk = fixMethod.trim().length > 0;
-    const imagesOk = hasRequiredFixImageSlots(fixImages, fixPreviews);
-    return envOk && catOk && causeOk && methodOk && imagesOk;
+    return isFixInfoComplete({
+      fixEnvironment,
+      brokenPart: brokenPartType,
+      cause,
+      fixMethod,
+      fixImageFiles: fixImages,
+      fixImagePreviews: fixPreviews,
+    });
   }, [
     canEditFix,
     fixEnvironment,
@@ -349,7 +394,21 @@ export default function JobDetailPage() {
     fixPreviews,
   ]);
 
-  const handleFixImage = (index: number, file: File | null) => {
+  const closeJobReady = fixSaveReady && reporterSigReady;
+
+  const handleFixImage = (
+    index: number,
+    file: File | null,
+    input?: HTMLInputElement | null,
+  ) => {
+    if (file) {
+      const err = validateJobImageFile(file);
+      if (err) {
+        toastError(err);
+        clearFileInput(input ?? fixFileRefs[index]?.current ?? null);
+        return;
+      }
+    }
     const imgs = [...fixImages];
     imgs[index] = file;
     const pv = [...fixPreviews];
@@ -379,86 +438,173 @@ export default function JobDetailPage() {
     );
   };
 
-  const handleSubmitFix = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!job || !token) return;
-    if (!canEditFix) {
-      toastError(
-        "สิทธิ์ไม่เพียงพอ",
-        "เฉพาะผู้รับงาน หรือผู้ดูแลระบบที่เกี่ยวข้องเท่านั้นที่บันทึกและปิดงานได้",
-      );
-      return;
-    }
+  const uploadFixForm = async (jobId: number) => {
+    const filesToUpload = fixImages.filter((f): f is File => f instanceof File);
+
+    await runMultipartUploadWithProxyFallback({
+      fields: [{ name: "fixImages", files: filesToUpload }],
+      reserveNonImageBytes: 80_000,
+      onCompressing: () =>
+        toastWarning(
+          "กำลังบีบอัดรูป",
+          "เซิร์ฟเวอร์จำกัดขนาดคำขอ — ระบบจะลดขนาดรูปแล้วส่งใหม่",
+        ),
+      upload: async (byField) => {
+        const form = new FormData();
+        form.append("brokenPartType", brokenPartType);
+        form.append("fixEnvironment", fixEnvironment);
+        form.append("cause", cause);
+        form.append("fixMethod", fixMethod);
+        form.append("note", note);
+        const ser = serializeJobSerialRowsToFormFields(serialRows);
+        form.append("oldSerialNumber", ser.oldSerialNumber);
+        form.append("newSerialNumber", ser.newSerialNumber);
+        (byField.get("fixImages") ?? []).forEach((file) =>
+          form.append("fixImages", file),
+        );
+        await axios.patch(`${API}/jobs/${jobId}/fix`, form, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      },
+    });
+  };
+
+  const applyJobDetailAfterFixSave = (data: JobDetail) => {
+    setJob(data);
+    setSerialRows(
+      parseJobSerialRowsFromDb(data.oldSerialNumber, data.newSerialNumber),
+    );
+    setFixImages([null, null, null]);
+    setFixPreviews(buildFixPreviewUrlsFromJob(data.id, data.fixImages));
+  };
+
+  const validateFixFormForSave = (): boolean => {
     if (fixEnvironment !== "INDOOR" && fixEnvironment !== "OUTDOOR") {
       toastError("ข้อมูลไม่ครบ", "กรุณาเลือกประเภทสถานที่ (Indoor / Outdoor)");
-      return;
+      return false;
     }
     if (brokenPartType !== "Hardware" && brokenPartType !== "Software") {
       toastError("ข้อมูลไม่ครบ", "กรุณาเลือกประเภทงาน (Hardware / Software)");
-      return;
+      return false;
     }
     if (!cause.trim()) {
       toastError("ข้อมูลไม่ครบ", "กรุณาระบุสาเหตุ");
-      return;
+      return false;
     }
     if (!fixMethod.trim()) {
       toastError("ข้อมูลไม่ครบ", "กรุณาระบุวิธีแก้ไข");
-      return;
+      return false;
     }
     if (!hasRequiredFixImageSlots(fixImages, fixPreviews)) {
       toastError(
         "รูปภาพไม่ครบ",
         "กรุณาแนบรูปการแก้ไขอย่างน้อย 2 รูปแรก หรือใช้รูปเดิมที่มีอยู่แล้ว",
       );
+      return false;
+    }
+    return true;
+  };
+
+  const handleSubmitFix = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!job || !token) return;
+    if (!canEditFix) {
+      toastError(
+        "สิทธิ์ไม่เพียงพอ",
+        "เฉพาะผู้รับงาน หรือผู้ดูแลระบบที่เกี่ยวข้องเท่านั้นที่บันทึกการแก้ไขได้",
+      );
       return;
     }
+    if (!(await ensureStaffSignatureOrToast(token))) return;
+    if (!validateFixFormForSave()) return;
+
     setSaving(true);
     try {
-      const form = new FormData();
-      form.append("brokenPartType", brokenPartType);
-      form.append("fixEnvironment", fixEnvironment);
-      form.append("cause", cause);
-      form.append("fixMethod", fixMethod);
-      form.append("note", note);
-      const ser = serializeJobSerialRowsToFormFields(serialRows);
-      form.append("oldSerialNumber", ser.oldSerialNumber);
-      form.append("newSerialNumber", ser.newSerialNumber);
-      const filesToUpload = fixImages.filter(
-        (f): f is File => f instanceof File,
-      );
-      filesToUpload.forEach((file) => form.append("fixImages", file));
-
-      // ไม่ต้องกำหนด Content-Type เอง เพื่อให้ axios ใส่ boundary ให้ถูกต้อง
-      await axios.patch(`${API}/jobs/${job.id}/fix`, form, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await uploadFixForm(job.id);
       toastSuccess("บันทึกข้อมูลการแก้ไขเรียบร้อยแล้ว", 1500);
-      // reload detail
       const res = await axios.get<JobDetail>(`${API}/jobs/${job.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const payload = unwrapApiData<unknown>(res?.data);
       const data = isJobDetail(payload) ? payload : null;
-      setJob(data);
-      if (data) {
-        setSerialRows(
-          parseJobSerialRowsFromDb(data.oldSerialNumber, data.newSerialNumber),
-        );
-        setFixImages([null, null, null]);
-        setFixPreviews(buildFixPreviewUrlsFromJob(data.id, data.fixImages));
-      }
-    } catch {
-      toastError("ข้อผิดพลาด", "ไม่สามารถบันทึกข้อมูลการแก้ไขได้");
+      if (data) applyJobDetailAfterFixSave(data);
+    } catch (err: unknown) {
+      const msg = formatJobImageUploadError(
+        err,
+        axios.isAxiosError(err) && err.response?.data?.message
+          ? String(
+              Array.isArray(err.response.data.message)
+                ? err.response.data.message.join(", ")
+                : err.response.data.message,
+            )
+          : "ไม่สามารถบันทึกข้อมูลการแก้ไขได้",
+      );
+      toastError("ข้อผิดพลาด", msg);
     } finally {
       setSaving(false);
     }
   };
 
-  const reloadJob = async () => {
+  const handleCloseJob = async () => {
+    if (!job || !token) return;
+    if (!canEditFix) {
+      toastError(
+        "สิทธิ์ไม่เพียงพอ",
+        "เฉพาะผู้รับงาน หรือผู้ดูแลระบบที่เกี่ยวข้องเท่านั้นที่ปิดงานได้",
+      );
+      return;
+    }
+    if (!(await ensureStaffSignatureOrToast(token))) return;
+    if (!validateFixFormForSave()) return;
+    const sigBlob = await reporterSigRef.current?.toBlob("image/png");
+    if (!sigBlob) {
+      toastError("ข้อมูลไม่ครบ", "กรุณาเซ็นลายเซ็นผู้แจ้งก่อนปิดงาน");
+      return;
+    }
+
+    setClosing(true);
+    let fixSaved = false;
+    try {
+      await uploadFixForm(job.id);
+      fixSaved = true;
+      const closeForm = new FormData();
+      closeForm.append("reporterSignature", sigBlob, "reporter-signature.png");
+      await axios.patch(`${API}/jobs/${job.id}/close`, closeForm, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toastSuccess("ปิดงานเรียบร้อยแล้ว (สถานะ: เสร็จสิ้น)", 1800);
+      reporterSigRef.current?.clear();
+      setReporterSigReady(false);
+      await reloadJob({ silent: true });
+    } catch (err: unknown) {
+      const msg = formatJobImageUploadError(
+        err,
+        axios.isAxiosError(err) && err.response?.data?.message
+          ? String(
+              Array.isArray(err.response.data.message)
+                ? err.response.data.message.join(", ")
+                : err.response.data.message,
+            )
+          : "ไม่สามารถปิดงานได้",
+      );
+      toastError(
+        fixSaved ? "ปิดงานไม่สำเร็จ" : "ข้อผิดพลาด",
+        fixSaved
+          ? `บันทึกการแก้ไขแล้ว แต่ปิดงานไม่สำเร็จ — ${msg}`
+          : msg,
+      );
+    } finally {
+      setClosing(false);
+    }
+  };
+
+  const reloadJob = async (opts?: { silent?: boolean }): Promise<JobDetail | null> => {
     const id = Number(params?.id);
-    if (!id || !token) return;
-    setLoading(true);
-    setError(null);
+    if (!id || !token) return null;
+    if (!opts?.silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const res = await axios.get<JobDetail>(`${API}/jobs/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -481,10 +627,12 @@ export default function JobDetailPage() {
         setFixImages([null, null, null]);
         setFixPreviews(buildFixPreviewUrlsFromJob(data.id, data.fixImages));
       }
+      return data;
     } catch {
-      setError("ไม่พบข้อมูลใบแจ้งซ่อมนี้");
+      if (!opts?.silent) setError("ไม่พบข้อมูลใบแจ้งซ่อมนี้");
+      return null;
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   };
 
@@ -598,6 +746,7 @@ export default function JobDetailPage() {
 
   const handleReopenJob = async () => {
     if (!job || !token || !reopenReason.trim()) return;
+    if (!(await ensureStaffSignatureOrToast(token))) return;
     const ok = await confirmDialog({
       title: "ยืนยัน Reopen งาน?",
       text: "สถานะจะเปลี่ยนเป็นกำลังแก้ไข เพื่อให้แก้ไขข้อมูลได้ — เมื่อแก้ครบแล้วให้บันทึกและปิดงานอีกครั้ง",
@@ -638,6 +787,7 @@ export default function JobDetailPage() {
       toastError("สิทธิ์ไม่เพียงพอ", "คุณไม่มีสิทธิ์รับงาน");
       return;
     }
+    if (!(await ensureStaffSignatureOrToast(token))) return;
     if (!jobNeedsAssignee(job)) {
       toastError("ทำรายการไม่ได้", "งานนี้มีผู้รับผิดชอบแล้ว หรือไม่สามารถรับงานในสถานะนี้ได้");
       return;
@@ -704,6 +854,7 @@ export default function JobDetailPage() {
     if (!job || !token) return;
     if (!canAssignAny) return;
     if (assignSelectedId == null) return;
+    if (!(await ensureStaffSignatureOrToast(token))) return;
 
     setAssignActionSaving(true);
     try {
@@ -778,6 +929,48 @@ export default function JobDetailPage() {
       toastError("ดาวน์โหลดไม่สำเร็จ", detail);
     } finally {
       setServerPdfDownloading(false);
+    }
+  };
+
+  const openClassifyDocDialog = async () => {
+    if (!token) return;
+    if (!(await ensureStaffSignatureOrToast(token))) return;
+    setClassifyOpen(true);
+  };
+
+  const handleClassifyDoc = async (isOutOfContract: boolean) => {
+    if (!token || !job) return;
+    if (!(await ensureStaffSignatureOrToast(token))) return;
+    setClassifySubmitting(true);
+    try {
+      await axios.patch(
+        `${API}/jobs/${job.id}/classify-doc`,
+        { isOutOfContract },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const reloaded = await reloadJob({ silent: true });
+      if (!isFormalDocTicketNo(reloaded?.ticketNo)) {
+        toastError(
+          "จำแนกเอกสารไม่สำเร็จ",
+          "ออกเลขแล้วแต่ยังอัปเดตหน้าจอไม่ได้ — กรุณารีเฟรช",
+        );
+        return;
+      }
+      toastSuccess(
+        isOutOfContract
+          ? "จำแนกเป็นนอกสัญญาแล้ว — ย้ายไปเมนูนอกสัญญา"
+          : "จำแนกเป็นในสัญญาแล้ว",
+        1800,
+      );
+      setClassifyOpen(false);
+    } catch (err) {
+      toastError(
+        "จำแนกเอกสารไม่สำเร็จ",
+        formatApiErrorDetail(axiosErrorData(err)) ??
+          "ไม่สามารถออกเลข Running Doc No ได้",
+      );
+    } finally {
+      setClassifySubmitting(false);
     }
   };
 
@@ -893,7 +1086,12 @@ export default function JobDetailPage() {
                           <MapPin size={12} aria-hidden /> สถานที่
                         </p>
                         <p className="text-sm glass-text">
-                          {[job.province, job.district, job.location]
+                          {[
+                            job.province,
+                            job.district,
+                            job.agency,
+                            job.location,
+                          ]
                             .filter(Boolean)
                             .join(" · ") || "–"}
                         </p>
@@ -933,56 +1131,80 @@ export default function JobDetailPage() {
                     </p>
                   </div>
 
-                  {job.images && Array.isArray(job.images) && job.images.length > 0 && (
-                    <div className={GLASS_SECTION}>
-                      <p className="text-xs font-semibold glass-muted-text mb-3">
-                        รูปภาพประกอบ
-                      </p>
+                  <div className={GLASS_SECTION}>
+                    <p className="text-xs font-semibold glass-muted-text mb-3">
+                      รูปภาพปัญหาที่แจ้ง
+                    </p>
+                    <div className="flex flex-col gap-4">
+                    {Array.isArray(job.images) &&
+                    job.images.some(
+                      (u) => typeof u === "string" && u.trim(),
+                    ) ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {job.images.slice(0, 4).map((src, i) => {
+                        {job.images.slice(0, 3).map((src, i) => {
                           if (!src) return null;
                           return (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => {
-                              if (!job) return;
-                              const slice = (job.images as string[]).slice(0, 4);
-                              const proxyUrls: string[] = [];
-                              const origIdx: number[] = [];
-                              slice.forEach((u, idx) => {
-                                if (u) {
-                                  origIdx.push(idx);
-                                  proxyUrls.push(
-                                    dashboardJobImagePath(job.id, "issue", idx),
-                                  );
-                                }
-                              });
-                              const pos = origIdx.indexOf(i);
-                              if (pos < 0) return;
-                              setPreviewImages(proxyUrls);
-                              setPreviewIndex(pos);
-                            }}
-                            className="relative w-full aspect-4/3 sm:aspect-video glass-card overflow-hidden bg-[var(--glass-card-bg)] group cursor-pointer"
-                          >
-                            <ManagedImage
-                              src={dashboardJobImagePath(job.id, "issue", i)}
-                              alt={`รูปประกอบ ${i + 1}`}
-                              fill
-                              sizes={MANAGED_IMAGE_SIZES.galleryResponsiveSm}
-                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                            />
-                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <span className="text-white text-xs font-medium px-2 py-1 rounded-full bg-black/40 backdrop-blur-sm">
-                                คลิกเพื่อขยาย
-                              </span>
-                            </div>
-                          </button>
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => {
+                                if (!job) return;
+                                const slice = (job.images as string[]).slice(
+                                  0,
+                                  3,
+                                );
+                                const proxyUrls: string[] = [];
+                                const origIdx: number[] = [];
+                                slice.forEach((u, idx) => {
+                                  if (u) {
+                                    origIdx.push(idx);
+                                    proxyUrls.push(
+                                      dashboardJobImagePath(
+                                        job.id,
+                                        "issue",
+                                        idx,
+                                      ),
+                                    );
+                                  }
+                                });
+                                const pos = origIdx.indexOf(i);
+                                if (pos < 0) return;
+                                setPreviewImages(proxyUrls);
+                                setPreviewIndex(pos);
+                              }}
+                              className="relative w-full aspect-4/3 sm:aspect-video glass-card overflow-hidden bg-[var(--glass-card-bg)] group cursor-pointer"
+                            >
+                              <ManagedImage
+                                src={dashboardJobImagePath(job.id, "issue", i)}
+                                alt={`รูปปัญหา ${i + 1}`}
+                                fill
+                                sizes={MANAGED_IMAGE_SIZES.galleryResponsiveSm}
+                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                              />
+                              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <span className="text-white text-xs font-medium px-2 py-1 rounded-full bg-black/40 backdrop-blur-sm">
+                                  คลิกเพื่อขยาย
+                                </span>
+                              </div>
+                            </button>
                           );
                         })}
                       </div>
+                    ) : !canUploadIssueImages ? (
+                      <p className="text-xs glass-muted-text">
+                        ยังไม่มีรูปภาพที่แจ้ง
+                      </p>
+                    ) : null}
+                    <IssueImagesUploadPanel
+                      key={countNonemptyIssueImages(job.images)}
+                      jobId={job.id}
+                      token={token}
+                      canUpload={canUploadIssueImages}
+                      existingCount={countNonemptyIssueImages(job.images)}
+                      onUploaded={() => void reloadJob({ silent: true })}
+                    />
                     </div>
-                  )}
+                  </div>
                 </>
               )}
             </div>
@@ -1054,7 +1276,7 @@ export default function JobDetailPage() {
                   )}
                   {isResolved && (
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                      <span className="text-sm">ไฟล์ PDF รายงาน:</span>
+                      <span className="text-sm">หลังปิดงาน:</span>
                       <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                         <a
                           href={`/print/jobs/${job.id}`}
@@ -1081,6 +1303,18 @@ export default function JobDetailPage() {
                               : "ดาวน์โหลด (เซิร์ฟเวอร์)"}
                           </span>
                         </Button>
+                        {showClassifyDoc ? (
+                          <Button
+                            type="button"
+                            variant="default"
+                            onClick={() => void openClassifyDocDialog()}
+                            disabled={classifySubmitting}
+                            className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-lg hover:bg-blue-500 focus-visible:ring-blue-500/40 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <Stamp size={14} aria-hidden />
+                            จำแนกเอกสาร
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
                   )}
@@ -1216,6 +1450,7 @@ export default function JobDetailPage() {
                     งานนี้ถูกยกเลิกแล้ว — ไม่มีการดำเนินการซ่อมต่อ และไม่สามารถบันทึกการแก้ไขหรือ Reopen ได้
                   </p>
                 ) : (canEditFix || isReadOnlyFix) ? (
+                  <>
                   <form onSubmit={handleSubmitFix} className="space-y-4">
                     <div className="glass-card p-3 sm:p-4 space-y-3">
                       <p className="text-xs glass-muted-text leading-relaxed">
@@ -1232,7 +1467,7 @@ export default function JobDetailPage() {
                         ,{" "}
                         <span className="glass-muted-text font-medium">วิธีแก้ไข</span>
                         และแนบรูป 2 รูปแรก — เลือกประเภทสถานที่ก่อน จึงจะเลือกประเภทงานได้
-                        หมายเหตุและ Serial ไม่บังคับ
+                        หมายเหตุและ Serial ไม่บังคับ — บันทึกการแก้ไขก่อน แล้วให้ผู้แจ้งเซ็นที่ส่วนปิดงานด้านล่าง
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
@@ -1474,7 +1709,7 @@ export default function JobDetailPage() {
                         <span className={GLASS_LABEL}>
                           รูปการแก้ไข{" "}
                           <span className="glass-muted-text font-normal">
-                            (บังคับ 2 รูปแรก — ใช้รูปเดิมได้ / อัปโหลดใหม่เพื่อเปลี่ยน)
+                            (บังคับ 2 รูปแรก — ใช้รูปเดิมได้ / อัปโหลดใหม่เพื่อเปลี่ยน) · {JOB_IMAGE_HINT}
                           </span>
                         </span>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mt-1">
@@ -1522,13 +1757,14 @@ export default function JobDetailPage() {
                                 )}
                                 <input
                                   type="file"
-                                  accept="image/*"
+                                  accept={JOB_IMAGE_ACCEPT}
                                   className="hidden"
                                   ref={fixFileRefs[i]}
                                   onChange={(e) =>
                                     handleFixImage(
                                       i,
                                       e.target.files?.[0] || null,
+                                      e.target,
                                     )
                                   }
                                 />
@@ -1539,14 +1775,16 @@ export default function JobDetailPage() {
                       </div>
                     )}
                     {canEditFix ? (
-                      <Button
-                        type="submit"
-                        variant="default"
-                        disabled={saving || !fixFormReadyToSubmit}
-                        className="mt-3 w-full cursor-pointer rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white shadow-lg hover:bg-blue-700 focus-visible:ring-blue-500/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
-                      >
-                        {saving ? "กำลังบันทึก..." : "บันทึกและปิดงาน (สถานะ: เสร็จสิ้น)"}
-                      </Button>
+                      <>
+                        <Button
+                          type="submit"
+                          variant="default"
+                          disabled={saving || closing || !fixSaveReady}
+                          className="mt-3 w-full cursor-pointer rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white shadow-lg hover:bg-blue-700 focus-visible:ring-blue-500/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
+                        >
+                          {saving ? "กำลังบันทึก..." : "บันทึกการแก้ไข"}
+                        </Button>
+                      </>
                     ) : isResolved && (canReopenAny || (canReopenSelf && isAssignee)) ? (
                       <div className="w-full mt-3 py-3 rounded-xl text-xs sm:text-sm font-medium text-center border border-dashed border-[var(--glass-card-border)] glass-muted-text bg-[var(--glass-card-bg)] backdrop-blur-sm">
                         งานนี้ถูกปิดแล้ว — หากต้องการแก้ไขข้อมูลการแก้ไข ให้ใช้ขั้นตอน Reopen ด้านล่าง
@@ -1599,6 +1837,45 @@ export default function JobDetailPage() {
                       </div>
                     )}
                   </form>
+
+                  {canEditFix && (
+                    <div className="glass-card p-3 sm:p-4 space-y-3 mt-4 border border-emerald-300/40 dark:border-emerald-500/25">
+                      <div>
+                        <p className="text-sm font-semibold glass-text">
+                          ปิดงาน — ลายเซ็นผู้แจ้ง
+                        </p>
+                        <p className="text-xs glass-muted-text mt-1 leading-relaxed">
+                          ให้ผู้แจ้งปัญหาเซ็นบนอุปกรณ์นี้ (มือถือ/แท็บเล็ต/แล็ปท็อป) หลังบันทึกการแก้ไขครบแล้ว
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className={GLASS_LABEL}>
+                          ลายเซ็นผู้แจ้ง <span className="text-red-600 dark:text-red-400">*</span>
+                        </Label>
+                        <SignaturePad
+                          handleRef={reporterSigRef}
+                          height={160}
+                          onStrokeChange={setReporterSigReady}
+                          disabled={saving || closing}
+                        />
+                      </div>
+                      {!fixSaveReady && (
+                        <p className="text-xs text-amber-800 dark:text-amber-200/90">
+                          กรุณากรอกและบันทึกข้อมูลการแก้ไขให้ครบก่อนปิดงาน
+                        </p>
+                      )}
+                      <Button
+                        type="button"
+                        variant="default"
+                        onClick={() => void handleCloseJob()}
+                        disabled={saving || closing || !closeJobReady}
+                        className="w-full cursor-pointer rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-lg hover:bg-emerald-700 focus-visible:ring-emerald-500/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
+                      >
+                        {closing ? "กำลังปิดงาน..." : "ปิดงาน (สถานะ: เสร็จสิ้น)"}
+                      </Button>
+                    </div>
+                  )}
+                  </>
                 ) : (
                   <p className="text-xs glass-muted-text text-center py-2">
                     ข้อมูลการแก้ไขถูกบันทึกแล้ว — การ Reopen/แก้ไขเพิ่มทำได้ตามสิทธิ์ที่กำหนดในบทบาท หากคุณไม่สามารถดำเนินการได้ โปรดติดต่อผู้ดูแลระบบ
@@ -1630,6 +1907,16 @@ export default function JobDetailPage() {
         onSelectStaff={setAssignSelectedId}
         assignActionSaving={assignActionSaving}
         onSubmit={() => void handleAssignSubmit()}
+      />
+
+      <JobClassifyDocDialog
+        open={classifyOpen}
+        onOpenChange={(open) => {
+          if (!open && !classifySubmitting) setClassifyOpen(false);
+        }}
+        ticketNo={job?.ticketNo}
+        submitting={classifySubmitting}
+        onConfirm={(isOutOfContract) => void handleClassifyDoc(isOutOfContract)}
       />
     </DashboardPageShell>
   );

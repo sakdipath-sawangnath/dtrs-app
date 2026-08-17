@@ -23,7 +23,11 @@
     "security:outdated": "npm outdated",
     "script:fix-job-dates-batch": "ts-node scripts/fix-job-dates-by-tickets.ts",
     "script:audit-report-future-year": "ts-node scripts/audit-job-report-future-in-year.ts",
-    "script:fix-report-future-audited": "ts-node scripts/fix-job-report-future-audited.ts"
+    "script:fix-report-future-audited": "ts-node scripts/fix-job-report-future-audited.ts",
+    "script:seed-locations-mssql": "ts-node scripts/seed-locations-from-mssql.ts",
+    "script:seed-sites-xlsx": "ts-node scripts/seed-sites-from-xlsx.ts",
+    "script:seed-sites-xlsx:dry": "ts-node scripts/seed-sites-from-xlsx.ts --dry-run",
+    "script:seed-sites-xlsx:clear": "ts-node scripts/seed-sites-from-xlsx.ts --clear"
   },
   "engines": {
     "npm": ">=10.0.0",
@@ -47,6 +51,8 @@
     "class-validator": "^0.14.4",
     "csv-parse": "^6.1.0",
     "dotenv": "^16.4.7",
+    "file-type": "^21.3.4",
+    "heic-convert": "^2.1.0",
     "minio": "^8.0.4",
     "nodemailer": "^8.0.3",
     "passport-jwt": "^4.0.1",
@@ -68,6 +74,7 @@
     "@types/cheerio": "^0.22.35",
     "@types/dotenv": "^8.2.3",
     "@types/express": "^5.0.0",
+    "@types/heic-convert": "^2.1.1",
     "@types/jest": "^29.5.14",
     "@types/minio": "^7.1.1",
     "@types/multer": "^1.4.12",
@@ -78,6 +85,7 @@
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.3",
+    "exceljs": "^4.4.0",
     "globals": "^15.14.0",
     "jest": "^29.7.0",
     "prettier": "^3.4.2",
@@ -89,8 +97,7 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.20.0",
-    "exceljs": "^4.4.0"
+    "typescript-eslint": "^8.20.0"
   },
   "jest": {
     "moduleFileExtensions": [
@@ -107,7 +114,10 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^file-type$": "<rootDir>/../test/mocks/file-type.ts"
+    }
   },
   "overrides": {
     "file-type": "^21.3.4",

@@ -24,6 +24,10 @@
 | `/socket.io` | `http://<IP-เครื่อง>:8405` | `EventsGateway` (Socket.IO) |
 | `/api/` | `http://<IP-เครื่อง>:8405` | API หลักของ Nest (รวม `/api/jobs/...`, `/api/jobs/.../report-pdf`, `/api/jobs/.../image/...`) |
 
+**ขนาด request อัปโหลด:** ตั้ง `client_max_body_size 50m;` ที่ location `/api/` (หรือใน Advanced config ของ proxy host) — ค่าเริ่มต้น Nginx ~1MB จะได้ **413** ก่อนถึง Nest เมื่อส่ง multipart รูปหลายไฟล์ (3×5MB + ฟิลด์ฟอร์ม). **Deploy checklist:** หลัง deploy ฟีเจอร์จำกัดรูป 5MB ให้ยืนยันค่านี้บน UAT/PRD ก่อนทดสอบอัปโหลดจากมือถือ
+
+**Fallback ฝั่งแอป (เมื่อยังตั้ง NPM ไม่ได้):** frontend จะบีบอัดรูปใน browser อัตโนมัติเมื่อขนาดรวมใกล้เกิน ~1MB หรือเมื่อได้ HTTP **413** แล้วลองส่งใหม่ (`frontend/src/lib/jobImageProxyFallback.ts`) — คุณภาพอาจลดลง; รูป **HEIC** ที่ใหญ่เกินงบประมาณต่อไฟล์ยังต้องแปลงเป็น JPG เอง
+
 ตัวอย่างค่าใน UI ตรงกับรูปที่ตั้งค่าไว้: scheme **http**, forward ไป **192.168.0.128** แยกพอร์ต **8404** / **8405** ตามตารางด้านบน
 
 ### Safety-net ฝั่งแอป (เมื่อ `/api/` ยังชี้ไป Next)

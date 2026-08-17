@@ -20,8 +20,24 @@ import { Textarea } from "@/components/ui/textarea";
 import PublicRouteLoading from "@/components/PublicRouteLoading";
 import ManagedImage, { MANAGED_IMAGE_SIZES } from "@/components/ManagedImage";
 import ManagedImageFrame from "@/components/ManagedImageFrame";
+import {
+  fetchSiteOptionAgencies,
+  fetchSiteOptionDistricts,
+  fetchSiteOptionProvinces,
+  fetchSiteOptionStations,
+  fetchSiteOptionSubdistricts,
+} from "@/lib/sitesOptionsApi";
+import {
+  clearFileInput,
+  JOB_IMAGE_ACCEPT,
+  JOB_IMAGE_HINT,
+  validateJobImageFile,
+} from "@/lib/jobImageUpload";
+import {
+  formatJobImageUploadError,
+  runMultipartUploadWithProxyFallback,
+} from "@/lib/jobImageProxyFallback";
 
-interface Site { id: number; province: string; district: string; agency: string; }
 type ReporterPayload = {
   name: string;
   email?: string | null;
@@ -31,6 +47,16 @@ type ReporterPayload = {
 
 function isReporterPayload(v: unknown): v is ReporterPayload {
   return !!v && typeof v === 'object' && 'name' in v && typeof (v as { name?: unknown }).name === 'string';
+}
+
+/** ต้องตรงกับ `CreateJobSchema.description` ใน backend */
+const REPORT_DESCRIPTION_MIN_LENGTH = 10;
+const REPORT_DESCRIPTION_MAX_LENGTH = 500;
+
+function clampReportDescription(value: string): string {
+  return value.length > REPORT_DESCRIPTION_MAX_LENGTH
+    ? value.slice(0, REPORT_DESCRIPTION_MAX_LENGTH)
+    : value;
 }
 
 /** ดึงข้อความจาก Nest + axios (รองรับ error.message / error.error.message / details) */
@@ -68,12 +94,15 @@ function ReportPageContent() {
   const searchParams = useSearchParams();
   const API = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4100/api';
 
-  const [sites, setSites] = useState<Site[]>([]);
+  const [provinces, setProvinces] = useState<string[]>([]);
   const [districts, setDistricts] = useState<string[]>([]);
+  const [subdistricts, setSubdistricts] = useState<string[]>([]);
   const [agencies, setAgencies] = useState<string[]>([]);
-  const [sitesLoading, setSitesLoading] = useState(false);
+  const [stations, setStations] = useState<string[]>([]);
+  const [provincesLoading, setProvincesLoading] = useState(false);
+  const [cascadeLoading, setCascadeLoading] = useState(false);
   const [sitesError, setSitesError] = useState<string | null>(null);
-  const [sitesFetched, setSitesFetched] = useState(false);
+  const [provincesFetched, setProvincesFetched] = useState(false);
   
   const [submitting, setSubmitting] = useState(false);
   const [isSearchingPhone, setIsSearchingPhone] = useState(false);
@@ -84,7 +113,7 @@ function ReportPageContent() {
   const isOutOfContract = contractStatus === 'OUT_OF_CONTRACT';
 
   const [form, setForm] = useState({
-    province: '', district: '', location: '',
+    province: '', district: '', subdistrict: '', agency: '', location: '',
     reporterName: '', reporterPhone: '', reporterEmail: '',
     reporterPosition: '',
     description: '',
@@ -105,52 +134,28 @@ function ReportPageContent() {
     Boolean(session) &&
     ['STAFF', 'ADMIN', 'SUPERVISOR'].includes(role || '');
 
-  // โหลดรายการสถานที่ (Sites): สาธารณะ — หลังตรวจสอบเบอร์สำเร็จ; เจ้าหน้าที่ที่ล็อกอิน — โหลดทันที
-  const fetchSites = async (): Promise<void> => {
-    // กันยิงซ้ำ
-    if (sitesFetched || sitesLoading) return;
+  /** P1: หลังตรวจเบอร์ (หรือ staff พร้อมแจ้ง) โหลดแค่รายการจังหวัดจาก Site */
+  const loadProvinces = async (): Promise<void> => {
+    if (provincesFetched || provincesLoading) return;
 
-    setSitesLoading(true);
+    setProvincesLoading(true);
     setSitesError(null);
     try {
-      const r = await axios.get<Site[]>(`${API}/sites`, { timeout: 10000 });
-      const root: unknown = r?.data;
-      const nested =
-        root && typeof root === 'object' && 'data' in root
-          ? (root as { data?: unknown }).data
-          : undefined;
-      const payload: unknown = nested ?? root;
-
-      const arr = Array.isArray(payload) ? (payload as unknown[]) : [];
-      const cleaned = arr.filter((s): s is Site => {
-        if (!s || typeof s !== 'object') return false;
-        const o = s as Record<string, unknown>;
-        return (
-          typeof o.id === 'number' &&
-          typeof o.province === 'string' &&
-          typeof o.district === 'string' &&
-          typeof o.agency === 'string'
+      const list = await fetchSiteOptionProvinces();
+      setProvinces(list);
+      setProvincesFetched(true);
+      if (list.length === 0) {
+        setSitesError(
+          'ไม่พบข้อมูลสถานที่ในระบบ (Site) — กรุณา seed ข้อมูลพื้นที่ก่อน',
         );
-      });
-
-      setSites(cleaned);
-      setSitesFetched(true);
-      if (cleaned.length === 0) {
-        setSitesError('ไม่พบข้อมูลสถานที่ในระบบ (Site) — กรุณา seed ข้อมูลพื้นที่ก่อน');
       }
     } catch {
-      setSitesError('โหลดรายการสถานที่ไม่สำเร็จ');
-      setSites([]);
+      setSitesError('โหลดรายการจังหวัดไม่สำเร็จ');
+      setProvinces([]);
     } finally {
-      setSitesLoading(false);
+      setProvincesLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (status !== 'authenticated' || !isStaffFlow) return;
-    void fetchSites();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, isStaffFlow]);
 
   useEffect(() => {
     return () => {
@@ -165,52 +170,167 @@ function ReportPageContent() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed?.form) {
-          // Merge specifically to avoid stale missing fields
-          setForm(prev => ({ ...prev, ...parsed.form }));
+          const restored = { ...parsed.form } as typeof form;
+          if (typeof restored.description === 'string') {
+            restored.description = clampReportDescription(restored.description);
+          }
+          setForm((prev) => ({ ...prev, ...restored }));
         }
         if (parsed?.isUserFound) setIsUserFound(parsed.isUserFound);
         if (parsed?.phoneSearched) setPhoneSearched(parsed.phoneSearched);
-        
-        // หลังกดตรวจสอบเบอร์แล้ว (พบหรือไม่พบในระบบ) ต้องโหลด sites
         if (parsed?.phoneSearched) {
-          fetchSites();
+          void loadProvinces();
         }
       }
     } catch (e) {
-      console.error("Failed to parse report form draft", e);
+      console.error('Failed to parse report form draft', e);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // --- 2. Save Draft to Session Storage ---
   useEffect(() => {
-    // Only save logic if the user has actually started interacting
     if (phoneSearched || form.reporterPhone) {
       const draft = { form, isUserFound, phoneSearched };
       sessionStorage.setItem('reportFormDraft', JSON.stringify(draft));
     }
   }, [form, isUserFound, phoneSearched]);
 
+  /** Staff: เมื่อเบอร์ครบ 10 หลัก (canProceed) ให้โหลดจังหวัด */
+  const isPhoneValidEarly = /^\d{10}$/.test(form.reporterPhone.trim());
   useEffect(() => {
-    if (form.province) {
-      setDistricts([...new Set(sites.filter(s => s.province === form.province).map(s => s.district))]);
-      setForm(p => ({ ...p, district: '', location: '' }));
-    }
-  }, [form.province, sites]);
+    if (!isStaffFlow || !isPhoneValidEarly) return;
+    void loadProvinces();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStaffFlow, isPhoneValidEarly]);
+
+  /** เลือกจังหวัด → โหลดอำเภอจาก Site */
+  const cascadeInflight = useRef(0);
+  const beginCascadeLoad = () => {
+    cascadeInflight.current += 1;
+    setCascadeLoading(true);
+  };
+  const endCascadeLoad = () => {
+    cascadeInflight.current = Math.max(0, cascadeInflight.current - 1);
+    if (cascadeInflight.current === 0) setCascadeLoading(false);
+  };
 
   useEffect(() => {
-    if (form.district && form.province) {
-      const raw = sites
-        .filter((s) => s.province === form.province && s.district === form.district)
-        .map((s) => (s.agency ?? "").trim())
-        .filter(Boolean);
-      const unique = [...new Set(raw)].sort((a, b) => a.localeCompare(b, "th"));
-      setAgencies(unique);
-      setForm((p) => ({ ...p, location: "" }));
-    } else {
+    if (!form.province) {
+      setDistricts([]);
+      setSubdistricts([]);
       setAgencies([]);
+      setStations([]);
+      return;
     }
-  }, [form.district, form.province, sites]);
+    let cancelled = false;
+    const ac = new AbortController();
+    beginCascadeLoad();
+    (async () => {
+      try {
+        const list = await fetchSiteOptionDistricts(form.province, ac.signal);
+        if (!cancelled) setDistricts(list);
+      } catch {
+        if (!ac.signal.aborted && !cancelled) setDistricts([]);
+      } finally {
+        endCascadeLoad();
+      }
+    })();
+    return () => {
+      cancelled = true;
+      ac.abort();
+    };
+  }, [form.province]);
+
+  /** เลือกอำเภอ → โหลดตำบลจาก Site */
+  useEffect(() => {
+    if (!form.district || !form.province) {
+      setSubdistricts([]);
+      return;
+    }
+    let cancelled = false;
+    const ac = new AbortController();
+    beginCascadeLoad();
+    (async () => {
+      try {
+        const list = await fetchSiteOptionSubdistricts(
+          form.province,
+          form.district,
+          ac.signal,
+        );
+        if (!cancelled) setSubdistricts(list);
+      } catch {
+        if (!ac.signal.aborted && !cancelled) setSubdistricts([]);
+      } finally {
+        endCascadeLoad();
+      }
+    })();
+    return () => {
+      cancelled = true;
+      ac.abort();
+    };
+  }, [form.district, form.province]);
+
+  /** อำเภอ (+ตำบล optional) → โหลดสถานที่/หน่วยงาน */
+  useEffect(() => {
+    if (!form.district || !form.province) {
+      setAgencies([]);
+      return;
+    }
+    let cancelled = false;
+    const ac = new AbortController();
+    beginCascadeLoad();
+    (async () => {
+      try {
+        const list = await fetchSiteOptionAgencies(
+          form.province,
+          form.district,
+          form.subdistrict || undefined,
+          ac.signal,
+        );
+        if (!cancelled) setAgencies(list);
+      } catch {
+        if (!ac.signal.aborted && !cancelled) setAgencies([]);
+      } finally {
+        endCascadeLoad();
+      }
+    })();
+    return () => {
+      cancelled = true;
+      ac.abort();
+    };
+  }, [form.district, form.province, form.subdistrict]);
+
+  /** เลือกสถานที่ → โหลดชื่อสถานี */
+  useEffect(() => {
+    if (!form.agency || !form.district || !form.province) {
+      setStations([]);
+      return;
+    }
+    let cancelled = false;
+    const ac = new AbortController();
+    beginCascadeLoad();
+    (async () => {
+      try {
+        const list = await fetchSiteOptionStations(
+          form.province,
+          form.district,
+          form.agency,
+          form.subdistrict || undefined,
+          ac.signal,
+        );
+        if (!cancelled) setStations(list);
+      } catch {
+        if (!ac.signal.aborted && !cancelled) setStations([]);
+      } finally {
+        endCascadeLoad();
+      }
+    })();
+    return () => {
+      cancelled = true;
+      ac.abort();
+    };
+  }, [form.agency, form.district, form.province, form.subdistrict]);
 
   const handlePhoneSearch = async () => {
     const phone = form.reporterPhone.trim();
@@ -251,8 +371,7 @@ function ReportPageContent() {
         });
         setIsUserFound(true);
         toastSuccess('ดึงข้อมูลผู้แจ้งสำเร็จ', 1500);
-        // เมื่อผ่านการตรวจสอบเบอร์โทรแล้วค่อยโหลดรายการสถานที่
-        fetchSites();
+        void loadProvinces();
       } else {
         setForm(p => ({ ...p, reporterName: '', reporterEmail: '', reporterPosition: '' }));
         setRemoteReporterAvatarUrl(null);
@@ -266,7 +385,7 @@ function ReportPageContent() {
           'ไม่พบประวัติในระบบ',
           'กรุณากรอกชื่อ-สกุล (และอีเมลถ้ามี) แล้วดำเนินการแจ้งซ่อมได้',
         );
-        fetchSites();
+        void loadProvinces();
       }
       setPhoneSearched(true);
     } catch {
@@ -283,19 +402,35 @@ function ReportPageContent() {
       });
       setIsUserFound(false);
       setPhoneSearched(true);
-      fetchSites();
+      void loadProvinces();
     } finally {
       setIsSearchingPhone(false);
     }
   };
 
-  const handleImage = (i: number, file: File | null) => {
+  const handleImage = (i: number, file: File | null, input?: HTMLInputElement | null) => {
+    if (file) {
+      const err = validateJobImageFile(file);
+      if (err) {
+        toastError(err);
+        clearFileInput(input ?? fileRefs[i].current);
+        return;
+      }
+    }
     const imgs = [...images]; imgs[i] = file;
     const pv = [...previews]; pv[i] = file ? URL.createObjectURL(file) : null;
     setImages(imgs); setPreviews(pv);
   };
 
-  const handleReporterAvatarChange = (file: File | null) => {
+  const handleReporterAvatarChange = (file: File | null, input?: HTMLInputElement | null) => {
+    if (file) {
+      const err = validateJobImageFile(file);
+      if (err) {
+        toastError(err);
+        clearFileInput(input ?? reporterAvatarRef.current);
+        return;
+      }
+    }
     setReporterAvatarFile(file);
     setReporterAvatarLocalUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
@@ -339,7 +474,7 @@ function ReportPageContent() {
     const emailTrim = form.reporterEmail.trim();
     const phoneTrim = form.reporterPhone.trim();
     if (!emailTrim) {
-      setReporterEmailError('กรุณาระบุอีเมล');
+      setReporterEmailError(null);
       return;
     }
     if (!EMAIL_PATTERN.test(emailTrim)) {
@@ -386,70 +521,88 @@ function ReportPageContent() {
       return;
     }
     const emailTrim = form.reporterEmail.trim();
-    if (!emailTrim) {
-      setReporterEmailError('กรุณาระบุอีเมล');
-      toastWarning('อีเมล', 'กรุณาระบุอีเมล');
-      return;
-    }
-    if (!EMAIL_PATTERN.test(emailTrim)) {
-      setReporterEmailError('รูปแบบอีเมลไม่ถูกต้อง');
-      toastWarning('อีเมล', 'รูปแบบอีเมลไม่ถูกต้อง');
-      return;
-    }
-    const phoneTrim = form.reporterPhone.trim();
-    try {
-      const emailFree = await checkReporterEmailAvailability(emailTrim, phoneTrim);
-      if (!emailFree) {
-        setReporterEmailError('อีเมลนี้ถูกใช้โดยผู้ใช้อื่นแล้ว');
-        toastWarning('อีเมล', 'อีเมลนี้ถูกใช้โดยผู้ใช้อื่นแล้ว กรุณาใช้อีเมลอื่น');
+    if (emailTrim) {
+      if (!EMAIL_PATTERN.test(emailTrim)) {
+        setReporterEmailError('รูปแบบอีเมลไม่ถูกต้อง');
+        toastWarning('อีเมล', 'รูปแบบอีเมลไม่ถูกต้อง');
         return;
       }
-    } catch {
-      toastWarning('การเชื่อมต่อ', 'ไม่สามารถตรวจสอบอีเมลได้ ลองอีกครั้ง');
+      const phoneTrim = form.reporterPhone.trim();
+      try {
+        const emailFree = await checkReporterEmailAvailability(emailTrim, phoneTrim);
+        if (!emailFree) {
+          setReporterEmailError('อีเมลนี้ถูกใช้โดยผู้ใช้อื่นแล้ว');
+          toastWarning('อีเมล', 'อีเมลนี้ถูกใช้โดยผู้ใช้อื่นแล้ว กรุณาใช้อีเมลอื่น');
+          return;
+        }
+      } catch {
+        toastWarning('การเชื่อมต่อ', 'ไม่สามารถตรวจสอบอีเมลได้ ลองอีกครั้ง');
+        return;
+      }
+    } else {
+      setReporterEmailError(null);
+    }
+    if (!provincesFetched) {
+      toastWarning('กรุณารอสักครู่', 'ระบบกำลังโหลดรายการจังหวัด');
       return;
     }
-    if (!sitesFetched) {
-      toastWarning('กรุณารอสักครู่', 'ระบบกำลังโหลดรายการสถานที่');
+    if (!form.province || !form.district || !form.agency || !form.location) {
+      toastWarning('ข้อมูลสถานที่ไม่ครบ', 'กรุณาเลือก จังหวัด / อำเภอ / สถานที่ / ชื่อสถานี ให้ครบถ้วน');
       return;
     }
-    if (!form.province || !form.district || !form.location) {
-      toastWarning('ข้อมูลสถานที่ไม่ครบ', 'กรุณาเลือก จังหวัด / อำเภอ / สถานที่ ให้ครบถ้วน');
+    const descriptionTrimmed = form.description.trim();
+    if (!descriptionTrimmed || descriptionTrimmed.length < REPORT_DESCRIPTION_MIN_LENGTH) {
+      toastWarning(
+        'รายละเอียดไม่ครบ',
+        `รายละเอียดต้องมีอย่างน้อย ${REPORT_DESCRIPTION_MIN_LENGTH} ตัวอักษร`,
+      );
       return;
     }
-    if (!form.description || form.description.trim().length < 10) {
-      toastWarning('รายละเอียดไม่ครบ', 'รายละเอียดต้องมีอย่างน้อย 10 ตัวอักษร');
-      return;
-    }
-    if (!images[0] || !images[1]) {
-      toastWarning('รูปภาพไม่ครบ', 'กรุณาแนบรูปภาพอย่างน้อย 2 รูปแรก');
+    if (descriptionTrimmed.length > REPORT_DESCRIPTION_MAX_LENGTH) {
+      toastWarning(
+        'รายละเอียดยาวเกินไป',
+        `รายละเอียดต้องไม่เกิน ${REPORT_DESCRIPTION_MAX_LENGTH} ตัวอักษร`,
+      );
       return;
     }
     setSubmitting(true);
     try {
-      const formData = new FormData();
-      Object.entries(form).forEach(([key, value]) => {
-        let str = typeof value === 'string' ? value.trim() : String(value ?? '');
-        if (key === 'reporterEmail') str = str.replace(/\s/g, '');
-        formData.append(key, str);
-      });
-      formData.append('isOutOfContract', isOutOfContract ? 'true' : 'false');
-      formData.append('reportDate', new Date().toISOString());
-
-      if (reporterAvatarFile) {
-        formData.append('reporterAvatar', reporterAvatarFile);
-      }
-      
-      images.forEach((img) => {
-        if (img) {
-          formData.append('images', img);
-        }
-      });
+      const issueFiles = images.filter((img): img is File => img instanceof File);
+      const imageFields = [
+        { name: 'images', files: issueFiles },
+        ...(reporterAvatarFile
+          ? [{ name: 'reporterAvatar', files: [reporterAvatarFile] }]
+          : []),
+      ];
 
       const headers: Record<string, string> = {};
       const token = (session as { accessToken?: string })?.accessToken;
       if (token) headers.Authorization = `Bearer ${token}`;
-      // ไม่ต้องกำหนด Content-Type เอง เพื่อให้ axios ใส่ boundary ให้ถูกต้อง
-      const res = await axios.post(`${API}/public/jobs`, formData, { headers });
+
+      const res = await runMultipartUploadWithProxyFallback({
+        fields: imageFields,
+        reserveNonImageBytes: 64_000,
+        onCompressing: () =>
+          toastWarning(
+            'กำลังบีบอัดรูป',
+            'เซิร์ฟเวอร์จำกัดขนาดคำขอ — ระบบจะลดขนาดรูปแล้วส่งใหม่',
+          ),
+        upload: async (byField) => {
+          const formData = new FormData();
+          Object.entries(form).forEach(([key, value]) => {
+            let str = typeof value === 'string' ? value.trim() : String(value ?? '');
+            if (key === 'reporterEmail') str = str.replace(/\s/g, '');
+            formData.append(key, str);
+          });
+          formData.append('isOutOfContract', isOutOfContract ? 'true' : 'false');
+          formData.append('reportDate', new Date().toISOString());
+          (byField.get('reporterAvatar') ?? []).forEach((f) =>
+            formData.append('reporterAvatar', f),
+          );
+          (byField.get('images') ?? []).forEach((f) => formData.append('images', f));
+          return axios.post(`${API}/public/jobs`, formData, { headers });
+        },
+      });
       const root: unknown = res?.data;
       const nested =
         root && typeof root === 'object' && 'data' in root
@@ -462,21 +615,24 @@ function ReportPageContent() {
       // เคลียร์ Draft ทิ้งเมื่อสำเร็จ
       sessionStorage.removeItem('reportFormDraft');
 
-      if (ticketNo) {
-        toastSuccess(`แจ้งซ่อมสำเร็จ! เลขที่ใบแจ้งซ่อมของคุณคือ ${ticketNo}`, 2200);
-        setTimeout(() => {
-          if (phoneDigits.length >= 9) {
-            router.push(`/public/status?phone=${encodeURIComponent(phoneDigits)}`);
-          } else {
-            router.push(`/public/status?ticketNo=${encodeURIComponent(ticketNo)}`);
-          }
-        }, 800);
+      const ticket = typeof ticketNo === 'string' ? ticketNo.trim() : '';
+      if (ticket) {
+        toastSuccess(`แจ้งซ่อมสำเร็จ! เลขที่ใบแจ้งซ่อมของคุณคือ ${ticket}`, 2200);
       } else {
         toastSuccess('แจ้งซ่อมสำเร็จ! ทีมช่างจะดำเนินการในเร็วๆ นี้', 1500);
       }
+      setTimeout(() => {
+        if (phoneDigits.length >= 9) {
+          router.push(`/public/status?phone=${encodeURIComponent(phoneDigits)}`);
+        } else if (ticket) {
+          router.push(`/public/status?ticketNo=${encodeURIComponent(ticket)}`);
+        }
+      }, 800);
       setForm({
         province: '',
         district: '',
+        subdistrict: '',
+        agency: '',
         location: '',
         reporterName: '',
         reporterPhone: '',
@@ -495,12 +651,14 @@ function ReportPageContent() {
       setPhoneSearched(false);
       setIsUserFound(false);
     } catch (err: unknown) {
-      const text = extractApiErrorMessage(err);
-      toastError('เกิดข้อผิดพลาด', text || 'ไม่สามารถส่งข้อมูลได้');
+      const text = formatJobImageUploadError(
+        err,
+        extractApiErrorMessage(err) || 'ไม่สามารถส่งข้อมูลได้',
+      );
+      toastError('เกิดข้อผิดพลาด', text);
     } finally { setSubmitting(false); }
   };
 
-  const provinces = [...new Set(sites.map((s) => s.province))];
   const isPhoneValid = /^\d{10}$/.test(form.reporterPhone.trim());
   /** สาธารณะ: หลังกดตรวจสอบแล้ว — พบผู้แจ้ง หรือ ไม่พบแต่จะกรอกชื่อเอง; เจ้าหน้าที่: เบอร์ถูกต้องพอ */
   const canProceed =
@@ -511,21 +669,24 @@ function ReportPageContent() {
   const nameOk =
     isUserFound || form.reporterName.trim().length > 0;
   const emailTrimForUi = form.reporterEmail.trim();
-  const emailFormatOk = EMAIL_PATTERN.test(emailTrimForUi);
-  const emailOk =
-    emailFormatOk && emailTrimForUi.length > 0 && !reporterEmailError;
+  const emailFormatOk =
+    emailTrimForUi.length === 0 || EMAIL_PATTERN.test(emailTrimForUi);
+  const emailOk = emailFormatOk && !reporterEmailError;
+  const descriptionLen = form.description.trim().length;
+  const descriptionOk =
+    descriptionLen >= REPORT_DESCRIPTION_MIN_LENGTH &&
+    descriptionLen <= REPORT_DESCRIPTION_MAX_LENGTH;
   const canSubmit =
     canProceed &&
     nameOk &&
     emailOk &&
     !emailChecking &&
-    sitesFetched &&
+    provincesFetched &&
     !!form.province &&
     !!form.district &&
+    !!form.agency &&
     !!form.location &&
-    form.description.trim().length >= 10 &&
-    !!images[0] &&
-    !!images[1];
+    descriptionOk;
   
   const customStyles = getReactSelectGlassStyles(theme);
 
@@ -594,7 +755,7 @@ function ReportPageContent() {
                       กรอกเบอร์ → กด &quot;ตรวจสอบ&quot; — มีบัญชีในระบบจะดึงข้อมูลให้
                     </p>
                     <p className="glass-subtle-text border-t border-[var(--glass-card-border)] pt-2">
-                      ยังไม่มีบัญชี: กรอกชื่อ อีเมล ตำแหน่ง และรูปโปรไฟล์ — ส่งแล้วระบบจะสร้าง/อัปเดตบัญชีผู้แจ้งซ่อมให้เอง
+                      ยังไม่มีบัญชี: กรอกชื่อ (อีเมล/ตำแหน่ง/รูปโปรไฟล์ถ้ามี) — ส่งแล้วระบบจะสร้าง/อัปเดตบัญชีผู้แจ้งซ่อมให้เอง
                     </p>
                   </>
                 )}
@@ -635,14 +796,16 @@ function ReportPageContent() {
                         });
                         setReporterEmailError(null);
                         // สาธารณะ: เปลี่ยนเบอร์ต้องตรวจสอบใหม่ — รีเซ็ตสถานที่; เจ้าหน้าที่โหลดสถานที่ไว้แล้ว ไม่ต้องรีเซ็ต
-                        if (!isStaffFlow && sitesFetched) {
-                          setSitesFetched(false);
-                          setSites([]);
+                        if (!isStaffFlow && provincesFetched) {
+                          setProvincesFetched(false);
+                          setProvinces([]);
                           setDistricts([]);
+                          setSubdistricts([]);
                           setAgencies([]);
-                          setForm(p => ({ ...p, province: '', district: '', location: '' }));
+                          setStations([]);
+                          setForm(p => ({ ...p, province: '', district: '', subdistrict: '', agency: '', location: '' }));
                           setSitesError(null);
-                          setSitesLoading(false);
+                          setProvincesLoading(false);
                         }
                       }}
                       onKeyDown={(e) => {
@@ -670,7 +833,7 @@ function ReportPageContent() {
                 {!phoneSearched && !isStaffFlow && (
                   <p className="text-xs glass-subtle-text mt-2">
                     กรอกเบอร์ 10 หลักแล้วกด &quot;ตรวจสอบ&quot; — หากมีข้อมูลในระบบจะดึงชื่อให้อัตโนมัติ
-                    หากยังไม่มีบัญชี ให้กรอกชื่อ-สกุลและอีเมล
+                    หากยังไม่มีบัญชี ให้กรอกชื่อ-สกุล (อีเมลถ้ามี)
                   </p>
                 )}
               </div>
@@ -701,12 +864,16 @@ function ReportPageContent() {
                         <input
                           ref={reporterAvatarRef}
                           type="file"
-                          accept="image/*"
+                          accept={JOB_IMAGE_ACCEPT}
                           className="hidden"
                           onChange={(e) =>
-                            handleReporterAvatarChange(e.target.files?.[0] ?? null)
+                            handleReporterAvatarChange(
+                              e.target.files?.[0] ?? null,
+                              e.target,
+                            )
                           }
                         />
+                        <p className="mt-2 text-xs glass-muted-text">{JOB_IMAGE_HINT}</p>
                       </div>
                     </div>
                     <div className="min-w-0 flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -728,12 +895,12 @@ function ReportPageContent() {
                       </div>
                       <div>
                         <Label className={labelClass} htmlFor="reporter-email-input">
-                          อีเมล <span className="text-red-500">*</span>
+                          อีเมล{' '}
+                          <span className="glass-subtle-text font-normal text-xs ml-1">(ถ้ามี)</span>
                         </Label>
                         <Input
                           id="reporter-email-input"
                           type="email"
-                          required
                           readOnly={isUserFound && !!form.reporterEmail.trim()}
                           placeholder="example@email.com"
                           autoComplete="email"
@@ -801,7 +968,7 @@ function ReportPageContent() {
               <MapPin size={18} className={headerIconClass} />
               <h2 className={headerTitleClass}>สถานที่เกิดปัญหา</h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label className={labelClass}>จังหวัด <span className="text-red-500">*</span></Label>
                 <Select
@@ -811,8 +978,18 @@ function ReportPageContent() {
                   menuPosition="fixed"
                   menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                   value={form.province ? { value: form.province, label: form.province } : null}
-                  onChange={(opt: { value: string; label: string } | null) => setForm({ ...form, province: opt?.value || '' })}
-                  isDisabled={sitesLoading}
+                  onChange={(opt: { value: string; label: string } | null) => {
+                    const next = opt?.value || '';
+                    setForm({
+                      ...form,
+                      province: next,
+                      district: '',
+                      subdistrict: '',
+                      agency: '',
+                      location: '',
+                    });
+                  }}
+                  isDisabled={provincesLoading}
                   noOptionsMessage={() => "ไม่พบข้อมูล"}
                   isClearable
                 />
@@ -826,24 +1003,83 @@ function ReportPageContent() {
                   menuPosition="fixed"
                   menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                   value={form.district ? { value: form.district, label: form.district } : null}
-                  onChange={(opt: { value: string; label: string } | null) => setForm({ ...form, district: opt?.value || '' })}
-                  isDisabled={!form.province}
+                  onChange={(opt: { value: string; label: string } | null) => {
+                    const next = opt?.value || '';
+                    setForm({
+                      ...form,
+                      district: next,
+                      subdistrict: '',
+                      agency: '',
+                      location: '',
+                    });
+                  }}
+                  isDisabled={!form.province || cascadeLoading}
                   noOptionsMessage={() => "กรุณาเลือกจังหวัดก่อน"}
                   isClearable
                 />
               </div>
               <div>
-                <Label className={labelClass}>สถานที่ / หน่วยงาน <span className="text-red-500">*</span></Label>
+                <Label className={labelClass}>
+                  ตำบล{' '}
+                  <span className="glass-subtle-text font-normal text-xs">(ถ้ามี)</span>
+                </Label>
+                <Select
+                  options={subdistricts.map(s => ({ value: s, label: s }))}
+                  styles={customStyles}
+                  placeholder={subdistricts.length === 0 ? "– ยังไม่มีตำบลในระบบ –" : "– เลือกตำบล –"}
+                  menuPosition="fixed"
+                  menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                  value={form.subdistrict ? { value: form.subdistrict, label: form.subdistrict } : null}
+                  onChange={(opt: { value: string; label: string } | null) => {
+                    const next = opt?.value || '';
+                    setForm({
+                      ...form,
+                      subdistrict: next,
+                      agency: '',
+                      location: '',
+                    });
+                  }}
+                  isDisabled={!form.district || cascadeLoading}
+                  noOptionsMessage={() => "ยังไม่มีตำบล — เลือกสถานที่/หน่วยงานได้เลย"}
+                  isClearable
+                />
+              </div>
+              <div>
+                <Label className={labelClass}>สถานที่/หน่วยงาน <span className="text-red-500">*</span></Label>
                 <Select
                   options={agencies.map(a => ({ value: a, label: a }))}
                   styles={customStyles}
-                  placeholder="– เลือกสถานที่ –"
+                  placeholder="– เลือกสถานที่/หน่วยงาน –"
+                  menuPosition="fixed"
+                  menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                  value={form.agency ? { value: form.agency, label: form.agency } : null}
+                  onChange={(opt: { value: string; label: string } | null) => {
+                    const next = opt?.value || '';
+                    setForm({
+                      ...form,
+                      agency: next,
+                      location: '',
+                    });
+                  }}
+                  isDisabled={!form.district || cascadeLoading}
+                  noOptionsMessage={() => "กรุณาเลือกอำเภอก่อน หรือยังไม่มี Site ในพื้นที่นี้"}
+                  isClearable
+                />
+              </div>
+              <div>
+                <Label className={labelClass}>ชื่อสถานี <span className="text-red-500">*</span></Label>
+                <Select
+                  options={stations.map(s => ({ value: s, label: s }))}
+                  styles={customStyles}
+                  placeholder="– เลือกชื่อสถานี –"
                   menuPosition="fixed"
                   menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                   value={form.location ? { value: form.location, label: form.location } : null}
-                  onChange={(opt: { value: string; label: string } | null) => setForm({ ...form, location: opt?.value || '' })}
-                  isDisabled={!form.district}
-                  noOptionsMessage={() => "กรุณาเลือกอำเภอก่อน"}
+                  onChange={(opt: { value: string; label: string } | null) =>
+                    setForm({ ...form, location: opt?.value || '' })
+                  }
+                  isDisabled={!form.agency || cascadeLoading}
+                  noOptionsMessage={() => "กรุณาเลือกสถานที่/หน่วยงานก่อน"}
                   isClearable
                 />
               </div>
@@ -864,21 +1100,46 @@ function ReportPageContent() {
                 id="report-description-hint"
                 className="text-xs glass-subtle-text leading-relaxed mb-2 max-w-3xl"
               >
-                ระบบจะรับเมื่อมีอย่างน้อย <span className="glass-muted-text font-medium">10 ตัวอักษร</span>
-                &nbsp;กรุณาเขียนให้ครบอย่างน้อยหนึ่งประโยค เช่น อาการที่เห็น (เสียง ภาพ ไฟ ฯลฯ) จุดที่เกิด
+                ระบบจะรับเมื่อมีอย่างน้อย{' '}
+                <span className="glass-muted-text font-medium">
+                  {REPORT_DESCRIPTION_MIN_LENGTH} ตัวอักษร
+                </span>
+                {' '}และไม่เกิน{' '}
+                <span className="glass-muted-text font-medium">
+                  {REPORT_DESCRIPTION_MAX_LENGTH} ตัวอักษร
+                </span>
+                {' '}กรุณาเขียนให้ครบอย่างน้อยหนึ่งประโยค เช่น อาการที่เห็น (เสียง ภาพ ไฟ ฯลฯ) จุดที่เกิด
                 (ห้อง/ชั้น/อุปกรณ์) เวลาที่พบ หรือความถี่ของปัญหา
               </p>
               <Textarea
                 id="report-description"
                 required
-                minLength={10}
+                minLength={REPORT_DESCRIPTION_MIN_LENGTH}
+                maxLength={REPORT_DESCRIPTION_MAX_LENGTH}
                 className={cn(inputClass, "min-h-[140px] resize-y")}
                 placeholder="ระบุอาการ, จุดสังเกต หรือปัญหาที่พบให้ละเอียด..."
                 value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    description: clampReportDescription(e.target.value),
+                  })
+                }
                 rows={5}
-                aria-describedby="report-description-hint"
+                aria-describedby="report-description-hint report-description-count"
               />
+              <p
+                id="report-description-count"
+                className={cn(
+                  "mt-1.5 text-xs text-right tabular-nums",
+                  form.description.length >= REPORT_DESCRIPTION_MAX_LENGTH
+                    ? "font-medium text-amber-700 dark:text-amber-400"
+                    : "glass-subtle-text",
+                )}
+                aria-live="polite"
+              >
+                {form.description.length}/{REPORT_DESCRIPTION_MAX_LENGTH}
+              </p>
             </div>
           </section>
 
@@ -888,14 +1149,14 @@ function ReportPageContent() {
               <Camera size={18} className={headerIconClass} />
               <div className="flex flex-col">
                  <h2 className={headerTitleClass}>รูปภาพประกอบ</h2>
-                 <p className="text-xs glass-subtle-text font-normal">ถ่ายรูปจุดที่เกิดปัญหา (บังคับ 2 รูปแรก)</p>
+                 <p className="text-xs glass-subtle-text font-normal">ถ่ายรูปจุดที่เกิดปัญหา (ถ้ามี) · {JOB_IMAGE_HINT}</p>
               </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
               {[0, 1, 2].map(i => (
                 <div key={i} className="flex flex-col group">
                   <p className={`text-xs mb-1.5 font-medium glass-muted-text`}>
-                    รูปที่ {i + 1} {i < 2 && <span className="text-red-500">*</span>}
+                    รูปที่ {i + 1}
                   </p>
                     <div
                       onClick={() => fileRefs[i].current?.click()}
@@ -938,11 +1199,10 @@ function ReportPageContent() {
                     )}
                     <input
                       type="file"
-                      accept="image/*"
+                      accept={JOB_IMAGE_ACCEPT}
                         className="hidden"
                         ref={fileRefs[i]}
-                        required={i < 2}
-                        onChange={e => handleImage(i, e.target.files?.[0] || null)}
+                        onChange={e => handleImage(i, e.target.files?.[0] || null, e.target)}
                     />
                   </div>
                 </div>

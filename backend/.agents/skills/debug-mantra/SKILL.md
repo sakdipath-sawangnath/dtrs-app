@@ -111,9 +111,9 @@ Maintain a running **ledger** of every experiment in this session. Each entry: w
 | `/public/status`, `/status` | ตรวจสอบสถานะ | `GET /public/jobs/status-by-phone`, `GET /public/jobs/status/:ticketNo` |
 | `/login` | Auth | NextAuth `authorize()` → `frontend/src/lib/auth.ts` → Nest `POST /auth/login` |
 | `/dashboard/pending` | คิวรอดำเนินการ | `JobsList` + RBAC `menu.pending`, `job.assign` |
-| `/dashboard/in-progress`, `/dashboard/my-jobs` | งานกำลังแก้ / งานของฉัน | `PATCH /jobs/:id/fix`, `job.fix.*`, Socket.IO refresh |
+| `/dashboard/in-progress`, `/dashboard/my-jobs` | งานกำลังแก้ / งานของฉัน | `PATCH /jobs/:id/fix` คง `IN_PROGRESS`; ป้าย「รอเซ็นผู้แจ้ง」เมื่อแก้ครบ; `job.fix.*`, Socket.IO refresh; อัปโหลดรูปปัญหา `PATCH /jobs/:id/issue-images` + `job.issue.upload` |
 | `/dashboard/all`, `/dashboard/out-of-contract` | ประวัติ / นอกสัญญา | `Job.isOutOfContract`, `PATCH /jobs/:id/out-of-contract` |
-| `/dashboard/jobs/[id]` | รายละเอียดงาน | `GET /jobs/:id`, backfill วันที่, อัปโหลดรูป |
+| `/dashboard/jobs/[id]` | รายละเอียดงาน | `GET /jobs/:id`, บันทึก `PATCH /jobs/:id/fix`, ปิดงาน `PATCH /jobs/:id/close` (ลายเซ็นผู้แจ้ง), backfill วันที่, อัปโหลดรูปปัญหา (`job.issue.upload`, PENDING/IN_PROGRESS) |
 | `/print/jobs/[id]`, PDF | พิมพ์รายงาน | Next `/api/print-jobs/:id/data` → Puppeteer `JobsPdfService`; รูปผ่าน `/job-images/...` |
 | `/dashboard/settings` | SMTP / อีเมล / MinIO orphan | `SettingsModule`, `menu.settings` |
 | `/dashboard/roles`, `/dashboard/users` | RBAC | `PermissionsGuard`, `GET /roles/me/permissions` |
@@ -161,15 +161,16 @@ Maintain a running **ledger** of every experiment in this session. Each entry: w
 **RBAC**
 
 - UI อ่าน `GET /roles/me/permissions` — ต้อง unwrap `data.permissions`
-- Sidebar fallback ตาม enum role เมื่อ permission list ว่าง
-- Permission ที่มักสับสน: `job.assign` (มอบหมาย + ย้ายนอกสัญญา), `job.fix.self|any`, `job.reopen.self|any`, `job.deleteInProgress`, `job.deleteUnassigned`, `menu.*`
+- Sidebar fallback ตามรหัสบทบาทมาตรฐานเมื่อ permission list ว่าง
+- Permission ที่มักสับสน: `job.assign` (มอบหมาย + ย้ายนอกสัญญา), `job.viewContractTabs` (แท็บสัญญา/นอกสัญญาในรายการงาน — ไม่ใช่เมนู `menu.outOfContract`), `job.issue.upload` (อัปโหลดรูปปัญหาที่แจ้ง — ไม่ใช่ `job.fix.*`; PENDING/IN_PROGRESS เท่านั้น), `job.fix.self|any`, `job.reopen.self|any`, `job.deleteInProgress`, `job.deleteUnassigned`, `menu.*`
 - หลังเพิ่ม permission ใหม่: restart backend หรือ `seed-roles-permissions.ts`
+- `User.role` เป็น `VARCHAR` (`AppRole.code`) ไม่ใช่ Prisma enum — บทบาทที่สร้างเองเก็บที่ `role` + `roleId`
 
 **งาน (Job domain)**
 
 - สถานะ: `PENDING` → `IN_PROGRESS` → `RESOLVED` (+ Reopen)
 - `assignedToId` null vs มีคนรับ — กระทบปุ่มมอบหมาย/รับงาน/ลบ
-- `isOutOfContract` — แท็บสัญญา/นอกสัญญา
+- `isOutOfContract` — แท็บสัญญา/นอกสัญญา (ต้องมี `job.viewContractTabs` ถึงจะเห็นแท็บ)
 - Serial หลายแถว — JSON ใน `Job.oldSerialNumber` (ดู [`docs/Job-Serial-Multi-Row.md`](../../../docs/Job-Serial-Multi-Row.md))
 - `reportDate` / `fixDate` — timezone Bangkok; backfill ใน `JobsService`
 

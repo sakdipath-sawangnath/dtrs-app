@@ -309,6 +309,28 @@ export class MinioService implements OnModuleInit {
     return this.putObjectAndGetUrl(objectName, file);
   }
 
+  /** upload ลายเซ็นเจ้าหน้าที่: users/{userId}/signature.{ext} */
+  async uploadUserSignature(
+    userId: number,
+    file: Express.Multer.File,
+  ): Promise<string> {
+    const ext = file.originalname.split('.').pop() || 'png';
+    const normalizedExt = ext.startsWith('.') ? ext : `.${ext}`;
+    const objectName = `users/${userId}/signature${normalizedExt}`;
+    return this.putObjectAndGetUrl(objectName, file);
+  }
+
+  /** upload ลายเซ็นผู้แจ้งตอนปิดงาน: jobs/{jobId}/reporter-signature.{ext} */
+  async uploadJobReporterSignature(
+    jobId: number,
+    file: Express.Multer.File,
+  ): Promise<string> {
+    const ext = file.originalname.split('.').pop() || 'png';
+    const normalizedExt = ext.startsWith('.') ? ext : `.${ext}`;
+    const objectName = `jobs/${jobId}/reporter-signature${normalizedExt}`;
+    return this.putObjectAndGetUrl(objectName, file);
+  }
+
   async listObjectsRecursive(prefix = ''): Promise<MinioObjectInfo[]> {
     const normalizedPrefix = prefix.trim();
     const stream = this.minioClient.listObjectsV2(

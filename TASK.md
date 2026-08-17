@@ -49,6 +49,7 @@
 - [x] อัปเดตฟอร์มแจ้งซ่อม (`/report`) เรียงการ์ด: แบบฟอร์มจำกัดเบอร์โทรเฉพาะตัวเลข 10 หลัก และฟิลด์ค้นหาสถานที่เป็น Select2 (`react-select`)
 - [x] เพิ่มระบบค้นหาประวัติผู้แจ้งจากเบอร์โทร และล็อคข้อมูลชื่อ-อีเมลเมื่อพบในระบบ (Read-only)
 - [x] เขียน Seed Script (`seed-from-excel.ts`, `seed-from-csv.ts`, `seed-admin.ts`)
+- [x] Seed Locations master จาก MS SQL dump (`seed-locations-from-mssql.ts` + `scripts/data/TB_MST_*.sql`) — คู่มือ `docs/Locations-Master-Seed.md` (2026-08-14)
 - [x] ตรวจสอบความถูกต้องของข้อมูลพื้นที่โครงการ (Sites) อ้างอิงตาม Excel/CSV
 - [x] Login ด้วยอีเมลหรือชื่อผู้ใช้ + password toggle
 - [x] User dropdown ใน header (โปรไฟล์, ออกจากระบบ); หน้าโปรไฟล์ แก้ไขข้อมูล/เปลี่ยนรหัสผ่าน
@@ -59,11 +60,11 @@
 - [x] บทบาท SUPERVISOR (หัวหน้างาน) + สิทธิ์ job.assign; ปุ่มมอบหมายงานในหน้ารอดำเนินการ (modal เลือกเจ้าหน้าที่); GET /users/assignable, PATCH /jobs/:id/assign — **อัปเดต 2026-03-30:** API/UI อิง RBAC (`job.assign`, `menu.pending` สำหรับรับงานเอง) สอดคล้อง `/dashboard/roles`
 - [x] หน้ารอดำเนินการ: ปุ่มดูรายละเอียด → ไปหน้า `/dashboard/jobs/:id` (full page); ปุ่มมอบหมายงานใช้ react-select
 - [x] นอกสัญญา (คงสถานะ PENDING) + ย้ายนอกสัญญา
-  - `/dashboard/out-of-contract` แสดงเฉพาะงาน `PENDING` ที่ `isOutOfContract=true` (โครงสร้างเหมือน `/dashboard/pending`)
-  - ปุ่ม "ย้ายนอกสัญญา" บนหน้ารอดำเนินการ — **อัปเดต 2026-03-30:** แสดงและเรียก API ได้เมื่อมีสิทธิ์ **`job.assign`** (เดิมเทียบเท่า ADMIN/SUPERVISOR); คงสถานะ `PENDING`
-  - Backend มี endpoint `PATCH /jobs/:id/out-of-contract` เพื่อย้ายนอกสัญญา
+  - `/dashboard/out-of-contract` แสดง `PENDING` OOC + `RESOLVED` OOC ที่จำแนกเอกสารแล้ว (โครงสร้างรายการเหมือนคิวงานอื่น)
+  - ปุ่ม "ย้ายนอกสัญญา" — **ไม่อยู่บน `/dashboard/pending` แล้ว** (2026-08-14); API `PATCH /jobs/:id/out-of-contract` ยังมีเมื่อมีสิทธิ์ **`job.assign`**; งานนอกสัญญาหลังปิดใช้จำแนกเอกสาร (`classify-doc`)
+  - Backend มี endpoint `PATCH /jobs/:id/out-of-contract` เพื่อย้ายนอกสัญญา (คง `PENDING`)
 - [x] Sidebar: เพิ่ม "งานที่รับผิดชอบ" (`/dashboard/my-jobs`); ไม่แสดงเมนู โปรไฟล์ (เข้าได้จาก dropdown)
-- [x] หน้ารายละเอียดงาน (`/dashboard/jobs/:id`): การ์ดแจ้งข้อขัดข้อง + การ์ดข้อมูลการแก้ไข + ฟอร์มบันทึกการแก้ไข (ลำดับ: fixEnvironment (Indoor/Outdoor) ก่อน แล้วค่อย brokenPartType (Hardware/Software); ฟิลด์บังคับ: cause, fixMethod และรูปการแก้ไข “อย่างน้อย 2 รูปแรก”; หมายเหตุ/Serial ไม่บังคับ); PATCH /jobs/:id/fix; พิมพ์/PDF — หน้า `/print/jobs/:id` + เทมเพลต (อัปเดต: ไม่ใช้ html2canvas บนหน้ารายละเอียด; มี `GET /jobs/:id/report-pdf` สำหรับไฟล์ PDF)
+- [x] หน้ารายละเอียดงาน (`/dashboard/jobs/:id`): การ์ดแจ้งข้อขัดข้อง (อัปโหลดรูปปัญหาเมื่อมี **`job.issue.upload`** — ดู §33) + การ์ดข้อมูลการแก้ไข + ฟอร์มบันทึกการแก้ไข (ลำดับ: fixEnvironment ก่อน แล้ว brokenPartType; บังคับ: cause, fixMethod และรูปอย่างน้อย 2 รูปแรก) — `PATCH /jobs/:id/fix` คง `IN_PROGRESS`; ปิดงาน + ลายเซ็นผู้แจ้งที่หน้ารายละเอียด (`PATCH /jobs/:id/close`) — ดู §34; พิมพ์/PDF; **จำแนกเอกสาร** (`job.classifyDoc`) เมื่อ `RESOLVED` + hex
 - [x] RBAC งานซ่อม: เพิ่ม permission `job.fix.self|any` และ `job.reopen.self|any` เพื่อให้กำหนดผ่าน `/dashboard/roles` ได้ว่า role ใด “บันทึก/ปิดงาน” และ “Reopen” ได้ (เฉพาะงานตัวเองหรือทุกงาน)
 
 ## 8. Phase 4 - MinIO Integration (2026-03-11)
@@ -86,7 +87,7 @@
 - [x] ระบบออกรายงาน PDF / พิมพ์ (Resolved) — หน้า `/print/jobs/[id]` + เทมเพลต + `print.css`; ดาวน์โหลด PDF ผ่าน `GET /jobs/:id/report-pdf` (อัปเดตจาก html2canvas+jsPDF บนหน้ารายละเอียด)
 
 ## 11. Phase 6.1 - Dashboard UI/Permission Polish (2026-03-20)
-- [x] เพิ่ม segmented tabs “สัญญา/นอกสัญญา” ใน `/dashboard/my-jobs`, `/dashboard/all`, และ `/dashboard/in-progress` (ค่าเริ่มต้นเป็น “สัญญา” แยกตาม `Job.isOutOfContract`)
+- [x] เพิ่ม segmented tabs “สัญญา/นอกสัญญา” ใน `/dashboard/my-jobs`, `/dashboard/all`, และ `/dashboard/in-progress` (ค่าเริ่มต้นเป็น “สัญญา” แยกตาม `Job.isOutOfContract`; **2026-08-14:** มองเห็นเมื่อมี **`job.viewContractTabs`**)
 - [x] ปรับ `/dashboard/pending`: ซ่อนคอลัมน์ “ผู้รับผิดชอบ” และจัดลำดับปุ่ม “จัดการ” โดยย้ายปุ่ม “ลบงาน” (`ลบงาน`) ไปไว้ท้ายสุด
 - [x] เพิ่ม alert ยืนยันก่อน “ย้ายนอกสัญญา” ในหน้ารอดำเนินการ และคงสถานะงานเดิมเป็น `PENDING` ตาม requirement
 - [x] ปรับ `/dashboard/in-progress`: ปุ่ม “อัปเดต” เปิด modal กรอก “ข้อมูลการแก้ไข” เหมือนรูปแบบการ์ดใน `/dashboard/jobs/:id` และบันทึกด้วย `PATCH /jobs/:id/fix` (อัปโหลดรูปได้สูงสุด 3 รูป)
@@ -133,7 +134,7 @@
 
 ## 14c. RBAC API เต็มชุด — menu.* / job.updateStatus / job.deleteInProgress / site.create (2026-03-31)
 
-- [x] `roles` / `users` / `settings` controllers — `PermissionsGuard` + `menu.roles` / `menu.users` / `menu.settings`; `GET /users/assignable` — `job.assign`; `PATCH /jobs/:id/status` — `job.updateStatus`; `DELETE /jobs/:id` — `job.deleteInProgress` + `job.deleteUnassigned`; `POST /areas` — `site.create`; `RBAC_ROLE_PERMISSION_CODES` + `PermissionsGuard` enum fallback; seed/sync permission
+- [x] `roles` / `users` / `settings` controllers — `PermissionsGuard` + `menu.roles` / `menu.users` / `menu.settings`; `GET /users/assignable` — `job.assign`; `PATCH /jobs/:id/status` — `job.updateStatus`; `DELETE /jobs/:id` — `job.deleteInProgress` + `job.deleteUnassigned`; `POST /areas` — `site.create`; `RBAC_ROLE_PERMISSION_CODES` + `PermissionsGuard` fallback ตามรหัสบทบาทมาตรฐาน; seed/sync permission
 - [x] เอกสาร: `README.md`, `STATUS.md`, `PLAN.md`, `TASK.md`, `backend/README.md`, `backend/docs/RBAC-Setup.md`, `backend/postman/README.md`, `frontend/README.md`
 
 ## 14. Phase 6.4 — SMTP, Reopen, assignee-only fix, Nest CLI v11, JobsList tabs (2026-03-22)
@@ -374,3 +375,77 @@
 
 ### เอกสาร
 - [x] Sync: `CHANGELOG.md`, `README.md`, `STATUS.md`, `TASK.md`, `PLAN.md`, `docs/README.md`, `frontend/README.md`, `AGENTS.md`
+
+## 29. Locations master seed — MS SQL → MySQL (2026-08-14)
+
+> คู่มือ: [`docs/Locations-Master-Seed.md`](docs/Locations-Master-Seed.md) · แผน: [`docs/Meeting-11082026-Requirements-Plan.plan.md`](docs/Meeting-11082026-Requirements-Plan.plan.md) Phase B
+
+- [x] วาง dump `backend/scripts/data/TB_MST_Province.sql` / `TB_MST_District.sql` / `TB_MST_SubDistrict.sql`
+- [x] สคริปต์ `seed-locations-from-mssql.ts` (+ `npm run script:seed-locations-mssql`, `DRY_RUN=1`)
+- [x] นำเข้า local (~77 จังหวัด / ~928 อำเภอ / ~7432 ตำบล)
+- [x] fix-then-ship: Locations API lazy-load + public จังหวัดจาก Site; หน้า locations ขยายแถวโหลดลูก
+- [ ] รันบน UAT/PRD หลัง deploy เมื่อ Locations ว่าง
+- [x] Sync docs: `Locations-Master-Seed.md`, Meeting plan, `PLAN.md`, `STATUS.md`, `TASK.md`, `docs/README.md`, `AGENTS.md`, `DTRS-Migration-Checklist.md`, `backend/README.md`, `CHANGELOG.md`
+
+## 30. Site station + Sites.xlsx import (2026-08-14)
+
+> คู่มือ: [`docs/Sites-Import.md`](docs/Sites-Import.md)
+
+- [x] Prisma: `Site.station`, `Job.agency` + migration backfill
+- [x] Backend: DTO/service `existsByLocation(province, district, agency, station, subdistrict?)`; `CreateJobSchema.agency` required
+- [x] Frontend: dashboard sites modal (agency + station); public report cascade 5 ขั้น
+- [x] สคริปต์ `seed-sites-from-xlsx.ts` + `npm run script:seed-sites-xlsx` (+ `:dry`, `:clear` สำหรับ Windows)
+- [x] รัน migration + seed **local** (198 แถวจาก `Sites.xlsx`; dry-run + import; **`:clear` ลบของเก่า 209 → เหลือเฉพาะ Excel**)
+- [ ] รัน migration + seed บน UAT/PRD (สำรอง DB ก่อน `script:seed-sites-xlsx:clear` ถ้าต้องแทนที่ Site เก่า)
+- [x] Sync docs: `Sites-Import.md`, `CHANGELOG.md`, `PLAN.md`, `STATUS.md`, `TASK.md`, `AGENTS.md`, `docs/README.md`, Meeting plan, `DTRS-Migration-Checklist.md`, `backend/README.md`
+
+## 31. RBAC — custom role + แท็บสัญญา/นอกสัญญา (2026-08-14)
+
+- [x] `User.role` เป็น `VARCHAR(64)` เก็บ `AppRole.code` (เช่น `ADMIN_1`) — migration `20260814133000_user_role_varchar`; `GET /users` ไม่ 500 เมื่อมีบทบาทที่สร้างเอง
+- [x] Permission **`job.viewContractTabs`** ในแคตตาล็อก (`roles.service.ts` + `seed-roles-permissions.ts`); `JobsList` ซ่อนแท็บและตัดงานนอกสัญญาเมื่อไม่มีสิทธิ์
+- [x] Default ผูก ADMIN/STAFF/SUPERVISOR ผ่าน `ensurePermissionCatalogSynced`; บทบาทกำหนดเองติ๊กที่ `/dashboard/roles`
+- [x] Sync docs: `CHANGELOG.md`, `backend/docs/RBAC-Setup.md`, `README.md`, `STATUS.md`, `PLAN.md`, `TASK.md`, `frontend/README.md`, `docs/System-Workflow.md`
+
+## 32. Meeting-11082026 — Doc No classify + job detail (2026-08-14)
+
+> แผน: [`docs/Meeting-11082026-Requirements-Plan.plan.md`](docs/Meeting-11082026-Requirements-Plan.plan.md) Phase C (ปรับ)
+
+- [x] สร้างงาน: `ticketNo` hex 8 ตัว; มอบหมาย/bulk/OOC **ไม่** gen Running Doc No
+- [x] `PATCH /jobs/:id/classify-doc` + `job.classifyDoc` (ADMIN/SUPERVISOR) + ลายเซ็น; ในสัญญา `CM-SHF-2002-…` / นอกสัญญา `YYYYMM…`
+- [x] UI จำแนก: `/dashboard/all` + `/dashboard/jobs/:id` (`JobClassifyDocDialog` — เลือกแล้วยืนยัน)
+- [x] ซ่อน RESOLVED OOC ที่จำแนกแล้วจาก `/all` + `/my-jobs`; หน้า `/out-of-contract` รับ PENDING + RESOLVED OOC จำแนกแล้ว
+- [x] fix-then-ship job detail: รีโหลดเงียบหลังจำแนก + toast error จาก API
+- [x] Sync docs: `Meeting` plan, `System-Workflow`, `STATUS`, `PLAN`, `TASK`, `RBAC-Setup`, `docs/README`, `CHANGELOG`
+
+## 33. อัปโหลดรูปปัญหาที่แจ้ง — `job.issue.upload` (2026-08-17)
+
+> แผน: [`docs/Meeting-11082026-Requirements-Plan.plan.md`](docs/Meeting-11082026-Requirements-Plan.plan.md) Phase D · RBAC: [`backend/docs/RBAC-Setup.md`](backend/docs/RBAC-Setup.md)
+
+- [x] Permission **`job.issue.upload`** ในแคตตาล็อก (`roles.service.ts` + `seed-roles-permissions.ts`); seed **ADMIN** เท่านั้น — STAFF/SUPERVISOR/USER ติ๊กที่ `/dashboard/roles` (ไม่ใส่ใน `ACTION_CODES_SUPERVISOR`)
+- [x] `PATCH /jobs/:id/issue-images` — JWT + `PermissionsGuard` (`job.issue.upload`); งาน **PENDING / IN_PROGRESS** (รวมยังไม่มีผู้รับ); เติมต่อได้ถึง 3 รูป ไม่ลบ/ไม่แทนที่; ไม่ใช้ `job.fix.*`
+- [x] UI: card **รูปภาพปัญหาที่แจ้ง** บน `/dashboard/jobs/:id` + wrench modal ใน `JobsList`; หน้า public ยังไม่บังคับรูป
+- [x] จำกัดไฟล์: **5MB/ไฟล์** · JPG/PNG/WebP (magic bytes) · HEIC/HEIF→JPEG ฝั่ง Nest · สูงสุด 3 รูป issue/fix; ลายเซ็นผู้แจ้ง PNG; Multer oversize/เกินจำนวน → **400** ข้อความไทย
+- [x] Fallback 413 (nginx ~1MB): frontend บีบอัดรูปแล้ว retry (`jobImageProxyFallback.ts`) — ไม่แทน `client_max_body_size 50m` ที่ NPM
+- [x] Tests: `job-image-upload.spec.ts` · `jobImageUpload.test.ts` · `jobImageProxyFallback.test.ts` · `public-jobs-upload.e2e-spec.ts` · `jobs-issue-images.e2e-spec.ts`
+- [x] Sync docs: `CHANGELOG`, `RBAC-Setup`, `STATUS`, `TASK`, `README`, `frontend/README`, `backend/README`, `postman/README`, `System-Workflow`, Meeting plan, `PLAN`, Reverse-Proxy NPM
+
+## 34. แยกลายเซ็นผู้แจ้งออกจากบันทึกการแก้ไข (2026-08-17)
+
+> Grill: คง `IN_PROGRESS` ระหว่างรอเซ็น · API แยก `/fix` กับ `/close` · ปิดงานที่ `/dashboard/jobs/:id` เท่านั้น
+
+- [x] `PATCH /jobs/:id/fix` บันทึกการแก้ไขอย่างเดียว (ไม่รับลายเซ็น, คง `IN_PROGRESS`)
+- [x] `PATCH /jobs/:id/close` บังคับลายเซ็นผู้แจ้ง + ตรวจข้อมูลแก้ครบ → `RESOLVED` + อีเมล/PDF
+- [x] UI: หน้ารายละเอียดแยกบล็อก「บันทึกการแก้ไข」กับ「ปิดงาน — ลายเซ็นผู้แจ้ง」; wrench modal บันทึกอย่างเดียว + ลิงก์ไปปิดงาน
+- [x] fix-then-ship: modal บันทึก `/fix` ก่อนไปปิดงาน; `/close` ตรวจครบก่อนอัปโหลดลายเซ็น; toast แยกกรณีบันทึกแล้วแต่ปิดไม่สำเร็จ; unit `jobs-close.service.spec.ts` + e2e `jobs-close.e2e-spec.ts`
+- [x] ป้าย「รอเซ็นผู้แจ้ง」ในรายการงาน (`JobsList` / `/dashboard/my-jobs` / `in-progress`) เมื่อสถานะยัง `IN_PROGRESS` แต่ข้อมูลแก้ไขครบ (สาเหตุ/วิธีแก้ + รูป ≥ 2) — ไม่เพิ่มสถานะใหม่; unit `jobFixImageSlots.test.ts`
+
+## 35. Meeting-11082026 — PDF รายงาน CM/SHF (2026-08-17)
+
+> แผน: [`docs/Meeting-11082026-Requirements-Plan.plan.md`](docs/Meeting-11082026-Requirements-Plan.plan.md) ข้อ 8 Reports · scrutinize fix-then-ship
+
+- [x] `reportPdfConstants.ts` — hardcode หัวโครงการ SHF + สัญญา 8680228
+- [x] `PdfReportHeader` — NBTC | ข้อความโครงการ | FORTH (หน้า 1 + 2)
+- [x] `JobMaintenancePdfTemplate` — ตาราง 5 แถว, รายละเอียด CM, ลายเซ็นหน้า 1, รูป caption ใต้ช่อง; คง `issueLine` fallback `brokenPart`
+- [x] `print.css` — signature block, ความสูงช่องรูปหลัง header หน้า 2
+- [x] `frontend/public/logo/logo-FORTH.png` — โลโก้ FORTH ทางการ (ตัดพื้นดำเป็นโปร่งใสสำหรับพิมพ์บนพื้นขาว)
+- [x] Sync docs: `CHANGELOG`, Meeting plan, `DTRS-Migration-Checklist` #39, `System-Workflow`

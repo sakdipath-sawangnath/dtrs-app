@@ -11,3 +11,9 @@ export const CreateDistrictSchema = z.object({
 });
 
 export type CreateDistrictDto = z.infer<typeof CreateDistrictSchema>;
+
+export const CreateSubdistrictSchema = z.object({
+  name: z.string().trim().min(1, 'กรุณาระบุชื่อตำบล'),
+});
+
+export type CreateSubdistrictDto = z.infer<typeof CreateSubdistrictSchema>;

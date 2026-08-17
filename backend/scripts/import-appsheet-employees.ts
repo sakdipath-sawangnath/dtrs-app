@@ -1,4 +1,5 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
+import { Role } from '../src/common/role.constants';
 import * as Minio from 'minio';
 import axios from 'axios';
 import * as cheerio from 'cheerio';

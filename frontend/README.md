@@ -12,10 +12,10 @@ Next.js 15 (App Router) สำหรับระบบแจ้งปัญห�
 ## โครงสร้างหลัก
 
 - `src/app/` — หน้าและ layout (report, status, login, dashboard)
-- `src/components/` — SiteHeader (**ThemeToggle** Sun/Moon), SiteFooter, PublicLayoutShell, DashboardPageShell, DashboardFilterBar, **`CrudModal`** (portal → `document.body`, **`z-100`**, Glass theme-aware, พร็อพ `size` md/lg — ใช้ที่ `/dashboard/users`, `/dashboard/roles` ฯลฯ), UserMenuDropdown, SegmentedTabs, JobsList (ตารางงาน + แท็บสัญญา/นอกสัญญา **ไม่ห่อ glass ชั้นนอก** + badge งานค้าง + modal อัปเดตการแก้ไขแบบ Glass + ดูรายละเอียด full page `/dashboard/jobs/:id` + มอบหมายงาน react-select / รับงาน — ปุ่มมอบหมายและย้ายนอกสัญญาอิงสิทธิ์ **`job.assign`** จาก `/roles/me/permissions`; ลบงาน PENDING ไม่มอบหมายอิง **`job.deleteUnassigned`**; รองรับ `assignedToMe` สำหรับงานที่รับผิดชอบ; ลบงาน IN_PROGRESS ที่หน้า `/dashboard/in-progress` อิง **`job.deleteInProgress`**)
+- `src/components/` — SiteHeader (**ThemeToggle** Sun/Moon), SiteFooter, PublicLayoutShell, DashboardPageShell, DashboardFilterBar, **`CrudModal`** (portal → `document.body`, **`z-100`**, Glass theme-aware, พร็อพ `size` md/lg — ใช้ที่ `/dashboard/users`, `/dashboard/roles` ฯลฯ), UserMenuDropdown, SegmentedTabs, JobsList (ตารางงาน + แท็บสัญญา/นอกสัญญาเมื่อมี **`job.viewContractTabs`** **ไม่ห่อ glass ชั้นนอก** + badge งานค้าง + ป้าย「รอเซ็นผู้แจ้ง」เมื่อ `IN_PROGRESS` และข้อมูลแก้ไขครบ + modal อัปเดตการแก้ไขแบบ Glass บันทึก `PATCH /fix` อย่างเดียว + ดูรายละเอียด full page `/dashboard/jobs/:id` เพื่อปิดงาน + มอบหมายงาน react-select / รับงาน — ปุ่มมอบหมายและย้ายนอกสัญญาอิงสิทธิ์ **`job.assign`** จาก `/roles/me/permissions`; **จำแนกเอกสาร** บน `/dashboard/all` อิง **`job.classifyDoc`**; อัปโหลดรูปปัญหาที่แจ้งใน wrench modal อิง **`job.issue.upload`** (งาน `PENDING`/`IN_PROGRESS`, เติมถึง 3 รูป); ลบงาน PENDING ไม่มอบหมายอิง **`job.deleteUnassigned`**; รองรับ `assignedToMe` สำหรับงานที่รับผิดชอบ; ลบงาน IN_PROGRESS ที่หน้า `/dashboard/in-progress` อิง **`job.deleteInProgress`**)
 - `src/app/globals.css` — **`--glass-*` tokens** + utilities (`.glass-page`, `.glass-card`, `.glass-text`) และ class **`form-input-glass`** (อ่าน `--glass-input-*` ทั้ง Dark/Light; แยกจาก `.form-input` legacy)
 - `src/lib/useAppTheme.ts` — hook อ่าน theme จาก `next-themes` (มี `mounted` guard สำหรับ hydration)
-- `src/lib/` — auth.ts (NextAuth; รูปผู้ใช้ใน session ใช้ path **`/user-images/:id`** เมื่อมีรูปในระบบ), toast.ts, **apiResponse.ts**, **`jobImageProxy.ts`** + route **`/job-images/...`**, **`userImageProxy.ts`** + route **`/user-images/[userId]`**, **`dashboardJobImageUrl.ts`** — helper path รูปงานสำหรับ `<img>` บนแดชบอร์ด
+- `src/lib/` — auth.ts (NextAuth; รูปผู้ใช้ใน session ใช้ path **`/user-images/:id`** เมื่อมีรูปในระบบ), toast.ts, **apiResponse.ts**, **`jobImageUpload.ts`** (pre-check 5MB / JPG/PNG/WebP/HEIC) + **`jobImageProxyFallback.ts`** (บีบรูป retry หลัง 413), **`jobImageProxy.ts`** + route **`/job-images/...`**, **`userImageProxy.ts`** + route **`/user-images/[userId]`**, **`dashboardJobImageUrl.ts`** — helper path รูปงานสำหรับ `<img>` บนแดชบอร์ด
 
 ### Flow สำคัญ
 
@@ -28,10 +28,10 @@ Next.js 15 (App Router) สำหรับระบบแจ้งปัญห�
   - ถ้ามี `?ticketNo=...` ใน URL จะกรอกช่องค้นหาให้อัตโนมัติและยิงค้นหาให้ทันที เพื่อรองรับการ redirect จากหน้า `/report`
 
 - **/dashboard/my-jobs**
-  - งานที่รับผิดชอบ — JobsList แสดงเฉพาะงานที่รับมอบหมายให้ผู้ใช้ปัจจุบัน; filter + DataTable
+  - งานที่รับผิดชอบ — JobsList แสดงเฉพาะงานที่รับมอบหมายให้ผู้ใช้ปัจจุบัน; filter + DataTable; ป้าย「รอเซ็นผู้แจ้ง」เมื่อแก้ครบแล้วยัง `IN_PROGRESS`
 
 - **/dashboard/jobs/[id]**
-  - รายละเอียดงานเต็มหน้า: การ์ดข้อมูลการแจ้งข้อขัดข้อง + การ์ดข้อมูลการแก้ไข + ฟอร์มบันทึกการแก้ไข (ส่วนขัดข้อง, สาเหตุ, วิธีแก้ไข, รูปการแก้ไข สูงสุด 3 รูป, หมายเหตุ, Serial เก่า/ใหม่); **บันทึกการแก้ไข / Reopen — เฉพาะผู้รับงาน (assignee)**; Reopen มี `confirmDialog` ก่อนเรียก API; เมื่อสถานะ Resolved — พิมพ์/PDF ผ่านหน้า **`/print/jobs/[id]`** + `JobMaintenancePdfTemplate` + `print.css` (หรือดาวน์โหลด PDF ฝั่ง backend `GET /jobs/:id/report-pdf`)
+  - รายละเอียดงานเต็มหน้า: การ์ดข้อมูลการแจ้งข้อขัดข้อง (card **รูปภาพปัญหาที่แจ้ง** อัปโหลดได้เมื่อมี **`job.issue.upload`** และงาน `PENDING`/`IN_PROGRESS`; เติมถึง 3 รูป · **5MB/ไฟล์** JPG/PNG/WebP/HEIC ไม่ลบ/ไม่แทนที่) + การ์ดข้อมูลการแก้ไข + ฟอร์ม**บันทึกการแก้ไข** (`PATCH /jobs/:id/fix`, คง `IN_PROGRESS`) และบล็อกแยก **ปิดงาน — ลายเซ็นผู้แจ้ง** (`PATCH /jobs/:id/close`); **บันทึก/ปิดงาน / Reopen — ตาม RBAC** (`job.fix.*` / `job.reopen.*`); Reopen มี `confirmDialog` ก่อนเรียก API; เมื่อสถานะ Resolved — พิมพ์/PDF + **จำแนกเอกสาร** (`job.classifyDoc`, ยังเป็น hex) ผ่าน `JobClassifyDocDialog`; พิมพ์ผ่านหน้า **`/print/jobs/[id]`** + `JobMaintenancePdfTemplate` + `print.css` (หรือดาวน์โหลด PDF ฝั่ง backend `GET /jobs/:id/report-pdf`)
 
 - **`/print/jobs/[id]` (พิมพ์)**
   - ข้อมูล JSON จาก **`GET /api/print-jobs/:id/data`** (Next API route); รูปในเทมเพลตใช้ **`/job-images/:id/:kind/:index`** (ไม่อยู่ใต้ `/api` — reverse proxy ส่งต่อไป Next ตาม host หลักได้โดยไม่ต้องแยก location เพิ่ม) หรือ alias **`/api/job-images/...`** ถ้าตั้ง NPM แยกเหมือน `/api/print-jobs`
@@ -59,6 +59,12 @@ npm run build
 ```
 
 ควรรันก่อน merge/deploy; โปรเจกต์หลักใช้ GitLab CI แยก build `frontend` / `backend` ตาม `.gitlab-ci.yml` ที่ root (ดู `README.md` ด้านบน)
+
+```bash
+npm test
+```
+
+ครอบคลุม `jobImageUpload.test.ts` + `jobImageProxyFallback.test.ts` (validate 5MB / 413 fallback) + `jobFixImageSlots.test.ts` (ป้ายรอเซ็นผู้แจ้ง) พร้อมเทสอื่นใน `src/lib/`
 
 ## รันพัฒนา
 
@@ -92,5 +98,5 @@ PRD/Docker: ดูคอมเมนต์ใน [`.env.example`](.env.example) 
 
 - สถานะโปรเจกต์และ API: root [STATUS.md](../STATUS.md), [README.md](../README.md) (ดัชนีเอกสาร)
 - Private MinIO + proxy รูป: [../docs/Project-Plan-Private-MinIO-Images.md](../docs/Project-Plan-Private-MinIO-Images.md), [../docs/minio.md](../docs/minio.md)
-- Reverse proxy (NPM): [../backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md](../backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md)
+- Reverse proxy (NPM): [../backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md](../backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md) — `client_max_body_size 50m` ที่ `/api/`; ถ้ายังไม่ได้ตั้ง แอปบีบรูปแล้ว retry หลัง 413
 - ดัชนีโฟลเดอร์ `docs/`: [../docs/README.md](../docs/README.md)

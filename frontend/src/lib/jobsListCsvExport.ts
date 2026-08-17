@@ -52,6 +52,19 @@ function brokenPartDisplay(v: string | null | undefined): string {
   return "ไม่ระบุ";
 }
 
+function workDurationDays(job: {
+  fixDate?: string | null;
+  reportDate?: string | null;
+  createdAt?: string | null;
+}): string {
+  if (!job.fixDate) return "";
+  const end = new Date(job.fixDate).getTime();
+  const start = new Date(job.reportDate || job.createdAt || "").getTime();
+  if (Number.isNaN(end) || Number.isNaN(start)) return "";
+  const days = Math.max(0, Math.round((end - start) / (24 * 60 * 60 * 1000)));
+  return String(days);
+}
+
 /** RFC 4180 style: double quotes, escape internal quotes */
 export function csvEscapeCell(value: unknown): string {
   if (value == null) return "";
@@ -73,6 +86,7 @@ export function buildJobsListAuditCsv(jobs: readonly JobsListCsvJob[]): string {
     "วันที่สร้างในระบบ_แสดง_พศ",
     "วันที่ปิดงาน_raw",
     "วันที่ปิดงาน_แสดง_พศ",
+    "ระยะเวลาจบงาน_วัน",
     "ผู้แจ้ง",
     "เบอร์โทร",
     "อีเมล",
@@ -109,6 +123,7 @@ export function buildJobsListAuditCsv(jobs: readonly JobsListCsvJob[]): string {
       formatThaiDateTimeDisplay(j.createdAt) ?? "",
       j.fixDate ?? "",
       formatThaiDateTimeDisplay(j.fixDate) ?? "",
+      workDurationDays(j),
       j.reporterName ?? "",
       j.reporterPhone ?? "",
       j.reporterEmail ?? "",
@@ -133,6 +148,8 @@ export function buildJobsListAuditCsv(jobs: readonly JobsListCsvJob[]): string {
 
   return lines.join("\r\n");
 }
+
+export { workDurationDays };
 
 /** UTF-8 + BOM สำหรับเปิดใน Excel ภาษาไทย */
 export function downloadUtf8Csv(filename: string, csvBody: string): void {

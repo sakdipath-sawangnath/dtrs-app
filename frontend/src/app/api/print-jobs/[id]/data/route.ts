@@ -56,6 +56,29 @@ async function fetchImageDataUrl(
   }
 }
 
+async function fetchBinaryDataUrl(
+  token: string,
+  path: string,
+): Promise<string | null> {
+  const apiBase = getServerApiBaseUrl();
+  try {
+    const res = await fetchWithTimeout(
+      `${apiBase}${path}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      },
+      IMAGE_FETCH_MS,
+    );
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    const ct = res.headers.get("content-type") || "image/png";
+    return `data:${ct};base64,${buf.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * รวม job + รูป data URL สำหรับหน้าพิมพ์ — เรียกจาก client หลังโหลดหน้า
  * (ไม่ส่งผ่าน RSC props เพื่อกัน Maximum call stack เมื่อ base64 ใหญ่)
@@ -121,14 +144,32 @@ export async function GET(
   }
 
   const indices = [0, 1, 2] as const;
-  const [issue, fix] = await Promise.all([
+  const staffId =
+    job &&
+    typeof job === "object" &&
+    job.assignedTo &&
+    typeof job.assignedTo === "object" &&
+    "id" in (job.assignedTo as object)
+      ? Number((job.assignedTo as { id?: number }).id)
+      : NaN;
+
+  const [issue, fix, reporterSignature, staffSignature] = await Promise.all([
     Promise.all(
       indices.map((i) => fetchImageDataUrl(token, jobId, "issue", i)),
     ),
     Promise.all(indices.map((i) => fetchImageDataUrl(token, jobId, "fix", i))),
+    fetchBinaryDataUrl(token, `/jobs/${jobId}/image/reporter-signature`),
+    Number.isFinite(staffId)
+      ? fetchBinaryDataUrl(token, `/users/${staffId}/signature`)
+      : Promise.resolve(null),
   ]);
 
-  const prefetchedImages: PdfPrefetchedImages = { issue, fix };
+  const prefetchedImages: PdfPrefetchedImages = {
+    issue,
+    fix,
+    reporterSignature,
+    staffSignature,
+  };
 
   return Response.json({ job, prefetchedImages });
 }

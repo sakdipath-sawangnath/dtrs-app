@@ -7,13 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  ADMIN
-  STAFF
-  USER
-  SUPERVISOR  // หัวหน้างาน — เห็นเมนูแบบเจ้าหน้าที่ + มอบหมายงานได้
-}
-
 enum JobStatus {
   PENDING
   IN_PROGRESS
@@ -59,12 +52,14 @@ model User {
   username     String   @unique
   password     String
   name         String?
-  role         Role     @default(STAFF) // เลิกใช้เมื่อ migrate ไป roleId แล้ว
+  /// AppRole.code (รวมบทบาทที่สร้างเอง เช่น ADMIN_1) — ไม่ใช้ Prisma enum เพื่อไม่ให้ findMany พัง
+  role         String   @default("STAFF") @db.VarChar(64)
   roleId       Int? // ถ้ามีค่า ใช้สิทธิ์จากตาราง Role/Permission
   roleRef      AppRole? @relation("UserRole", fields: [roleId], references: [id])
   phone        String?
   position     String? // ตำแหน่ง
   image        String? // รูปภาพ
+  signature    String? // ลายเซ็นเจ้าหน้าที่ (MinIO URL)
   isLocked     Boolean  @default(false) // ล็อกการเข้าสู่ระบบ (ADMIN ตั้งได้)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -94,23 +89,38 @@ model Province {
 
 // District belongs to one Province
 model District {
-  id         Int      @id @default(autoincrement())
-  name       String
-  provinceId Int
-  province   Province @relation(fields: [provinceId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id           Int           @id @default(autoincrement())
+  name         String
+  provinceId   Int
+  province     Province      @relation(fields: [provinceId], references: [id], onDelete: Cascade)
+  subdistricts Subdistrict[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   @@unique([provinceId, name])
 }
 
+// Subdistrict (ตำบล) belongs to one District
+model Subdistrict {
+  id         Int      @id @default(autoincrement())
+  name       String
+  districtId Int
+  district   District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([districtId, name])
+}
+
 model Site {
-  id        Int      @id @default(autoincrement())
-  province  String // จังหวัด
-  district  String // อำเภอ
-  agency    String // หน่วยงาน
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          Int      @id @default(autoincrement())
+  province    String // จังหวัด (denormalize จาก master)
+  district    String // อำเภอ
+  subdistrict String? // ตำบล
+  agency      String // สถานที่/หน่วยงาน
+  station     String // ชื่อสถานี
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Job {
@@ -119,9 +129,11 @@ model Job {
   reportDate DateTime? // วัน เวลาที่แจ้งซ่อม Auto
 
   // Location
-  province String? // จังหวัด
-  district String? // อำเภอ
-  location String? // สถานที่
+  province    String? // จังหวัด
+  district    String? // อำเภอ
+  subdistrict String? // ตำบล
+  agency      String? // สถานที่/หน่วยงาน
+  location    String? // ชื่อสถานี (station)
 
   // Reporter
   reporterId    Int?
@@ -161,6 +173,9 @@ model Job {
   fixNote      String? @db.Text // หมายเหตุการแก้ไข
   systemStatus String? // สถานะระบบ
 
+  reporterSignature String? // ลายเซ็นผู้แจ้งตอนปิดงาน (MinIO URL)
+  reporterSignedAt  DateTime? // เวลาที่เซ็นปิดงาน
+
   isOutOfContract Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -170,4 +185,15 @@ model Setting {
   id    Int    @id @default(autoincrement())
   key   String @unique
   value Json
+}
+
+// ตัวนับ Doc No — IN_CONTRACT period='' ; OUT_OF_CONTRACT period=YYYYMM (Asia/Bangkok)
+model DocSequence {
+  id        Int      @id @default(autoincrement())
+  kind      String // IN_CONTRACT | OUT_OF_CONTRACT
+  period    String   @default("") // '' หรือ YYYYMM
+  lastValue Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([kind, period])
 }

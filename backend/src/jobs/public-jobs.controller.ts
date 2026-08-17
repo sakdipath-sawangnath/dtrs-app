@@ -16,6 +16,11 @@ import { EventsGateway } from '../events/events.gateway';
 import { Prisma } from '@prisma/client';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { CreateJobSchema } from './dto/create-job.dto';
+import {
+  assertAndNormalizeJobImage,
+  JOB_IMAGE_MULTER_LIMITS,
+  normalizeJobImageFiles,
+} from '../common/upload/job-image-upload';
 
 /**
  * API สาธารณะสำหรับหน้า `/public/report` และ `/public/status` เท่านั้น
@@ -32,10 +37,13 @@ export class PublicJobsController {
   /** แจ้งซ่อม (multipart) — ไม่ต้อง JWT; รูป issue = images[], รูปโปรไฟล์ผู้แจ้ง = reporterAvatar */
   @Post()
   @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'images', maxCount: 10 },
-      { name: 'reporterAvatar', maxCount: 1 },
-    ]),
+    FileFieldsInterceptor(
+      [
+        { name: 'images', maxCount: 3 },
+        { name: 'reporterAvatar', maxCount: 1 },
+      ],
+      { limits: JOB_IMAGE_MULTER_LIMITS },
+    ),
   )
   async createReport(
     @Body(new ZodValidationPipe(CreateJobSchema)) createJobDto: any,
@@ -45,8 +53,10 @@ export class PublicJobsController {
       reporterAvatar?: Express.Multer.File[];
     },
   ) {
-    const issueFiles = files?.images ?? [];
-    const reporterAvatar = files?.reporterAvatar?.[0];
+    const issueFiles = await normalizeJobImageFiles(files?.images ?? []);
+    const reporterAvatar = files?.reporterAvatar?.[0]
+      ? await assertAndNormalizeJobImage(files.reporterAvatar[0])
+      : undefined;
     const baseData: Prisma.JobCreateInput = {
       ...createJobDto,
     };

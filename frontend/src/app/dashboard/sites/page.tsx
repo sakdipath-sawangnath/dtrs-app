@@ -26,6 +26,14 @@ import DashboardStatCards, {
 import { useDashboardTablePaging } from "@/hooks/useDashboardTablePaging";
 import { toastSuccess, toastError, confirmDialog } from "@/lib/toast";
 import { unwrapApiData } from "@/lib/apiResponse";
+import {
+  fetchLocationDistricts,
+  fetchLocationProvinces,
+  fetchLocationSubdistricts,
+  type LocationDistrictOption,
+  type LocationProvinceOption,
+  type LocationSubdistrictOption,
+} from "@/lib/locationsApi";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4100/api";
 
@@ -37,14 +45,9 @@ interface SiteRow {
   id: number;
   province: string;
   district: string;
+  subdistrict?: string | null;
   agency: string;
-}
-
-/** จังหวัด–อำเภอจาก API /locations (ข้อมูลหลักที่สัมพันธ์กัน) */
-interface LocationProvince {
-  id: number;
-  name: string;
-  districts: { id: number; name: string }[];
+  station: string;
 }
 
 type AxiosErr = {
@@ -79,14 +82,21 @@ export default function DashboardSitesPage() {
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [editing, setEditing] = useState<SiteRow | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ province: "", district: "", agency: "" });
+  const [form, setForm] = useState({
+    province: "",
+    district: "",
+    subdistrict: "",
+    agency: "",
+    station: "",
+  });
   /** เลือกหลายแถวเพื่อลบแบบ bulk */
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const headerSelectRef = useRef<HTMLInputElement>(null);
 
-  const [locationTree, setLocationTree] = useState<LocationProvince[]>([]);
-  const [locationsLoading, setLocationsLoading] = useState(true);
+  const [provincesMaster, setProvincesMaster] = useState<LocationProvinceOption[]>([]);
+  const [formDistricts, setFormDistricts] = useState<LocationDistrictOption[]>([]);
+  const [formSubdistricts, setFormSubdistricts] = useState<LocationSubdistrictOption[]>([]);
   const [provinceModalOpen, setProvinceModalOpen] = useState(false);
   const [districtModalOpen, setDistrictModalOpen] = useState(false);
   const [provinceNameForm, setProvinceNameForm] = useState("");
@@ -96,21 +106,63 @@ export default function DashboardSitesPage() {
   const [savingDistrict, setSavingDistrict] = useState(false);
 
   const fetchLocations = useCallback(async () => {
-    setLocationsLoading(true);
     try {
-      const r = await axios.get<unknown>(`${API}/locations/provinces`, { timeout: 15000 });
-      const payload = unwrapApiData<unknown>(r?.data);
-      setLocationTree(Array.isArray(payload) ? (payload as LocationProvince[]) : []);
+      const list = await fetchLocationProvinces();
+      setProvincesMaster(list);
     } catch {
-      setLocationTree([]);
-    } finally {
-      setLocationsLoading(false);
+      setProvincesMaster([]);
     }
   }, []);
 
   useEffect(() => {
     fetchLocations();
   }, [fetchLocations]);
+
+  /** lazy-load อำเภอเมื่อเลือกจังหวัดในฟอร์ม Site */
+  useEffect(() => {
+    if (!form.province || !modalOpen) {
+      setFormDistricts([]);
+      return;
+    }
+    const provinceId = provincesMaster.find((p) => p.name === form.province)?.id;
+    if (provinceId == null) {
+      setFormDistricts([]);
+      return;
+    }
+    const ac = new AbortController();
+    void (async () => {
+      try {
+        const rows = await fetchLocationDistricts(provinceId, ac.signal);
+        setFormDistricts(rows);
+      } catch {
+        if (!ac.signal.aborted) setFormDistricts([]);
+      }
+    })();
+    return () => ac.abort();
+  }, [form.province, provincesMaster, modalOpen]);
+
+  /** lazy-load ตำบลเมื่อเลือกอำเภอในฟอร์ม Site */
+  useEffect(() => {
+    if (!form.district || !modalOpen) {
+      setFormSubdistricts([]);
+      return;
+    }
+    const districtId = formDistricts.find((d) => d.name === form.district)?.id;
+    if (districtId == null) {
+      setFormSubdistricts([]);
+      return;
+    }
+    const ac = new AbortController();
+    void (async () => {
+      try {
+        const rows = await fetchLocationSubdistricts(districtId, ac.signal);
+        setFormSubdistricts(rows);
+      } catch {
+        if (!ac.signal.aborted) setFormSubdistricts([]);
+      }
+    })();
+    return () => ac.abort();
+  }, [form.district, formDistricts, modalOpen]);
 
   useEffect(() => {
     if (!token || status !== "authenticated") {
@@ -282,7 +334,8 @@ export default function DashboardSitesPage() {
         (s) =>
           s.province.toLowerCase().includes(q) ||
           s.district.toLowerCase().includes(q) ||
-          s.agency.toLowerCase().includes(q),
+          s.agency.toLowerCase().includes(q) ||
+          s.station.toLowerCase().includes(q),
       );
     }
     if (provinceFilter) {
@@ -352,7 +405,7 @@ export default function DashboardSitesPage() {
   const clearSelection = () => setSelectedIds(new Set());
 
   const openCreate = () => {
-    setForm({ province: "", district: "", agency: "" });
+    setForm({ province: "", district: "", subdistrict: "", agency: "", station: "" });
     setModalMode("create");
     setEditing(null);
     setModalOpen(true);
@@ -363,6 +416,8 @@ export default function DashboardSitesPage() {
       province: row.province,
       district: row.district,
       agency: row.agency,
+      station: row.station,
+      subdistrict: row.subdistrict ?? "",
     });
     setModalMode("edit");
     setEditing(row);
@@ -375,8 +430,10 @@ export default function DashboardSitesPage() {
     const province = form.province.trim();
     const district = form.district.trim();
     const agency = form.agency.trim();
-    if (!province || !district || !agency) {
-      toastError("กรุณากรอกจังหวัด อำเภอ และหน่วยงาน");
+    const station = form.station.trim();
+    const subdistrict = form.subdistrict.trim();
+    if (!province || !district || !agency || !station) {
+      toastError("กรุณากรอกจังหวัด อำเภอ สถานที่/หน่วยงาน และชื่อสถานี");
       return;
     }
     setSaving(true);
@@ -384,14 +441,14 @@ export default function DashboardSitesPage() {
       if (modalMode === "create") {
         await axios.post(
           `${API}/sites`,
-          { province, district, agency },
+          { province, district, subdistrict, agency, station },
           { headers: { Authorization: `Bearer ${token}` } },
         );
         toastSuccess("เพิ่ม Site สำเร็จ", 1200);
       } else if (editing) {
         await axios.patch(
           `${API}/sites/${editing.id}`,
-          { province, district, agency },
+          { province, district, subdistrict, agency, station },
           { headers: { Authorization: `Bearer ${token}` } },
         );
         toastSuccess("บันทึกสำเร็จ", 1200);
@@ -409,7 +466,7 @@ export default function DashboardSitesPage() {
     if (!token) return;
     const ok = await confirmDialog({
       title: "ยืนยันการลบ",
-      text: `ลบ Site "${row.province} / ${row.district} / ${row.agency}"?`,
+      text: `ลบ Site "${row.province} / ${row.district} / ${row.agency} / ${row.station}"?`,
     });
     if (!ok) return;
     try {
@@ -465,7 +522,7 @@ export default function DashboardSitesPage() {
 
   const openDistrictModal = () => {
     setDistrictNameForm("");
-    setDistrictProvinceId(locationTree[0]?.id ?? "");
+    setDistrictProvinceId(provincesMaster[0]?.id ?? "");
     setDistrictModalOpen(true);
   };
 
@@ -527,7 +584,7 @@ export default function DashboardSitesPage() {
     return (
       <DashboardPageShell
         title="จัดการ Site"
-        subtitle="จังหวัด อำเภอ หน่วยงาน — ข้อมูลหลักจังหวัด–อำเภอสัมพันธ์กัน · กรองจากการ์ดหรือตารางด้านล่าง"
+        subtitle="จังหวัด อำเภอ ตำบล ชื่อสถานี — เลือกจาก master หรือจัดการที่เมนูพื้นที่"
         noCard={true}
       >
         <DashboardRouteLoading variant="page" />
@@ -538,88 +595,28 @@ export default function DashboardSitesPage() {
   return (
     <DashboardPageShell
       title="จัดการ Site"
-      subtitle="จังหวัด อำเภอ หน่วยงาน — ข้อมูลหลักจังหวัด–อำเภอสัมพันธ์กัน · กรองจากการ์ดหรือตารางด้านล่าง"
+      subtitle="จังหวัด อำเภอ ตำบล ชื่อสถานี — master พื้นที่อยู่ที่เมนู «จัดการพื้นที่ (Master)»"
       noCard={true}
     >
       <div className="flex flex-col gap-4 min-h-0 flex-1">
         <div className="glass-card p-4 sm:p-5 text-slate-900 dark:text-slate-100">
-          <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
+              <div className="flex items-center gap-2">
                 <Landmark className="h-5 w-5 text-emerald-600 dark:text-emerald-400/90 shrink-0" aria-hidden />
-                <h2 className="text-base font-bold tracking-tight">จังหวัดและอำเภอ (ข้อมูลหลัก)</h2>
+                <h2 className="text-base font-bold tracking-tight">ข้อมูลหลักพื้นที่</h2>
               </div>
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1.5 max-w-2xl leading-relaxed">
-                อำเภอต้องอยู่ภายใต้จังหวัดหนึ่งเท่านั้น — ใช้เป็นฐานชื่อพื้นที่ร่วมกับรายการ Site ด้านล่าง (ข้อมูลคนละชุดกับ Site แต่ช่วยให้ชื่อสอดคล้องกัน)
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1.5 leading-relaxed">
+                จัดการจังหวัด / อำเภอ / ตำบล ที่เมนู Master — ฟอร์ม Site ด้านล่างผูก cascade จากข้อมูลนั้น
               </p>
             </div>
-            {canCreate && (
-              <div className="flex flex-wrap gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={openProvinceModal}
-                  className="inline-flex items-center justify-center gap-2 min-h-[44px] px-4 rounded-xl text-sm font-medium border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-emerald-100 dark:hover:bg-emerald-900/40 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/45"
-                >
-                  <Plus size={16} aria-hidden /> เพิ่มจังหวัด
-                </button>
-                <button
-                  type="button"
-                  onClick={openDistrictModal}
-                  disabled={locationTree.length === 0}
-                  title={locationTree.length === 0 ? "เพิ่มจังหวัดก่อน" : undefined}
-                  className="inline-flex items-center justify-center gap-2 min-h-[44px] px-4 rounded-xl text-sm font-medium border border-sky-300 bg-sky-50 text-sky-800 hover:bg-sky-100 dark:border-sky-500/40 dark:bg-sky-950/25 dark:text-sky-100 dark:hover:bg-sky-900/35 transition-all cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/45"
-                >
-                  <MapPinned size={16} aria-hidden /> เพิ่มอำเภอ
-                </button>
-              </div>
-            )}
-          </div>
-
-          {locationsLoading ? (
-            <div className="mt-5">
-              <DashboardRouteLoading variant="overlay" />
-            </div>
-          ) : locationTree.length === 0 ? (
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-5">
-              {canCreate
-                ? "ยังไม่มีจังหวัดในระบบ — กด «เพิ่มจังหวัด» เพื่อเริ่ม แล้วค่อย «เพิ่มอำเภอ» ภายใต้จังหวัดนั้น"
-                : "ยังไม่มีข้อมูลจังหวัด–อำเภอในระบบ"}
-            </p>
-          ) : (
-            <ul
-              className="mt-4 space-y-2 max-h-[min(20rem,50vh)] overflow-y-auto pr-1"
-              aria-label="รายการจังหวัดและอำเภอ"
+            <a
+              href="/dashboard/locations"
+              className="inline-flex items-center justify-center gap-2 min-h-[44px] px-4 rounded-xl text-sm font-medium border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-emerald-100 dark:hover:bg-emerald-900/40 transition-all cursor-pointer shrink-0"
             >
-              {locationTree.map((p) => (
-                <li
-                  key={p.id}
-                  className="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-3.5 dark:border-[var(--glass-card-border)] dark:bg-slate-950/35"
-                >
-                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <MapPin size={14} className="text-emerald-600 dark:text-emerald-400/90 shrink-0" aria-hidden />
-                    <span>{p.name}</span>
-                    <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
-                      {p.districts.length} อำเภอ
-                    </span>
-                  </p>
-                  <div className="mt-2.5 flex flex-wrap gap-1.5">
-                    {p.districts.length === 0 ? (
-                      <span className="text-xs text-slate-500 dark:text-slate-400">ยังไม่มีอำเภอ — ใช้ปุ่ม «เพิ่มอำเภอ» แล้วเลือกจังหวัดนี้</span>
-                    ) : (
-                      p.districts.map((d) => (
-                        <span
-                          key={d.id}
-                          className="text-xs px-2.5 py-1 rounded-lg bg-white text-slate-700 border border-slate-200 dark:bg-slate-800/70 dark:text-slate-200 dark:border-white/8"
-                        >
-                          {d.name}
-                        </span>
-                      ))
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+              ไปจัดการ Master
+            </a>
+          </div>
         </div>
 
         {!loading && !loadError && sites.length > 0 && (
@@ -644,7 +641,7 @@ export default function DashboardSitesPage() {
         <div className="glass-card overflow-hidden flex flex-col min-h-0 text-slate-900 dark:text-slate-100">
           <DashboardFilterBar
             onRefresh={() => fetchSites()}
-            searchPlaceholder="ค้นหา จังหวัด / อำเภอ / หน่วยงาน"
+            searchPlaceholder="ค้นหา จังหวัด / อำเภอ / ชื่อสถานี"
             searchValue={query}
             onSearchChange={setQuery}
             rightActions={
@@ -813,7 +810,13 @@ export default function DashboardSitesPage() {
                         อำเภอ
                       </th>
                       <th scope="col" className="px-4 py-3 font-medium">
-                        หน่วยงาน
+                        ตำบล
+                      </th>
+                      <th scope="col" className="px-4 py-3 font-medium">
+                        สถานที่/หน่วยงาน
+                      </th>
+                      <th scope="col" className="px-4 py-3 font-medium">
+                        ชื่อสถานี
                       </th>
                       {(canUpdate || canDelete) && (
                         <th scope="col" className="px-4 py-3 font-medium text-right w-[120px]">
@@ -841,7 +844,11 @@ export default function DashboardSitesPage() {
                         )}
                         <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{row.province}</td>
                         <td className="px-4 py-3 text-slate-800 dark:text-slate-200">{row.district}</td>
+                        <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                          {row.subdistrict?.trim() || "—"}
+                        </td>
                         <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.agency}</td>
+                        <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.station}</td>
                         {(canUpdate || canDelete) && (
                           <td className="px-4 py-2 text-right">
                             <div className="flex items-center justify-end gap-1">
@@ -900,39 +907,92 @@ export default function DashboardSitesPage() {
             <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="site-province">
               จังหวัด
             </label>
-            <input
+            <select
               id="site-province"
-              type="text"
-              className="form-input-glass w-full"
+              className="form-input-glass w-full min-h-11"
               value={form.province}
-              onChange={(e) => setForm({ ...form, province: e.target.value })}
-              autoComplete="address-level1"
-            />
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  province: e.target.value,
+                  district: "",
+                  subdistrict: "",
+                })
+              }
+            >
+              <option value="">-- เลือกจังหวัด --</option>
+              {provincesMaster.map((p) => (
+                <option key={p.id} value={p.name}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="site-district">
               อำเภอ
             </label>
-            <input
+            <select
               id="site-district"
-              type="text"
-              className="form-input-glass w-full"
+              className="form-input-glass w-full min-h-11"
               value={form.district}
-              onChange={(e) => setForm({ ...form, district: e.target.value })}
-              autoComplete="address-level2"
-            />
+              disabled={!form.province}
+              onChange={(e) =>
+                setForm({ ...form, district: e.target.value, subdistrict: "" })
+              }
+            >
+              <option value="">-- เลือกอำเภอ --</option>
+              {formDistricts.map((d) => (
+                <option key={d.id} value={d.name}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="site-subdistrict">
+              ตำบล{" "}
+              <span className="text-xs font-normal text-slate-500 dark:text-slate-400">(ถ้ามี)</span>
+            </label>
+            <select
+              id="site-subdistrict"
+              className="form-input-glass w-full min-h-11"
+              value={form.subdistrict}
+              disabled={!form.district}
+              onChange={(e) => setForm({ ...form, subdistrict: e.target.value })}
+            >
+              <option value="">-- ไม่ระบุ / ยังไม่มีใน master --</option>
+              {formSubdistricts.map((s) => (
+                <option key={s.id} value={s.name}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="site-agency">
-              หน่วยงาน
+              สถานที่/หน่วยงาน
             </label>
             <input
               id="site-agency"
               type="text"
-              className="form-input-glass w-full"
+              className="form-input-glass w-full min-h-11"
               value={form.agency}
               onChange={(e) => setForm({ ...form, agency: e.target.value })}
               autoComplete="organization"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="site-station">
+              ชื่อสถานี
+            </label>
+            <input
+              id="site-station"
+              type="text"
+              className="form-input-glass w-full min-h-11"
+              value={form.station}
+              onChange={(e) => setForm({ ...form, station: e.target.value })}
+              autoComplete="off"
             />
           </div>
         </div>
@@ -989,7 +1049,7 @@ export default function DashboardSitesPage() {
               aria-label="เลือกจังหวัดที่อำเภอสังกัด"
             >
               <option value="">-- เลือกจังหวัด --</option>
-              {locationTree.map((p) => (
+              {provincesMaster.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>

@@ -19,6 +19,11 @@ const RBAC_MENU_PERMISSIONS = [
   { code: 'menu.all', name: 'ประวัติทั้งหมด', category: 'menu' },
   { code: 'menu.outOfContract', name: 'นอกสัญญา', category: 'menu' },
   { code: 'menu.sites', name: 'จัดการ Site', category: 'menu' },
+  {
+    code: 'menu.locations',
+    name: 'จัดการข้อมูล Master (พื้นที่)',
+    category: 'menu',
+  },
   { code: 'menu.users', name: 'จัดการผู้ใช้', category: 'menu' },
   { code: 'menu.settings', name: 'ตั้งค่าระบบ', category: 'menu' },
   { code: 'menu.roles', name: 'จัดการบทบาทและสิทธิ์', category: 'menu' },
@@ -26,6 +31,12 @@ const RBAC_MENU_PERMISSIONS = [
 
 const RBAC_ACTION_PERMISSIONS = [
   { code: 'job.assign', name: 'มอบหมายงาน', category: 'job' },
+  {
+    code: 'job.viewContractTabs',
+    name: 'ดูแท็บสัญญา/นอกสัญญา',
+    category: 'job',
+  },
+  { code: 'job.classifyDoc', name: 'จำแนกเอกสาร', category: 'job' },
   {
     code: 'job.deleteUnassigned',
     name: 'ลบงานที่ยังไม่มีผู้รับผิดชอบ',
@@ -48,6 +59,11 @@ const RBAC_ACTION_PERMISSIONS = [
     category: 'job',
   },
   {
+    code: 'job.issue.upload',
+    name: 'อัปโหลดรูปปัญหาที่แจ้ง',
+    category: 'job',
+  },
+  {
     code: 'job.fix.self',
     name: 'บันทึก/ปิดงาน (เฉพาะงานที่รับผิดชอบ)',
     category: 'job',
@@ -67,7 +83,10 @@ const RBAC_ACTION_PERMISSIONS = [
 const RBAC_ACTION_CODES_ALL = RBAC_ACTION_PERMISSIONS.map((p) => p.code);
 /** SUPERVISOR ไม่ได้ลบงาน IN_PROGRESS แบบผู้ดูแล (เฉพาะ ADMIN) */
 const RBAC_ACTION_CODES_SUPERVISOR = RBAC_ACTION_CODES_ALL.filter(
-  (c) => c !== 'job.deleteInProgress' && c !== 'job.backfillDate',
+  (c) =>
+    c !== 'job.deleteInProgress' &&
+    c !== 'job.backfillDate' &&
+    c !== 'job.issue.upload',
 );
 
 const RBAC_ALL_PERMISSIONS = [
@@ -108,7 +127,13 @@ const RBAC_DEFAULT_ROLES = [
 
 const RBAC_STAFF_MENU_CODES = RBAC_MENU_PERMISSIONS.map((p) => p.code).filter(
   (c) =>
-    !['menu.users', 'menu.settings', 'menu.roles', 'menu.sites'].includes(c),
+    ![
+      'menu.users',
+      'menu.settings',
+      'menu.roles',
+      'menu.sites',
+      'menu.locations',
+    ].includes(c),
 );
 
 /** export ให้ PermissionsGuard ใช้ชุดเดียวกับ enum user (ไม่มี roleId) */
@@ -119,6 +144,7 @@ export const RBAC_ROLE_PERMISSION_CODES: Record<string, string[]> = {
   ],
   STAFF: [
     ...RBAC_STAFF_MENU_CODES,
+    'job.viewContractTabs',
     'job.fix.self',
     'job.reopen.self',
     'job.updateStatus',
@@ -127,6 +153,7 @@ export const RBAC_ROLE_PERMISSION_CODES: Record<string, string[]> = {
   SUPERVISOR: [
     ...RBAC_STAFF_MENU_CODES,
     'menu.sites',
+    'menu.locations',
     ...RBAC_ACTION_CODES_SUPERVISOR,
   ],
 };
@@ -315,7 +342,7 @@ export class RolesService implements OnModuleInit {
         SUPERVISOR: roleIds.SUPERVISOR,
       };
       for (const u of users) {
-        const roleId = enumToRoleId[u.role as string];
+        const roleId = enumToRoleId[u.role];
         if (roleId != null) {
           await this.prisma.user.update({
             where: { id: u.id },

@@ -20,6 +20,7 @@ import {
   Search,
   Shield,
   Loader2,
+  Landmark,
 } from "lucide-react";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
@@ -40,6 +41,7 @@ const navigation = [
   { name: "ประวัติทั้งหมด", href: "/dashboard/all", icon: CheckCircle, permission: "menu.all", roles: ["ADMIN", "STAFF", "SUPERVISOR"] },
   { name: "นอกสัญญา", href: "/dashboard/out-of-contract", icon: Clock, permission: "menu.outOfContract", roles: ["ADMIN", "STAFF", "SUPERVISOR"] },
   { name: "จัดการ Site", href: "/dashboard/sites", icon: MapPin, permission: "menu.sites", roles: ["ADMIN", "SUPERVISOR"] },
+  { name: "จัดการพื้นที่ (Master)", href: "/dashboard/locations", icon: Landmark, permission: "menu.locations", roles: ["ADMIN", "SUPERVISOR"] },
   { name: "จัดการผู้ใช้", href: "/dashboard/users", icon: UserCog, permission: "menu.users", roles: ["ADMIN"] },
   { name: "จัดการบทบาทและสิทธิ์", href: "/dashboard/roles", icon: Shield, permission: "menu.roles", roles: ["ADMIN"] },
   { name: "ตั้งค่าระบบ", href: "/dashboard/settings", icon: Settings, permission: "menu.settings", roles: ["ADMIN"] },
