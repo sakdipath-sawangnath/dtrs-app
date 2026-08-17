@@ -27,7 +27,10 @@ describe('JobsService saveFixInfo / closeJob', () => {
     brokenPart: 'Hardware',
     cause: 'สายหลุด',
     fixMethod: 'ต่อสายใหม่',
-    fixImages: ['https://example.invalid/1.jpg', 'https://example.invalid/2.jpg'],
+    fixImages: [
+      'https://example.invalid/1.jpg',
+      'https://example.invalid/2.jpg',
+    ],
   };
 
   const savedJob = {
