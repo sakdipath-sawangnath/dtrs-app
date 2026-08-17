@@ -10,6 +10,10 @@
 
 | ไฟล์ | หัวข้อ |
 |------|--------|
+| [System-Workflow.md](./System-Workflow.md) | **Flow chart / System workflow** — lifecycle งาน, report/status, dashboard, อีเมล, MinIO, auth, PDF, proxy (mermaid) |
+| [Meeting-11082026-Requirements-Plan.plan.md](./Meeting-11082026-Requirements-Plan.plan.md) | **แผน Meeting-11082026** — Phase A–E ✅ · ข้อ 8 Reports ✅ (PDF CM/SHF); Doc No จำแนกหลังปิดงาน; UI `/all` + job detail; รูปปัญหา `job.issue.upload` · **5MB/HEIC** · fallback 413 · แยก `/fix` กับ `/close` + ป้าย「รอเซ็นผู้แจ้ง」 |
+| [Locations-Master-Seed.md](./Locations-Master-Seed.md) | **Seed จังหวัด/อำเภอ/ตำบล** จาก dump MS SQL (`TB_MST_*.sql`) → MySQL ผ่าน `seed-locations-from-mssql.ts` |
+| [Sites-Import.md](./Sites-Import.md) | **Seed Site** จาก `Sites.xlsx` (agency + station) · migration `Site.station` / `Job.agency` · local ✅ |
 | [DTRS-Migration-Checklist.md](./DTRS-Migration-Checklist.md) | **Checklist ย้ายจาก `cctv-app_ticket`** — Docker/CI, env, MinIO, DB, branding; **อัปเดต 2026-08-06:** P0 ✅ · Variables UAT กลุ่ม A+B ✅ · `production`/NPM/deploy pending |
 | [GitLab-CI-Plan.md](./GitLab-CI-Plan.md) | **แผน + implement GitLab CI** — UAT+PRD, grilling + hardening; Variables MinIO ✅ 2026-08-06 |
 | [GitLab-CI-Variables-Checklist.md](./GitLab-CI-Variables-Checklist.md) | **Checklist GitLab CI/CD Variables** — กลุ่ม A `staging` ✅ · กลุ่ม B MinIO ✅ · `production` pending · mapping เข้า container |

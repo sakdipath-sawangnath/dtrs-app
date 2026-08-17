@@ -48,6 +48,7 @@ async function main() {
         province: String(row['จังหวัด']).trim(),
         district: String(row['อำเภอ']).trim(),
         agency: String(row['หน่วยงาน']).trim(),
+        station: String(row['หน่วยงาน']).trim(),
       },
     }).catch(async () => {
       // สร้างใหม่ถ้า upsert ไม่ได้
@@ -56,6 +57,7 @@ async function main() {
           province: String(row['จังหวัด']).trim(),
           district: String(row['อำเภอ']).trim(),
           agency: String(row['หน่วยงาน']).trim(),
+          station: String(row['หน่วยงาน']).trim(),
         },
       }).catch(() => null);
     });

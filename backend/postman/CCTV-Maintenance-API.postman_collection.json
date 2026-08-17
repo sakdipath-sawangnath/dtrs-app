@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "CCTV Maintenance API",
-    "description": "API ระบบแจ้งซ่อม · Backend NestJS\n\n**วิธีใช้:**\n1. ตั้งค่า baseUrl = http://localhost:4100/api (หรือตาม server)\n2. ตั้ง jobId สำหรับ request ในโฟลเดอร์ Jobs\n3. รัน request \"Auth > Login\" แล้วใส่ access_token ใน Variables\n\n**รูปงาน** `GET /jobs/:id/image/:kind/:index` — **502** = โหลดจาก MinIO ไม่ได้; **404** = ไม่มีรูปในช่อง · Collection debug หน้าพิมพ์: `CCTV-Print-PDF-Debug.postman_collection.json`\n\n**อัปเดต:** Jobs — fix/reopen เฉพาะผู้รับงาน; Settings — SMTP (ADMIN); ดู `backend/docs/api-endpoints.json`",
+    "description": "API ระบบแจ้งซ่อม · Backend NestJS\n\n**วิธีใช้:**\n1. ตั้งค่า baseUrl = http://localhost:4100/api (หรือตาม server)\n2. ตั้ง jobId สำหรับ request ในโฟลเดอร์ Jobs\n3. รัน request \"Auth > Login\" แล้วใส่ access_token ใน Variables\n\n**รูปงาน** `GET /jobs/:id/image/:kind/:index` — **502** = โหลดจาก MinIO ไม่ได้; **404** = ไม่มีรูปในช่อง · Collection debug หน้าพิมพ์: `CCTV-Print-PDF-Debug.postman_collection.json`\n\n**อัปเดต:** `POST /public/jobs` — `description` (อาการที่พบ) อย่างน้อย 10 ไม่เกิน **500** ตัวอักษร (400 ถ้าเกิน); รูป issue/fix ตามเดิม; Settings — SMTP (ADMIN); ดู `backend/docs/api-endpoints.json`",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -173,13 +173,72 @@
           "name": "Create Job (Public)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [],
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"province\": \"สงขลา\",\n  \"district\": \"เมือง\",\n  \"location\": \"สถานีตำรวจ\",\n  \"reporterName\": \"ผู้แจ้ง\",\n  \"reporterPhone\": \"0812345678\",\n  \"reporterEmail\": \"reporter@example.com\",\n  \"description\": \"รายละเอียดปัญหา\"\n}"
+              "mode": "formdata",
+              "formdata": [
+                { "key": "province", "value": "สงขลา", "type": "text" },
+                { "key": "district", "value": "เมือง", "type": "text" },
+                { "key": "subdistrict", "value": "", "type": "text" },
+                { "key": "agency", "value": "สถานที่/หน่วยงาน", "type": "text" },
+                { "key": "location", "value": "ชื่อสถานี", "type": "text" },
+                { "key": "reporterName", "value": "ผู้แจ้ง", "type": "text" },
+                { "key": "reporterPhone", "value": "0812345678", "type": "text" },
+                { "key": "reporterEmail", "value": "reporter@example.com", "type": "text" },
+                { "key": "reporterPosition", "value": "", "type": "text" },
+                { "key": "description", "value": "กล้องไม่แสดงภาพ ห้องประชุมชั้น 2 พบตั้งแต่เช้านี้", "type": "text" },
+                { "key": "isOutOfContract", "value": "false", "type": "text" },
+                { "key": "images", "type": "file", "src": [], "disabled": true },
+                { "key": "reporterAvatar", "type": "file", "src": [], "disabled": true }
+              ]
             },
-            "url": "{{baseUrl}}/jobs",
-            "description": "แจ้งซ่อมใหม่ (ไม่ต้อง login)"
+            "url": "{{baseUrl}}/public/jobs",
+            "description": "แจ้งซ่อมสาธารณะ (multipart, ไม่ต้อง JWT) · `description` อย่างน้อย 10 ไม่เกิน **500** ตัวอักษร · รูป `images[]` สูงสุด 3 ไฟล์ (5MB, JPG/PNG/WebP/HEIC→JPEG) + `reporterAvatar` optional"
+          }
+        },
+        {
+          "name": "Create Job (Public) — description over 500",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('descriptionOver500', Array.from({ length: 501 }, function () { return 'ก'; }).join(''));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 when description exceeds 500 characters', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "province", "value": "สงขลา", "type": "text" },
+                { "key": "district", "value": "เมือง", "type": "text" },
+                { "key": "agency", "value": "สถานที่/หน่วยงาน", "type": "text" },
+                { "key": "location", "value": "ชื่อสถานี", "type": "text" },
+                { "key": "reporterName", "value": "ผู้แจ้ง", "type": "text" },
+                { "key": "reporterPhone", "value": "0812345678", "type": "text" },
+                { "key": "reporterEmail", "value": "reporter@example.com", "type": "text" },
+                { "key": "description", "value": "{{descriptionOver500}}", "type": "text" },
+                { "key": "isOutOfContract", "value": "false", "type": "text" }
+              ]
+            },
+            "url": "{{baseUrl}}/public/jobs",
+            "description": "เคสลบ: `description` 501 ตัวอักษร (pre-request สร้าง `{{descriptionOver500}}`) · คาด **400** จาก `CreateJobSchema` — ไม่บันทึกงาน"
           }
         },
         {
@@ -285,7 +344,22 @@
               ]
             },
             "url": "{{baseUrl}}/jobs/{{jobId}}/fix",
-            "description": "บันทึกการแก้ไข + รูปการแก้ไข (optional) · เฉพาะผู้รับงาน · ถ้ายัง RESOLVED ต้อง Reopen ก่อน"
+            "description": "บันทึกการแก้ไข + รูปการแก้ไข (optional) · คง IN_PROGRESS · ไม่รับลายเซ็นผู้แจ้ง · ถ้ายัง RESOLVED ต้อง Reopen ก่อน"
+          }
+        },
+        {
+          "name": "Close Job (assignee / job.fix.*)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "reporterSignature", "type": "file", "src": [], "disabled": false }
+              ]
+            },
+            "url": "{{baseUrl}}/jobs/{{jobId}}/close",
+            "description": "ปิดงาน · บังคับลายเซ็นผู้แจ้ง PNG · ต้องบันทึกการแก้ไขครบก่อน · ตั้ง RESOLVED"
           }
         },
         {
@@ -381,11 +455,51 @@
       "name": "Sites",
       "item": [
         {
-          "name": "Get All Sites (Public)",
+          "name": "Get All Sites (Public / Dashboard)",
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/sites",
-            "description": "รายการพื้นที่โครงการ (จังหวัด/อำเภอ/หน่วยงาน) สำหรับ dropdown หน้าแจ้งปัญหา"
+            "description": "รายการ Site เต็ม — ใช้ dashboard; public report ใช้ options/* แทน"
+          }
+        },
+        {
+          "name": "Options Provinces (Public cascade)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/sites/options/provinces",
+            "description": "จังหวัดจาก Site (หลังตรวจเบอร์บน /public/report)"
+          }
+        },
+        {
+          "name": "Options Districts (Public cascade)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/sites/options/districts?province=กาญจนบุรี",
+            "description": "อำเภอตามจังหวัด"
+          }
+        },
+        {
+          "name": "Options Subdistricts (Public cascade)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/sites/options/subdistricts?province=กาญจนบุรี&district=เลาขวัญ",
+            "description": "ตำบลตามจังหวัด+อำเภอ"
+          }
+        },
+        {
+          "name": "Options Agencies (Public cascade)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/sites/options/agencies?province=กาญจนบุรี&district=เลาขวัญ&subdistrict=ทุ่งกระบ่ำ",
+            "description": "สถานที่/หน่วยงาน (subdistrict optional)"
+          }
+        },
+        {
+          "name": "Options Stations (Public cascade)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/sites/options/stations?province=กาญจนบุรี&district=เลาขวัญ&agency=ที่ทำการบ้านผู้ใหญ่บ้าน",
+            "description": "ชื่อสถานี"
           }
         },
         {
@@ -398,10 +512,10 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"province\": \"สงขลา\",\n  \"district\": \"เมือง\",\n  \"agency\": \"สถานีตำรวจ\"\n}"
+              "raw": "{\n  \"province\": \"สงขลา\",\n  \"district\": \"เมือง\",\n  \"agency\": \"สถานที่/หน่วยงาน\",\n  \"station\": \"ชื่อสถานี\"\n}"
             },
             "url": "{{baseUrl}}/sites",
-            "description": "สร้าง Site (ต้อง login)"
+            "description": "สร้าง Site (ต้อง login; agency + station)"
           }
         }
       ]

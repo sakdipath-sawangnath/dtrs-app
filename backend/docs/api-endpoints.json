@@ -108,9 +108,26 @@
     },
     {
       "method": "POST",
+      "path": "/api/public/jobs",
+      "auth": false,
+      "description": "แจ้งซ่อม (multipart) — ฟิลด์ข้อความ + images[] (สูงสุด 3, 5MB/ไฟล์, JPG/PNG/WebP/HEIC→JPEG) + reporterAvatar (optional, กฎเดียวกัน) · description (อาการที่พบ) อย่างน้อย 10 ไม่เกิน 500 ตัวอักษร (400 ถ้าเกิน)",
+      "body": {
+        "province": "",
+        "district": "",
+        "agency": "",
+        "location": "",
+        "reporterName": "",
+        "reporterPhone": "",
+        "description": "string min 10 max 500",
+        "images": "0–3 ไฟล์รูป",
+        "reporterAvatar": "optional 1 ไฟล์"
+      }
+    },
+    {
+      "method": "POST",
       "path": "/api/jobs",
       "auth": false,
-      "description": "แจ้งซ่อมใหม่ (สาธารณะ)",
+      "description": "แจ้งซ่อมใหม่ (legacy path — ใช้ POST /api/public/jobs แทน)",
       "body": { "province": "", "district": "", "location": "", "reporterName": "", "reporterPhone": "", "reporterEmail": "", "description": "", "images": [] }
     },
     {
@@ -184,17 +201,37 @@
     },
     {
       "method": "PATCH",
+      "path": "/api/jobs/:id/issue-images",
+      "auth": "Bearer JWT",
+      "permission": "job.issue.upload",
+      "description": "อัปโหลดรูปปัญหา (multipart field images, สูงสุด 3, 5MB/ไฟล์, JPG/PNG/WebP/HEIC→JPEG) — เติมต่อได้ถึง 3 รูป ไม่แทนที่; งาน PENDING หรือ IN_PROGRESS เท่านั้น",
+      "body": { "images": "ไฟล์รูป 1–3 (required อย่างน้อย 1)" }
+    },
+    {
+      "method": "PATCH",
       "path": "/api/jobs/:id/fix",
       "auth": "Bearer JWT",
-      "description": "บันทึกการแก้ไขงาน (multipart/form-data: ฟิลด์ข้อความ + ไฟล์ fixImages) · เฉพาะผู้รับงาน (assignee) ไม่ยกเว้น ADMIN · ถ้าสถานะยัง RESOLVED ต้อง PATCH reopen ก่อน · ตั้ง status=RESOLVED และ fixDate อัตโนมัติ",
+      "permission": "job.fix.self | job.fix.any",
+      "description": "บันทึกการแก้ไขงาน (multipart: fixImages สูงสุด 3 × 5MB JPG/PNG/WebP/HEIC→JPEG) · คง status=IN_PROGRESS · ไม่รับลายเซ็นผู้แจ้ง",
       "body": {
         "brokenPartType": "optional",
-        "cause": "optional",
-        "fixMethod": "optional",
+        "fixEnvironment": "INDOOR | OUTDOOR",
+        "cause": "required",
+        "fixMethod": "required",
         "note": "optional",
         "oldSerialNumber": "optional",
         "newSerialNumber": "optional",
         "fixImages": "ไฟล์ (optional)"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/jobs/:id/close",
+      "auth": "Bearer JWT",
+      "permission": "job.fix.self | job.fix.any",
+      "description": "ปิดงาน (multipart: reporterSignature PNG ≤5MB) · ต้องบันทึกการแก้ไขครบก่อน · ตั้ง status=RESOLVED + fixDate",
+      "body": {
+        "reporterSignature": "ไฟล์ PNG (required)"
       }
     },
     {
@@ -214,6 +251,14 @@
     },
     {
       "method": "PATCH",
+      "path": "/api/jobs/:id/classify-doc",
+      "auth": "Bearer JWT",
+      "permission": "job.classifyDoc",
+      "description": "จำแนกเอกสารหลัง RESOLVED: แทนที่ hex ticketNo ด้วย Running Doc No ครั้งเดียว (ในสัญญา CM-SHF-2002-XXXX / นอกสัญญา YYYYMM####) + ตั้ง isOutOfContract; UI: /dashboard/all และ /dashboard/jobs/:id",
+      "body": { "isOutOfContract": false }
+    },
+    {
+      "method": "PATCH",
       "path": "/api/jobs/:id/cancel",
       "auth": "Bearer JWT",
       "description": "ยกเลิกงานสถานะ PENDING → CANCELLED · สิทธิ์ job.cancel",
@@ -229,7 +274,37 @@
       "method": "GET",
       "path": "/api/sites",
       "auth": false,
-      "description": "รายการพื้นที่โครงการ (จังหวัด/อำเภอ/หน่วยงาน) สำหรับหน้าแจ้งปัญหา"
+      "description": "รายการ Site เต็ม (dashboard); public report ใช้ /api/sites/options/* แทน"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sites/options/provinces",
+      "auth": false,
+      "description": "Public cascade: รายการจังหวัดจาก Site (string[])"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sites/options/districts?province=",
+      "auth": false,
+      "description": "Public cascade: อำเภอตามจังหวัด (string[])"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sites/options/subdistricts?province=&district=",
+      "auth": false,
+      "description": "Public cascade: ตำบลตามจังหวัด+อำเภอ (string[])"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sites/options/agencies?province=&district=&subdistrict?",
+      "auth": false,
+      "description": "Public cascade: สถานที่/หน่วยงาน (ตำบล optional)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sites/options/stations?province=&district=&agency=&subdistrict?",
+      "auth": false,
+      "description": "Public cascade: ชื่อสถานี"
     },
     {
       "method": "POST",

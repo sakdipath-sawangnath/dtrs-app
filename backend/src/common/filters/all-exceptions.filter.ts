@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
+import { MulterError } from 'multer';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -47,6 +48,39 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message = exception.message;
         code = 'HTTP_ERROR';
       }
+
+      const text = String(message ?? '');
+      if (text.includes('Unexpected field')) {
+        httpStatus = HttpStatus.BAD_REQUEST;
+        code = 'VALIDATION_ERROR';
+        message = 'อัปโหลดรูปได้สูงสุด 3 รูป';
+      } else if (httpStatus === HttpStatus.PAYLOAD_TOO_LARGE) {
+        httpStatus = HttpStatus.BAD_REQUEST;
+        code = 'VALIDATION_ERROR';
+        message = 'ไฟล์รูปใหญ่เกิน 5MB';
+      }
+    } else if (exception instanceof MulterError) {
+      httpStatus = HttpStatus.BAD_REQUEST;
+      code = 'VALIDATION_ERROR';
+      if (exception.code === 'LIMIT_FILE_SIZE') {
+        message = 'ไฟล์รูปใหญ่เกิน 5MB';
+      } else if (
+        exception.code === 'LIMIT_FILE_COUNT' ||
+        exception.code === 'LIMIT_UNEXPECTED_FILE'
+      ) {
+        message = 'อัปโหลดรูปได้สูงสุด 3 รูป';
+      } else if (exception.message?.includes('Unexpected field')) {
+        message = 'อัปโหลดรูปได้สูงสุด 3 รูป';
+      } else {
+        message = exception.message;
+      }
+    } else if (
+      exception instanceof Error &&
+      exception.message.includes('Unexpected field')
+    ) {
+      httpStatus = HttpStatus.BAD_REQUEST;
+      code = 'VALIDATION_ERROR';
+      message = 'อัปโหลดรูปได้สูงสุด 3 รูป';
     } else if (exception instanceof Error) {
       message = exception.message;
       this.logger.error(`Exception: ${exception.message}`, exception.stack);

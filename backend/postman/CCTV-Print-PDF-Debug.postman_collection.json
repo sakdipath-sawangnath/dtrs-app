@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "CCTV Print/PDF Debug",
-    "description": "ตรวจเส้นทาง Print/PDF + รูปงาน (Next + Nest + MinIO + Reverse Proxy)\n\n**สรุป path:**\n- `GET {{apiBase}}/print-jobs/:id/data` → Next (ต้องแยก NPM ไปพอร์ต frontend)\n- `GET {{publicBaseUrl}}/job-images/:id/issue|fix/:index` → Next — **ไม่อยู่ใต้ `/api` เท่านั้น** ไม่ต้องแยก NPM เพิ่ม\n- `GET {{apiBase}}/job-images/...` → alias บน Next (ต้องแยก NPM เหมือน print-jobs)\n- `GET {{apiBase}}/jobs/:id/image/:kind/:index` → Nest — **502** = backend โหลด URL ใน DB จาก MinIO ไม่ได้; **404** = ไม่มีรูปในช่อง; **401** = ไม่มี JWT\n\n**prefetchedImages เป็น null ทุกช่อง:** Nest โหลด object จาก MinIO ไม่สำเร็จ — ทดสอบ request **07** จากเครื่องเดียวกับ backend หรือ `curl -I` ที่ MinIO\n\n**Windows curl + HTTPS:** ถ้าเจอ `CRYPT_E_NO_REVOCATION_CHECK` ใช้ `curl -I --ssl-no-revoke \"...\"`",
+    "description": "ตรวจเส้นทาง Print/PDF + รูปงาน (Next + Nest + MinIO + Reverse Proxy)\n\n**สรุป path:**\n- `GET {{apiBase}}/print-jobs/:id/data` → Next (ต้องแยก NPM ไปพอร์ต frontend)\n- `GET {{publicBaseUrl}}/job-images/:id/issue|fix/:index` → Next — **ไม่อยู่ใต้ `/api` เท่านั้น** ไม่ต้องแยก NPM เพิ่ม\n- `GET {{apiBase}}/job-images/...` → alias บน Next (ต้องแยก NPM เหมือน print-jobs)\n- `GET {{apiBase}}/jobs/:id/image/:kind/:index` → Nest — **502** = backend โหลด URL ใน DB จาก MinIO ไม่ได้; **404** = ไม่มีรูปในช่อง; **401** = ไม่มี JWT\n\n**prefetchedImages เป็น null ทุกช่อง:** Nest โหลด object จาก MinIO ไม่สำเร็จ — ทดสอบ request **07** จากเครื่องเดียวกับ backend หรือ `curl -I` ที่ MinIO\n\n**Job.description:** สร้างจาก `POST /public/jobs` ได้ 10–500 ตัวอักษร (Zod) — PDF แสดงตามที่บันทึก ไม่ตัดเพิ่ม · เคส 400 ดู `CCTV-Maintenance-API.postman_collection.json` → Create Job (Public) — description over 500\n\n**Windows curl + HTTPS:** ถ้าเจอ `CRYPT_E_NO_REVOCATION_CHECK` ใช้ `curl -I --ssl-no-revoke \"...\"`",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -46,7 +46,7 @@
         "method": "GET",
         "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
         "url": "{{apiBase}}/jobs/{{jobId}}",
-        "description": "ดู `images` / `fixImages` (URL เต็มไป MinIO) และ `status` ต้องเป็น RESOLVED เพื่อให้ print-jobs ส่ง JSON"
+        "description": "ดู `images` / `fixImages` (URL เต็มไป MinIO) และ `status` ต้องเป็น RESOLVED เพื่อให้ print-jobs ส่ง JSON\n- `description` จาก public report ถูกจำกัด **500** ตัวอักษรตอนสร้าง (คอลัมน์ยังเป็น TEXT) — ค่าที่นี่คือที่บันทึกแล้ว ไม่ใช่เพดานตอนพิมพ์"
       }
     },
     {

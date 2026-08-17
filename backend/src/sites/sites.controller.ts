@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -7,6 +8,7 @@ import {
   Post,
   Param,
   ParseIntPipe,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { SitesService } from './sites.service';
@@ -29,10 +31,73 @@ import { PermissionsGuard } from '../auth/permissions.guard';
 export class SitesController {
   constructor(private readonly sitesService: SitesService) {}
 
-  /** Public: หน้าแจ้งปัญหา (/report) ใช้ดึงรายการจังหวัด/อำเภอ/หน่วยงาน */
+  /** Public: ตาราง dashboard / รายการเต็ม (ไม่ใช้บน public report cascade) */
   @Get()
   async findAll() {
     return this.sitesService.findAll();
+  }
+
+  /** Public cascade — จังหวัดที่มีใน Site */
+  @Get('options/provinces')
+  async optionProvinces() {
+    return this.sitesService.listOptionProvinces();
+  }
+
+  /** Public cascade — อำเภอตามจังหวัด */
+  @Get('options/districts')
+  async optionDistricts(@Query('province') province?: string) {
+    if (!province?.trim()) {
+      throw new BadRequestException('กรุณาระบุ province');
+    }
+    return this.sitesService.listOptionDistricts(province);
+  }
+
+  /** Public cascade — ตำบลตามจังหวัด+อำเภอ */
+  @Get('options/subdistricts')
+  async optionSubdistricts(
+    @Query('province') province?: string,
+    @Query('district') district?: string,
+  ) {
+    if (!province?.trim() || !district?.trim()) {
+      throw new BadRequestException('กรุณาระบุ province และ district');
+    }
+    return this.sitesService.listOptionSubdistricts(province, district);
+  }
+
+  /** Public cascade — สถานที่/หน่วยงาน (ตำบล optional) */
+  @Get('options/agencies')
+  async optionAgencies(
+    @Query('province') province?: string,
+    @Query('district') district?: string,
+    @Query('subdistrict') subdistrict?: string,
+  ) {
+    if (!province?.trim() || !district?.trim()) {
+      throw new BadRequestException('กรุณาระบุ province และ district');
+    }
+    return this.sitesService.listOptionAgencies(
+      province,
+      district,
+      subdistrict,
+    );
+  }
+
+  /** Public cascade — ชื่อสถานี */
+  @Get('options/stations')
+  async optionStations(
+    @Query('province') province?: string,
+    @Query('district') district?: string,
+    @Query('agency') agency?: string,
+    @Query('subdistrict') subdistrict?: string,
+  ) {
+    if (!province?.trim() || !district?.trim() || !agency?.trim()) {
+      throw new BadRequestException('กรุณาระบุ province, district และ agency');
+    }
+    return this.sitesService.listOptionStations(
+      province,
+      district,
+      agency,
+      subdistrict,
+    );
   }
 
   /** จัดการ Site: สร้าง (ต้องมี permission) */

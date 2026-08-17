@@ -17,7 +17,10 @@ import {
   Res,
   StreamableFile,
 } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import {
+  FilesInterceptor,
+  FileFieldsInterceptor,
+} from '@nestjs/platform-express';
 import { JobsService } from './jobs.service';
 import { JobsPdfService } from './jobs-pdf.service';
 import { MinioService } from '../minio/minio.service';
@@ -28,11 +31,17 @@ import { Permissions } from '../auth/permissions.decorator';
 import { RolesService } from '../roles/roles.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import {
+  assertReporterSignatureFile,
+  JOB_IMAGE_MULTER_LIMITS,
+  normalizeJobImageFiles,
+} from '../common/upload/job-image-upload';
+import {
   UpdateJobStatusSchema,
   UpdateFixInfoSchema,
   AssignStaffSchema,
   BulkAssignStaffSchema,
   UpdateOutOfContractSchema,
+  ClassifyDocSchema,
   ReopenJobSchema,
   BackfillJobDatesSchema,
   DashboardSummaryPdfQuerySchema,
@@ -122,6 +131,22 @@ export class JobsController {
       throw new BadRequestException('ต้องระบุ query phone');
     }
     return this.jobsService.findByReporterPhoneForStatusList(p, true);
+  }
+
+  /**
+   * Proxy ลายเซ็นผู้แจ้งตอนปิดงาน — ต้องอยู่ก่อน `:id/image/:kind/:index`
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/image/reporter-signature')
+  async streamReporterSignature(
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ) {
+    const { buffer, contentType } =
+      await this.jobsService.getReporterSignatureImageBuffer(id);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.send(buffer);
   }
 
   /**
@@ -264,24 +289,85 @@ export class JobsController {
     return updated;
   }
 
+  /**
+   * อัปโหลดรูปปัญหา (issue) — เติมต่อได้สูงสุด 3 รูป ไม่แทนที่รูปเดิม
+   * RBAC: job.issue.upload · สถานะ PENDING | IN_PROGRESS
+   */
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('job.issue.upload')
+  @Patch(':id/issue-images')
+  @UseInterceptors(
+    FilesInterceptor('images', 3, { limits: JOB_IMAGE_MULTER_LIMITS }),
+  )
+  async uploadIssueImages(
+    @Req() req: ReqUser,
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFiles() files: Array<Express.Multer.File>,
+  ) {
+    const userId = req.user?.id;
+    if (userId == null) {
+      throw new ForbiddenException('ไม่มีสิทธิ์อัปโหลดรูปปัญหา');
+    }
+    await this.jobsService.assertUserCanUploadIssueImages(id, userId);
+
+    const normalizedFiles = await normalizeJobImageFiles(files ?? []);
+    const newCount = normalizedFiles.length;
+    if (newCount < 1) {
+      throw new BadRequestException('กรุณาแนบรูปปัญหาอย่างน้อย 1 รูป');
+    }
+
+    const existingCount = await this.jobsService.getNonemptyIssueImageCount(id);
+    if (existingCount + newCount > 3) {
+      throw new BadRequestException(
+        `อัปโหลดได้อีกไม่เกิน ${Math.max(0, 3 - existingCount)} รูป (สูงสุด 3 รูป)`,
+      );
+    }
+
+    const uploadedUrls: string[] = [];
+    let index = existingCount + 1;
+    for (const file of normalizedFiles) {
+      const url = await this.minioService.uploadJobImage(
+        id,
+        'issue',
+        index,
+        file,
+      );
+      uploadedUrls.push(url);
+      index++;
+    }
+
+    const updated = await this.jobsService.setIssueImages(id, uploadedUrls);
+    this.eventsGateway.notifyJobUpdate(updated);
+    return updated;
+  }
+
   @UseGuards(JwtAuthGuard)
   @Patch(':id/fix')
-  @UseInterceptors(FilesInterceptor('fixImages'))
-  async updateFixInfo(
-    @Req() req: ReqUser & { headers?: { authorization?: string } },
+  @UseInterceptors(
+    FileFieldsInterceptor([{ name: 'fixImages', maxCount: 3 }], {
+      limits: JOB_IMAGE_MULTER_LIMITS,
+    }),
+  )
+  async saveFixInfo(
+    @Req() req: ReqUser,
     @Param('id') id: string,
     @Body(new ZodValidationPipe(UpdateFixInfoSchema)) body: any,
-    @UploadedFiles() files: Array<Express.Multer.File>,
+    @UploadedFiles()
+    files: {
+      fixImages?: Express.Multer.File[];
+    },
   ) {
     const userId = req.user?.id;
     if (userId == null) {
       throw new ForbiddenException('ไม่มีสิทธิ์บันทึกข้อมูลการแก้ไข');
     }
-    /** Reopen/บันทึกการแก้ไข — RBAC: job.fix.self|any */
+    /** บันทึกการแก้ไข — RBAC: job.fix.self|any */
     await this.jobsService.assertUserCanFix(+id, userId);
 
+    const fixFiles = await normalizeJobImageFiles(files?.fixImages ?? []);
+
     const existingCount = await this.jobsService.getNonemptyFixImageCount(+id);
-    const newCount = files?.length ?? 0;
+    const newCount = fixFiles.length;
     if (newCount > 0 && newCount < 2) {
       throw new BadRequestException(
         'กรุณาแนบรูปการแก้ไขอย่างน้อย 2 รูป หรือไม่แนบรูปเพื่อใช้รูปเดิม',
@@ -294,7 +380,7 @@ export class JobsController {
     const uploadedUrls: string[] = [];
     if (newCount >= 2) {
       let index = 1;
-      for (const file of files) {
+      for (const file of fixFiles) {
         const url = await this.minioService.uploadJobImage(
           +id,
           'fix',
@@ -306,23 +392,62 @@ export class JobsController {
       }
     }
 
+    const updated = await this.jobsService.saveFixInfo(+id, {
+      brokenPartType: body.brokenPartType ?? null,
+      fixEnvironment: body.fixEnvironment,
+      cause: body.cause ?? null,
+      fixMethod: body.fixMethod ?? null,
+      note: body.note ?? null,
+      oldSerialNumber: body.oldSerialNumber ?? null,
+      newSerialNumber: body.newSerialNumber ?? null,
+      fixImagesUrls: uploadedUrls.length > 0 ? uploadedUrls : undefined,
+      actorUserId: userId,
+    });
+    this.eventsGateway.notifyJobUpdate(updated);
+    return updated;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/close')
+  @UseInterceptors(
+    FileFieldsInterceptor([{ name: 'reporterSignature', maxCount: 1 }], {
+      limits: JOB_IMAGE_MULTER_LIMITS,
+    }),
+  )
+  async closeJob(
+    @Req() req: ReqUser & { headers?: { authorization?: string } },
+    @Param('id') id: string,
+    @UploadedFiles()
+    files: {
+      reporterSignature?: Express.Multer.File[];
+    },
+  ) {
+    const userId = req.user?.id;
+    if (userId == null) {
+      throw new ForbiddenException('ไม่มีสิทธิ์ปิดงาน');
+    }
+    /** ปิดงาน — RBAC: job.fix.self|any */
+    await this.jobsService.assertUserCanFix(+id, userId);
+    await this.jobsService.assertJobFixReadyToClose(+id);
+
+    const sigFile = files?.reporterSignature?.[0];
+    if (!sigFile) {
+      throw new BadRequestException('กรุณาเซ็นลายเซ็นผู้แจ้งก่อนปิดงาน');
+    }
+    const normalizedSig = await assertReporterSignatureFile(sigFile);
+
+    const reporterSignatureUrl =
+      await this.minioService.uploadJobReporterSignature(+id, normalizedSig);
+
     const raw = req.headers?.authorization ?? '';
     const jwt =
       typeof raw === 'string' && raw.startsWith('Bearer ')
         ? raw.slice(7).trim()
         : '';
-    const updated = await this.jobsService.updateFixInfo(
+    const updated = await this.jobsService.closeJob(
       +id,
-      {
-        brokenPartType: body.brokenPartType ?? null,
-        fixEnvironment: body.fixEnvironment,
-        cause: body.cause ?? null,
-        fixMethod: body.fixMethod ?? null,
-        note: body.note ?? null,
-        oldSerialNumber: body.oldSerialNumber ?? null,
-        newSerialNumber: body.newSerialNumber ?? null,
-        fixImagesUrls: uploadedUrls.length > 0 ? uploadedUrls : undefined,
-      },
+      reporterSignatureUrl,
+      userId,
       jwt,
     );
     this.eventsGateway.notifyJobUpdate(updated);
@@ -409,6 +534,26 @@ export class JobsController {
     const updated = await this.jobsService.moveToOutOfContract(
       +id,
       body.isOutOfContract,
+      req.user.id,
+    );
+    this.eventsGateway.notifyJobUpdate(updated);
+    return updated;
+  }
+
+  /** จำแนกเอกสารหลังปิดงาน — ออก Running Doc No ครั้งเดียว */
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('job.classifyDoc')
+  @Patch(':id/classify-doc')
+  async classifyDoc(
+    @Req() req: ReqUser,
+    @Param('id', ParseIntPipe) id: number,
+    @Body(new ZodValidationPipe(ClassifyDocSchema))
+    body: { isOutOfContract: boolean },
+  ) {
+    const updated = await this.jobsService.classifyDoc(
+      id,
+      body.isOutOfContract,
+      req.user.id,
     );
     this.eventsGateway.notifyJobUpdate(updated);
     return updated;

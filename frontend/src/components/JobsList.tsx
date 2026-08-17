@@ -28,8 +28,9 @@ import {
   Plus,
   Minus,
   Download,
+  Stamp,
 } from "lucide-react";
-import { toastSuccess, toastError, confirmDialog } from "@/lib/toast";
+import { toastSuccess, toastError, confirmDialog, toastWarning } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,6 +43,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import DashboardPageShell from "./DashboardPageShell";
 import DashboardFilterBar from "./DashboardFilterBar";
+import JobClassifyDocDialog from "./jobs/JobClassifyDocDialog";
 import Select from "react-select";
 import { getReactSelectGlassStyles } from "@/lib/reactSelectGlassStyles";
 import { useAppTheme } from "@/lib/useAppTheme";
@@ -75,13 +77,35 @@ import {
 import {
   buildJobsListAuditCsv,
   downloadUtf8Csv,
+  workDurationDays,
 } from "@/lib/jobsListCsvExport";
 import JobImageLightbox from "@/components/jobs/JobImageLightbox";
+import IssueImagesUploadPanel, {
+  countNonemptyIssueImages,
+  jobStatusAllowsIssueImageUpload,
+} from "@/components/jobs/IssueImagesUploadPanel";
 import ManagedImage, { MANAGED_IMAGE_SIZES } from "@/components/ManagedImage";
+import { ensureStaffSignatureOrToast } from "@/lib/ensureStaffSignature";
+import {
+  clearFileInput,
+  JOB_IMAGE_ACCEPT,
+  JOB_IMAGE_HINT,
+  validateJobImageFile,
+} from "@/lib/jobImageUpload";
+import {
+  formatJobImageUploadError,
+  runMultipartUploadWithProxyFallback,
+} from "@/lib/jobImageProxyFallback";
 import { jobNeedsAssignee } from "@/lib/jobAssignEligibility";
+import {
+  isClassifiedOutOfContractResolved,
+  isFormalDocTicketNo,
+} from "@/lib/docTicketNo";
 import {
   buildFixPreviewUrlsFromJob,
   hasRequiredFixImageSlots,
+  isAwaitingReporterSignature,
+  isFixInfoComplete,
 } from "@/lib/jobFixImageSlots";
 
 function ActionIconButton({
@@ -261,6 +285,17 @@ const STATUS_CONFIG: Record<
   },
 };
 
+const AWAITING_SIGNATURE_BADGE_CLS =
+  "h-auto px-2 py-1 text-xs font-semibold shadow-none ring-0 border border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/35 dark:bg-amber-950/30 dark:text-amber-100";
+
+function AwaitingReporterSignatureBadge() {
+  return (
+    <Badge variant="outline" className={AWAITING_SIGNATURE_BADGE_CLS}>
+      รอเซ็นผู้แจ้ง
+    </Badge>
+  );
+}
+
 function getPageTitle(
   statusFilter?: string,
   showOutOfContract?: boolean,
@@ -359,6 +394,7 @@ const NO_CARD_SHELL =
 
 export default function JobsList({
   statusFilter,
+  statusAllowlist,
   showOutOfContract = false,
   assignedToMe = false,
   showContractTabs = false,
@@ -367,8 +403,11 @@ export default function JobsList({
   subtitle: customSubtitle,
   noCard = false,
   enableAllBreakdownFilters = false,
+  enableMoveOutOfContract = true,
 }: {
   statusFilter?: string;
+  /** หลายสถานะ (เช่น หน้า นอกสัญญา = PENDING + RESOLVED ที่จำแนกแล้ว) */
+  statusAllowlist?: string[];
   showOutOfContract?: boolean;
   assignedToMe?: boolean;
   showContractTabs?: boolean;
@@ -383,16 +422,11 @@ export default function JobsList({
    * - เพิ่มคอลัมน์ในตารางสำหรับ fixEnvironment / brokenPart
    */
   enableAllBreakdownFilters?: boolean;
+  /** ปุ่ม «ย้ายนอกสัญญา» ในคอลัมน์จัดการ — ปิดบน `/dashboard/pending` */
+  enableMoveOutOfContract?: boolean;
 }) {
   const { theme } = useAppTheme();
   const selectStyles = getReactSelectGlassStyles(theme);
-  const { title: derivedTitle, subtitle: derivedSubtitle } = getPageTitle(
-    statusFilter,
-    showOutOfContract,
-    assignedToMe
-  );
-  const title = customTitle || derivedTitle || "ข้อขัดข้อง";
-  const subtitle = customSubtitle || derivedSubtitle || "รายการแจ้งซ่อมและสถานะ";
 
   const [jobs, setJobs] = useState<Job[]>([]);
   /** รายการหลังกรองสถานะ/มอบหมายให้ฉัน แต่ก่อนแยกสัญญา/นอกสัญญา — ใช้นับ badge แท็บ */
@@ -431,6 +465,8 @@ export default function JobsList({
   const userRole = (session?.user as { role?: string })?.role ?? "";
   const userRoleUpper = String(userRole).toUpperCase();
   const [movingOutOfContractJobId, setMovingOutOfContractJobId] = useState<number | null>(null);
+  const [classifyJob, setClassifyJob] = useState<Job | null>(null);
+  const [classifySubmitting, setClassifySubmitting] = useState(false);
 
   // ---- Update Fix Info Modal (IN_PROGRESS) ----
   const [updateFixJob, setUpdateFixJob] = useState<Job | null>(null);
@@ -548,6 +584,13 @@ export default function JobsList({
     return userRoleUpper === "ADMIN" || userRoleUpper === "SUPERVISOR";
   }, [myPermissions, userRoleUpper]);
 
+  const canClassifyDoc = useMemo(() => {
+    if (myPermissions !== null) {
+      return myPermissions.includes("job.classifyDoc");
+    }
+    return userRoleUpper === "ADMIN" || userRoleUpper === "SUPERVISOR";
+  }, [myPermissions, userRoleUpper]);
+
   const canDeleteUnassigned =
     myPermissions != null
       ? myPermissions.includes("job.deleteUnassigned")
@@ -569,6 +612,26 @@ export default function JobsList({
     return userRoleUpper === "ADMIN" || userRoleUpper === "SUPERVISOR";
   }, [myPermissions, userRoleUpper]);
 
+  /** แท็บสัญญา/นอกสัญญา — ตั้งที่ /dashboard/roles (`job.viewContractTabs`) */
+  const canViewContractTabs = useMemo(() => {
+    if (myPermissions !== null) {
+      return myPermissions.includes("job.viewContractTabs");
+    }
+    return ["ADMIN", "STAFF", "SUPERVISOR"].includes(userRoleUpper);
+  }, [myPermissions, userRoleUpper]);
+
+  const effectiveShowContractTabs = showContractTabs && canViewContractTabs;
+  const effectiveShowOutOfContract =
+    effectiveShowContractTabs && showOutOfContract;
+
+  const { title: derivedTitle, subtitle: derivedSubtitle } = getPageTitle(
+    statusFilter,
+    effectiveShowOutOfContract,
+    assignedToMe,
+  );
+  const title = customTitle || derivedTitle || "ข้อขัดข้อง";
+  const subtitle = customSubtitle || derivedSubtitle || "รายการแจ้งซ่อมและสถานะ";
+
   const fetchJobs = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -578,23 +641,43 @@ export default function JobsList({
       });
       const payload = unwrapApiData<unknown>(res?.data);
       let data: Job[] = Array.isArray(payload) ? (payload as Job[]) : [];
-      if (statusFilter) data = data.filter((j) => j.status === statusFilter);
+      if (statusAllowlist && statusAllowlist.length > 0) {
+        const allowed = new Set(statusAllowlist);
+        data = data.filter((j) => allowed.has(j.status));
+      } else if (statusFilter) {
+        data = data.filter((j) => j.status === statusFilter);
+      }
       if (assignedToMe && currentUserId) {
         data = data.filter(
           (j) => j.assignedTo && Number(j.assignedTo.id) === currentUserId
         );
       }
-      if (showContractTabs) {
+      if (effectiveShowContractTabs) {
         setJobsForContractCounts(data);
       } else {
         setJobsForContractCounts([]);
       }
-      // แยกตามฐานข้อมูล Job.isOutOfContract
-      if (showOutOfContract === true) {
-        data = data.filter((j) => j.isOutOfContract === true);
+      const dedicatedOutOfContractPage =
+        showOutOfContract === true && !showContractTabs;
+      if (effectiveShowContractTabs || dedicatedOutOfContractPage) {
+        if (showOutOfContract === true) {
+          data = data.filter((j) => j.isOutOfContract === true);
+        } else {
+          data = data.filter((j) => j.isOutOfContract !== true);
+        }
       } else {
-        // เมื่อไม่ใช่ "นอกสัญญา" ให้ตัดงานนอกสัญญาออก
         data = data.filter((j) => j.isOutOfContract !== true);
+      }
+      // ประวัติทั้งหมด / งานของฉัน: งาน RESOLVED นอกสัญญาที่จำแนกแล้วไปหน้าเมนูนอกสัญญา
+      if (enableAllBreakdownFilters || assignedToMe) {
+        data = data.filter((j) => !isClassifiedOutOfContractResolved(j));
+      }
+      // คิวหน้า นอกสัญญา: RESOLVED เฉพาะที่จำแนกแล้ว (PENDING คงเดิม)
+      if (dedicatedOutOfContractPage) {
+        data = data.filter(
+          (j) =>
+            j.status !== "RESOLVED" || isFormalDocTicketNo(j.ticketNo),
+        );
       }
       setJobs(data);
     } catch (e: unknown) {
@@ -615,10 +698,14 @@ export default function JobsList({
     assignedToMe,
     currentUserId,
     router,
-    showContractTabs,
-    showOutOfContract,
+    effectiveShowContractTabs,
+    effectiveShowOutOfContract,
     statusFilter,
+    statusAllowlist,
     token,
+    showOutOfContract,
+    showContractTabs,
+    enableAllBreakdownFilters,
   ]);
 
   useEffect(() => {
@@ -739,7 +826,7 @@ export default function JobsList({
 
   /** งานค้าง = ยังไม่เสร็จสิ้น (ไม่นับ RESOLVED / CANCELLED) — แยกนับตามสัญญา/นอกสัญญา */
   const contractTabBadgeCounts = useMemo(() => {
-    if (!showContractTabs) return { contract: 0, out: 0 };
+    if (!effectiveShowContractTabs) return { contract: 0, out: 0 };
     const unfinished = (j: Job) =>
       j.status !== "RESOLVED" && j.status !== "CANCELLED";
     return {
@@ -750,7 +837,7 @@ export default function JobsList({
         (j) => j.isOutOfContract === true && unfinished(j),
       ).length,
     };
-  }, [showContractTabs, jobsForContractCounts]);
+  }, [effectiveShowContractTabs, jobsForContractCounts]);
 
   const contractSegmentTabs = useMemo(
     () => [
@@ -786,7 +873,7 @@ export default function JobsList({
       toastError("ไม่มีข้อมูลที่ส่งออก", "ลองปรับตัวกรองหรือรีเฟรชรายการ");
       return;
     }
-    const tab = showOutOfContract ? "นอกสัญญา" : "สัญญา";
+    const tab = effectiveShowOutOfContract ? "นอกสัญญา" : "สัญญา";
     const stamp = format(new Date(), "yyyy-MM-dd_HHmm", { locale: th });
     const filename = `รายการงาน_${tab}_${stamp}.csv`;
     const body = buildJobsListAuditCsv(sortedFilteredJobs);
@@ -794,7 +881,7 @@ export default function JobsList({
     toastSuccess(
       `ส่งออก CSV แล้ว · รวม ${sortedFilteredJobs.length} แถว (ตามตัวกรองและการเรียงปัจจุบัน ไม่จำกัดเฉพาะหน้าตาราง)`,
     );
-  }, [sortedFilteredJobs, showOutOfContract]);
+  }, [sortedFilteredJobs, effectiveShowOutOfContract]);
 
   const showAssignedToColumn = statusFilter !== "PENDING";
 
@@ -1174,7 +1261,7 @@ export default function JobsList({
     districtFilter,
     search,
     pageSize,
-    showOutOfContract,
+    effectiveShowOutOfContract,
     statusSelect,
     fixEnvironmentSelect,
     brokenPartSelect,
@@ -1187,6 +1274,8 @@ export default function JobsList({
   }, [provinceFilter]);
 
   const handleTakeJob = async (id: number) => {
+    if (!token) return;
+    if (!(await ensureStaffSignatureOrToast(token))) return;
     const ok = await confirmDialog({
       title: "รับงานนี้?",
       text: "คุณต้องการรับงานนี้เข้าสู่ขั้นตอนการแก้ไขหรือไม่",
@@ -1195,7 +1284,7 @@ export default function JobsList({
       confirmColor: "#16a34a",
       cancelColor: "#475569",
     });
-    if (!ok || !token) return;
+    if (!ok) return;
     const staffId = currentUserId || 1;
     try {
       await axios.patch(
@@ -1207,6 +1296,41 @@ export default function JobsList({
       fetchJobs();
     } catch {
       toastError("ข้อผิดพลาด", "ไม่สามารถรับงานได้");
+    }
+  };
+
+  const openClassifyDocDialog = async (job: Job) => {
+    if (!token) return;
+    if (!(await ensureStaffSignatureOrToast(token))) return;
+    setClassifyJob(job);
+  };
+
+  const handleClassifyDoc = async (isOutOfContract: boolean) => {
+    if (!token || !classifyJob) return;
+    if (!(await ensureStaffSignatureOrToast(token))) return;
+    setClassifySubmitting(true);
+    try {
+      await axios.patch(
+        `${API}/jobs/${classifyJob.id}/classify-doc`,
+        { isOutOfContract },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      toastSuccess(
+        isOutOfContract
+          ? "จำแนกเป็นนอกสัญญาแล้ว — ย้ายไปเมนูนอกสัญญา"
+          : "จำแนกเป็นในสัญญาแล้ว",
+        1800,
+      );
+      setClassifyJob(null);
+      fetchJobs();
+    } catch (err) {
+      toastError(
+        "จำแนกเอกสารไม่สำเร็จ",
+        formatApiErrorDetail(axiosErrorData(err)) ??
+          "ไม่สามารถออกเลข Running Doc No ได้",
+      );
+    } finally {
+      setClassifySubmitting(false);
     }
   };
 
@@ -1256,6 +1380,7 @@ export default function JobsList({
 
   const handleReopenUpdateFix = async () => {
     if (!updateFixJob || !token || !updateReopenReason.trim()) return;
+    if (!(await ensureStaffSignatureOrToast(token))) return;
     const ok = await confirmDialog({
       title: "ยืนยัน Reopen งาน?",
       text: "สถานะจะเปลี่ยนเป็นกำลังแก้ไข เพื่อให้แก้ไขข้อมูลได้ — เมื่อแก้ครบแล้วให้บันทึกและปิดงานอีกครั้ง",
@@ -1305,7 +1430,19 @@ export default function JobsList({
     }
   };
 
-  const handleUpdateFixImage = (index: number, file: File | null) => {
+  const handleUpdateFixImage = (
+    index: number,
+    file: File | null,
+    input?: HTMLInputElement | null,
+  ) => {
+    if (file) {
+      const err = validateJobImageFile(file);
+      if (err) {
+        toastError(err);
+        clearFileInput(input ?? updateFixFileRefs[index]?.current ?? null);
+        return;
+      }
+    }
     setUpdateFixImages((prev) => {
       const next = [...prev];
       next[index] = file;
@@ -1318,10 +1455,9 @@ export default function JobsList({
     });
   };
 
-  const handleSubmitUpdateFix = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!updateFixJob || !token) return;
-    if (updateFixSaving) return;
+  const persistUpdateFix = async (): Promise<boolean> => {
+    if (!updateFixJob || !token) return false;
+    if (updateFixSaving) return false;
 
     const isAssignee =
       !!updateFixJob.assignedTo &&
@@ -1332,62 +1468,101 @@ export default function JobsList({
       !!updateFixJob && !!updateFixJob.assignedTo && isAssignee && !isResolved;
 
     if (!canEditFix) {
-      toastError("สิทธิ์ไม่เพียงพอ", "เฉพาะผู้รับงานเท่านั้นที่บันทึกและปิดงานได้");
-      return;
+      toastError("สิทธิ์ไม่เพียงพอ", "เฉพาะผู้รับงานเท่านั้นที่บันทึกการแก้ไขได้");
+      return false;
     }
     if (updateFixEnvironment !== "INDOOR" && updateFixEnvironment !== "OUTDOOR") {
       toastError("ข้อมูลไม่ครบ", "กรุณาเลือกประเภทสถานที่ (Indoor / Outdoor)");
-      return;
+      return false;
     }
     if (updateBrokenPartType !== "Hardware" && updateBrokenPartType !== "Software") {
       toastError("ข้อมูลไม่ครบ", "กรุณาเลือกประเภทงาน (Hardware / Software)");
-      return;
+      return false;
     }
     if (!updateCause.trim()) {
       toastError("ข้อมูลไม่ครบ", "กรุณาระบุสาเหตุ");
-      return;
+      return false;
     }
     if (!updateFixMethod.trim()) {
       toastError("ข้อมูลไม่ครบ", "กรุณาระบุวิธีแก้ไข");
-      return;
+      return false;
     }
     if (!hasRequiredFixImageSlots(updateFixImages, updateFixPreviews)) {
       toastError(
         "รูปภาพไม่ครบ",
         "กรุณาแนบรูปการแก้ไขอย่างน้อย 2 รูปแรก หรือใช้รูปเดิมที่มีอยู่แล้ว",
       );
-      return;
+      return false;
     }
+    if (!(await ensureStaffSignatureOrToast(token))) return false;
 
     setUpdateFixSaving(true);
     try {
-      const form = new FormData();
-      form.append("brokenPartType", updateBrokenPartType);
-      form.append("fixEnvironment", updateFixEnvironment);
-      form.append("cause", updateCause);
-      form.append("fixMethod", updateFixMethod);
-      form.append("note", updateNote);
-      const ser = serializeJobSerialRowsToFormFields(updateSerialRows);
-      form.append("oldSerialNumber", ser.oldSerialNumber);
-      form.append("newSerialNumber", ser.newSerialNumber);
-
       const filesToUpload = updateFixImages.filter(
         (f): f is File => f instanceof File,
       );
-      filesToUpload.forEach((file) => form.append("fixImages", file));
 
-      await axios.patch(`${API}/jobs/${updateFixJob.id}/fix`, form, {
-        headers: { Authorization: `Bearer ${token}` },
+      await runMultipartUploadWithProxyFallback({
+        fields: [{ name: "fixImages", files: filesToUpload }],
+        reserveNonImageBytes: 80_000,
+        onCompressing: () =>
+          toastWarning(
+            "กำลังบีบอัดรูป",
+            "เซิร์ฟเวอร์จำกัดขนาดคำขอ — ระบบจะลดขนาดรูปแล้วส่งใหม่",
+          ),
+        upload: async (byField) => {
+          const form = new FormData();
+          form.append("brokenPartType", updateBrokenPartType);
+          form.append("fixEnvironment", updateFixEnvironment);
+          form.append("cause", updateCause);
+          form.append("fixMethod", updateFixMethod);
+          form.append("note", updateNote);
+          const ser = serializeJobSerialRowsToFormFields(updateSerialRows);
+          form.append("oldSerialNumber", ser.oldSerialNumber);
+          form.append("newSerialNumber", ser.newSerialNumber);
+          (byField.get("fixImages") ?? []).forEach((file) =>
+            form.append("fixImages", file),
+          );
+          await axios.patch(`${API}/jobs/${updateFixJob.id}/fix`, form, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        },
       });
-
-      toastSuccess("บันทึกข้อมูลการแก้ไขเรียบร้อยแล้ว", 1500);
-      setUpdateFixJob(null);
-      await fetchJobs();
-    } catch {
-      toastError("ข้อผิดพลาด", "ไม่สามารถบันทึกข้อมูลการแก้ไขได้");
+      return true;
+    } catch (err: unknown) {
+      const msg = formatJobImageUploadError(
+        err,
+        axios.isAxiosError(err) && err.response?.data?.message
+          ? String(
+              Array.isArray(err.response.data.message)
+                ? err.response.data.message.join(", ")
+                : err.response.data.message,
+            )
+          : "ไม่สามารถบันทึกข้อมูลการแก้ไขได้",
+      );
+      toastError("ข้อผิดพลาด", msg);
+      return false;
     } finally {
       setUpdateFixSaving(false);
     }
+  };
+
+  const handleSubmitUpdateFix = async (e: FormEvent) => {
+    e.preventDefault();
+    const ok = await persistUpdateFix();
+    if (!ok) return;
+    toastSuccess("บันทึกข้อมูลการแก้ไขเรียบร้อยแล้ว", 1500);
+    setUpdateFixJob(null);
+    await fetchJobs();
+  };
+
+  const handleGoToCloseJob = async () => {
+    const jobId = updateFixJob?.id;
+    const ok = await persistUpdateFix();
+    if (!ok || jobId == null) return;
+    toastSuccess("บันทึกการแก้ไขแล้ว — ไปปิดงานที่หน้ารายละเอียด", 1500);
+    setUpdateFixJob(null);
+    router.push(`/dashboard/jobs/${jobId}`);
   };
 
   const loadAssignableStaff = async (): Promise<boolean> => {
@@ -1454,6 +1629,7 @@ export default function JobsList({
 
   const handleAssignSubmit = async () => {
     if (assignSelectedId == null || !token) return;
+    if (!(await ensureStaffSignatureOrToast(token))) return;
     const bulkIds = assignBulkIds;
     const singleJob = assignJob;
     if (bulkIds.length === 0 && !singleJob) return;
@@ -1503,6 +1679,7 @@ export default function JobsList({
   const moveJobToOutOfContract = async (jobId: number) => {
     if (!token) return;
     if (movingOutOfContractJobId === jobId) return;
+    if (!(await ensureStaffSignatureOrToast(token))) return;
 
     const ok = await confirmDialog({
       title: "ย้ายนอกสัญญา?",
@@ -1673,7 +1850,7 @@ export default function JobsList({
               : "flex flex-col h-full"
           }
         >
-          {showContractTabs && onShowOutOfContractChange && (
+          {effectiveShowContractTabs && onShowOutOfContractChange && (
             <div
               className={
                 noCard
@@ -1683,7 +1860,7 @@ export default function JobsList({
             >
               <SegmentedTabs
                 tabs={contractSegmentTabs}
-                activeId={showOutOfContract ? "out" : "contract"}
+                activeId={effectiveShowOutOfContract ? "out" : "contract"}
                 onChange={(id) => onShowOutOfContractChange(id === "out")}
                 ariaLabel="แท็บงานสัญญา/นอกสัญญา"
               />
@@ -1719,7 +1896,7 @@ export default function JobsList({
               : "flex flex-col h-full"
           }
         >
-          {showContractTabs && onShowOutOfContractChange && (
+          {effectiveShowContractTabs && onShowOutOfContractChange && (
             <div
               className={
                 noCard
@@ -1729,7 +1906,7 @@ export default function JobsList({
             >
               <SegmentedTabs
                 tabs={contractSegmentTabs}
-                activeId={showOutOfContract ? "out" : "contract"}
+                activeId={effectiveShowOutOfContract ? "out" : "contract"}
                 onChange={(id) => onShowOutOfContractChange(id === "out")}
                 ariaLabel="แท็บงานสัญญา/นอกสัญญา"
               />
@@ -1839,18 +2016,27 @@ export default function JobsList({
     !!updateFixJob.assignedTo &&
     isUpdateAssignee &&
     !isUpdateResolved;
+  const updateCanUploadIssueImages =
+    Array.isArray(myPermissions) &&
+    myPermissions.includes("job.issue.upload") &&
+    jobStatusAllowsIssueImageUpload(updateFixJob?.status);
+  const updateIssueImageCount = countNonemptyIssueImages(updateFixJob?.images);
   const updateIsReadOnlyFix = !!updateFixJob && !updateCanEditFix;
 
   // หลีกเลี่ยง `useMemo` เพราะไฟล์นี้มี early-return หลายจุด
   // (React Hooks ต้องเรียกทุกครั้งตามกฎ-of-hooks)
-  const updateFixFormReadyToSubmit = updateCanEditFix
-    ? (updateFixEnvironment === "INDOOR" || updateFixEnvironment === "OUTDOOR") &&
-      (updateBrokenPartType === "Hardware" ||
-        updateBrokenPartType === "Software") &&
-      updateCause.trim().length > 0 &&
-      updateFixMethod.trim().length > 0 &&
-      hasRequiredFixImageSlots(updateFixImages, updateFixPreviews)
+  const updateFixSaveReady = updateCanEditFix
+    ? isFixInfoComplete({
+        fixEnvironment: updateFixEnvironment,
+        brokenPart: updateBrokenPartType,
+        cause: updateCause,
+        fixMethod: updateFixMethod,
+        fixImageFiles: updateFixImages,
+        fixImagePreviews: updateFixPreviews,
+      })
     : true;
+
+  const updateFixFormReadyToSubmit = updateFixSaveReady;
 
   const tableAndPagination = (
     <>
@@ -1937,10 +2123,13 @@ export default function JobsList({
                   <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-40">
                     ประเภทงาน
                   </th>
+                  <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-28">
+                    ระยะเวลาจบงาน
+                  </th>
                 </>
               )}
               <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap">รายละเอียดปัญหา</th>
-              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-28">สถานะ</th>
+              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-52">สถานะ</th>
               {showAssignedToColumn && (
                 <th
                   className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-44"
@@ -2009,7 +2198,9 @@ export default function JobsList({
                       ) : null}
                     </td>
                   )}
-                  <td className="px-2.5 py-2.5 font-mono text-sm font-medium text-slate-900 dark:text-slate-100">{job.ticketNo ?? "–"}</td>
+                  <td className="px-2.5 py-2.5 font-mono text-sm font-medium text-slate-900 dark:text-slate-100">
+                    {job.ticketNo?.trim() ? job.ticketNo : "—"}
+                  </td>
                   <td className="px-2.5 py-2.5 text-sm whitespace-nowrap text-slate-600 dark:text-slate-400">
                     {dateStr ? format(new Date(dateStr), "dd/MM/yy", { locale: th }) : "–"}
                   </td>
@@ -2059,6 +2250,16 @@ export default function JobsList({
                           {partLabel}
                         </Badge>
                       </td>
+                      <td className="px-2.5 py-2.5 text-sm text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                        {(() => {
+                          const d = workDurationDays({
+                            fixDate: job.fixDate,
+                            reportDate: job.reportDate,
+                            createdAt: job.createdAt,
+                          });
+                          return d ? `${d} วัน` : "—";
+                        })()}
+                      </td>
                     </>
                   )}
                   <td className="px-2.5 py-2.5 truncate text-sm text-slate-800 dark:text-slate-200">
@@ -2073,15 +2274,20 @@ export default function JobsList({
                     )}
                   </td>
                   <td className="px-2.5 py-2.5">
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "h-auto px-2 py-1 text-xs font-semibold shadow-none ring-0",
-                        cfg.badgeCls,
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "h-auto px-2 py-1 text-xs font-semibold shadow-none ring-0",
+                          cfg.badgeCls,
+                        )}
+                      >
+                        {cfg.label}
+                      </Badge>
+                      {isAwaitingReporterSignature(job) && (
+                        <AwaitingReporterSignatureBadge />
                       )}
-                    >
-                      {cfg.label}
-                    </Badge>
+                    </div>
                   </td>
                   {showAssignedToColumn && (
                     <td className="px-2.5 py-2.5 text-sm text-slate-900 dark:text-slate-100">
@@ -2130,8 +2336,9 @@ export default function JobsList({
                         </ActionIconButton>
                       )}
 
-                      {job.status === "PENDING" &&
-                        !showOutOfContract &&
+                      {enableMoveOutOfContract &&
+                        job.status === "PENDING" &&
+                        !effectiveShowOutOfContract &&
                         canMoveOutOfContract &&
                         !!token &&
                         job.isOutOfContract !== true && (
@@ -2164,6 +2371,20 @@ export default function JobsList({
                             color="#dc2626"
                           >
                             <Trash2 size={16} />
+                          </ActionIconButton>
+                        )}
+
+                      {enableAllBreakdownFilters &&
+                        canClassifyDoc &&
+                        job.status === "RESOLVED" &&
+                        !isFormalDocTicketNo(job.ticketNo) &&
+                        !!token && (
+                          <ActionIconButton
+                            label="จำแนกเอกสาร"
+                            onClick={() => void openClassifyDocDialog(job)}
+                            color="#7c3aed"
+                          >
+                            <Stamp size={16} />
                           </ActionIconButton>
                         )}
 
@@ -2228,7 +2449,7 @@ export default function JobsList({
             : "flex flex-col h-full"
         }
       >
-        {showContractTabs && onShowOutOfContractChange && (
+        {effectiveShowContractTabs && onShowOutOfContractChange && (
           <div
             className={
               noCard
@@ -2238,7 +2459,7 @@ export default function JobsList({
           >
             <SegmentedTabs
               tabs={contractSegmentTabs}
-              activeId={showOutOfContract ? "out" : "contract"}
+              activeId={effectiveShowOutOfContract ? "out" : "contract"}
               onChange={(id) => onShowOutOfContractChange(id === "out")}
               ariaLabel="แท็บงานสัญญา/นอกสัญญา"
             />
@@ -2306,6 +2527,9 @@ export default function JobsList({
                       <span className={STATUS_CONFIG[detailJob.status]?.badgeCls ?? "badge"}>
                         {STATUS_CONFIG[detailJob.status]?.label ?? detailJob.status}
                       </span>
+                      {isAwaitingReporterSignature(detailJob) && (
+                        <AwaitingReporterSignatureBadge />
+                      )}
                       {(detailJob.reportDate || detailJob.createdAt) && (
                         <span
                           className="text-xs flex items-center gap-1"
@@ -2542,6 +2766,90 @@ export default function JobsList({
                     <div className="space-y-4">
                       <div className={`${GLASS_SECTION} p-4 sm:p-6 h-fit`}>
                         <h3 className="text-sm font-bold mb-3 glass-text">
+                          รูปภาพปัญหาที่แจ้ง
+                        </h3>
+                        <div className="flex flex-col gap-3">
+                        {Array.isArray(updateFixJob.images) &&
+                        updateFixJob.images.some(
+                          (u) => typeof u === "string" && u.trim(),
+                        ) ? (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {updateFixJob.images.map((src, i) => {
+                              if (!src || typeof src !== "string") return null;
+                              return (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  className="relative aspect-video overflow-hidden rounded-xl border border-[var(--glass-card-border)] cursor-pointer"
+                                  onClick={() => {
+                                    const urls = (updateFixJob.images ?? [])
+                                      .map((u, idx) =>
+                                        u
+                                          ? dashboardJobImagePath(
+                                              updateFixJob.id,
+                                              "issue",
+                                              idx,
+                                            )
+                                          : null,
+                                      )
+                                      .filter(Boolean) as string[];
+                                    setUpdatePreviewImages(urls);
+                                    setUpdatePreviewIndex(
+                                      Math.max(0, urls.indexOf(
+                                        dashboardJobImagePath(
+                                          updateFixJob.id,
+                                          "issue",
+                                          i,
+                                        ),
+                                      )),
+                                    );
+                                  }}
+                                  aria-label={`ดูรูปปัญหาที่ ${i + 1}`}
+                                >
+                                  <ManagedImage
+                                    src={dashboardJobImagePath(
+                                      updateFixJob.id,
+                                      "issue",
+                                      i,
+                                    )}
+                                    alt={`รูปปัญหา ${i + 1}`}
+                                    fill
+                                    className="object-cover"
+                                    sizes={MANAGED_IMAGE_SIZES.galleryResponsiveSm}
+                                  />
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : !updateCanUploadIssueImages ? (
+                          <p className="text-xs glass-muted-text">
+                            ยังไม่มีรูปปัญหาที่แจ้ง
+                          </p>
+                        ) : null}
+                          <IssueImagesUploadPanel
+                            key={updateIssueImageCount}
+                            jobId={updateFixJob.id}
+                            token={token}
+                            canUpload={updateCanUploadIssueImages}
+                            existingCount={updateIssueImageCount}
+                            onUploaded={async () => {
+                              const res = await axios.get(
+                                `${API}/jobs/${updateFixJob.id}`,
+                                {
+                                  headers: {
+                                    Authorization: `Bearer ${token}`,
+                                  },
+                                },
+                              );
+                              const j = unwrapApiData(res.data) as Job;
+                              setUpdateFixJob(j);
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className={`${GLASS_SECTION} p-4 sm:p-6 h-fit`}>
+                        <h3 className="text-sm font-bold mb-3 glass-text">
                           ข้อมูลการแก้ไข
                         </h3>
 
@@ -2549,14 +2857,19 @@ export default function JobsList({
                         <div className="space-y-3 text-xs glass-muted-text">
                           <div className="flex justify-between gap-2 items-center">
                             <span>สถานะปัจจุบัน:</span>
-                            <span
-                              className={
-                                STATUS_CONFIG[updateFixJob.status]?.badgeCls ??
-                                "badge badge-pending"
-                              }
-                            >
-                              {STATUS_CONFIG[updateFixJob.status]?.label ??
-                                updateFixJob.status}
+                            <span className="flex flex-wrap items-center justify-end gap-1.5">
+                              <span
+                                className={
+                                  STATUS_CONFIG[updateFixJob.status]?.badgeCls ??
+                                  "badge badge-pending"
+                                }
+                              >
+                                {STATUS_CONFIG[updateFixJob.status]?.label ??
+                                  updateFixJob.status}
+                              </span>
+                              {isAwaitingReporterSignature(updateFixJob) && (
+                                <AwaitingReporterSignatureBadge />
+                              )}
                             </span>
                           </div>
 
@@ -2914,7 +3227,7 @@ export default function JobsList({
                                 <span className={GLASS_MODAL_LABEL}>
                                   รูปการแก้ไข{" "}
                                   <span className="glass-muted-text font-normal">
-                                    (บังคับ 2 รูปแรก — ใช้รูปเดิมได้ / อัปโหลดใหม่เพื่อเปลี่ยน)
+                                    (บังคับ 2 รูปแรก — ใช้รูปเดิมได้ / อัปโหลดใหม่เพื่อเปลี่ยน) · {JOB_IMAGE_HINT}
                                   </span>
                                 </span>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mt-1">
@@ -2962,13 +3275,14 @@ export default function JobsList({
                                         )}
                                         <input
                                           type="file"
-                                          accept="image/*"
+                                          accept={JOB_IMAGE_ACCEPT}
                                           className="hidden"
                                           ref={updateFixFileRefs[i]}
                                           onChange={(e) =>
                                             handleUpdateFixImage(
                                               i,
                                               e.target.files?.[0] || null,
+                                              e.target,
                                             )
                                           }
                                         />
@@ -2980,20 +3294,34 @@ export default function JobsList({
                             )}
 
                             {updateCanEditFix ? (
-                              <button
-                                type="submit"
-                                disabled={
-                                  updateFixSaving ||
-                                  updateFixLoading ||
-                                  updateIsReadOnlyFix ||
-                                  !updateFixFormReadyToSubmit
-                                }
-                                className="w-full mt-3 py-3 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-lg active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100 transition-all focus:ring-2 focus:ring-blue-500/40 outline-none cursor-pointer disabled:cursor-not-allowed"
-                              >
-                                {updateFixSaving
-                                  ? "กำลังบันทึก..."
-                                  : "บันทึกและปิดงาน (สถานะ: เสร็จสิ้น)"}
-                              </button>
+                              <>
+                                <button
+                                  type="submit"
+                                  disabled={
+                                    updateFixSaving ||
+                                    updateFixLoading ||
+                                    updateIsReadOnlyFix ||
+                                    !updateFixFormReadyToSubmit
+                                  }
+                                  className="w-full mt-3 py-3 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-lg active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100 transition-all focus:ring-2 focus:ring-blue-500/40 outline-none cursor-pointer disabled:cursor-not-allowed"
+                                >
+                                  {updateFixSaving
+                                    ? "กำลังบันทึก..."
+                                    : "บันทึกการแก้ไข"}
+                                </button>
+                                {updateFixSaveReady && updateFixJob && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleGoToCloseJob()}
+                                    disabled={updateFixSaving || updateFixLoading}
+                                    className="w-full mt-2 min-h-11 py-3 rounded-xl text-sm font-semibold text-emerald-900 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 shadow-sm active:scale-[0.98] transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed dark:text-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-500/35 dark:hover:bg-emerald-900/40"
+                                  >
+                                    {updateFixSaving
+                                      ? "กำลังบันทึก..."
+                                      : "บันทึกแล้วไปปิดงาน — ให้ผู้แจ้งเซ็นที่หน้ารายละเอียด"}
+                                  </button>
+                                )}
+                              </>
                             ) : isUpdateResolved && isUpdateAssignee ? (
                               <div className="w-full mt-2 py-2.5 rounded-xl text-xs font-semibold text-center border border-dashed border-[var(--glass-card-border)] bg-[var(--glass-input-bg)] glass-muted-text">
                                 งานนี้ถูกปิดแล้ว — หากต้องการแก้ไข ให้ใช้ขั้นตอน Reopen ด้านล่าง
@@ -3170,6 +3498,16 @@ export default function JobsList({
           </div>
         </DialogContent>
       </Dialog>
+
+      <JobClassifyDocDialog
+        open={classifyJob != null}
+        onOpenChange={(open) => {
+          if (!open && !classifySubmitting) setClassifyJob(null);
+        }}
+        ticketNo={classifyJob?.ticketNo}
+        submitting={classifySubmitting}
+        onConfirm={(isOutOfContract) => void handleClassifyDoc(isOutOfContract)}
+      />
     </DashboardPageShell>
   );
 }

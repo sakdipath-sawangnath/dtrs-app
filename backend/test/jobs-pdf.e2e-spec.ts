@@ -26,7 +26,7 @@ describe('Jobs PDF routes (e2e)', () => {
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
     await app.init();
-  });
+  }, 120_000);
 
   afterAll(async () => {
     await app.close();
@@ -41,6 +41,20 @@ describe('Jobs PDF routes (e2e)', () => {
   it('TC-BE-04: GET /api/jobs/reports/summary-pdf requires auth (401 without token)', () => {
     return request(app.getHttpServer())
       .get('/api/jobs/reports/summary-pdf?periodType=month&month=2026-01')
+      .expect(401);
+  });
+
+  it('PATCH /api/jobs/:id/classify-doc requires auth (401 without token)', () => {
+    return request(app.getHttpServer())
+      .patch('/api/jobs/1/classify-doc')
+      .send({ isOutOfContract: false })
+      .expect(401);
+  });
+
+  it('PATCH /api/jobs/:id/assign requires auth (401 without token)', () => {
+    return request(app.getHttpServer())
+      .patch('/api/jobs/1/assign')
+      .send({ staffId: 1 })
       .expect(401);
   });
 });

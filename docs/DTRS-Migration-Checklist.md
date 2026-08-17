@@ -181,7 +181,7 @@
 | 36 | อีเมล test subject | `backend/src/settings/mail.service.ts` | ☐ |
 | 37 | ชื่อไฟล์ PDF แนบอีเมล | `backend/src/jobs/job-email-notification.service.ts` — `DTRS-*.pdf` | ✅ |
 | 38 | หัวข้อ PDF รายงาน | `backend/src/jobs/jobs-pdf.service.ts` | ☐ |
-| 39 | ข้อความใน PDF template | `frontend/src/components/pdf/JobMaintenancePdfTemplate.tsx` (โครงการ CCTV 5 จังหวัด — **business copy**) | ☐ |
+| 39 | ข้อความใน PDF template | `frontend/src/components/pdf/JobMaintenancePdfTemplate.tsx` + `reportPdfConstants.ts` (โครงการ SHF/CM) | ✅ |
 | 40 | Public layout watermark | `frontend/src/components/PublicLayoutShell.tsx` (icon CCTV — OK ถ้ายังเป็นระบบ CCTV) | ☐ |
 
 ---
@@ -236,6 +236,8 @@
 | # | ไฟล์ | หมายเหตุ | สถานะ |
 |---|------|---------|--------|
 | 61 | `backend/scripts/seed-from-excel.ts` | อ่าน `ระบบแจ้งซ่อม .xlsx`, sheet `ระบบแจ้งซ่อม ` | ☐ |
+| 61b | `backend/scripts/seed-locations-from-mssql.ts` | dump `scripts/data/TB_MST_*.sql` → Province/District/Subdistrict — [`docs/Locations-Master-Seed.md`](./Locations-Master-Seed.md); รันหลัง deploy UAT/PRD ถ้า Locations ว่าง | ☐ |
+| 61c | `backend/scripts/seed-sites-from-xlsx.ts` | `scripts/data/Sites.xlsx` sheet `info` → Site (agency+station); migration ก่อน — [`docs/Sites-Import.md`](./Sites-Import.md) | ☐ UAT/PRD · local ✅ 198 แถว |
 | 62 | `backend/scripts/migrate-excel.ts` | path Excel เดิม | ☐ |
 | 63 | `backend/scripts/migrate-*-to-minio.ts` | โฟลเดอร์ `CCTVMaintenance-641488446` ที่ root | ☐ |
 | 64 | `backend/scripts/import-appsheet-employees.ts` | AppSheet URL `CCTVMaintenance-641488446` | ☐ |

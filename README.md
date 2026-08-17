@@ -6,6 +6,17 @@
 
 **Changelog + app version:** [`CHANGELOG.md`](CHANGELOG.md) — key changes; commit ที่แตะไฟล์นี้จะถาม SemVer bump (`frontend/package.json`) ผ่าน husky · footer แสดง `vX.Y.Z` จาก package (ไม่ใช่ DB) · ครั้งแรก: `npm install` ที่ root
 
+## บันทึกการอัปเดตล่าสุด (2026-08-17)
+
+- **แยกบันทึกแก้ไข / ปิดงาน** — `PATCH /jobs/:id/fix` คง `IN_PROGRESS`; `PATCH /jobs/:id/close` บังคับลายเซ็นผู้แจ้ง (PNG) → `RESOLVED`; ปิดงานที่ `/dashboard/jobs/:id` เท่านั้น; รายการงานมีป้าย「รอเซ็นผู้แจ้ง」เมื่อแก้ครบแล้วยังกำลังแก้ไข — [`TASK.md`](TASK.md) §34 · [`CHANGELOG.md`](CHANGELOG.md)
+- **อัปโหลดรูปงาน** — **5MB/ไฟล์** · สูงสุด **3 รูป** ต่อช่อง issue/fix · **JPG/PNG/WebP** (magic bytes) · **HEIC/HEIF → JPEG** ฝั่ง Nest; ลายเซ็นผู้แจ้ง PNG เท่านั้น — สิทธิ์รูปปัญหา **`job.issue.upload`** (`PATCH /jobs/:id/issue-images`) ไม่ผูก `job.fix.*`; งาน **PENDING / IN_PROGRESS**; เติมได้ถึง 3 รูป ไม่ลบ/ไม่แทนที่; UI `/dashboard/jobs/:id` + wrench modal; หน้า public ไม่บังคับรูป; seed **ADMIN** เท่านั้น — [`backend/docs/RBAC-Setup.md`](backend/docs/RBAC-Setup.md)
+- **อัปโหลดผ่าน reverse proxy** — แนะนำ `client_max_body_size 50m;` ที่ NPM location `/api/` (ค่าเริ่มต้น nginx ~1MB ได้ **413**) — [`backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md`](backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md). **Fallback ฝั่งแอป:** frontend บีบอัดรูปใน browser เมื่อขนาดรวมใกล้เกิน ~1MB หรือได้ 413 แล้ว retry (`frontend/src/lib/jobImageProxyFallback.ts`) — คุณภาพอาจลด; HEIC ใหญ่เกินงบต้องแปลง JPG เอง
+
+## บันทึกการอัปเดตล่าสุด (2026-08-14)
+
+- **บทบาทที่สร้างเอง (`User.role`)** — คอลัมน์เป็น **`VARCHAR`** เก็บ `AppRole.code` (เช่น `ADMIN_1`); ไม่ใช้ Prisma/MySQL enum อีกต่อไป เพื่อไม่ให้ `GET /users` 500 — ดู [`backend/docs/RBAC-Setup.md`](backend/docs/RBAC-Setup.md)
+- **แท็บสัญญา/นอกสัญญา** — มองเห็นเมื่อมีสิทธิ์ **`job.viewContractTabs`** (ตั้งที่ `/dashboard/roles`); ไม่ติ๊ก = เห็นแค่งานในสัญญา ไม่มีแท็บสลับ; คนละตัวกับเมนู sidebar `menu.outOfContract` และปุ่มย้ายนอกสัญญา `job.assign` — หลังเพิ่ม permission ให้ restart backend เพื่อ `ensurePermissionCatalogSynced`
+
 ## บันทึกการอัปเดตล่าสุด (2026-08-06)
 
 - **Frontend Light / Dark theme** — สลับโหมดจาก **Sun/Moon** ใน `SiteHeader` (`next-themes`, key `dtrs-theme`, ค่าเริ่มต้น **Dark**); tokens `--glass-*` + utilities ใน `globals.css`; `/print/*` บังคับ light ผ่าน `PrintThemeShell` (ไม่ซ้อน ThemeProvider); contrast ตาราง/ฟิลเตอร์ (JobsList, sites, roles ฯลฯ) — ดู [`CHANGELOG.md`](CHANGELOG.md) · [`frontend/README.md`](frontend/README.md) · [`AGENTS.md`](AGENTS.md)
@@ -61,7 +72,7 @@
 ## บันทึกการอัปเดต (2026-03-30)
 
 - **RBAC คิวงาน (หน้ารอดำเนินการ + API)** — ปุ่ม «มอบหมายงาน» / «ย้ายนอกสัญญา» ใน `JobsList` อิงสิทธิ์ **`job.assign`** จาก `GET /roles/me/permissions` (สอดคล้อง `/dashboard/roles`); `PATCH /jobs/:id/assign` และ `PATCH /jobs/:id/out-of-contract` และการลบงาน `PENDING` ไม่มอบหมายใน `DELETE /jobs/:id` ใช้ **`RolesService.getPermissionsForUser`** ฝั่ง Nest (`JobsModule` import `RolesModule`) — รับงานเองได้เมื่อมี `menu.pending` และเลือกตัวเอง; ทุกครั้งที่มอบหมาย/รับงาน ระบบจะบันทึก `assignedById` เพื่อให้ UI แยก **มอบหมายงาน** vs **รับงานเอง** บนหน้า `/dashboard/jobs/:id`; สรุปเชิงลึกที่ [`backend/docs/RBAC-Setup.md`](backend/docs/RBAC-Setup.md)
-- **RBAC API สอดคล้องหน้า `/dashboard/roles` (ต่อ)** — `GET /users/assignable` ใช้ **`job.assign`** (`PermissionsGuard`); CRUD **`/roles/*`** (ยกเว้น `me/permissions`) ใช้ **`menu.roles`**; CRUD **`/users/*`** (ยกเว้น `me`, `reporters`, `assignable`) ใช้ **`menu.users`**; **`/settings/*`** ใช้ **`menu.settings`**; **`PATCH /jobs/:id/status`** ใช้ **`job.updateStatus`**; ลบงาน **IN_PROGRESS** ใช้ **`job.deleteInProgress`** (บทบาทมาตรฐาน **SUPERVISOR** ไม่ได้สิทธิ์นี้); **`POST /areas`** ใช้ **`site.create`**; `PermissionsGuard` กับ user แบบ enum ใช้ map **`RBAC_ROLE_PERMISSION_CODES`** เดียวกับ `RolesService` — หลัง deploy ให้สตาร์ท backend เพื่อ sync permission ใหม่ หรือรัน `seed-roles-permissions.ts`
+- **PermissionsGuard** กับ user ที่ยังไม่มี `roleId` ใช้ map **`RBAC_ROLE_PERMISSION_CODES`** เดียวกับ `RolesService` (รหัสบทบาทมาตรฐาน) — หลัง deploy ให้สตาร์ท backend เพื่อ sync permission ใหม่ หรือรัน `seed-roles-permissions.ts`
 
 ## บันทึกการอัปเดต (2026-03-28)
 
@@ -79,9 +90,10 @@
 - **CC อีเมล** — CC มาจากช่องตั้งค่า + บทบาทที่เลือกเท่านั้น (ไม่แทรกผู้รับงานเป็น CC อัตโนมัติเมื่อปิดงาน) — สรุปใน [`docs/Email-Notifications.md`](docs/Email-Notifications.md)
 - **Modal แดชบอร์ด (`CrudModal`)** — แสดงด้วย **`createPortal` → `document.body`**, **`z-100`** ให้อยู่เหนือ `SiteHeader`/`sidebar` (`z-50`); โทน **Glass ตาม theme** (Dark/Light); พร็อพ **`size`**: `md` | `lg`; ล็อก scroll `body` ขณะเปิด
 - **หน้า `/dashboard/roles`** — modal เพิ่ม/แก้ไขบทบาทและกำหนดสิทธิ์: ฟิลด์ใช้ **`form-input-glass`** (`globals.css`); รายการสิทธิ์ในกล่องแก้ว + checkbox สไตล์ dark
-- **RBAC งานซ่อม (แก้ไข/ปิดงาน + Reopen)** — คุมสิทธิ์ผ่าน `/dashboard/roles` ด้วย permission:
+- **RBAC งานซ่อม (แก้ไข/ปิดงาน + Reopen + รูปปัญหา)** — คุมสิทธิ์ผ่าน `/dashboard/roles` ด้วย permission:
   - `job.fix.self` / `job.fix.any`
   - `job.reopen.self` / `job.reopen.any`
+  - `job.issue.upload` — อัปโหลดรูปปัญหาที่แจ้ง (`PATCH /jobs/:id/issue-images`); ไม่ใช้ `job.fix.*`; default seed **ADMIN** เท่านั้น
 
 ### ย้อนหลัง (2026-03-23)
 
@@ -109,7 +121,8 @@
   - Frontend: หน้า `/dashboard/settings` — โหลด/บันทึก/ทดสอบส่งอีเมล; **โครง layout เนื้อหาแบบเดียวกับหน้าภาพรวม** (`/dashboard`) ไม่ใช้ `DashboardPageShell` เป็นห่อหลัก
 - **งานปิดแล้ว (Reopen) + RBAC (อัปเดต)**
   - `PATCH /api/jobs/:id/reopen`: คุมสิทธิ์ผ่าน RBAC — `job.reopen.any` ทำได้ทุกงาน, `job.reopen.self` ทำได้เฉพาะผู้รับงาน; สถานะ **เสร็จสิ้น → กำลังแก้ไข**, บันทึกเหตุผลต่อท้าย `fixNote`, ล้าง `fixDate`; มี **ยืนยัน** (SweetAlert) ก่อนเรียก API
-  - `PATCH /api/jobs/:id/fix`: คุมสิทธิ์ผ่าน RBAC — `job.fix.any` ทำได้ทุกงาน, `job.fix.self` ทำได้เฉพาะผู้รับงาน; ถ้างานเป็น `RESOLVED` ต้อง Reopen ก่อน
+  - `PATCH /api/jobs/:id/fix`: คุมสิทธิ์ผ่าน RBAC — `job.fix.any` ทำได้ทุกงาน, `job.fix.self` ทำได้เฉพาะผู้รับงาน; บันทึกการแก้ไขคง `IN_PROGRESS`; ถ้างานเป็น `RESOLVED` ต้อง Reopen ก่อน
+  - `PATCH /api/jobs/:id/close`: ปิดงานด้วยลายเซ็นผู้แจ้ง (สิทธิ์เดียวกับ `/fix`) → `RESOLVED`
 - **เครื่องมือพัฒนา Backend**: อัปเกรด `@nestjs/cli` เป็น **v11** ให้สอดคล้อง Nest 11 + TypeScript 5.7 (แก้ error watch mode `Cannot read properties of undefined (reading 'paths')`)
 - **UI รายการงาน**: แท็บ **สัญญา / นอกสัญญา** — เอา **card/glass ห่อชั้นนอก**ออก เหลือเฉพาะกล่องควบคุมใน `SegmentedTabs`
 
@@ -122,6 +135,10 @@
 | [`STATUS.md`](STATUS.md) | สถานะระบบและสรุป API |
 | [`PLAN.md`](PLAN.md), [`TASK.md`](TASK.md) | แผนและงาน |
 | [`docs/README.md`](docs/README.md) | ดัชนีโฟลเดอร์ `docs/` |
+| [`docs/System-Workflow.md`](docs/System-Workflow.md) | Flow chart / System workflow (mermaid) |
+| [`docs/Meeting-11082026-Requirements-Plan.plan.md`](docs/Meeting-11082026-Requirements-Plan.plan.md) | แผน requirements Meeting-11082026 (Phase A–E ✅ · Reports เลื่อน · จำแนก Doc No) |
+| [`docs/Locations-Master-Seed.md`](docs/Locations-Master-Seed.md) | Seed จังหวัด/อำเภอ/ตำบล จาก dump MS SQL → MySQL |
+| [`docs/Sites-Import.md`](docs/Sites-Import.md) | Seed Site จาก `Sites.xlsx` (agency + station) — local ✅ 198 แถว |
 | [`docs/DTRS-Migration-Checklist.md`](docs/DTRS-Migration-Checklist.md) | Checklist ย้ายจาก `cctv-app_ticket` |
 | [`docs/GitLab-CI-Plan.md`](docs/GitLab-CI-Plan.md) | แผน + implement GitLab CI (UAT+PRD) |
 | [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md) | Checklist ตั้ง GitLab CI/CD Variables |
@@ -241,9 +258,9 @@
 4. **ระบบจัดการแดชบอร์ด (Dashboard):** `http://localhost:3000/dashboard`
    - ภาพรวม (สถิติ, กราฟสัดส่วน/จังหวัด/แนวโน้มรายวัน, เมนูด่วนตาม RBAC)
    - รอดำเนินการ (ปุ่ม ดูรายละเอียด → ไปหน้า `/dashboard/jobs/:id` / **มอบหมายงาน** และ **ย้ายนอกสัญญา** ตามสิทธิ์ **`job.assign`** จาก RBAC; **รับงาน** = assign เป็นตัวเองเมื่อมี `menu.pending` แต่ไม่มี `job.assign`; **ลบงาน** เมื่อมี **`job.deleteUnassigned`**; ย้ายนอกสัญญาคงสถานะ `PENDING`)
-  - รายละเอียดงาน (`/dashboard/jobs/:id`): พิมพ์รายงานได้เมื่องานมีสถานะเสร็จสิ้น (Resolved) ผ่านหน้า **`/print/jobs/:id`** (เทมเพลต `JobMaintenancePdfTemplate` + `print.css`; พิมพ์จากเบราว์เซอร์); card **Backfill วันที่** ใช้รูปแบบวันที่ **`dd/mm/yyyy`** พร้อม preview ปฏิทินไทย (พ.ศ.) และรูปในงานเปิดดูผ่าน `JobImageLightbox`
+  - รายละเอียดงาน (`/dashboard/jobs/:id`): card **รูปภาพปัญหาที่แจ้ง** อัปโหลดเพิ่มได้เมื่อมี **`job.issue.upload`** และงาน `PENDING`/`IN_PROGRESS` (เติมถึง 3 รูป); พิมพ์รายงานได้เมื่องานมีสถานะเสร็จสิ้น (Resolved) ผ่านหน้า **`/print/jobs/:id`** (เทมเพลต `JobMaintenancePdfTemplate` + `print.css`; พิมพ์จากเบราว์เซอร์); card **Backfill วันที่** ใช้รูปแบบวันที่ **`dd/mm/yyyy`** พร้อม preview ปฏิทินไทย (พ.ศ.) และรูปในงานเปิดดูผ่าน `JobImageLightbox`
    - **งานที่รับผิดชอบ** — รายการงานที่รับมอบหมาย (filter + datatable)
-   - กำลังแก้ไข (`/dashboard/in-progress`): แท็บสัญญา/นอกสัญญา + badge งานค้าง; ปุ่มอัปเดต (ผู้รับผิดชอบ); ปุ่มลบงาน IN_PROGRESS ตามสิทธิ์ **`job.deleteInProgress`** (UI `JobsList` + API `DELETE /jobs/:id`); ข้อขัดข้องทั้งหมด, นอกสัญญา (แสดงเฉพาะ PENDING ที่ `isOutOfContract=true`)
-   - จัดการผู้ใช้ (ADMIN: CRUD; บทบาท: ADMIN, STAFF, หัวหน้างาน, ผู้แจ้งซ่อม) — คลิกรูปโปรไฟล์ในตารางเปิด modal ดูรูปขนาดใหญ่
+   - กำลังแก้ไข (`/dashboard/in-progress`): แท็บสัญญา/นอกสัญญาเมื่อมี **`job.viewContractTabs`** + badge งานค้าง; ปุ่มอัปเดต (ผู้รับผิดชอบ); ปุ่มลบงาน IN_PROGRESS ตามสิทธิ์ **`job.deleteInProgress`** (UI `JobsList` + API `DELETE /jobs/:id`); ข้อขัดข้องทั้งหมด, นอกสัญญา (แสดงเฉพาะ PENDING ที่ `isOutOfContract=true`)
+   - จัดการผู้ใช้ (สิทธิ์ **`menu.users`**: CRUD; เลือกบทบาทจาก `AppRole` รวมที่สร้างเอง) — คลิกรูปโปรไฟล์ในตารางเปิด modal ดูรูปขนาดใหญ่
   - จัดการบทบาทและสิทธิ์ (ADMIN), **ตั้งค่าระบบ** (`/dashboard/settings`, ADMIN) — กำหนด SMTP, ทดสอบส่งอีเมล, ตัวเลือก TLS, เทมเพลตอีเมลแจ้งงาน (รวม `publicBaseUrl`, แจ้งตาม Role), รหัสผ่านเริ่มต้น, ข้อมูล Footer (`appName` / `companyName` / `version`), **สแกน/ลบไฟล์ MinIO ค้าง**; ค่าที่แสดงใน `SiteFooter` ใช้ fallback **DB → env → `package.json`**; สรุป flow การส่งอีเมล: [`docs/Email-Notifications.md`](docs/Email-Notifications.md) · orphan: [`docs/MinIO-Orphan-Cleanup.md`](docs/MinIO-Orphan-Cleanup.md)
    - โปรไฟล์เข้าได้จากเมนูผู้ใช้ (dropdown) ไม่แสดงใน sidebar

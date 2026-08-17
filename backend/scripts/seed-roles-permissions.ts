@@ -20,6 +20,7 @@ const MENU_PERMISSIONS = [
   { code: 'menu.all', name: 'ประวัติทั้งหมด', category: 'menu' },
   { code: 'menu.outOfContract', name: 'นอกสัญญา', category: 'menu' },
   { code: 'menu.sites', name: 'จัดการ Site', category: 'menu' },
+  { code: 'menu.locations', name: 'จัดการข้อมูล Master (พื้นที่)', category: 'menu' },
   { code: 'menu.users', name: 'จัดการผู้ใช้', category: 'menu' },
   { code: 'menu.settings', name: 'ตั้งค่าระบบ', category: 'menu' },
   { code: 'menu.roles', name: 'จัดการบทบาทและสิทธิ์', category: 'menu' },
@@ -27,11 +28,14 @@ const MENU_PERMISSIONS = [
 
 const ACTION_PERMISSIONS = [
   { code: 'job.assign', name: 'มอบหมายงาน', category: 'job' },
+  { code: 'job.viewContractTabs', name: 'ดูแท็บสัญญา/นอกสัญญา', category: 'job' },
+  { code: 'job.classifyDoc', name: 'จำแนกเอกสาร', category: 'job' },
   { code: 'job.deleteUnassigned', name: 'ลบงานที่ยังไม่มีผู้รับผิดชอบ', category: 'job' },
   { code: 'job.updateStatus', name: 'เปลี่ยนสถานะงาน', category: 'job' },
   { code: 'job.backfillDate', name: 'แก้ไขวันเวลาย้อนหลังของงาน', category: 'job' },
   { code: 'job.deleteInProgress', name: 'ลบงานกำลังแก้ไข (ผู้ดูแล)', category: 'job' },
   { code: 'job.cancel', name: 'ยกเลิกงานรอดำเนินการ (PENDING)', category: 'job' },
+  { code: 'job.issue.upload', name: 'อัปโหลดรูปปัญหาที่แจ้ง', category: 'job' },
   { code: 'job.fix.self', name: 'บันทึก/ปิดงาน (เฉพาะงานที่รับผิดชอบ)', category: 'job' },
   { code: 'job.fix.any', name: 'บันทึก/ปิดงาน (ทุกงาน)', category: 'job' },
   { code: 'job.reopen.self', name: 'Reopen งาน (เฉพาะงานที่รับผิดชอบ)', category: 'job' },
@@ -43,7 +47,10 @@ const ACTION_PERMISSIONS = [
 
 const ACTION_CODES_ALL = ACTION_PERMISSIONS.map((p) => p.code);
 const ACTION_CODES_SUPERVISOR = ACTION_CODES_ALL.filter(
-  (c) => c !== 'job.deleteInProgress' && c !== 'job.backfillDate',
+  (c) =>
+    c !== 'job.deleteInProgress' &&
+    c !== 'job.backfillDate' &&
+    c !== 'job.issue.upload',
 );
 
 const ALL_PERMISSIONS = [...MENU_PERMISSIONS, ...ACTION_PERMISSIONS];
@@ -56,15 +63,21 @@ const DEFAULT_ROLES = [
 ] as const;
 
 const STAFF_MENUS = MENU_PERMISSIONS.map((p) => p.code).filter((c) =>
-  !['menu.users', 'menu.settings', 'menu.roles', 'menu.sites'].includes(c),
+  !['menu.users', 'menu.settings', 'menu.roles', 'menu.sites', 'menu.locations'].includes(c),
 );
 
 // ADMIN ได้ทุก permission; SUPERVISOR ไม่มี job.deleteInProgress (เฉพาะ ADMIN)
 const ROLE_PERMISSION_CODES: Record<string, string[]> = {
   ADMIN: [...MENU_PERMISSIONS.map((p) => p.code), ...ACTION_CODES_ALL],
-  STAFF: [...STAFF_MENUS, 'job.fix.self', 'job.reopen.self', 'job.updateStatus'],
+  STAFF: [
+    ...STAFF_MENUS,
+    'job.viewContractTabs',
+    'job.fix.self',
+    'job.reopen.self',
+    'job.updateStatus',
+  ],
   USER: ['menu.profile', 'menu.report', 'menu.status'],
-  SUPERVISOR: [...STAFF_MENUS, 'menu.sites', ...ACTION_CODES_SUPERVISOR],
+  SUPERVISOR: [...STAFF_MENUS, 'menu.sites', 'menu.locations', ...ACTION_CODES_SUPERVISOR],
 };
 
 async function main() {

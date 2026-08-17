@@ -1,6 +1,7 @@
 import {
   BadGatewayException,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -12,12 +13,18 @@ import {
   maskPhoneForPublic,
   maskTextForPublic,
 } from '../common/utils/mask-public-text';
+import { randomBytes } from 'crypto';
 import { JobStatus, Prisma } from '@prisma/client';
 import { SitesService } from '../sites/sites.service';
 import { UsersService } from '../users/users.service';
 import { MinioService } from '../minio/minio.service';
 import { JobEmailNotificationService } from './job-email-notification.service';
 import { RolesService } from '../roles/roles.service';
+import {
+  bangkokYearMonth as formatBangkokYearMonth,
+  formatDocTicketNo,
+  isFormalDocTicketNo,
+} from './doc-ticket-no';
 import axios from 'axios';
 
 @Injectable()
@@ -88,30 +95,53 @@ export class JobsService {
   async create(data: Prisma.JobCreateInput) {
     const province = (data.province as string)?.trim();
     const district = (data.district as string)?.trim();
+    const agency = (data.agency as string)?.trim();
     const location = (data.location as string)?.trim();
-    if (province && district && location) {
-      const exists = await this.sitesService.existsByLocation(
+    let subdistrict =
+      typeof data.subdistrict === 'string' ? data.subdistrict.trim() : '';
+
+    if (province && district && location && !agency) {
+      throw new BadRequestException('กรุณาระบุสถานที่/หน่วยงาน พร้อมชื่อสถานี');
+    }
+
+    if (province && district && agency && location) {
+      const site = await this.sitesService.findByLocation(
         province,
         district,
+        agency,
         location,
+        subdistrict || null,
+        { whenSubdistrictEmpty: 'any' },
       );
-      if (!exists) {
+      if (!site) {
         throw new BadRequestException(
-          'กรุณาเลือกสถานที่จากรายการที่กำหนด (จังหวัด/อำเภอ/หน่วยงาน ไม่ถูกต้อง)',
+          'กรุณาเลือกสถานที่จากรายการที่กำหนด (จังหวัด/อำเภอ/ตำบล/สถานที่/ชื่อสถานี ไม่ถูกต้อง)',
         );
+      }
+      // ฟอร์มไม่เลือกตำบล — เติมจาก Site ที่ match (เช่น ข้อมูลจาก Sites.xlsx)
+      if (!subdistrict && site.subdistrict?.trim()) {
+        subdistrict = site.subdistrict.trim();
       }
     }
 
     const createData: Prisma.JobCreateInput = { ...data };
+    if (agency) {
+      createData.agency = agency;
+    }
+    if (subdistrict) {
+      createData.subdistrict = subdistrict;
+    } else if ('subdistrict' in createData) {
+      createData.subdistrict = null;
+    }
     // แปลงค่า isOutOfContract จาก form-data (string) ให้เป็น boolean ที่แน่นอน
     const rawOut = (data as any).isOutOfContract;
     if (typeof rawOut === 'string') {
       (createData as any).isOutOfContract = rawOut === 'true' || rawOut === '1';
     }
 
-    if (!createData.ticketNo) {
-      createData.ticketNo = await this.generateTicketNo();
-    }
+    // ticketNo = hex 8 ตัวตอนสร้าง — Running Doc No ออกตอนจำแนกเอกสารหลัง RESOLVED
+    delete (createData as { ticketNo?: unknown }).ticketNo;
+    createData.ticketNo = randomBytes(4).toString('hex');
     if (!createData.reportDate) {
       createData.reportDate = new Date();
     }
@@ -267,6 +297,55 @@ export class JobsService {
       throw new BadGatewayException(
         'ไม่สามารถโหลดรูปจากที่เก็บได้ — ตรวจสอบ URL ใน DB, MinIO/พร็อกซี, และว่า backend เข้าถึง object storage ได้',
       );
+    }
+  }
+
+  async getReporterSignatureImageBuffer(
+    jobId: number,
+  ): Promise<{ buffer: Buffer; contentType: string }> {
+    const row = await this.prisma.job.findUnique({
+      where: { id: jobId },
+      select: { reporterSignature: true },
+    });
+    if (!row) {
+      throw new NotFoundException(`Job with ID ${jobId} not found`);
+    }
+    const url = row.reporterSignature?.trim();
+    if (!url) {
+      throw new NotFoundException('ไม่มีลายเซ็นผู้แจ้ง');
+    }
+
+    const objectKey = this.minioService.tryParseBucketObjectKeyFromUrl(url);
+    if (objectKey) {
+      try {
+        return await this.minioService.getBucketObjectBuffer(objectKey);
+      } catch (sdkErr: unknown) {
+        if (!this.isMinioObjectNotFoundError(sdkErr)) {
+          this.logger.warn(
+            `getReporterSignatureImageBuffer MinIO SDK failed job=${jobId} key=${objectKey} ${String(sdkErr)}`,
+          );
+        }
+      }
+    }
+
+    const fetchUrl = this.minioService.rewriteStorageUrlForServerFetch(url);
+    try {
+      const resp = await axios.get<ArrayBuffer>(fetchUrl, {
+        responseType: 'arraybuffer',
+        timeout: 30000,
+        maxContentLength: 5 * 1024 * 1024,
+        validateStatus: (s) => s >= 200 && s < 400,
+      });
+      const ct = (resp.headers['content-type'] as string) || 'image/png';
+      return { buffer: Buffer.from(resp.data), contentType: ct };
+    } catch (err: unknown) {
+      const detail = axios.isAxiosError(err)
+        ? `code=${err.code ?? 'n/a'} status=${err.response?.status ?? 'n/a'}`
+        : 'non-axios error';
+      this.logger.warn(
+        `getReporterSignatureImageBuffer failed job=${jobId} ${detail}`,
+      );
+      throw new BadGatewayException('ไม่สามารถโหลดลายเซ็นผู้แจ้งจากที่เก็บได้');
     }
   }
 
@@ -538,7 +617,7 @@ export class JobsService {
     };
   }
 
-  async updateStatus(id: number, status: any, jwtForEmailPdf?: string) {
+  async updateStatus(id: number, status: any, _jwtForEmailPdf?: string) {
     const prev = await this.prisma.job.findUnique({
       where: { id },
       select: { status: true, assignedToId: true },
@@ -550,31 +629,16 @@ export class JobsService {
       throw new BadRequestException('ไม่สามารถเปลี่ยนสถานะงานที่ยกเลิกแล้ว');
     }
     const nextSt = String(status ?? '').toUpperCase();
+    // ปิดงานต้องผ่าน PATCH /jobs/:id/close (ลายเซ็นผู้แจ้ง + ข้อมูลแก้ไขครบ)
     if (nextSt === String(JobStatus.RESOLVED)) {
-      if (prev.assignedToId == null) {
-        throw new BadRequestException(
-          'ปิดงานไม่ได้: ต้องมีผู้รับผิดชอบงานก่อน',
-        );
-      }
-      if (prev.status === JobStatus.PENDING) {
-        throw new BadRequestException(
-          'ปิดงานไม่ได้: งานสถานะรอดำเนินการ (PENDING) ต้องมอบหมายและเปลี่ยนเป็นกำลังแก้ไขก่อน',
-        );
-      }
-      if (prev.status !== JobStatus.IN_PROGRESS) {
-        throw new BadRequestException(
-          'ปิดงานได้เฉพาะงานสถานะกำลังแก้ไข (IN_PROGRESS) เท่านั้น',
-        );
-      }
+      throw new BadRequestException(
+        'ปิดงานกรุณาใช้ PATCH /jobs/:id/close พร้อมลายเซ็นผู้แจ้ง — ไม่รองรับการตั้ง RESOLVED ผ่านเปลี่ยนสถานะโดยตรง',
+      );
     }
     const updated = await this.prisma.job.update({
       where: { id },
       data: { status },
     });
-    const wasResolved = prev?.status === JobStatus.RESOLVED;
-    if (nextSt === 'RESOLVED' && !wasResolved) {
-      void this.jobEmailNotifications.notifyClosed(updated.id, jwtForEmailPdf);
-    }
     return updated;
   }
 
@@ -659,6 +723,77 @@ export class JobsService {
     });
   }
 
+  /** นับรูปปัญหาที่ไม่ว่าง */
+  countNonemptyIssueImages(images: unknown): number {
+    if (!Array.isArray(images)) return 0;
+    return images.filter((u) => typeof u === 'string' && u.trim().length > 0)
+      .length;
+  }
+
+  async getNonemptyIssueImageCount(jobId: number): Promise<number> {
+    const row = await this.prisma.job.findUnique({
+      where: { id: jobId },
+      select: { images: true },
+    });
+    if (!row) throw new NotFoundException(`ไม่พบงาน id=${jobId}`);
+    return this.countNonemptyIssueImages(row.images);
+  }
+
+  /**
+   * อัปโหลดรูปปัญหา — สิทธิ์ job.issue.upload อย่างเดียว
+   * อนุญาตเฉพาะงาน PENDING / IN_PROGRESS
+   */
+  async assertUserCanUploadIssueImages(
+    jobId: number,
+    userId: number,
+  ): Promise<void> {
+    const codes = await this.getPermissionCodesForUser(userId);
+    if (!codes.includes('job.issue.upload')) {
+      throw new ForbiddenException('ไม่มีสิทธิ์อัปโหลดรูปปัญหา');
+    }
+
+    const job = await this.prisma.job.findUnique({
+      where: { id: jobId },
+      select: { id: true, status: true },
+    });
+    if (!job) {
+      throw new NotFoundException(`ไม่พบงาน id=${jobId}`);
+    }
+    if (
+      job.status !== JobStatus.PENDING &&
+      job.status !== JobStatus.IN_PROGRESS
+    ) {
+      throw new BadRequestException(
+        'อัปโหลดรูปปัญหาได้เฉพาะงานรอดำเนินการหรือกำลังแก้ไข',
+      );
+    }
+  }
+
+  /** เติมรูปปัญหาต่อท้าย (สูงสุด 3) — ไม่แทนที่รูปเดิม */
+  async setIssueImages(id: number, imageUrls: string[]) {
+    const job = await this.prisma.job.findUnique({
+      where: { id },
+      select: { id: true, images: true },
+    });
+    if (!job) throw new NotFoundException(`ไม่พบงาน id=${id}`);
+    const existing = Array.isArray(job.images)
+      ? (job.images as unknown[]).filter(
+          (u): u is string => typeof u === 'string' && u.trim().length > 0,
+        )
+      : [];
+    const merged = [...existing, ...imageUrls].slice(0, 3);
+    const updated = await this.prisma.job.update({
+      where: { id },
+      data: { images: merged as any },
+      include: {
+        assignedTo: { select: { id: true, name: true, image: true } },
+        assignedBy: { select: { id: true, name: true, image: true } },
+        reporter: { select: { id: true, image: true } },
+      },
+    });
+    return this.mapJobForClient(updated);
+  }
+
   /** สิทธิ์ผู้ใช้ — ใช้ชุดเดียวกับ GET /roles/me/permissions และ PermissionsGuard */
   private async getPermissionCodesForUser(userId: number): Promise<string[]> {
     return this.rolesService.getPermissionsForUser(userId);
@@ -721,6 +856,7 @@ export class JobsService {
   }
 
   async reopenJobByAssignee(jobId: number, userId: number, reason: string) {
+    await this.usersService.assertHasStaffSignature(userId);
     await this.assertUserCanReopen(jobId, userId);
     const row = await this.prisma.job.findUnique({
       where: { id: jobId },
@@ -746,6 +882,8 @@ export class JobsService {
         status: JobStatus.IN_PROGRESS,
         fixNote: newNote,
         fixDate: null,
+        reporterSignature: null,
+        reporterSignedAt: null,
       },
     });
 
@@ -756,7 +894,75 @@ export class JobsService {
     return full;
   }
 
-  async updateFixInfo(
+  /** ตรวจว่างาน IN_PROGRESS มีข้อมูลแก้ไขครบพร้อมปิดงาน */
+  async assertJobFixReadyToClose(jobId: number): Promise<void> {
+    const row = await this.prisma.job.findUnique({
+      where: { id: jobId },
+      select: {
+        status: true,
+        assignedToId: true,
+        fixEnvironment: true,
+        brokenPart: true,
+        cause: true,
+        fixMethod: true,
+        fixImages: true,
+      },
+    });
+    if (!row) {
+      throw new NotFoundException(`ไม่พบงาน id=${jobId}`);
+    }
+    this.assertJobAllowsFixMutation(row, 'ปิดงาน');
+    if (row.fixEnvironment !== 'INDOOR' && row.fixEnvironment !== 'OUTDOOR') {
+      throw new BadRequestException(
+        'ปิดงานไม่ได้: กรุณาบันทึกประเภทสถานที่ (Indoor / Outdoor) ก่อน',
+      );
+    }
+    if (row.brokenPart !== 'Hardware' && row.brokenPart !== 'Software') {
+      throw new BadRequestException(
+        'ปิดงานไม่ได้: กรุณาบันทึกประเภทงาน (Hardware / Software) ก่อน',
+      );
+    }
+    if (!row.cause?.trim()) {
+      throw new BadRequestException('ปิดงานไม่ได้: กรุณาบันทึกสาเหตุก่อน');
+    }
+    if (!row.fixMethod?.trim()) {
+      throw new BadRequestException('ปิดงานไม่ได้: กรุณาบันทึกวิธีแก้ไขก่อน');
+    }
+    if (this.countNonemptyFixImages(row.fixImages) < 2) {
+      throw new BadRequestException(
+        'ปิดงานไม่ได้: กรุณาแนบรูปการแก้ไขอย่างน้อย 2 รูปก่อน',
+      );
+    }
+  }
+
+  private assertJobAllowsFixMutation(
+    row: { status: JobStatus; assignedToId: number | null },
+    actionLabel: string,
+  ): void {
+    if (row.status === JobStatus.RESOLVED) {
+      throw new BadRequestException(
+        'งานปิดแล้ว หากต้องการแก้ไขโปรด Reopen เพื่อเปลี่ยนสถานะเป็นกำลังแก้ไขก่อน',
+      );
+    }
+    if (row.assignedToId == null) {
+      throw new BadRequestException(
+        `${actionLabel}ไม่ได้: ต้องมีผู้รับผิดชอบงานก่อน`,
+      );
+    }
+    if (row.status === JobStatus.PENDING) {
+      throw new BadRequestException(
+        `${actionLabel}ไม่ได้: งานสถานะรอดำเนินการ (PENDING) ต้องมอบหมายและเปลี่ยนเป็นกำลังแก้ไขก่อน`,
+      );
+    }
+    if (row.status !== JobStatus.IN_PROGRESS) {
+      throw new BadRequestException(
+        `${actionLabel}ได้เฉพาะงานสถานะกำลังแก้ไข (IN_PROGRESS) เท่านั้น`,
+      );
+    }
+  }
+
+  /** บันทึกข้อมูลการแก้ไข — คงสถานะ IN_PROGRESS (ไม่รับลายเซ็นผู้แจ้ง) */
+  async saveFixInfo(
     id: number,
     payload: {
       brokenPartType?: string | null;
@@ -767,9 +973,12 @@ export class JobsService {
       oldSerialNumber?: string | null;
       newSerialNumber?: string | null;
       fixImagesUrls?: string[];
+      actorUserId?: number;
     },
-    jwtForEmailPdf?: string,
   ) {
+    if (payload.actorUserId != null) {
+      await this.usersService.assertHasStaffSignature(payload.actorUserId);
+    }
     const current = await this.prisma.job.findUnique({
       where: { id },
       select: { status: true, assignedToId: true },
@@ -777,29 +986,9 @@ export class JobsService {
     if (!current) {
       throw new NotFoundException(`ไม่พบงาน id=${id}`);
     }
-    if (current.status === JobStatus.RESOLVED) {
-      throw new BadRequestException(
-        'งานปิดแล้ว หากต้องการแก้ไขโปรด Reopen เพื่อเปลี่ยนสถานะเป็นกำลังแก้ไขก่อน',
-      );
-    }
-    if (current.assignedToId == null) {
-      throw new BadRequestException('ปิดงานไม่ได้: ต้องมีผู้รับผิดชอบงานก่อน');
-    }
-    if (current.status === JobStatus.PENDING) {
-      throw new BadRequestException(
-        'ปิดงานไม่ได้: งานสถานะรอดำเนินการ (PENDING) ต้องมอบหมายและเปลี่ยนเป็นกำลังแก้ไขก่อน',
-      );
-    }
-    if (current.status !== JobStatus.IN_PROGRESS) {
-      throw new BadRequestException(
-        'ปิดงานได้เฉพาะงานสถานะกำลังแก้ไข (IN_PROGRESS) เท่านั้น',
-      );
-    }
+    this.assertJobAllowsFixMutation(current, 'บันทึกการแก้ไข');
 
-    const data: Prisma.JobUpdateInput = {
-      status: JobStatus.RESOLVED,
-      fixDate: new Date(),
-    };
+    const data: Prisma.JobUpdateInput = {};
 
     if (payload.brokenPartType !== undefined) {
       data.brokenPart = payload.brokenPartType;
@@ -826,61 +1015,99 @@ export class JobsService {
       data.fixImages = payload.fixImagesUrls;
     }
 
-    const closed = await this.prisma.job.update({
+    await this.prisma.job.update({
       where: { id },
       data,
     });
+    const full = await this.findOne(id);
+    if (!full) {
+      throw new NotFoundException(`ไม่พบงาน id=${id}`);
+    }
+    return full;
+  }
+
+  /** ปิดงาน — ต้องมีข้อมูลแก้ไขครบแล้ว + ลายเซ็นผู้แจ้ง */
+  async closeJob(
+    id: number,
+    reporterSignatureUrl: string,
+    actorUserId: number,
+    jwtForEmailPdf?: string,
+  ) {
+    await this.usersService.assertHasStaffSignature(actorUserId);
+    await this.assertJobFixReadyToClose(id);
+    if (!reporterSignatureUrl?.trim()) {
+      throw new BadRequestException('กรุณาเซ็นลายเซ็นผู้แจ้งก่อนปิดงาน');
+    }
+
+    const closed = await this.prisma.job.update({
+      where: { id },
+      data: {
+        status: JobStatus.RESOLVED,
+        fixDate: new Date(),
+        reporterSignature: reporterSignatureUrl.trim(),
+        reporterSignedAt: new Date(),
+      },
+    });
     void this.jobEmailNotifications.notifyClosed(closed.id, jwtForEmailPdf);
-    return closed;
+    const full = await this.findOne(id);
+    if (!full) {
+      throw new NotFoundException(`ไม่พบงาน id=${id}`);
+    }
+    return full;
   }
 
   async assignStaff(id: number, staffId: number, assignedByUserId: number) {
-    const before = await this.prisma.job.findUnique({
-      where: { id },
-      select: { assignedToId: true, status: true },
+    await this.usersService.assertHasStaffSignature(assignedByUserId);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const before = await tx.job.findUnique({
+        where: { id },
+        select: {
+          assignedToId: true,
+          status: true,
+        },
+      });
+      if (!before) {
+        throw new NotFoundException(`ไม่พบงาน id=${id}`);
+      }
+      if (before.assignedToId != null) {
+        throw new BadRequestException(
+          'งานนี้มีผู้รับผิดชอบแล้ว — มอบหมายใหม่ได้เฉพาะงานที่ยังไม่มีผู้รับผิดชอบ',
+        );
+      }
+
+      const isOrphanInProgress = before.status === JobStatus.IN_PROGRESS;
+      const isOrphanResolved = before.status === JobStatus.RESOLVED;
+      const isPending = before.status === JobStatus.PENDING;
+
+      if (!isPending && !isOrphanInProgress && !isOrphanResolved) {
+        throw new BadRequestException(
+          'มอบหมายงานได้เฉพาะงานสถานะรอดำเนินการ (PENDING) หรืองานกำลังแก้ไข/เสร็จสิ้นที่ยังไม่มีผู้รับผิดชอบ',
+        );
+      }
+
+      const data: {
+        assignedToId: number;
+        assignedById: number;
+        status?: typeof JobStatus.IN_PROGRESS;
+        fixDate?: null;
+      } = {
+        assignedToId: staffId,
+        assignedById: assignedByUserId,
+      };
+      if (isPending || isOrphanInProgress || isOrphanResolved) {
+        data.status = JobStatus.IN_PROGRESS;
+      }
+      if (isOrphanResolved) {
+        data.fixDate = null;
+      }
+
+      return tx.job.update({
+        where: { id },
+        data,
+      });
     });
-    if (!before) {
-      throw new NotFoundException(`ไม่พบงาน id=${id}`);
-    }
-    if (before.assignedToId != null) {
-      throw new BadRequestException(
-        'งานนี้มีผู้รับผิดชอบแล้ว — มอบหมายใหม่ได้เฉพาะงานที่ยังไม่มีผู้รับผิดชอบ',
-      );
-    }
 
-    const isOrphanInProgress = before.status === JobStatus.IN_PROGRESS;
-    const isOrphanResolved = before.status === JobStatus.RESOLVED;
-    const isPending = before.status === JobStatus.PENDING;
-
-    if (!isPending && !isOrphanInProgress && !isOrphanResolved) {
-      throw new BadRequestException(
-        'มอบหมายงานได้เฉพาะงานสถานะรอดำเนินการ (PENDING) หรืองานกำลังแก้ไข/เสร็จสิ้นที่ยังไม่มีผู้รับผิดชอบ',
-      );
-    }
-
-    const data: {
-      assignedToId: number;
-      assignedById: number;
-      status?: typeof JobStatus.IN_PROGRESS;
-      fixDate?: null;
-    } = {
-      assignedToId: staffId,
-      assignedById: assignedByUserId,
-    };
-    if (isPending || isOrphanInProgress || isOrphanResolved) {
-      data.status = JobStatus.IN_PROGRESS;
-    }
-    if (isOrphanResolved) {
-      data.fixDate = null;
-    }
-
-    const updated = await this.prisma.job.update({
-      where: { id },
-      data,
-    });
-    if (before.assignedToId !== staffId) {
-      void this.jobEmailNotifications.notifyAssigned(updated.id);
-    }
+    void this.jobEmailNotifications.notifyAssigned(updated.id);
     return updated;
   }
 
@@ -958,19 +1185,54 @@ export class JobsService {
   /**
    * ย้ายงานไปนอกสัญญา แต่คงสถานะเป็น PENDING (ตาม requirement)
    */
-  async moveToOutOfContract(id: number, isOutOfContract: boolean) {
-    const job = await this.prisma.job.findUnique({ where: { id } });
-    if (!job) throw new NotFoundException(`ไม่พบ Job id=${id}`);
+  async moveToOutOfContract(
+    id: number,
+    isOutOfContract: boolean,
+    actorUserId: number,
+  ) {
+    await this.usersService.assertHasStaffSignature(actorUserId);
+    return this.prisma.$transaction(async (tx) => {
+      const job = await tx.job.findUnique({ where: { id } });
+      if (!job) throw new NotFoundException(`ไม่พบ Job id=${id}`);
 
-    if (job.status !== JobStatus.PENDING && isOutOfContract === true) {
-      throw new BadRequestException(
-        'อนุญาตให้ย้ายนอกสัญญาได้เฉพาะงานสถานะ PENDING เท่านั้น',
-      );
-    }
+      if (job.status !== JobStatus.PENDING && isOutOfContract === true) {
+        throw new BadRequestException(
+          'อนุญาตให้ย้ายนอกสัญญาได้เฉพาะงานสถานะ PENDING เท่านั้น',
+        );
+      }
 
-    return this.prisma.job.update({
-      where: { id },
-      data: { isOutOfContract },
+      return tx.job.update({
+        where: { id },
+        data: { isOutOfContract },
+      });
+    });
+  }
+
+  /**
+   * จำแนกเอกสารหลังปิดงาน: แทนที่ hex ด้วย Running Doc No (ครั้งเดียว)
+   */
+  async classifyDoc(id: number, isOutOfContract: boolean, actorUserId: number) {
+    await this.usersService.assertHasStaffSignature(actorUserId);
+    return this.prisma.$transaction(async (tx) => {
+      const job = await tx.job.findUnique({
+        where: { id },
+        select: { id: true, status: true, ticketNo: true },
+      });
+      if (!job) throw new NotFoundException(`ไม่พบ Job id=${id}`);
+      if (job.status !== JobStatus.RESOLVED) {
+        throw new BadRequestException(
+          'จำแนกเอกสารได้เฉพาะงานสถานะเสร็จสิ้น (RESOLVED)',
+        );
+      }
+      if (isFormalDocTicketNo(job.ticketNo)) {
+        throw new ConflictException('งานนี้จำแนกเอกสารแล้ว');
+      }
+
+      const ticketNo = await this.allocateTicketNo(tx, isOutOfContract);
+      return tx.job.update({
+        where: { id },
+        data: { ticketNo, isOutOfContract },
+      });
     });
   }
 
@@ -1016,20 +1278,82 @@ export class JobsService {
     return true;
   }
 
-  /** สร้างเลขที่ใบแจ้งซ่อมใหม่ให้มีรูปแบบใกล้เคียงข้อมูลเก่า (8 ตัวอักษร hex ไม่ซ้ำ) */
-  private async generateTicketNo(): Promise<string> {
-    for (let i = 0; i < 5; i++) {
-      // ตัวอย่างเดิมใน CSV เป็นรหัส 8 ตัว เช่น 65e5dfbd
-      const ticketNo = Array.from({ length: 8 }, () =>
-        Math.floor(Math.random() * 16).toString(16),
-      ).join('');
+  /** YYYYMM ตาม Asia/Bangkok */
+  private bangkokYearMonth(): string {
+    return formatBangkokYearMonth();
+  }
 
-      const exists = await this.prisma.job.findUnique({ where: { ticketNo } });
-      if (!exists) {
-        return ticketNo;
+  /** ออกเลข Doc No พร้อม retry เมื่อชนเลขที่มีอยู่แล้ว */
+  private async allocateTicketNo(
+    tx: Prisma.TransactionClient,
+    isOutOfContract: boolean,
+    maxAttempts = 5,
+  ): Promise<string> {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        return await this.nextTicketNo(tx, isOutOfContract);
+      } catch (err) {
+        lastErr = err;
+        if (
+          !(err instanceof ConflictException) ||
+          attempt === maxAttempts - 1
+        ) {
+          throw err;
+        }
       }
     }
-    throw new Error('ไม่สามารถสร้างเลขที่ใบแจ้งซ่อมได้ กรุณาลองใหม่อีกครั้ง');
+    throw lastErr;
+  }
+
+  /**
+   * ออกเลข Doc No ใน transaction (แถว DocSequence ล็อกด้วย SELECT … FOR UPDATE)
+   * ในสัญญา: CM-SHF-2002-XXXX (running ไม่รีเซ็ต)
+   * นอกสัญญา: YYYYMM#### (รีเซ็ตรายเดือน Asia/Bangkok; padStart 4 แล้วโตตามค่าจริง)
+   */
+  private async nextTicketNo(
+    tx: Prisma.TransactionClient,
+    isOutOfContract: boolean,
+  ): Promise<string> {
+    const kind = isOutOfContract ? 'OUT_OF_CONTRACT' : 'IN_CONTRACT';
+    const period = isOutOfContract ? this.bangkokYearMonth() : '';
+
+    await tx.$executeRaw`
+      INSERT INTO \`DocSequence\` (\`kind\`, \`period\`, \`lastValue\`, \`updatedAt\`)
+      VALUES (${kind}, ${period}, 0, NOW(3))
+      ON DUPLICATE KEY UPDATE \`id\` = \`id\`
+    `;
+
+    const locked = await tx.$queryRaw<Array<{ lastValue: number | bigint }>>`
+      SELECT \`lastValue\` FROM \`DocSequence\`
+      WHERE \`kind\` = ${kind} AND \`period\` = ${period}
+      FOR UPDATE
+    `;
+    const current = Number(locked[0]?.lastValue ?? 0);
+    const next = current + 1;
+
+    await tx.$executeRaw`
+      UPDATE \`DocSequence\`
+      SET \`lastValue\` = ${next}, \`updatedAt\` = NOW(3)
+      WHERE \`kind\` = ${kind} AND \`period\` = ${period}
+    `;
+
+    const ticketNo = formatDocTicketNo({
+      isOutOfContract,
+      running: next,
+      periodYm: period || undefined,
+    });
+
+    const clash = await tx.job.findUnique({
+      where: { ticketNo },
+      select: { id: true },
+    });
+    if (clash) {
+      throw new ConflictException(
+        `เลขที่ใบแจ้งซ่อมซ้ำ (${ticketNo}) — ลองใหม่อีกครั้ง`,
+      );
+    }
+    return ticketNo;
   }
 
   private static readonly BACKFILL_MIN_YEAR = 2000;

@@ -49,6 +49,61 @@ npm install
 
 ---
 
+## [0.2.0] - 2026-08-17
+
+### Added
+
+- ปิดงานแยกขั้นตอน: `PATCH /jobs/:id/close` (ลายเซ็นผู้แจ้ง → `RESOLVED`) — บันทึกการแก้ไขใช้ `PATCH /jobs/:id/fix` คง `IN_PROGRESS`; ปิดงานได้ที่ `/dashboard/jobs/:id` เท่านั้น
+- ป้าย「รอเซ็นผู้แจ้ง」ในคอลัมน์สถานะของรายการงาน เมื่อ `IN_PROGRESS` และข้อมูลแก้ไขครบแล้ว (ไม่เพิ่มสถานะใหม่)
+- อัปโหลดรูปงาน: fallback ฝั่ง browser เมื่อ reverse proxy จำกัด body (~1MB) — บีบอัดรูปอัตโนมัติหรือ retry หลัง HTTP 413 (degraded quality; HEIC ใหญ่เกินงบต้องแปลงเป็น JPG เอง)
+
+### Fixed
+
+- Lightbox ดูรูปใน Modal: light mode ใช้ตัวอักษร/ปุ่มสีขาวบนพื้นดำ (ไม่ใช้ `glass-text` ที่บังคับสีเข้ม)
+- Modal ประแจ: ปุ่มไปปิดงานบันทึก `PATCH /jobs/:id/fix` สำเร็จก่อนแล้วค่อยไปหน้ารายละเอียด (กันข้อมูลที่กรอกหาย)
+- ปิดงาน: ตรวจว่าข้อมูลแก้ไขครบก่อนอัปโหลดลายเซ็นผู้แจ้ง; ถ้าบันทึกแก้ไขผ่านแต่ปิดงานล้ม แจ้งว่าข้อมูลถูกบันทึกแล้ว
+- Modal อัปเดตงาน / หน้ารายละเอียด: เลือกไฟล์รูปปัญหาแล้วเห็น preview และกดอัปโหลดได้
+- อัปโหลดรูปงาน: HEIC/HEIF ที่แปลงไม่ได้คืน **400** ข้อความไทยแทน 500
+- อัปโหลดรูปงาน: ไฟล์เกิน 5MB หรือเกิน 3 รูป คืน **400** ข้อความไทย (ไม่ใช้ 413 / `Unexpected field` จาก Multer)
+- `GET /users`: รองรับบทบาทที่สร้างเอง (เช่น `ADMIN_1`) — เปลี่ยน `User.role` จาก MySQL/Prisma enum เป็น `VARCHAR` ให้เก็บ `AppRole.code` ได้โดยไม่ 500
+- Public report: หลังแจ้งสำเร็จพาไป `/public/status` ด้วยเบอร์ (และแสดงเลข hex เมื่อมี)
+- ปิดงาน: ปฏิเสธการตั้ง `RESOLVED` ผ่าน `PATCH /jobs/:id/status` — ต้องใช้ `PATCH /jobs/:id/close` พร้อมลายเซ็นผู้แจ้ง (หลังบันทึกการแก้ไขครบ)
+- จำแนกเอกสารบนหน้ารายละเอียด: ถือว่าสำเร็จเมื่อเลขทางการโชว์แล้ว (รีโหลดเงียบ); toast error ใช้ข้อความจาก API; ป้ายโซนเป็น «หลังปิดงาน»
+
+### Security
+
+- Public report: จำกัดช่องอาการที่พบสูงสุด **500 ตัวอักษร** ทั้ง UI (`maxLength` + ตัวนับ) และ API (`CreateJobSchema`) — คอลัมน์ `Job.description` ยังเป็น TEXT
+- อัปโหลดรูปงาน (public report, issue-images, fix, reporterAvatar): จำกัด **5MB/ไฟล์** · allowlist **JPG/PNG/WebP** (magic bytes) · **HEIC/HEIF แปลงเป็น JPEG ฝั่ง backend** · สูงสุด **3 รูป** ต่อช่อง issue/fix; ลายเซ็นผู้แจ้ง PNG เท่านั้น
+- `GET /users/:id/signature`: จำกัดเฉพาะตัวเอง / `menu.users` / สิทธิ์เมนูงานหรือปิดงาน (บล็อกผู้แจ้งดึงลายเซ็นเจ้าหน้าที่คนอื่น)
+- `PATCH /jobs/:id/issue-images`: ต้องมีสิทธิ์ **`job.issue.upload`** (ไม่ใช้ `job.fix.*`) และงานต้องเป็น PENDING หรือ IN_PROGRESS
+
+### Changed
+
+- PDF รายงาน CM (SHF): ปรับ `JobMaintenancePdfTemplate` ให้ตรงเทมเพลต CM.pdf — หัวโครงการ SHF + โลโก้ NBTC/FORTH ทั้ง 2 หน้า, ตารางข้อมูล 5 แถว (ชื่อสถานี/ตำบล), ลายเซ็นหน้า 1, caption ใต้รูปเป็น `1.รูปภาพข้อขัดข้อง` / `2.รูปภาพการแก้ไข` ทุกคู่; ค่าคงที่ใน `reportPdfConstants.ts`
+- บันทึก/ปิดงาน: แยก `PATCH /jobs/:id/fix` (บันทึกการแก้ไข คง `IN_PROGRESS`) กับ `PATCH /jobs/:id/close` (ลายเซ็นผู้แจ้ง → `RESOLVED`); modal ประแจบันทึกอย่างเดียว — ปิดงานที่หน้ารายละเอียดงาน
+- `/dashboard/pending`: เอาปุ่ม «ย้ายนอกสัญญา» ออกจากคอลัมน์จัดการ (API `PATCH …/out-of-contract` ยังมี; จำแนกนอกสัญญาหลังปิดงานใช้ `classify-doc`)
+- Public report: cascade สถานที่โหลดทีละขั้นผ่าน `GET /sites/options/*` (Site-only) — หลังตรวจเบอร์ยิงแค่ provinces ไม่ดึง `/sites` ทั้งก้อน; เคลียร์ลูกเฉพาะตอนผู้ใช้เปลี่ยน Select (ไม่ล้างตอน restore draft); dashboard คง `GET /sites`
+- Site/Job location: แยก `Site.agency` (สถานที่/หน่วยงาน) กับ `Site.station` (ชื่อสถานี); เพิ่ม `Job.agency`; cascade 5 ขั้น; `findByLocation` ตอนสร้างงานถ้าไม่ส่งตำบลใช้ `whenSubdistrictEmpty: 'any'` แล้วเติมตำบลจาก Site
+- Locations API: `GET /locations/provinces` คืนเฉพาะจังหวัด (lazy-load); เพิ่ม `GET …/provinces/:id/districts` และ `GET …/districts/:id/subdistricts` — public report แสดงจังหวัดจาก Site เท่านั้น
+- Public report (`/public/report`): อีเมลและรูปภาพประกอบเป็น optional; ฟอร์มส่ง `agency` + `location` (ชื่อสถานี); สร้าง/ผูกผู้แจ้งจากเบอร์ (`username = phone` เมื่อไม่มีอีเมล)
+- Locations master: เพิ่ม `Subdistrict` + API ตำบล; เมนู `/dashboard/locations` (`menu.locations`); ฟอร์ม Site/public cascade จังหวัด→อำเภอ→ตำบล→สถานที่/หน่วยงาน→ชื่อสถานี — **หลัง deploy รัน** `npx ts-node scripts/seed-roles-permissions.ts` (ใน `backend/`) เพื่อผูก `menu.locations`
+- Doc No: สร้างงานออก hex; Running Doc No (`CM-SHF-2002-XXXX` / `YYYYMM####`) ออกครั้งเดียวตอนจำแนกเอกสารหลังปิดงาน — ไม่ gen ตอน assign/OOC
+- `/dashboard/all`: dialog จำแนกเอกสารเลือกในสัญญา/นอกสัญญาก่อน แล้วกดยืนยัน — กันกดผิดจากปุ่มสีใกล้กัน และเตือนว่าเลขชั่วคราวถูกแทนที่ครั้งเดียว
+
+### Added
+
+- อัปโหลดรูปงาน: ตรวจขนาด/ชนิดไฟล์ทั้ง UI และ API (5MB, JPG/PNG/WebP/HEIC); helper กลาง `job-image-upload`; frontend pre-check ที่ public report, issue upload panel, และฟอร์มรูปแก้ไข
+- RBAC: สิทธิ์ `job.viewContractTabs` คุมการมองเห็นแท็บสัญญา/นอกสัญญาในรายการงาน (`/dashboard/all`, `my-jobs`, `in-progress`) — ตั้งที่ `/dashboard/roles`; บทบาทมาตรฐาน ADMIN/STAFF/SUPERVISOR ได้โดย default หลัง restart backend
+- Sites seed: นำเข้า `Sites.xlsx` (sheet `info`, ~198 แถว) ผ่าน `npm run script:seed-sites-xlsx` — dry-run `:dry`, แทนที่ทั้งก้อน `:clear` (Windows-friendly) — ดู [`docs/Sites-Import.md`](docs/Sites-Import.md); **local verify ✅**
+- Locations seed: นำเข้าจังหวัด/อำเภอ/ตำบลจาก dump MS SQL (`scripts/data/TB_MST_*.sql`) ผ่าน `npx ts-node scripts/seed-locations-from-mssql.ts` (รองรับ `DRY_RUN=1`) — ดู [`docs/Locations-Master-Seed.md`](docs/Locations-Master-Seed.md) (API lazy-load หลัง seed เต็มประเทศ)
+- Jobs: อัปโหลดรูปปัญหา (`PATCH /jobs/:id/issue-images`) ด้วยสิทธิ์ **`job.issue.upload`** — งาน PENDING/IN_PROGRESS (รวมยังไม่มีผู้รับ), เติมได้ถึง 3 รูปไม่แทนที่; UI ที่ `/dashboard/jobs/:id` และ wrench modal; ติ๊กบทบาทที่ `/dashboard/roles` (ADMIN ได้จาก seed)
+- Jobs: คอลัมน์/CSV「ระยะเวลาจบงาน」บน `/dashboard/all`
+- ลายเซ็นอิเล็กทรอนิกส์: `User.signature` + `Job.reporterSignature`; ตั้งที่โปรไฟล์; hard gate assign/bulk/OOC/fix/reopen/จำแนกเอกสาร; บังคับเซ็นผู้แจ้งตอนปิดงาน; ฝังใน PDF ปิดงานเมื่อมี
+- จำแนกเอกสาร: `PATCH /jobs/:id/classify-doc` + สิทธิ์ `job.classifyDoc` (ADMIN/SUPERVISOR); ปุ่มบน `/dashboard/all` และหน้ารายละเอียดงาน (คู่พิมพ์/PDF); งานนอกสัญญาที่จำแนกแล้วไป `/dashboard/out-of-contract`
+- Unit tests (Meeting A–E): Doc No format, CreateJob email optional, issue-image count, signature gate, CSV/workDurationDays
+
+---
+
 ## [0.1.3] - 2026-08-06
 
 ### Fixed

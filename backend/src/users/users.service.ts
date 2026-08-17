@@ -8,11 +8,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Prisma, Role } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { Role } from '../common/role.constants';
 import * as bcrypt from 'bcrypt';
 import axios from 'axios';
 import { DEFAULT_PASS_SETTING_KEY } from '../settings/settings.service';
 import { MinioService } from '../minio/minio.service';
+import { RolesService } from '../roles/roles.service';
 
 @Injectable()
 export class UsersService {
@@ -21,6 +23,7 @@ export class UsersService {
   constructor(
     private prisma: PrismaService,
     private minioService: MinioService,
+    private rolesService: RolesService,
   ) {}
 
   private readonly DEFAULT_PASS_SENTINEL = '__DEFAULT_PASS__';
@@ -47,7 +50,7 @@ export class UsersService {
     return pwd;
   }
 
-  private mapToEnumRole(code: string | null | undefined): Role | null {
+  private mapToBuiltInRole(code: string | null | undefined): Role | null {
     const c = code?.trim()?.toUpperCase();
     if (!c) return null;
     if (c === Role.ADMIN) return Role.ADMIN;
@@ -58,12 +61,28 @@ export class UsersService {
   }
 
   /**
+   * ค่าที่เก็บใน User.role (VARCHAR) — ใช้ AppRole.code เมื่อมี
+   * fallback เป็น built-in หรือ STAFF
+   */
+  private resolveStoredRoleCode(
+    roleCode: string | null | undefined,
+    appRoleCode?: string | null,
+  ): string {
+    const fromApp = appRoleCode?.trim()?.toUpperCase();
+    if (fromApp) return fromApp;
+    const builtIn = this.mapToBuiltInRole(roleCode);
+    if (builtIn) return builtIn;
+    const raw = roleCode?.trim()?.toUpperCase();
+    return raw || Role.STAFF;
+  }
+
+  /**
    * สำหรับส่งกลับ client:
    * - ถ้ามี roleRef ใช้ AppRole.code (รองรับ role ที่เพิ่มเอง)
-   * - ถ้าไม่มี roleRef ใช้ enum role
+   * - ถ้าไม่มี roleRef ใช้ User.role
    */
   private mapUserRoleForClient<
-    T extends { role: Role; roleRef?: { code?: string | null } | null },
+    T extends { role: string; roleRef?: { code?: string | null } | null },
   >(u: T): Omit<T, 'role'> & { role: string } {
     const code = u.roleRef?.code?.trim();
     return {
@@ -89,7 +108,20 @@ export class UsersService {
     });
   }
 
-  async findById(id: number) {
+  async findById(id: number): Promise<{
+    id: number;
+    name: string | null;
+    username: string;
+    email: string | null;
+    role: string;
+    roleId: number | null;
+    roleRef: { id: number; code: string; name: string } | null;
+    phone: string | null;
+    position: string | null;
+    image: string | null;
+    isLocked: boolean;
+    hasSignature: boolean;
+  } | null> {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: {
@@ -103,11 +135,28 @@ export class UsersService {
         phone: true,
         position: true,
         image: true,
+        signature: true,
         isLocked: true,
       },
     });
     if (!user) return null;
-    return this.mapUserRoleForClient(user as any);
+    const mapped = this.mapUserRoleForClient(user);
+    return {
+      id: mapped.id,
+      name: mapped.name,
+      username: mapped.username,
+      email: mapped.email,
+      role: mapped.role,
+      roleId: mapped.roleId,
+      roleRef: mapped.roleRef,
+      phone: mapped.phone,
+      position: mapped.position,
+      image: mapped.image,
+      isLocked: mapped.isLocked,
+      hasSignature: Boolean(
+        typeof user.signature === 'string' && user.signature.trim(),
+      ),
+    };
   }
 
   /** ใช้ใน JwtStrategy — บัญชีถูกล็อกห้ามใช้ API */
@@ -252,18 +301,15 @@ export class UsersService {
   async ensureReporterUserFromPublicReport(params: {
     phone: string;
     name: string;
-    email: string;
+    email?: string | null;
     position?: string;
     avatarFile?: Express.Multer.File;
   }): Promise<number> {
     const phone = params.phone.trim();
     const name = params.name.trim();
-    const email = params.email?.trim();
+    const email = params.email?.trim() || '';
     if (!phone || !name) {
       throw new BadRequestException('ข้อมูลผู้แจ้งไม่ครบ');
-    }
-    if (!email) {
-      throw new BadRequestException('กรุณาระบุอีเมล');
     }
     const position = params.position?.trim() || undefined;
 
@@ -273,23 +319,25 @@ export class UsersService {
     });
 
     if (existing) {
-      if (email !== (existing.email ?? '')) {
-        const taken = await this.prisma.user.findFirst({
-          where: {
-            id: { not: existing.id },
-            OR: [{ email }, { username: email }],
-          },
-          select: { id: true },
-        });
-        if (taken)
-          throw new ConflictException('อีเมลนี้ถูกใช้โดยผู้ใช้อื่นแล้ว');
-      }
       const updateData: Prisma.UserUpdateInput = {
         name,
-        email,
-        username: email,
         ...(position !== undefined ? { position } : {}),
       };
+      if (email) {
+        if (email !== (existing.email ?? '')) {
+          const taken = await this.prisma.user.findFirst({
+            where: {
+              id: { not: existing.id },
+              OR: [{ email }, { username: email }],
+            },
+            select: { id: true },
+          });
+          if (taken)
+            throw new ConflictException('อีเมลนี้ถูกใช้โดยผู้ใช้อื่นแล้ว');
+        }
+        updateData.email = email;
+        // ไม่บังคับย้าย username ตามอีเมล; ห้าม overwrite username เป็นสตริงว่าง
+      }
       await this.prisma.user.update({
         where: { id: existing.id },
         data: updateData,
@@ -310,14 +358,24 @@ export class UsersService {
     const appRole = await this.prisma.appRole.findUnique({
       where: { code: 'USER' },
     });
-    const byEmail = await this.prisma.user.findFirst({
-      where: { email },
+    if (email) {
+      const byEmail = await this.prisma.user.findFirst({
+        where: { email },
+        select: { id: true },
+      });
+      if (byEmail) {
+        throw new ConflictException('อีเมลนี้ถูกใช้แล้ว');
+      }
+    }
+    // identity หลักเป็นเบอร์ — username = phone เมื่อสร้างผู้แจ้งใหม่
+    const username = phone;
+    const byUsername = await this.prisma.user.findFirst({
+      where: { username },
       select: { id: true },
     });
-    if (byEmail) {
-      throw new ConflictException('อีเมลนี้ถูกใช้แล้ว');
+    if (byUsername) {
+      throw new ConflictException('เบอร์นี้ถูกใช้เป็นบัญชีอื่นแล้ว');
     }
-    const username = email;
 
     const resolvedPassword = await this.resolvePassword(
       this.DEFAULT_PASS_SENTINEL,
@@ -326,7 +384,7 @@ export class UsersService {
     const created = await this.prisma.user.create({
       data: {
         username,
-        email,
+        email: email || null,
         password: hashed,
         name,
         phone,
@@ -447,22 +505,28 @@ export class UsersService {
         ? String((data as any).role)
         : undefined;
     let roleId: number | undefined;
-    const enumRole = this.mapToEnumRole(roleCode);
+    let appRoleCode: string | undefined;
     if (roleCode) {
       const appRole = await this.prisma.appRole.findUnique({
         where: { code: roleCode.toUpperCase() },
       });
-      if (appRole) roleId = appRole.id;
+      if (appRole) {
+        roleId = appRole.id;
+        appRoleCode = appRole.code;
+      }
     }
+    // ตัด role ออกจาก spread — ตั้งค่าเองด้านล่างให้ตรง AppRole.code
+    const { role: _ignoredRole, ...dataWithoutRole } =
+      data as Prisma.UserCreateInput & {
+        role?: unknown;
+      };
     const createData: Prisma.UserCreateInput = {
-      ...data,
+      ...dataWithoutRole,
       isLocked: false,
       username,
       email: email || undefined,
       password: hashed,
-      // user.role เป็น enum (Prisma schema) รองรับแค่ ADMIN/STAFF/USER/SUPERVISOR
-      // ถ้า roleCode เป็นค่าใหม่ (เช่น CCTV) ให้เก็บไว้ที่ roleRef/roleId แทน
-      role: enumRole ?? Role.STAFF,
+      role: this.resolveStoredRoleCode(roleCode, appRoleCode),
       roleRef: roleId != null ? { connect: { id: roleId } } : undefined,
     };
     const created = await this.prisma.user.create({
@@ -491,7 +555,7 @@ export class UsersService {
       phone?: string;
       position?: string;
       image?: string;
-      role?: Prisma.EnumRoleFieldUpdateOperationsInput;
+      role?: string;
       isLocked?: boolean;
     },
     actorId?: number,
@@ -526,11 +590,12 @@ export class UsersService {
         where: { code: roleCode.toUpperCase() },
       });
       if (appRole) {
-        // roleRef/roleId เป็นทางเดียวที่รองรับ role code ที่เพิ่มเอง
         (updateData as any).roleId = appRole.id;
       }
-      // สำคัญ: ห้าม set user.role เป็นค่า custom (Prisma enum จะ error)
-      (updateData as any).role = this.mapToEnumRole(roleCode) ?? Role.STAFF;
+      (updateData as any).role = this.resolveStoredRoleCode(
+        roleCode,
+        appRole?.code,
+      );
     }
     const updated = await this.prisma.user.update({
       where: { id },
@@ -582,6 +647,124 @@ export class UsersService {
         image: true,
       },
     });
+  }
+
+  async updateSignature(id: number, signatureUrl: string) {
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: { signature: signatureUrl },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        email: true,
+        role: true,
+        phone: true,
+        position: true,
+        image: true,
+        signature: true,
+      },
+    });
+    return {
+      id: updated.id,
+      name: updated.name,
+      username: updated.username,
+      email: updated.email,
+      role: updated.role,
+      phone: updated.phone,
+      position: updated.position,
+      image: updated.image,
+      hasSignature: Boolean(updated.signature?.trim()),
+    };
+  }
+
+  /** เจ้าหน้าที่ต้องมีลายเซ็นก่อน assign / OOC / fix / reopen */
+  async assertHasStaffSignature(userId: number): Promise<void> {
+    const row = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { signature: true },
+    });
+    if (!row?.signature?.trim()) {
+      throw new ForbiddenException(
+        'กรุณาตั้งลายเซ็นที่โปรไฟล์ก่อนดำเนินการนี้',
+      );
+    }
+  }
+
+  /**
+   * ดูลายเซ็น: ตัวเอง / menu.users / สิทธิ์เมนูงานหรือปิดงาน (สำหรับ PDF และรายละเอียดงาน)
+   * บล็อกผู้แจ้ง (USER) ไม่ให้ดึงลายเซ็นเจ้าหน้าที่คนอื่น
+   */
+  async assertCanViewSignature(
+    actorUserId: number,
+    targetUserId: number,
+  ): Promise<void> {
+    if (Number(actorUserId) === Number(targetUserId)) return;
+
+    const codes = await this.rolesService.getPermissionsForUser(actorUserId);
+    const allowed = [
+      'menu.users',
+      'menu.dashboard',
+      'menu.pending',
+      'menu.inProgress',
+      'menu.myJobs',
+      'menu.all',
+      'menu.outOfContract',
+      'job.assign',
+      'job.fix.self',
+      'job.fix.any',
+    ];
+    if (allowed.some((c) => codes.includes(c))) return;
+
+    throw new ForbiddenException('ไม่มีสิทธิ์ดูลายเซ็น');
+  }
+
+  async getSignatureImageBuffer(
+    userId: number,
+  ): Promise<{ buffer: Buffer; contentType: string }> {
+    const row = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { signature: true },
+    });
+    const url = row?.signature?.trim();
+    if (!url) {
+      throw new NotFoundException('ไม่มีลายเซ็น');
+    }
+
+    const objectKey = this.minioService.tryParseBucketObjectKeyFromUrl(url);
+    if (objectKey) {
+      try {
+        return await this.minioService.getBucketObjectBuffer(objectKey);
+      } catch (sdkErr: unknown) {
+        if (!this.isMinioObjectNotFoundError(sdkErr)) {
+          this.logger.warn(
+            `getSignatureImageBuffer MinIO SDK failed user=${userId} key=${objectKey} ${String(sdkErr)}`,
+          );
+        }
+      }
+    }
+
+    const fetchUrl = this.minioService.rewriteStorageUrlForServerFetch(url);
+    try {
+      const resp = await axios.get<ArrayBuffer>(fetchUrl, {
+        responseType: 'arraybuffer',
+        timeout: 30000,
+        maxContentLength: 15 * 1024 * 1024,
+        validateStatus: (s) => s >= 200 && s < 400,
+      });
+      const ct = (resp.headers['content-type'] as string) || 'image/png';
+      return { buffer: Buffer.from(resp.data), contentType: ct };
+    } catch (err: unknown) {
+      const detail = axios.isAxiosError(err)
+        ? `code=${err.code ?? 'n/a'} status=${err.response?.status ?? 'n/a'}`
+        : 'non-axios error';
+      this.logger.warn(
+        `getSignatureImageBuffer failed user=${userId} ${detail}`,
+      );
+      throw new BadGatewayException(
+        'ไม่สามารถโหลดลายเซ็นจากที่เก็บได้ — ตรวจสอบ URL ใน DB และการเชื่อมต่อ MinIO',
+      );
+    }
   }
 
   async remove(id: number) {

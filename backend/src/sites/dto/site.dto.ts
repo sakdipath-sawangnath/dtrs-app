@@ -1,9 +1,19 @@
 import { z } from 'zod';
 
+const optionalSubdistrict = z.preprocess(
+  (v) => {
+    if (v === undefined || v === null) return '';
+    return String(v).trim();
+  },
+  z.string().max(200, 'ชื่อตำบลยาวเกินไป'),
+);
+
 export const CreateSiteSchema = z.object({
   province: z.string().trim().min(1, 'กรุณาระบุจังหวัด'),
   district: z.string().trim().min(1, 'กรุณาระบุอำเภอ'),
-  agency: z.string().trim().min(1, 'กรุณาระบุหน่วยงาน'),
+  subdistrict: optionalSubdistrict.optional(),
+  agency: z.string().trim().min(1, 'กรุณาระบุสถานที่/หน่วยงาน'),
+  station: z.string().trim().min(1, 'กรุณาระบุชื่อสถานี'),
 });
 
 export type CreateSiteDto = z.infer<typeof CreateSiteSchema>;
@@ -12,11 +22,21 @@ export const UpdateSiteSchema = z
   .object({
     province: z.string().trim().min(1, 'กรุณาระบุจังหวัด').optional(),
     district: z.string().trim().min(1, 'กรุณาระบุอำเภอ').optional(),
-    agency: z.string().trim().min(1, 'กรุณาระบุหน่วยงาน').optional(),
+    subdistrict: optionalSubdistrict.optional(),
+    agency: z.string().trim().min(1, 'กรุณาระบุสถานที่/หน่วยงาน').optional(),
+    station: z.string().trim().min(1, 'กรุณาระบุชื่อสถานี').optional(),
   })
-  .refine((v) => v.province != null || v.district != null || v.agency != null, {
-    message: 'กรุณาระบุอย่างน้อย 1 ฟิลด์',
-  });
+  .refine(
+    (v) =>
+      v.province != null ||
+      v.district != null ||
+      v.subdistrict != null ||
+      v.agency != null ||
+      v.station != null,
+    {
+      message: 'กรุณาระบุอย่างน้อย 1 ฟิลด์',
+    },
+  );
 
 export type UpdateSiteDto = z.infer<typeof UpdateSiteSchema>;
 

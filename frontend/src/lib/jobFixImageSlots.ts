@@ -48,3 +48,45 @@ export function hasRequiredFixImageSlots(
   }
   return true;
 }
+
+/** ตรวจว่าฟอร์ม/ข้อมูลงานมีครบก่อนปิดงาน (ไม่รวมลายเซ็นผู้แจ้ง) */
+export function isFixInfoComplete(input: {
+  fixEnvironment?: string | null;
+  brokenPart?: string | null;
+  cause?: string | null;
+  fixMethod?: string | null;
+  fixImages?: string[] | null;
+  fixImageFiles?: readonly (File | null)[];
+  fixImagePreviews?: readonly (string | null)[];
+}): boolean {
+  const env = input.fixEnvironment ?? "";
+  const envOk = env === "INDOOR" || env === "OUTDOOR";
+  const part = input.brokenPart ?? "";
+  const partOk = part === "Hardware" || part === "Software";
+  const causeOk = (input.cause ?? "").trim().length > 0;
+  const methodOk = (input.fixMethod ?? "").trim().length > 0;
+  const imagesOk =
+    input.fixImageFiles != null && input.fixImagePreviews != null
+      ? hasRequiredFixImageSlots(input.fixImageFiles, input.fixImagePreviews)
+      : existingFixImageUrlCount(input.fixImages) >= REQUIRED_FIX_IMAGE_SLOTS;
+  return envOk && partOk && causeOk && methodOk && imagesOk;
+}
+
+/** งานกำลังแก้ไขที่บันทึกการแก้ไขครบแล้ว รอผู้แจ้งเซ็นปิดงาน — ไม่ใช่สถานะใหม่ */
+export function isAwaitingReporterSignature(job: {
+  status?: string | null;
+  fixEnvironment?: string | null;
+  brokenPart?: string | null;
+  cause?: string | null;
+  fixMethod?: string | null;
+  fixImages?: string[] | null;
+}): boolean {
+  if (job.status !== "IN_PROGRESS") return false;
+  return isFixInfoComplete({
+    fixEnvironment: job.fixEnvironment,
+    brokenPart: job.brokenPart,
+    cause: job.cause,
+    fixMethod: job.fixMethod,
+    fixImages: job.fixImages,
+  });
+}

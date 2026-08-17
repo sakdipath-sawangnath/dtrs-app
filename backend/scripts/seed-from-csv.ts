@@ -100,7 +100,7 @@ async function main() {
     const key = `${province}|${district}|${agency}`;
     if (seenSites.has(key)) continue;
     seenSites.add(key);
-    await prisma.site.create({ data: { province, district, agency } }).catch(() => null);
+    await prisma.site.create({ data: { province, district, agency, station: agency } }).catch(() => null);
     siteCount++;
   }
 
@@ -116,7 +116,7 @@ async function main() {
     if (seenSites.has(key)) continue;
     seenSites.add(key);
     await prisma.site.create({
-      data: { province, district, agency: location },
+      data: { province, district, agency: location, station: location },
     }).catch(() => null);
     siteFromJobsCount++;
   }

@@ -1,15 +1,26 @@
 # แผนปรับปรุงระบบแจ้งซ่อม
 
-**อัปเดต:** 2026-08-06 (ส่วน 4.12 — Frontend Light/Dark theme)
+**อัปเดต:** 2026-08-17 (Meeting A–E · อัปโหลดรูป 5MB/HEIC + fallback 413)
+
+---
+
+## 0. แผนงานถัดไป — Meeting-11082026
+
+แผน grilling / ส่งงานเป็นเฟส (Public optional → Locations → Doc No → Jobs UX → Signature) บน branch **`feat/breaking-docno-locations-signature`** (base `staging`):  
+[`docs/Meeting-11082026-Requirements-Plan.plan.md`](docs/Meeting-11082026-Requirements-Plan.plan.md)
+
+- **สถานะโค้ด:** Phase A–E ✅ · ข้อ 8 Reports ✅ · Doc No ออกตอนจำแนกหลัง `RESOLVED` · UI จำแนกที่ `/dashboard/all` + `/dashboard/jobs/:id` · อัปโหลดรูปปัญหาที่แจ้งด้วย **`job.issue.upload`** (PENDING/IN_PROGRESS, เติมถึง 3 รูป · **5MB/ไฟล์** JPG/PNG/WebP/HEIC→JPEG; seed ADMIN) · fallback บีบรูปเมื่อ NPM 413 · แยก `PATCH /fix` กับ `PATCH /close` + ป้าย「รอเซ็นผู้แจ้ง」ในรายการ
+- **ถัดไป:** commit/MR เข้า `staging` เมื่อขอ · ทดสอบอัปโหลดมือถือบน UAT · seed locations/sites/RBAC ถ้ายังว่าง (รวม `job.issue.upload`) · ขอ infra ตั้ง `client_max_body_size 50m` ที่ NPM ถ้าต้องการคุณภาพเต็ม 5MB
+- **UX ✅:** ป้าย「รอเซ็นผู้แจ้ง」ในรายการงาน เมื่อ `IN_PROGRESS` แต่บันทึกการแก้ไขครบแล้ว — ดู [`TASK.md`](TASK.md) §34 — ไม่เพิ่มสถานะใหม่
 
 ---
 
 ## 1. บริบทจากเอกสาร Project
 
-- **ดัชนีเอกสารใน `docs/`**: [`docs/README.md`](docs/README.md) · ตัวแปร MinIO: [`docs/minio.md`](docs/minio.md) · Variables: [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md)
+- **ดัชนีเอกสารใน `docs/`**: [`docs/README.md`](docs/README.md) · ตัวแปร MinIO: [`docs/minio.md`](docs/minio.md) · Variables: [`docs/GitLab-CI-Variables-Checklist.md`](docs/GitLab-CI-Variables-Checklist.md) · แผน Meeting: [`docs/Meeting-11082026-Requirements-Plan.plan.md`](docs/Meeting-11082026-Requirements-Plan.plan.md)
 - **TASK.md / STATUS.md**: ระบบย้ายจาก AppSheet มา Next.js + NestJS แล้ว Phase 2–3 เสร็จ
-- **ข้อมูลพื้นที่**: Backend มีตาราง `Site` (จังหวัด, อำเภอ, หน่วยงาน) และ `Area` (อำเภอ, Site Engineer); การสร้าง Job ตรวจสอบ Site ก่อน (existsByLocation)
-- **Seed Script**: `backend/scripts/seed-from-excel.ts` (Excel), `backend/scripts/seed-from-csv.ts` (CSV), `backend/scripts/seed-admin.ts` (สร้าง admin ครั้งแรก)
+- **ข้อมูลพื้นที่**: Backend มีตาราง `Site` (จังหวัด, อำเภอ, ตำบล?, `agency`=สถานที่/หน่วยงาน, `station`=ชื่อสถานี) และ `Area` (อำเภอ, Site Engineer); master cascade ใช้ `Province` / `District` / `Subdistrict`; การสร้าง Job ตรวจสอบ Site ก่อน (`existsByLocation` ด้วย agency+station); `Job.agency` + `Job.location`(station)
+- **Seed Script**: `seed-from-excel.ts` (Excel), `seed-from-csv.ts` (CSV), `seed-admin.ts`, **`seed-locations-from-mssql.ts`** (dump `scripts/data/TB_MST_*.sql` → จังหวัด/อำเภอ/ตำบล), **`seed-sites-from-xlsx.ts`** (`Sites.xlsx` sheet `info` → agency+station; local ✅ 198 แถว) — คู่มือ [`docs/Locations-Master-Seed.md`](docs/Locations-Master-Seed.md), [`docs/Sites-Import.md`](docs/Sites-Import.md)
 
 ---
 
@@ -17,8 +28,8 @@
 
 | หน้า/ระบบ | ข้อมูลที่ใช้ | แหล่งข้อมูลใน Excel |
 |-----------|----------------|----------------------|
-| **หน้าแจ้งปัญหา** (`/report`) | จังหวัด → อำเภอ → สถานที่/หน่วยงาน (Cascading Dropdown) | ต้องมาจาก Sheet **"พื้นที่ ในโครงการ"** (คอลัมน์: จังหวัด, อำเภอ, หน่วยงาน) |
-| **Seed – Sites** | `Site` (province, district, agency) | Sheet **"พื้นที่ ในโครงการ"** |
+| **หน้าแจ้งปัญหา** (`/report`) | จังหวัด → อำเภอ → ตำบล → สถานที่/หน่วยงาน → ชื่อสถานี (cascade 5 ขั้น) | `Sites.xlsx` / `GET /sites` |
+| **Seed – Sites** | `Site` (province, district, subdistrict?, agency, station) | `Sites.xlsx` sheet **info** หรือ seed เดิม Excel/CSV |
 | **Seed – Areas** | `Area` (district, staffId) | Sheet **"พื้นที่ รับผิดชอบ"** (ในโค้ดใช้ชื่อ **"พื้นที่ รับผิชอบ"** — ตรวจสอบชื่อชีทจริงในไฟล์ Excel) |
 
 **ข้อควรทำ**
@@ -68,9 +79,10 @@
   Role SUPERVISOR เห็นเมนูเทียบเท่า STAFF; สิทธิ์ `job.assign`; ปุ่ม "มอบหมายงาน" ในหน้ารอดำเนินการ (modal เลือกเจ้าหน้าที่ด้วย react-select); API `GET /users/assignable`, `PATCH /jobs/:id/assign` — **อัปเดต 2026-03-30:** คุมสิทธิ์ด้วย RBAC (`job.assign` / `menu.pending` สำหรับรับงานเอง) สอดคล้อง `/dashboard/roles`
 
 - [x] **นอกสัญญา (คงสถานะ PENDING) + ปุ่มย้ายนอกสัญญา**
-  - หน้า `/dashboard/out-of-contract` แสดงเฉพาะงาน `PENDING` ที่ `isOutOfContract=true` (โครงสร้างเหมือน `/dashboard/pending`)
-  - ปุ่ม "ย้ายนอกสัญญา" ในหน้ารอดำเนินการ — **อัปเดต 2026-03-30:** ต้องมีสิทธิ์ **`job.assign`**; ย้ายงาน `pending → out-of-contract` โดย “คงสถานะเป็น PENDING”
+  - หน้า `/dashboard/out-of-contract` แสดงงานนอกสัญญา: **`PENDING`** ที่ `isOutOfContract=true` และ **`RESOLVED`** ที่จำแนกนอกสัญญาแล้ว (เลขทางการ) — ไม่ใช่แค่คิว PENDING
+  - ปุ่ม "ย้ายนอกสัญญา" — **ไม่แสดงบน `/dashboard/pending`** (2026-08-14); API ยังมีเมื่อมีสิทธิ์ **`job.assign`**; ย้ายงาน PENDING นอกสัญญาได้จากที่อื่นที่ยังเปิดปุ่ม หรือหลังปิดงานผ่านจำแนกเอกสาร
   - Backend มี endpoint `PATCH /jobs/:id/out-of-contract` เพื่อตั้ง `isOutOfContract=true`
+  - **จำแนกเอกสาร (Meeting Phase C):** `PATCH /jobs/:id/classify-doc` + `job.classifyDoc` — ปุ่มบน `/dashboard/all` และ `/dashboard/jobs/:id`
 ---
 
 ## 3. รายการงานที่ดำเนินการแล้ว (เพิ่มเติม)
@@ -82,10 +94,10 @@
   - เตรียมสคริปต์ `backend/scripts/migrate-job-images-to-minio.ts` และ `backend/scripts/migrate-all-job-images-to-minio.ts` เพื่อแก้ปัญหา `Job.images/fixImages` ที่เก็บเป็น path แบบ legacy ทำให้หน้า `/dashboard/jobs/:id` ไม่แสดงรูป
 
 - [x] **งานที่รับผิดชอบ + หน้ารายละเอียดงานเต็มหน้า**  
-  Sidebar เพิ่มเมนู "งานที่รับผิดชอบ" (`/dashboard/my-jobs`) แสดง DataTable งานที่รับมอบหมาย; ปุ่มดูรายละเอียดไปหน้า `/dashboard/jobs/:id` (full page) แทน modal; layout การ์ดซ้าย "ข้อมูลการแจ้งข้อขัดข้อง" และขวา "ข้อมูลการแก้ไข" ให้สอดคล้องกัน
+  Sidebar เพิ่มเมนู "งานที่รับผิดชอบ" (`/dashboard/my-jobs`) แสดง DataTable งานที่รับมอบหมาย; ปุ่มดูรายละเอียดไปหน้า `/dashboard/jobs/:id` (full page) แทน modal; layout การ์ดซ้าย "ข้อมูลการแจ้งข้อขัดข้อง" และขวา "ข้อมูลการแก้ไข" ให้สอดคล้องกัน; **อัปเดต 2026-08-17:** card รูปปัญหาที่แจ้งอัปโหลดได้เมื่อมี **`job.issue.upload`** (`PENDING`/`IN_PROGRESS`, เติมถึง 3 รูป)
 
 - [x] **ฟอร์มบันทึกการแก้ไขงาน (PATCH /jobs/:id/fix)**  
-  หน้ารายละเอียดงานมีฟอร์ม: ส่วนขัดข้อง (Hardware/Software), สาเหตุ, วิธีแก้ไข, รูปการแก้ไข (สูงสุด 3 รูป), หมายเหตุ, Serial เก่า/ใหม่; Admin/Supervisor แก้ได้เสมอ, Staff แก้ได้เฉพาะก่อน Resolved; Backend อัปโหลดรูปไป MinIO และตั้ง status=RESOLVED, fixDate อัตโนมัติ
+  หน้ารายละเอียดงานมีฟอร์ม: ส่วนขัดข้อง (Hardware/Software), สาเหตุ, วิธีแก้ไข, รูปการแก้ไข (สูงสุด 3 รูป), หมายเหตุ, Serial เก่า/ใหม่; RBAC `job.fix.*`; Backend อัปโหลดรูปไป MinIO และ **คง `IN_PROGRESS`** — ปิดงานแยกที่ `PATCH /jobs/:id/close` (ลายเซ็นผู้แจ้ง → `RESOLVED` + `fixDate`); รายการงานมีป้าย「รอเซ็นผู้แจ้ง」เมื่อแก้ครบแล้วยังกำลังแก้ไข — [`TASK.md`](TASK.md) §34
 
 - [x] **Sidebar ไม่แสดงเมนู โปรไฟล์**  
   โปรไฟล์เข้าได้จากเมนูผู้ใช้ (dropdown) เท่านั้น; seed สิทธิ์ `menu.myJobs` สำหรับงานที่รับผิดชอบ
@@ -100,10 +112,10 @@
 - [ ] พัฒนาหน้าจอ Admin สำหรับการจัดการบทบาทและสิทธิ์แบบ Visual
 
 ## 4.1 Dashboard UI/Permission Polish (2026-03-20)
-- [x] แยก “สัญญา/นอกสัญญา” ด้วย segmented tabs บน `/dashboard/my-jobs`, `/dashboard/all`, และ `/dashboard/in-progress` (default: สัญญา แยกตาม `Job.isOutOfContract`)
+- [x] แยก “สัญญา/นอกสัญญา” ด้วย segmented tabs บน `/dashboard/my-jobs`, `/dashboard/all`, และ `/dashboard/in-progress` (default: สัญญา แยกตาม `Job.isOutOfContract`; มองเห็นเมื่อมี **`job.viewContractTabs`**)
 - [x] ซ่อนคอลัมน์ “ผู้รับผิดชอบ” ใน `/dashboard/pending`
 - [x] จัดลำดับปุ่ม “ลบงาน” (`ลบงาน`) ไปท้ายสุด และให้ปุ่ม “ย้ายนอกสัญญา” แสดง `alert ยืนยัน` ก่อนทำรายการ
-- [x] ปุ่ม “อัปเดต” ใน `/dashboard/in-progress` เปิด modal “ข้อมูลการแก้ไข” และบันทึกด้วย `PATCH /jobs/:id/fix` (ส่งฟอร์ม + รูปสูงสุด 3 รูป)
+- [x] ปุ่ม “อัปเดต” ใน `/dashboard/in-progress` เปิด modal “ข้อมูลการแก้ไข” และบันทึกด้วย `PATCH /jobs/:id/fix` (ส่งฟอร์ม + รูปสูงสุด 3 รูป, คง `IN_PROGRESS`); ปิดงานที่หน้ารายละเอียด (`PATCH /close`); card รูปปัญหาที่แจ้งอัปโหลดเพิ่มได้เมื่อมี **`job.issue.upload`**; ป้าย「รอเซ็นผู้แจ้ง」เมื่อแก้ครบแล้วยัง `IN_PROGRESS`
 - [x] Header user info: แสดงรูปโปรไฟล์เมื่อ `session.user.image` มีค่า และ fallback เป็น initials เมื่อไม่มี/โหลดไม่สำเร็จ
 - [x] RBAC gating สำหรับปุ่มลบงาน pending ใช้ permission `job.deleteUnassigned` และ unwrap response ให้ถูกต้อง
 
@@ -190,6 +202,12 @@
 - [x] **Print isolate** — `PrintThemeShell` บังคับ light โดยไม่ซ้อน ThemeProvider กับ root
 - [x] **Contrast light mode** — JobsList / sites / roles / status badges / toast ตาม theme
 - [x] **เอกสาร** — `CHANGELOG.md`, `README.md`, `STATUS.md`, `TASK.md`, `PLAN.md`, `docs/README.md`, `frontend/README.md`, `AGENTS.md`
+
+## 4.13 RBAC — บทบาทกำหนดเอง + แท็บสัญญา/นอกสัญญา (2026-08-14)
+
+- [x] **`User.role`** เป็น `VARCHAR` เก็บ `AppRole.code` (รวมรหัสที่สร้างเอง เช่น `ADMIN_1`)
+- [x] **`job.viewContractTabs`** คุมการมองเห็นแท็บสัญญา/นอกสัญญาใน `JobsList`; ไม่มีสิทธิ์ = เห็นแค่งานในสัญญา
+- [x] **เอกสาร** — `CHANGELOG.md`, `backend/docs/RBAC-Setup.md`, `README.md`, `STATUS.md`, `TASK.md`, `frontend/README.md`, `docs/System-Workflow.md`
 
 ---
 

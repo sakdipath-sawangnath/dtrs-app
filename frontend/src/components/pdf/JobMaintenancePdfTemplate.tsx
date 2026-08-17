@@ -1,9 +1,11 @@
 "use client";
 
 import type { CSSProperties, RefObject } from "react";
-import { useRef } from "react";
+import { Fragment, useRef } from "react";
 import ManagedImage from "@/components/ManagedImage";
+import { PdfReportHeader } from "@/components/pdf/PdfReportHeader";
 import { sarabun } from "@/lib/fonts";
+import { REPORT_PDF_HEADER } from "@/lib/reportPdfConstants";
 
 /** ข้อมูลงานสำหรับเทมเพลต PDF (สอดคล้องกับ JobDetail หน้า dashboard) */
 export type JobMaintenancePdfJob = {
@@ -17,15 +19,15 @@ export type JobMaintenancePdfJob = {
   reporterPhone?: string;
   province?: string;
   district?: string;
+  subdistrict?: string;
+  agency?: string;
   location?: string;
   description?: string;
   title?: string;
   images?: string[] | null;
   assignedTo?: { id: number; name: string } | null;
   fixDate?: string | null;
-  /** หลังปิดงานมักเป็น Hardware | Software (ประเภทงาน) */
   brokenPart?: string | null;
-  /** INDOOR | OUTDOOR — ประเภทสถานที่ตอนแก้ไข */
   fixEnvironment?: string | null;
   cause?: string | null;
   fixMethod?: string | null;
@@ -34,17 +36,14 @@ export type JobMaintenancePdfJob = {
   oldSerialNumber?: string | null;
   newSerialNumber?: string | null;
   systemStatus?: string | null;
+  reporterSignature?: string | null;
+  reporterSignedAt?: string | null;
 };
 
-const PROJECT_SUBTITLE =
-  "โครงการค่าปรับปรุงระบบเครือข่ายกล้องโทรทัศน์วงจรปิด (CCTV) 5 จังหวัดชายแดนภาคใต้";
+/** โลโก้ NBTC — re-export สำหรับ backward compat */
+export { REPORT_LOGO_SRC } from "@/lib/reportPdfConstants";
 
-/** โลโก้ใน `frontend/public/logo/NBTC.png` → ใช้ path สาธารณะของ Next.js */
-export const REPORT_LOGO_SRC = "/logo/NBTC.png";
-
-/** สไตล์พื้นฐาน — ใช้เฉพาะ hex/rgb (ห้ามพึ่ง Tailwind สี theme เพราะ v4 ใช้ oklch แล้ว html2canvas parse ไม่ได้) */
-
-/** กระดาษ A4 + เว้นขอบ 15mm (1.5 cm) จากขอบกระดาษทุกด้าน — ตารางไม่เต็มแผ่น อยู่กึ่งกลางพื้นที่พิมพ์ */
+/** กระดาษ A4 */
 const PAGE: CSSProperties = {
   width: "210mm",
   minHeight: "297mm",
@@ -55,21 +54,15 @@ const PAGE: CSSProperties = {
   margin: 0,
 };
 
-/**
- * บล็อกเนื้อหาภายในขอบ — ความกว้างสูงสุด 15 cm (150mm) จัดกึ่งกลาง
- * (พื้นที่หลังเว้นขอบ 15mm แล้ว ≈ 180mm — ตารางแคบลงให้สมดุลตามตัวอย่าง)
- */
+/** ความกว้างเนื้อหา — ให้ print.css กำหนด max-width 182mm */
 const CONTENT: CSSProperties = {
-  width: "150mm",
+  width: "100%",
   maxWidth: "100%",
   margin: "0 auto",
   boxSizing: "border-box",
+  border: "1px solid #000000",
 };
 
-/**
- * ขอบตาราง — collapse ให้เส้นร่วมกันเป็นสายเดียวระหว่างเซลล์
- * (หลาย <table> ต่อกัน = ขอบล่าง+บนซ้อนกัน ดูเป็นเส้นคู่ใน html2canvas)
- */
 const BORDER: CSSProperties = {
   borderCollapse: "collapse" as const,
   borderSpacing: 0,
@@ -77,23 +70,21 @@ const BORDER: CSSProperties = {
   tableLayout: "fixed" as const,
 };
 
-/** เส้นขอบตาราง — ใส่ที่ td เท่านั้น + collapse (สีดำตามตัวอย่างรายงาน) */
 const cell: CSSProperties = {
   border: "1px solid #000000",
-  padding: "10px 12px",
+  padding: "4px 6px",
   color: "#000000",
   backgroundColor: "#ffffff",
   textAlign: "left" as const,
   boxSizing: "border-box" as const,
+  verticalAlign: "top" as const,
 };
 
-/** ป้ายกำกับฟิลด์ในตาราง PDF — ตัวหนาให้แยกจากค่าได้ชัด */
 const pdfFieldLabel: CSSProperties = {
   fontWeight: 700,
   color: "#000000",
 };
 
-/** รองรับ legacy สองฟิลด์ + JSON หลายแถวใน oldSerialNumber */
 function formatEquipmentSerialForPdf(
   oldSerialNumber: string | null | undefined,
   newSerialNumber: string | null | undefined,
@@ -156,25 +147,6 @@ function fmtTime(d: string | null | undefined): string {
   });
 }
 
-function formatFixEnvironmentLabel(v: string | null | undefined): string {
-  if (!v?.trim()) return "–";
-  const u = v.trim().toUpperCase();
-  if (u === "INDOOR") return "Indoor (ในอาคาร)";
-  if (u === "OUTDOOR") return "Outdoor (นอกอาคาร)";
-  return v.trim();
-}
-
-/** ค่าในฟิลด์ brokenPart หลังบันทึกการแก้ไข = ประเภทงาน */
-function formatJobTypeLabel(v: string | null | undefined): string {
-  if (!v?.trim()) return "–";
-  const t = v.trim();
-  const lower = t.toLowerCase();
-  if (lower === "hardware") return "Hardware (ฮาร์ดแวร์)";
-  if (lower === "software") return "Software (ซอฟต์แวร์)";
-  return t;
-}
-
-/** ไม่ใช้ brokenPart เป็นข้อความข้อขัดข้องถ้าเป็นค่า Hardware/Software อย่างเดียว */
 function isStoredJobTypeOnly(v: string | null | undefined): boolean {
   if (!v?.trim()) return false;
   const lower = v.trim().toLowerCase();
@@ -188,7 +160,6 @@ function padImages(urls: string[] | null | undefined, n: number): (string | null
   return out;
 }
 
-/** รูป issue/fix — `/job-images/...` บน PRD ไป Next โดยไม่ต้องแยก NPM ใต้ `/api` หรือ data URL จาก prefetch */
 function JobProxiedImage({
   jobId,
   kind,
@@ -222,25 +193,77 @@ function JobProxiedImage({
   );
 }
 
+function FieldCell({ label, value }: { label: string; value: string }) {
+  return (
+    <td style={cell}>
+      <span style={pdfFieldLabel}>{label}: </span>
+      {value}
+    </td>
+  );
+}
+
+function SignatureBlock({
+  signatureSrc,
+  caption,
+}: {
+  signatureSrc?: string | null;
+  caption: string;
+}) {
+  return (
+    <td
+      style={{
+        border: "none",
+        textAlign: "center",
+        verticalAlign: "bottom",
+        padding: "12px 16px 8px",
+        backgroundColor: "#ffffff",
+      }}
+    >
+      <div
+        style={{
+          minHeight: 40,
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "center",
+          marginBottom: 4,
+        }}
+      >
+        {signatureSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={signatureSrc}
+            alt={caption}
+            style={{ maxHeight: 44, maxWidth: "90%", objectFit: "contain" }}
+          />
+        ) : null}
+      </div>
+      <div
+        style={{
+          borderBottom: "1px dotted #000000",
+          margin: "0 12px 6px",
+          minHeight: 1,
+        }}
+      />
+      <div style={{ fontSize: 9, textAlign: "center" }}>({caption})</div>
+    </td>
+  );
+}
+
 export type PdfPrefetchedImages = {
   issue: (string | null)[];
   fix: (string | null)[];
+  reporterSignature?: string | null;
+  staffSignature?: string | null;
 };
 
 type Props = {
   job: JobMaintenancePdfJob;
-  /** ถ้าไม่ส่ง (เช่น หน้าพิมพ์) ใช้ ref ภายใน — ยังใช้กับ html2canvas บนหน้ารายละเอียดงานได้ */
   page1Ref?: RefObject<HTMLDivElement | null>;
   page2Ref?: RefObject<HTMLDivElement | null>;
-  /** data URL จาก prefetch ฝั่งเซิร์ฟเวอร์ — ใช้เมื่อไม่มี cookie (เช่น Puppeteer) */
   prefetchedImages?: PdfPrefetchedImages;
-  /** แสดงป้ายหมายเลขหน้าบนจอเท่านั้น (คลาส no-print) — ใช้หน้า /print/jobs */
   showScreenPageLabels?: boolean;
 };
 
-/**
- * เทมเพลตรายงาน 2 หน้า — html2canvas ไม่รองรับสีแบบ oklch() ของ Tailwind v4 จึงใช้ inline style (hex) เป็นหลัก
- */
 export function JobMaintenancePdfTemplate({
   job,
   page1Ref: page1RefProp,
@@ -260,8 +283,6 @@ export function JobMaintenancePdfTemplate({
     job.title?.trim() ||
     (isStoredJobTypeOnly(job.brokenPart) ? "" : job.brokenPart?.trim()) ||
     "–";
-  const fixEnvironmentLine = formatFixEnvironmentLabel(job.fixEnvironment);
-  const jobTypeLine = formatJobTypeLabel(job.brokenPart);
   const causeLine = job.cause?.trim() || "–";
   const fixParts =
     [job.fixMethod?.trim(), job.fixNote?.trim()].filter(Boolean).join("\n\n") || "–";
@@ -274,11 +295,11 @@ export function JobMaintenancePdfTemplate({
   const issueImgs = padImages(job.images as string[] | null, 3);
   const fixImgs = padImages(job.fixImages as string[] | null, 3);
 
+  const fontFamily = sarabun.style.fontFamily;
   const pageFont = (size: number): CSSProperties => ({
     fontSize: size,
     lineHeight: 1.35,
-    // next/font ให้ชื่อฟอนต์ที่โหลดแล้ว — ห้ามใส่ Tahoma ก่อน Sarabun จะไม่ถูกใช้
-    fontFamily: sarabun.style.fontFamily,
+    fontFamily,
   });
 
   return (
@@ -293,139 +314,124 @@ export function JobMaintenancePdfTemplate({
       <div
         ref={page1Ref}
         className={`${sarabun.className} pdf-page-1`}
-        style={{ ...PAGE, ...pageFont(11) }}
+        style={{ ...PAGE, ...pageFont(10) }}
       >
+        <PdfReportHeader fontFamily={fontFamily} />
         <div className="pdf-report-content" style={CONTENT}>
-        <h1 style={{ textAlign: "center", fontSize: 16, fontWeight: 700, margin: "0 0 4px", color: "#000000" }}>
-          รายงานการซ่อมบำรุงรักษาอุปกรณ์
-        </h1>
-        <p style={{ textAlign: "center", fontSize: 11, margin: "0 0 8px", color: "#000000", lineHeight: 1.35 }}>
-          {PROJECT_SUBTITLE}
-        </p>
+          <table style={{ ...BORDER, fontSize: 10 }}>
+            <tbody>
+              <tr>
+                <td
+                  style={{
+                    ...cell,
+                    textAlign: "center",
+                    fontWeight: 700,
+                    fontSize: 12,
+                    padding: "8px",
+                  }}
+                >
+                  {REPORT_PDF_HEADER.title}
+                </td>
+              </tr>
+            </tbody>
+          </table>
 
-        {/** ตารางหัว: คอลัมน์ซ้ายแคบ (โลโก้ rowspan 4) + 2 คอลัมน์ขวา 4 แถว — แยกจากตารางรายละเอียด */}
-        <table style={{ ...BORDER, marginTop: 16, fontSize: 10 }}>
-          <colgroup>
-            <col style={{ width: "28mm" }} />
-            <col />
-            <col />
-          </colgroup>
-          <tbody>
-            <tr>
-              <td
-                rowSpan={4}
-                style={{
-                  ...cell,
-                  textAlign: "center",
-                  verticalAlign: "middle",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 88 }}>
-                  <ManagedImage
-                    forceRaw
-                    src={REPORT_LOGO_SRC}
-                    alt="ตราหน่วยงาน"
-                    style={{ maxHeight: 68, maxWidth: 68, objectFit: "contain" }}
-                  />
-                </div>
-              </td>
-              <td style={{ ...cell, verticalAlign: "top" }}>
-                <span style={pdfFieldLabel}>เลขที่ใบแจ้งซ่อม: </span>
-                {job.ticketNo || "–"}
-              </td>
-              <td style={{ ...cell, verticalAlign: "top" }}>
-                <span style={pdfFieldLabel}>อำเภอ: </span>
-                {job.district || "–"}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ ...cell, verticalAlign: "top" }}>
-                <span style={pdfFieldLabel}>วันที่แจ้งซ่อม: </span>
-                {fmtDate(reportDt)}
-              </td>
-              <td style={{ ...cell, verticalAlign: "top" }}>
-                <span style={pdfFieldLabel}>จังหวัด: </span>
-                {job.province || "–"}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ ...cell, verticalAlign: "top" }}>
-                <span style={pdfFieldLabel}>เวลาแจ้งซ่อม: </span>
-                {fmtTime(reportDt)}
-              </td>
-              <td style={{ ...cell, verticalAlign: "top" }}>
-                <span style={pdfFieldLabel}>ผู้แก้ไข: </span>
-                {job.assignedTo?.name || "–"}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ ...cell, verticalAlign: "top" }}>
-                <span style={pdfFieldLabel}>วันที่แก้ไข: </span>
-                {fmtDate(fixDt)}
-              </td>
-              <td style={{ ...cell, verticalAlign: "top" }}>
-                <span style={pdfFieldLabel}>เวลาที่แก้ไข: </span>
-                {fmtTime(fixDt)}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+          <table style={{ ...BORDER, fontSize: 9 }}>
+            <colgroup>
+              <col style={{ width: "50%" }} />
+              <col style={{ width: "50%" }} />
+            </colgroup>
+            <tbody>
+              <tr>
+                <FieldCell label="เลขที่ใบแจ้งซ่อม" value={job.ticketNo || "–"} />
+                <FieldCell label="วันที่แจ้งซ่อม" value={fmtDate(reportDt)} />
+              </tr>
+              <tr>
+                <FieldCell label="ชื่อสถานี" value={job.location || "–"} />
+                <FieldCell label="เวลาแจ้งซ่อม" value={fmtTime(reportDt)} />
+              </tr>
+              <tr>
+                <FieldCell label="ตำบล" value={job.subdistrict || "–"} />
+                <FieldCell label="วันที่แก้ไข" value={fmtDate(fixDt)} />
+              </tr>
+              <tr>
+                <FieldCell label="อำเภอ" value={job.district || "–"} />
+                <FieldCell label="เวลาที่แก้ไข" value={fmtTime(fixDt)} />
+              </tr>
+              <tr>
+                <FieldCell label="จังหวัด" value={job.province || "–"} />
+                <FieldCell
+                  label="ผู้เข้าดำเนินการ"
+                  value={job.assignedTo?.name || "–"}
+                />
+              </tr>
+            </tbody>
+          </table>
 
-        {/** ไม่อยู่ในตาราง — ไม่มีเส้นขอบ/พื้นหลัง (ตามตัวอย่างรูป) */}
-        <p
-          style={{
-            textAlign: "center",
-            fontSize: 12,
-            fontWeight: 700,
-            margin: "12px 0 8px",
-            padding: 0,
-            color: "#000000",
-            border: "none",
-            backgroundColor: "transparent",
-          }}
-        >
-          รายละเอียดการซ่อมบำรุง
-        </p>
+          <table style={{ ...BORDER, fontSize: 9 }}>
+            <colgroup>
+              <col style={{ width: "48%" }} />
+              <col style={{ width: "52%" }} />
+            </colgroup>
+            <tbody>
+              <tr>
+                <td
+                  colSpan={2}
+                  style={{
+                    ...cell,
+                    textAlign: "center",
+                    fontWeight: 700,
+                    padding: "6px 8px",
+                  }}
+                >
+                  {REPORT_PDF_HEADER.detailsHeading}
+                </td>
+              </tr>
+              <tr>
+                <td rowSpan={2} style={cell}>
+                  <span style={pdfFieldLabel}>สถานที่: </span>
+                  {job.agency || "–"}
+                </td>
+                <td style={cell}>
+                  <span style={pdfFieldLabel}>ชื่อผู้แจ้ง: </span>
+                  {job.reporterName || "–"}
+                </td>
+              </tr>
+              <tr>
+                <td style={cell}>
+                  <span style={pdfFieldLabel}>เบอร์โทร: </span>
+                  {job.reporterPhone || "–"}
+                </td>
+              </tr>
+              <FullRow label="ข้อขัดข้อง" body={issueLine} />
+              <FullRow label="สาเหตุ" body={causeLine} />
+              <FullRow label="วิธีแก้ไข" body={fixParts} tall />
+              <FullRow label="รายการอุปกรณ์" body={equipLines} tall stackLabel />
+              <FullRow label="สถานะระบบ" body={statusLine} />
+            </tbody>
+          </table>
 
-        <table style={{ ...BORDER, marginTop: 0, fontSize: 10 }}>
-          <colgroup>
-            <col style={{ width: "48%" }} />
-            <col style={{ width: "52%" }} />
-          </colgroup>
-          <tbody>
-            <tr>
-              <td rowSpan={2} style={{ ...cell, verticalAlign: "top" }}>
-                <span style={pdfFieldLabel}>สถานที่: </span>
-                {job.location || "–"}
-              </td>
-              <td style={{ ...cell, verticalAlign: "top" }}>
-                <span style={pdfFieldLabel}>ชื่อ-สกุล: </span>
-                {job.reporterName || "–"}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ ...cell, verticalAlign: "top" }}>
-                <span style={pdfFieldLabel}>เบอร์โทร: </span>
-                {job.reporterPhone || "–"}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ ...cell, verticalAlign: "top" }}>
-                <span style={pdfFieldLabel}>ประเภทสถานที่: </span>
-                {fixEnvironmentLine}
-              </td>
-              <td style={{ ...cell, verticalAlign: "top" }}>
-                <span style={pdfFieldLabel}>ประเภทงาน: </span>
-                {jobTypeLine}
-              </td>
-            </tr>
-            <FullRow label="ข้อขัดข้อง" body={issueLine} />
-            <FullRow label="สาเหตุ" body={causeLine} />
-            <FullRow label="วิธีแก้ไข" body={fixParts} tall />
-            <FullRow label="รายการอุปกรณ์" body={equipLines} tall stackLabel />
-            <FullRow label="สถานะระบบ" body={statusLine} />
-          </tbody>
-        </table>
+          <table
+            className="pdf-signature-block"
+            style={{ ...BORDER, fontSize: 9, marginTop: 0, border: "none" }}
+          >
+            <colgroup>
+              <col style={{ width: "50%" }} />
+              <col style={{ width: "50%" }} />
+            </colgroup>
+            <tbody>
+              <tr>
+                <SignatureBlock
+                  signatureSrc={prefetchedImages?.staffSignature}
+                  caption="ผู้ดำเนินการ"
+                />
+                <SignatureBlock
+                  signatureSrc={prefetchedImages?.reporterSignature}
+                  caption="ผู้แจ้งเหตุขัดข้อง"
+                />
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -439,100 +445,117 @@ export function JobMaintenancePdfTemplate({
       <div
         ref={page2Ref}
         className={`${sarabun.className} pdf-page-2`}
-        style={{ ...PAGE, ...pageFont(10) }}
+        style={{ ...PAGE, ...pageFont(9) }}
       >
+        <PdfReportHeader fontFamily={fontFamily} />
         <div className="pdf-report-content" style={CONTENT}>
-        <h2
-          className="pdf-page-2-heading"
-          style={{ textAlign: "center", fontSize: 14, fontWeight: 700, margin: "0 0 12px", color: "#000000" }}
-        >
-          รูปภาพประกอบ
-        </h2>
-        <table className="pdf-images-table" style={{ ...BORDER, marginTop: 12 }}>
-          <colgroup>
-            <col style={{ width: "50%" }} />
-            <col style={{ width: "50%" }} />
-          </colgroup>
-          <tbody>
-            {[0, 1, 2].map((i) => (
-              <tr key={i}>
+          <table className="pdf-images-table" style={{ ...BORDER }}>
+            <colgroup>
+              <col style={{ width: "50%" }} />
+              <col style={{ width: "50%" }} />
+            </colgroup>
+            <tbody>
+              <tr>
                 <td
+                  colSpan={2}
+                  className="pdf-page-2-heading"
                   style={{
                     ...cell,
-                    width: "50%",
-                    verticalAlign: "top",
-                    paddingTop: i > 0 ? 12 : 10,
+                    textAlign: "center",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: "8px",
                   }}
                 >
-                  <div className="pdf-image-label" style={{ marginBottom: 6, fontWeight: 700, color: "#000000" }}>
-                    {i + 1}.รูปภาพข้อขัดข้อง:
-                  </div>
-                  <div
-                    className="pdf-image-slot"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: "#ffffff",
-                    }}
-                  >
-                    {issueImgs[i] ? (
-                      <JobProxiedImage
-                        jobId={job.id}
-                        kind="issue"
-                        index={i}
-                        alt={`ข้อขัดข้อง ${i + 1}`}
-                        prefetchedSrc={prefetchedImages?.issue?.[i]}
-                      />
-                    ) : (
-                      <span style={{ fontSize: 9, color: "#64748b" }}>–</span>
-                    )}
-                  </div>
-                </td>
-                <td
-                  style={{
-                    ...cell,
-                    width: "50%",
-                    verticalAlign: "top",
-                    paddingTop: i > 0 ? 12 : 10,
-                  }}
-                >
-                  <div className="pdf-image-label" style={{ marginBottom: 6, fontWeight: 700, color: "#000000" }}>
-                    {i + 1}.รูปภาพการแก้ไข:
-                  </div>
-                  <div
-                    className="pdf-image-slot"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: "#ffffff",
-                    }}
-                  >
-                    {fixImgs[i] ? (
-                      <JobProxiedImage
-                        jobId={job.id}
-                        kind="fix"
-                        index={i}
-                        alt={`การแก้ไข ${i + 1}`}
-                        prefetchedSrc={prefetchedImages?.fix?.[i]}
-                      />
-                    ) : (
-                      <span style={{ fontSize: 9, color: "#64748b" }}>–</span>
-                    )}
-                  </div>
+                  {REPORT_PDF_HEADER.imagesHeading}
                 </td>
               </tr>
-            ))}
-          </tbody>
-        </table>
+              {[0, 1, 2].map((i) => (
+                <Fragment key={i}>
+                  <tr>
+                    <td style={{ ...cell, padding: "6px 8px 2px", borderBottom: "none" }}>
+                      <div
+                        className="pdf-image-slot"
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: "#ffffff",
+                        }}
+                      >
+                        {issueImgs[i] ? (
+                          <JobProxiedImage
+                            jobId={job.id}
+                            kind="issue"
+                            index={i}
+                            alt={`ข้อขัดข้อง ${i + 1}`}
+                            prefetchedSrc={prefetchedImages?.issue?.[i]}
+                          />
+                        ) : (
+                          <span style={{ fontSize: 9, color: "#64748b" }}>–</span>
+                        )}
+                      </div>
+                    </td>
+                    <td style={{ ...cell, padding: "6px 8px 2px", borderBottom: "none" }}>
+                      <div
+                        className="pdf-image-slot"
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: "#ffffff",
+                        }}
+                      >
+                        {fixImgs[i] ? (
+                          <JobProxiedImage
+                            jobId={job.id}
+                            kind="fix"
+                            index={i}
+                            alt={`การแก้ไข ${i + 1}`}
+                            prefetchedSrc={prefetchedImages?.fix?.[i]}
+                          />
+                        ) : (
+                          <span style={{ fontSize: 9, color: "#64748b" }}>–</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td
+                      className="pdf-image-caption"
+                      style={{
+                        ...cell,
+                        padding: "2px 8px 8px",
+                        fontWeight: 700,
+                        fontSize: 9,
+                        borderTop: "none",
+                      }}
+                    >
+                      {REPORT_PDF_HEADER.imageCaptionIssue}
+                    </td>
+                    <td
+                      className="pdf-image-caption"
+                      style={{
+                        ...cell,
+                        padding: "2px 8px 8px",
+                        fontWeight: 700,
+                        fontSize: 9,
+                        borderTop: "none",
+                      }}
+                    >
+                      {REPORT_PDF_HEADER.imageCaptionFix}
+                    </td>
+                  </tr>
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </>
   );
 }
 
-/** แถวรายละเอียดยาว — colSpan 2 ในตาราง 2 คอลัมน์ */
 function FullRow({
   label,
   body,
@@ -542,21 +565,20 @@ function FullRow({
   label: string;
   body: string;
   tall?: boolean;
-  /** true = หัวข้อบรรทัดแรก เนื้อหาเริ่มบรรทัดถัดไป (กันรายการหลายบรรทัดชนกับหัวข้อ) */
   stackLabel?: boolean;
 }) {
   if (stackLabel) {
     return (
       <tr>
-        <td colSpan={2} style={{ ...cell, verticalAlign: "top" }}>
+        <td colSpan={2} style={cell}>
           <div style={{ color: "#000000" }}>
-            <div style={{ marginBottom: 6 }}>
+            <div style={{ marginBottom: 4 }}>
               <span style={pdfFieldLabel}>{label}:</span>
             </div>
             <div
               style={{
                 whiteSpace: "pre-wrap",
-                minHeight: tall ? 72 : 28,
+                minHeight: tall ? 32 : 18,
               }}
             >
               {body}
@@ -568,12 +590,12 @@ function FullRow({
   }
   return (
     <tr>
-      <td colSpan={2} style={{ ...cell, verticalAlign: "top" }}>
+      <td colSpan={2} style={cell}>
         <div
           style={{
             color: "#000000",
             whiteSpace: "pre-wrap",
-            minHeight: tall ? 80 : 36,
+            minHeight: tall ? 40 : 20,
           }}
         >
           <span style={pdfFieldLabel}>{label}: </span>
@@ -584,5 +606,4 @@ function FullRow({
   );
 }
 
-/** alias ตามชื่อที่อ้างอิงใน requirement */
 export const PdfTemplate = JobMaintenancePdfTemplate;

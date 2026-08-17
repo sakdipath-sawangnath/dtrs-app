@@ -127,6 +127,35 @@ export class UsersController {
     return this.usersService.updateImage(req.user.id, url);
   }
 
+  /** อัปโหลดลายเซ็นของตัวเอง */
+  @UseGuards(JwtAuthGuard)
+  @Patch('me/signature')
+  @UseInterceptors(FileInterceptor('signature'))
+  async uploadMySignature(
+    @Req() req: { user: { id: number } },
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new InternalServerErrorException({ message: 'ไม่พบไฟล์ลายเซ็น' });
+    }
+    const url = await this.minioService.uploadUserSignature(req.user.id, file);
+    return this.usersService.updateSignature(req.user.id, url);
+  }
+
+  /** สตรีมลายเซ็นของตัวเอง */
+  @UseGuards(JwtAuthGuard)
+  @Get('me/signature')
+  async streamMySignature(
+    @Req() req: { user: { id: number } },
+    @Res() res: Response,
+  ) {
+    const { buffer, contentType } =
+      await this.usersService.getSignatureImageBuffer(req.user.id);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'private, max-age=120');
+    res.send(buffer);
+  }
+
   /** สตรีมรูปโปรไฟล์ตาม user id — ต้อง JWT (แดชบอร์ด); ต้องอยู่ก่อน @Get(':id') */
   @UseGuards(JwtAuthGuard)
   @Get(':id/avatar')
@@ -136,6 +165,22 @@ export class UsersController {
   ) {
     const { buffer, contentType } =
       await this.usersService.getAvatarImageBuffer(id);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'private, max-age=120');
+    res.send(buffer);
+  }
+
+  /** สตรีมลายเซ็นตาม user id — ต้องอยู่ก่อน @Get(':id') */
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/signature')
+  async streamUserSignature(
+    @Req() req: { user: { id: number } },
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ) {
+    await this.usersService.assertCanViewSignature(req.user.id, id);
+    const { buffer, contentType } =
+      await this.usersService.getSignatureImageBuffer(id);
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'private, max-age=120');
     res.send(buffer);

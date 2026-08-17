@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
-import { User, Lock, Eye, EyeOff, Camera } from "lucide-react";
+import { User, Lock, Eye, EyeOff, Camera, PenLine } from "lucide-react";
 import DashboardRouteLoading from "@/components/DashboardRouteLoading";
 import SegmentedTabs from "@/components/SegmentedTabs";
 import RoleBadge from "@/components/RoleBadge";
+import SignaturePad, {
+  type SignaturePadHandle,
+} from "@/components/SignaturePad";
 import { toastSuccess, toastError } from "@/lib/toast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -25,9 +28,10 @@ interface Profile {
   phone: string | null;
   position: string | null;
   image: string | null;
+  hasSignature?: boolean;
 }
 
-type TabId = "profile" | "password";
+type TabId = "profile" | "password" | "signature";
 
 export default function ProfilePage() {
   const { data: session, update: updateSession } = useSession();
@@ -57,6 +61,10 @@ export default function ProfilePage() {
     newPassword: "",
     confirmPassword: "",
   });
+  const [hasSignature, setHasSignature] = useState(false);
+  const [signatureSaving, setSignatureSaving] = useState(false);
+  const [signaturePreviewKey, setSignaturePreviewKey] = useState(0);
+  const signaturePadRef = useRef<SignaturePadHandle | null>(null);
 
   const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4100/api";
   const token = (session as { accessToken?: string })?.accessToken;
@@ -84,6 +92,7 @@ export default function ProfilePage() {
           return null;
         }
         setProfile(p);
+        setHasSignature(Boolean(p.hasSignature));
         setForm({
           name: p.name ?? "",
           email: p.email ?? "",
@@ -247,8 +256,40 @@ export default function ProfilePage() {
     icon?: React.ComponentType<{ size?: number; className?: string }>;
   }> = [
     { id: "profile", label: "ข้อมูลผู้ใช้", icon: User },
+    { id: "signature", label: "ลายเซ็น", icon: PenLine },
     { id: "password", label: "รหัสผ่าน", icon: Lock },
   ];
+
+  const handleSaveSignature = async () => {
+    if (!token) return;
+    const blob = await signaturePadRef.current?.toBlob("image/png");
+    if (!blob) {
+      toastError("กรุณาวาดลายเซ็นก่อนบันทึก");
+      return;
+    }
+    setSignatureSaving(true);
+    try {
+      const fd = new FormData();
+      fd.append("signature", blob, "signature.png");
+      await axios.patch(`${API}/users/me/signature`, fd, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toastSuccess("บันทึกลายเซ็นแล้ว", 1200);
+      setHasSignature(true);
+      setSignaturePreviewKey((k) => k + 1);
+      signaturePadRef.current?.clear();
+      await fetchProfile();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })
+        ?.response?.data?.message;
+      toastError(
+        "บันทึกลายเซ็นไม่สำเร็จ",
+        Array.isArray(msg) ? msg.join(", ") : msg || "เกิดข้อผิดพลาด",
+      );
+    } finally {
+      setSignatureSaving(false);
+    }
+  };
 
   const pwdToggleBtn =
     "absolute right-1.5 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-lg glass-subtle-text hover:text-[var(--glass-text)] hover:bg-[var(--glass-hover)] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50";
@@ -266,7 +307,7 @@ export default function ProfilePage() {
       <div className="min-w-0">
         <h1 className="text-lg sm:text-xl font-bold truncate glass-text">โปรไฟล์</h1>
         <p className="text-sm mt-0.5 glass-muted-text">
-          จัดการข้อมูลส่วนตัวและรหัสผ่าน
+          จัดการข้อมูลส่วนตัว ลายเซ็น และรหัสผ่าน
         </p>
       </div>
 
@@ -458,6 +499,57 @@ export default function ProfilePage() {
                 </div>
               </div>
             </form>
+          ) : tab === "signature" ? (
+            <div className="w-full">
+              <div className={panelClass}>
+                <div className="flex items-center gap-2 mb-4">
+                  <PenLine
+                    size={18}
+                    className="glass-muted-text shrink-0"
+                    aria-hidden
+                  />
+                  <h3 className="text-sm font-bold glass-text">
+                    ลายเซ็นเจ้าหน้าที่
+                  </h3>
+                </div>
+                <p className="text-xs glass-muted-text mb-4">
+                  ต้องมีลายเซ็นก่อนมอบหมายงาน ย้ายนอกสัญญา ปิดงาน หรือ Reopen
+                </p>
+                {hasSignature && profile?.id ? (
+                  <div className="mb-4 rounded-xl border border-[var(--glass-card-border)] bg-white p-3">
+                    <p className="text-xs glass-muted-text mb-2">
+                      ลายเซ็นปัจจุบัน
+                    </p>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      key={signaturePreviewKey}
+                      src={`/user-images/${profile.id}/signature?t=${signaturePreviewKey}`}
+                      alt="ลายเซ็นปัจจุบัน"
+                      className="max-h-28 w-auto object-contain"
+                    />
+                  </div>
+                ) : (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mb-4">
+                    ยังไม่มีลายเซ็น — กรุณาวาดด้านล่างแล้วกดบันทึก
+                  </p>
+                )}
+                <SignaturePad handleRef={signaturePadRef} height={180} />
+                <div className="mt-6 pt-6 border-t border-[var(--glass-card-border)] flex justify-end">
+                  <Button
+                    type="button"
+                    disabled={signatureSaving}
+                    onClick={() => void handleSaveSignature()}
+                    className={primaryBtnClass}
+                  >
+                    {signatureSaving
+                      ? "กำลังบันทึก..."
+                      : hasSignature
+                        ? "อัปเดตลายเซ็น"
+                        : "บันทึกลายเซ็น"}
+                  </Button>
+                </div>
+              </div>
+            </div>
           ) : (
             <form onSubmit={handleChangePassword} className="w-full">
               <div className={panelClass}>
