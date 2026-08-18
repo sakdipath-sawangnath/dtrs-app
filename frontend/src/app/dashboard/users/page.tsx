@@ -27,6 +27,11 @@ import RoleBadge from "@/components/RoleBadge";
 import { toastSuccess, toastError, toastWarning, confirmDialog } from "@/lib/toast";
 import DataTablePagination, { DataTablePageSize } from "@/components/DataTablePagination";
 import { buildRoleBadgeStyleMap, type RoleBadgeStyleMap } from "@/lib/roleBadge";
+import {
+  mergeUserRoleOptions,
+  resolveUserManagementAccess,
+  usersManagementSubtitle,
+} from "@/lib/userManagementAccess";
 
 interface UserRow {
   id: number;
@@ -192,13 +197,18 @@ export default function UsersPage() {
   const [pageTab, setPageTab] = useState<"list" | "role">("list");
   const [pageSize, setPageSize] = useState<DataTablePageSize>(15);
   const [page, setPage] = useState(1);
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4100/api";
   const token = (session as { accessToken?: string })?.accessToken;
   const userRole = (session?.user as { role?: string })?.role ?? "STAFF";
   const sessionUserId = Number((session?.user as { id?: string })?.id);
-  const isAdmin = userRole === "ADMIN";
-  const [roles, setRoles] = useState<Array<{ id: number; code: string; name: string }>>([]);
+  const [permissions, setPermissions] = useState<string[] | null>(null);
+  const userMgmtAccess = resolveUserManagementAccess({ permissions, userRole });
+  const canManageUsers = userMgmtAccess.canManage;
+  const usersSubtitle = usersManagementSubtitle(userMgmtAccess);
+  const [roleCatalog, setRoleCatalog] = useState<Array<{ code: string; name?: string | null }>>(
+    [],
+  );
   const [rolesLoading, setRolesLoading] = useState(false);
   const [roleStyleMap, setRoleStyleMap] = useState<RoleBadgeStyleMap>({});
   const [showEditPassword, setShowEditPassword] = useState(false);
@@ -210,61 +220,58 @@ export default function UsersPage() {
     null,
   );
 
-  const fetchRoles = () => {
-    if (!token || !isAdmin) return;
-    setRolesLoading(true);
-    axios
-      .get<Array<{ id: number; code: string; name: string }>>(`${API}/roles`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((r) => {
-        const payload = unwrapApiData<unknown>(r?.data);
-        setRoles(Array.isArray(payload) ? (payload as Array<{ id: number; code: string; name: string }>) : []);
-      })
-      .catch(() => setRoles([]))
-      .finally(() => setRolesLoading(false));
-  };
-
   const fetchRoleStyles = () => {
     if (!token) return;
+    setRolesLoading(true);
     axios
-      .get<Array<{ code: string; badgeTextColor?: string | null; badgeBgColor?: string | null }>>(
+      .get<Array<{ code: string; name?: string | null; badgeTextColor?: string | null; badgeBgColor?: string | null }>>(
         `${API}/roles/public-styles`,
         { headers: { Authorization: `Bearer ${token}` } },
       )
       .then((r) => {
         const payload = unwrapApiData<unknown>(r?.data);
-        setRoleStyleMap(
-          buildRoleBadgeStyleMap(
-            Array.isArray(payload)
-              ? (payload as Array<{ code: string; badgeTextColor?: string | null; badgeBgColor?: string | null }>)
-              : [],
-          ),
-        );
+        const rows = Array.isArray(payload)
+          ? (payload as Array<{
+              code: string;
+              name?: string | null;
+              badgeTextColor?: string | null;
+              badgeBgColor?: string | null;
+            }>)
+          : [];
+        setRoleCatalog(rows);
+        setRoleStyleMap(buildRoleBadgeStyleMap(rows));
       })
-      .catch(() => setRoleStyleMap({}));
+      .catch(() => {
+        setRoleCatalog([]);
+        setRoleStyleMap({});
+      })
+      .finally(() => setRolesLoading(false));
   };
 
   useEffect(() => {
-    fetchRoles();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, isAdmin]);
+    if (!token || status !== "authenticated") {
+      setPermissions(null);
+      return;
+    }
+    fetch(`${API}/roles/me/permissions`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((raw) => {
+        const payload = unwrapApiData<{ permissions?: string[] }>(raw);
+        const list = payload?.permissions;
+        setPermissions(Array.isArray(list) ? list : []);
+      })
+      .catch(() => setPermissions([]));
+  }, [token, status, API]);
 
   useEffect(() => {
     fetchRoleStyles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const allRoleOptions = useMemo(() => {
-    const map = new Map<string, { value: string; label: string }>();
-    for (const o of ROLE_OPTIONS) map.set(o.value, o);
-    for (const r of roles) {
-      const code = String(r.code || "").toUpperCase().trim();
-      if (!code) continue;
-      map.set(code, { value: code, label: r.name?.trim() ? r.name : code });
-    }
-    return [...map.values()];
-  }, [roles]);
+  const allRoleOptions = useMemo(
+    () => mergeUserRoleOptions(ROLE_OPTIONS, roleCatalog),
+    [roleCatalog],
+  );
 
   const roleLabelByCode = useMemo(() => {
     return allRoleOptions.reduce<Record<string, string>>((acc, o) => {
@@ -568,7 +575,7 @@ export default function UsersPage() {
     return (
       <DashboardPageShell
         title="จัดการผู้ใช้และบทบาท"
-        subtitle={isAdmin ? "เพิ่ม/แก้ไข/ลบผู้ใช้ และกำหนด Role (ADMIN, STAFF, USER)" : "รายชื่อผู้ใช้และบทบาท (ดูอย่างเดียว)"}
+        subtitle={usersSubtitle}
         noCard={true}
       >
         <DashboardRouteLoading variant="page" />
@@ -579,7 +586,7 @@ export default function UsersPage() {
   return (
     <DashboardPageShell
       title="จัดการผู้ใช้และบทบาท"
-      subtitle={isAdmin ? "เพิ่ม/แก้ไข/ลบผู้ใช้ และกำหนด Role (ADMIN, STAFF, USER)" : "รายชื่อผู้ใช้และบทบาท (ดูอย่างเดียว)"}
+      subtitle={usersSubtitle}
       noCard={true}
     >
       <div className="flex flex-col space-y-6 flex-1 min-h-0">
@@ -649,7 +656,7 @@ export default function UsersPage() {
         searchValue={search}
         onSearchChange={setSearch}
         onRefresh={fetchUsers}
-        rightActions={isAdmin ? (
+        rightActions={canManageUsers ? (
           <button
             type="button"
             onClick={openCreate}
@@ -731,7 +738,7 @@ export default function UsersPage() {
                   <th className="px-4 py-3 border-b border-[var(--glass-card-border)] whitespace-nowrap w-30 text-center">
                     เข้าใช้
                   </th>
-                  {isAdmin && (
+                  {canManageUsers && (
                     <th className="px-4 py-3 border-b border-[var(--glass-card-border)] text-right whitespace-nowrap w-24">จัดการ</th>
                   )}
                 </tr>
@@ -779,7 +786,7 @@ export default function UsersPage() {
                         <span className="text-xs glass-subtle-text">ปกติ</span>
                       )}
                     </td>
-                    {isAdmin && (
+                    {canManageUsers && (
                       <td className="px-4 py-3 text-right">
                         {!isSoleAdmin(u) && (
                           <button
@@ -1029,7 +1036,7 @@ export default function UsersPage() {
                 placeholder="ตำแหน่งงาน"
               />
             </div>
-            {modalMode === "edit" && isAdmin && (
+            {modalMode === "edit" && canManageUsers && (
               <div className="flex items-start gap-3 rounded-xl border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] p-4">
                 <input
                   type="checkbox"
