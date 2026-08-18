@@ -111,7 +111,7 @@ Maintain a running **ledger** of every experiment in this session. Each entry: w
 | `/public/status`, `/status` | ตรวจสอบสถานะ | `GET /public/jobs/status-by-phone`, `GET /public/jobs/status/:ticketNo` |
 | `/login` | Auth | NextAuth `authorize()` → `frontend/src/lib/auth.ts` → Nest `POST /auth/login` |
 | `/dashboard/pending` | คิวรอดำเนินการ | `JobsList` + RBAC `menu.pending`, `job.assign` |
-| `/dashboard/in-progress`, `/dashboard/my-jobs` | งานกำลังแก้ / งานของฉัน | `PATCH /jobs/:id/fix` คง `IN_PROGRESS`; ป้าย「รอเซ็นผู้แจ้ง」เมื่อแก้ครบ; `job.fix.*`, Socket.IO refresh; อัปโหลดรูปปัญหา `PATCH /jobs/:id/issue-images` + `job.issue.upload` |
+| `/dashboard/in-progress`, `/dashboard/my-jobs` | งานกำลังแก้ / งานของฉัน | `PATCH /jobs/:id/fix` คง `IN_PROGRESS`; ป้าย「รอเซ็นผู้แจ้ง」เมื่อแก้ครบ; ปุ่ม Sign → `JobReporterSignDialog` → `PATCH /jobs/:id/close`; `job.fix.*`, Socket.IO refresh; อัปโหลดรูปปัญหา `PATCH /jobs/:id/issue-images` + `job.issue.upload` |
 | `/dashboard/all`, `/dashboard/out-of-contract` | ประวัติ / นอกสัญญา | `Job.isOutOfContract`, `PATCH /jobs/:id/out-of-contract` |
 | `/dashboard/jobs/[id]` | รายละเอียดงาน | `GET /jobs/:id`, บันทึก `PATCH /jobs/:id/fix`, ปิดงาน `PATCH /jobs/:id/close` (ลายเซ็นผู้แจ้ง), backfill วันที่, อัปโหลดรูปปัญหา (`job.issue.upload`, PENDING/IN_PROGRESS) |
 | `/print/jobs/[id]`, PDF | พิมพ์รายงาน | Next `/api/print-jobs/:id/data` → Puppeteer `JobsPdfService`; รูปผ่าน `/job-images/...` |

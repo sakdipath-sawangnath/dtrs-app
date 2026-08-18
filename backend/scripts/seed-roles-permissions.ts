@@ -6,6 +6,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { grantClassifyDocChildrenToRolesWithParent } from '../src/roles/classify-doc-permission-inherit';
 
 const prisma = new PrismaClient();
 
@@ -30,6 +31,8 @@ const ACTION_PERMISSIONS = [
   { code: 'job.assign', name: 'มอบหมายงาน', category: 'job' },
   { code: 'job.viewContractTabs', name: 'ดูแท็บสัญญา/นอกสัญญา', category: 'job' },
   { code: 'job.classifyDoc', name: 'จำแนกเอกสาร', category: 'job' },
+  { code: 'job.classifyDoc.contract', name: 'จำแนกเอกสาร — ในสัญญา', category: 'job' },
+  { code: 'job.classifyDoc.outOfContract', name: 'จำแนกเอกสาร — นอกสัญญา', category: 'job' },
   { code: 'job.deleteUnassigned', name: 'ลบงานที่ยังไม่มีผู้รับผิดชอบ', category: 'job' },
   { code: 'job.updateStatus', name: 'เปลี่ยนสถานะงาน', category: 'job' },
   { code: 'job.backfillDate', name: 'แก้ไขวันเวลาย้อนหลังของงาน', category: 'job' },
@@ -117,6 +120,9 @@ async function main() {
       });
     }
   }
+
+  console.log('Inherit job.classifyDoc.* ให้บทบาทที่มี job.classifyDoc...');
+  await grantClassifyDocChildrenToRolesWithParent(prisma);
 
   console.log('Sync User.roleId จาก User.role (enum)...');
   const enumToRoleId: Record<string, number> = {

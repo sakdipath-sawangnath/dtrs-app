@@ -29,6 +29,7 @@ import {
   Minus,
   Download,
   Stamp,
+  FileSignature,
 } from "lucide-react";
 import { toastSuccess, toastError, confirmDialog, toastWarning } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ import { cn } from "@/lib/utils";
 import DashboardPageShell from "./DashboardPageShell";
 import DashboardFilterBar from "./DashboardFilterBar";
 import JobClassifyDocDialog from "./jobs/JobClassifyDocDialog";
+import JobReporterSignDialog from "./jobs/JobReporterSignDialog";
 import Select from "react-select";
 import { getReactSelectGlassStyles } from "@/lib/reactSelectGlassStyles";
 import { useAppTheme } from "@/lib/useAppTheme";
@@ -466,6 +468,7 @@ export default function JobsList({
   const userRoleUpper = String(userRole).toUpperCase();
   const [movingOutOfContractJobId, setMovingOutOfContractJobId] = useState<number | null>(null);
   const [classifyJob, setClassifyJob] = useState<Job | null>(null);
+  const [signJob, setSignJob] = useState<Job | null>(null);
   const [classifySubmitting, setClassifySubmitting] = useState(false);
 
   // ---- Update Fix Info Modal (IN_PROGRESS) ----
@@ -585,11 +588,19 @@ export default function JobsList({
   }, [myPermissions, userRoleUpper]);
 
   const canClassifyDoc = useMemo(() => {
-    if (myPermissions !== null) {
-      return myPermissions.includes("job.classifyDoc");
-    }
-    return userRoleUpper === "ADMIN" || userRoleUpper === "SUPERVISOR";
-  }, [myPermissions, userRoleUpper]);
+    if (myPermissions === null) return false;
+    return myPermissions.includes("job.classifyDoc");
+  }, [myPermissions]);
+
+  const canClassifyDocContract = useMemo(() => {
+    if (myPermissions === null) return false;
+    return myPermissions.includes("job.classifyDoc.contract");
+  }, [myPermissions]);
+
+  const canClassifyDocOutOfContract = useMemo(() => {
+    if (myPermissions === null) return false;
+    return myPermissions.includes("job.classifyDoc.outOfContract");
+  }, [myPermissions]);
 
   const canDeleteUnassigned =
     myPermissions != null
@@ -612,6 +623,29 @@ export default function JobsList({
     return userRoleUpper === "ADMIN" || userRoleUpper === "SUPERVISOR";
   }, [myPermissions, userRoleUpper]);
 
+  const canFixAny = useMemo(() => {
+    if (myPermissions !== null) {
+      return myPermissions.includes("job.fix.any");
+    }
+    return userRoleUpper === "ADMIN";
+  }, [myPermissions, userRoleUpper]);
+
+  const canFixSelf = useMemo(() => {
+    if (myPermissions !== null) {
+      return myPermissions.includes("job.fix.self");
+    }
+    return ["STAFF", "SUPERVISOR", "ADMIN"].includes(userRoleUpper);
+  }, [myPermissions, userRoleUpper]);
+
+  const canUserCloseJob = useCallback(
+    (job: Job) => {
+      if (job.status !== "IN_PROGRESS" || !job.assignedTo) return false;
+      const isAssignee = String(job.assignedTo.id) === String(currentUserId);
+      return canFixAny || (canFixSelf && isAssignee);
+    },
+    [canFixAny, canFixSelf, currentUserId],
+  );
+
   /** แท็บสัญญา/นอกสัญญา — ตั้งที่ /dashboard/roles (`job.viewContractTabs`) */
   const canViewContractTabs = useMemo(() => {
     if (myPermissions !== null) {
@@ -632,9 +666,9 @@ export default function JobsList({
   const title = customTitle || derivedTitle || "ข้อขัดข้อง";
   const subtitle = customSubtitle || derivedSubtitle || "รายการแจ้งซ่อมและสถานะ";
 
-  const fetchJobs = useCallback(async () => {
+  const fetchJobs = useCallback(async (opts?: { silent?: boolean }) => {
     if (!token) return;
-    setLoading(true);
+    if (!opts?.silent) setLoading(true);
     try {
       const res = await axios.get(`${API}/jobs/list`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -1557,12 +1591,12 @@ export default function JobsList({
   };
 
   const handleGoToCloseJob = async () => {
-    const jobId = updateFixJob?.id;
+    const job = updateFixJob;
     const ok = await persistUpdateFix();
-    if (!ok || jobId == null) return;
-    toastSuccess("บันทึกการแก้ไขแล้ว — ไปปิดงานที่หน้ารายละเอียด", 1500);
+    if (!ok || !job) return;
+    toastSuccess("บันทึกการแก้ไขแล้ว — ให้ผู้แจ้งเซ็นปิดงาน", 1500);
     setUpdateFixJob(null);
-    router.push(`/dashboard/jobs/${jobId}`);
+    setSignJob(job);
   };
 
   const loadAssignableStaff = async (): Promise<boolean> => {
@@ -1928,7 +1962,7 @@ export default function JobsList({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={fetchJobs}
+                  onClick={() => void fetchJobs()}
                   className="mt-6 min-h-[44px] cursor-pointer gap-1.5 rounded-xl border-[var(--glass-input-border)] bg-[var(--glass-input-bg)] px-4 py-2.5 text-sm font-medium glass-text shadow-lg hover:bg-[var(--glass-hover)] active:scale-95"
                 >
                   <RefreshCw size={14} aria-hidden /> รีเฟรช
@@ -1947,7 +1981,7 @@ export default function JobsList({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={fetchJobs}
+                  onClick={() => void fetchJobs()}
                   className="mt-4 min-h-[44px] cursor-pointer gap-1.5 text-sm"
                 >
                   <RefreshCw size={14} aria-hidden /> รีเฟรช
@@ -2388,7 +2422,7 @@ export default function JobsList({
                           </ActionIconButton>
                         )}
 
-                      {job.status === "IN_PROGRESS" && (
+                      {job.status === "IN_PROGRESS" &&
                         job.assignedTo &&
                         String(job.assignedTo.id) === String(currentUserId) &&
                         !!token && (
@@ -2399,8 +2433,19 @@ export default function JobsList({
                           >
                             <Wrench size={16} />
                           </ActionIconButton>
-                        )
-                      )}
+                        )}
+
+                      {isAwaitingReporterSignature(job) &&
+                        canUserCloseJob(job) &&
+                        !!token && (
+                          <ActionIconButton
+                            label="ให้ผู้แจ้งเซ็นปิดงาน"
+                            color="#059669"
+                            onClick={() => setSignJob(job)}
+                          >
+                            <FileSignature size={16} />
+                          </ActionIconButton>
+                        )}
 
                       {job.status === "IN_PROGRESS" &&
                         canAdminDeleteInProgress &&
@@ -3318,7 +3363,7 @@ export default function JobsList({
                                   >
                                     {updateFixSaving
                                       ? "กำลังบันทึก..."
-                                      : "บันทึกแล้วไปปิดงาน — ให้ผู้แจ้งเซ็นที่หน้ารายละเอียด"}
+                                      : "บันทึกแล้วให้ผู้แจ้งเซ็นปิดงาน"}
                                   </button>
                                 )}
                               </>
@@ -3506,7 +3551,19 @@ export default function JobsList({
         }}
         ticketNo={classifyJob?.ticketNo}
         submitting={classifySubmitting}
+        canClassifyContract={canClassifyDocContract}
+        canClassifyOutOfContract={canClassifyDocOutOfContract}
         onConfirm={(isOutOfContract) => void handleClassifyDoc(isOutOfContract)}
+      />
+
+      <JobReporterSignDialog
+        open={signJob != null}
+        onOpenChange={(open) => {
+          if (!open) setSignJob(null);
+        }}
+        job={signJob}
+        token={token}
+        onSuccess={() => fetchJobs({ silent: true })}
       />
     </DashboardPageShell>
   );

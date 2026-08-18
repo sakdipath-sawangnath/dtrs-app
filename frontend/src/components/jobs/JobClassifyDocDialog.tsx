@@ -29,6 +29,8 @@ interface JobClassifyDocDialogProps {
   onOpenChange: (open: boolean) => void;
   ticketNo?: string;
   submitting: boolean;
+  canClassifyContract: boolean;
+  canClassifyOutOfContract: boolean;
   onConfirm: (isOutOfContract: boolean) => void;
 }
 
@@ -57,9 +59,15 @@ export default function JobClassifyDocDialog({
   onOpenChange,
   ticketNo,
   submitting,
+  canClassifyContract,
+  canClassifyOutOfContract,
   onConfirm,
 }: JobClassifyDocDialogProps) {
   const [selected, setSelected] = useState<ClassifyKind | null>(null);
+  const visibleChoices = CHOICES.filter((choice) =>
+    choice.kind === "in" ? canClassifyContract : canClassifyOutOfContract,
+  );
+  const hasVisibleChoice = visibleChoices.length > 0;
 
   useEffect(() => {
     if (open) setSelected(null);
@@ -134,12 +142,16 @@ export default function JobClassifyDocDialog({
             </AlertDescription>
           </Alert>
 
-          <div
-            role="radiogroup"
-            aria-labelledby="classify-doc-title"
-            className="grid grid-cols-1 gap-3 sm:grid-cols-2"
-          >
-            {CHOICES.map((choice) => {
+          {hasVisibleChoice ? (
+            <div
+              role="radiogroup"
+              aria-labelledby="classify-doc-title"
+              className={cn(
+                "grid grid-cols-1 gap-3",
+                visibleChoices.length > 1 && "sm:grid-cols-2",
+              )}
+            >
+              {visibleChoices.map((choice) => {
               const Icon = choice.icon;
               const isOn = selected === choice.kind;
               return (
@@ -177,8 +189,22 @@ export default function JobClassifyDocDialog({
                   </span>
                 </button>
               );
-            })}
-          </div>
+              })}
+            </div>
+          ) : (
+            <Alert
+              className="border-amber-300 bg-amber-50 text-amber-950 [&>svg]:text-amber-700 dark:border-amber-500/35 dark:bg-amber-950/30 dark:text-amber-100 dark:[&>svg]:text-amber-400"
+            >
+              <AlertTriangle aria-hidden />
+              <AlertTitle className="text-sm font-semibold text-amber-950 dark:text-amber-100">
+                ไม่มีสิทธิ์เลือกประเภทเอกสาร
+              </AlertTitle>
+              <AlertDescription className="text-sm leading-relaxed text-amber-900 dark:text-amber-100/90">
+                คุณไม่มีสิทธิ์จำแนกประเภทเอกสาร กรุณาติดต่อผู้ดูแลระบบ /
+                ผู้ที่เกี่ยวข้อง
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
 
         <DialogFooter className="flex flex-col-reverse gap-2 border-t border-[var(--glass-card-border)] p-4 sm:flex-row sm:justify-end sm:gap-3 sm:p-5">
@@ -195,7 +221,7 @@ export default function JobClassifyDocDialog({
             type="button"
             variant="default"
             className="min-h-11 flex-1 cursor-pointer rounded-xl bg-blue-600 text-white shadow-lg hover:bg-blue-500 active:scale-95 sm:flex-initial"
-            disabled={selected == null || submitting}
+            disabled={selected == null || submitting || !hasVisibleChoice}
             onClick={() => {
               if (selected == null) return;
               onConfirm(selected === "ooc");

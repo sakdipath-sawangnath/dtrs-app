@@ -1209,9 +1209,29 @@ export class JobsService {
   }
 
   /**
+   * ตรวจสิทธิ์จำแนกในสัญญา / นอกสัญญา (ปุ่มใน dialog)
+   * ประตู job.classifyDoc ตรวจที่ PermissionsGuard แล้ว
+   */
+  async assertUserCanClassifyDocKind(
+    userId: number,
+    isOutOfContract: boolean,
+  ): Promise<void> {
+    const codes = await this.getPermissionCodesForUser(userId);
+    const needed = isOutOfContract
+      ? 'job.classifyDoc.outOfContract'
+      : 'job.classifyDoc.contract';
+    if (!codes.includes(needed)) {
+      throw new ForbiddenException(
+        'คุณไม่มีสิทธิ์จำแนกประเภทเอกสาร กรุณาติดต่อผู้ดูแลระบบ / ผู้ที่เกี่ยวข้อง',
+      );
+    }
+  }
+
+  /**
    * จำแนกเอกสารหลังปิดงาน: แทนที่ hex ด้วย Running Doc No (ครั้งเดียว)
    */
   async classifyDoc(id: number, isOutOfContract: boolean, actorUserId: number) {
+    await this.assertUserCanClassifyDocKind(actorUserId, isOutOfContract);
     await this.usersService.assertHasStaffSignature(actorUserId);
     return this.prisma.$transaction(async (tx) => {
       const job = await tx.job.findUnique({

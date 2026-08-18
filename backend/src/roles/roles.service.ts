@@ -6,6 +6,11 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  CLASSIFY_DOC_CHILD_CODES,
+  grantClassifyDocChildrenToRolesWithParent,
+  shouldGrantClassifyDocChildrenOnCatalogSync,
+} from './classify-doc-permission-inherit';
 
 /** แคตตาล็อก Permission — ต้องสอดคล้องกับ `scripts/seed-roles-permissions.ts` */
 const RBAC_MENU_PERMISSIONS = [
@@ -37,6 +42,16 @@ const RBAC_ACTION_PERMISSIONS = [
     category: 'job',
   },
   { code: 'job.classifyDoc', name: 'จำแนกเอกสาร', category: 'job' },
+  {
+    code: 'job.classifyDoc.contract',
+    name: 'จำแนกเอกสาร — ในสัญญา',
+    category: 'job',
+  },
+  {
+    code: 'job.classifyDoc.outOfContract',
+    name: 'จำแนกเอกสาร — นอกสัญญา',
+    category: 'job',
+  },
   {
     code: 'job.deleteUnassigned',
     name: 'ลบงานที่ยังไม่มีผู้รับผิดชอบ',
@@ -215,37 +230,63 @@ export class RolesService implements OnModuleInit {
       const newCodes = RBAC_ALL_PERMISSIONS.map((x) => x.code).filter(
         (c) => !beforeCodes.has(c),
       );
-      if (newCodes.length === 0) return;
-
       const newCodeSet = new Set<string>(newCodes);
       const allPerms = await this.prisma.permission.findMany({
         select: { id: true, code: true },
       });
       const idByCode = Object.fromEntries(allPerms.map((p) => [p.code, p.id]));
 
-      const builtIn = await this.prisma.appRole.findMany({
-        where: { code: { in: ['ADMIN', 'STAFF', 'USER', 'SUPERVISOR'] } },
-        select: { id: true, code: true },
-      });
+      if (newCodes.length > 0) {
+        const builtIn = await this.prisma.appRole.findMany({
+          where: { code: { in: ['ADMIN', 'STAFF', 'USER', 'SUPERVISOR'] } },
+          select: { id: true, code: true },
+        });
 
-      for (const r of builtIn) {
-        const allowed = RBAC_ROLE_PERMISSION_CODES[r.code];
-        if (!allowed) continue;
-        const toLink = allowed.filter((c) => newCodeSet.has(c));
-        const rows = toLink
-          .map((code) => {
-            const permissionId = idByCode[code];
-            return permissionId != null ? { roleId: r.id, permissionId } : null;
-          })
-          .filter(
-            (x): x is { roleId: number; permissionId: number } => x != null,
-          );
-        if (rows.length > 0) {
-          await this.prisma.rolePermission.createMany({
-            data: rows,
-            skipDuplicates: true,
-          });
+        for (const r of builtIn) {
+          const allowed = RBAC_ROLE_PERMISSION_CODES[r.code];
+          if (!allowed) continue;
+          const toLink = allowed.filter((c) => newCodeSet.has(c));
+          const rows = toLink
+            .map((code) => {
+              const permissionId = idByCode[code];
+              return permissionId != null
+                ? { roleId: r.id, permissionId }
+                : null;
+            })
+            .filter(
+              (x): x is { roleId: number; permissionId: number } => x != null,
+            );
+          if (rows.length > 0) {
+            await this.prisma.rolePermission.createMany({
+              data: rows,
+              skipDuplicates: true,
+            });
+          }
         }
+      }
+
+      /**
+       * บทบาทที่มี job.classifyDoc (รวมที่สร้างเอง) ได้ลูกครบในรอบแรก
+       * ไม่รันทุก restart — กันการติ๊กออกที่ /dashboard/roles ถูกคืน
+       */
+      const childIds = CLASSIFY_DOC_CHILD_CODES.map(
+        (code) => idByCode[code],
+      ).filter((id): id is number => id != null);
+      const existingChildLinkCount =
+        childIds.length === 0
+          ? 0
+          : await this.prisma.rolePermission.count({
+              where: { permissionId: { in: childIds } },
+            });
+      if (
+        shouldGrantClassifyDocChildrenOnCatalogSync({
+          childCodesAreNew: CLASSIFY_DOC_CHILD_CODES.some((c) =>
+            newCodeSet.has(c),
+          ),
+          existingChildLinkCount,
+        })
+      ) {
+        await grantClassifyDocChildrenToRolesWithParent(this.prisma);
       }
     })();
 

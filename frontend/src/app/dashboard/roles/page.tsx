@@ -385,6 +385,13 @@ export default function RolesPage() {
             <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
               เลือกสิทธิ์เมนู/งานที่บทบาทนี้สามารถใช้งานได้
             </p>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              จำแนกเอกสาร: <span className="font-mono">job.classifyDoc</span>{" "}
+              เป็นประตูเปิดปุ่ม —{" "}
+              <span className="font-mono">job.classifyDoc.contract</span> /{" "}
+              <span className="font-mono">job.classifyDoc.outOfContract</span>{" "}
+              เลือกในสัญญาหรือนอกสัญญาใน dialog (ติ๊กแค่ลูกโดยไม่มีประตูยังเรียก API ไม่ได้)
+            </p>
             <div
               className="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/40 backdrop-blur-sm p-3 max-h-[min(22rem,50vh)] overflow-y-auto space-y-0.5 shadow-inner ring-1 ring-slate-200/80 dark:ring-white/5"
               role="group"
