@@ -55,7 +55,7 @@ full-stack (Public + Jobs workflow + Sites/Locations + Profile signature + Expor
 - [x] **Phase C** — DocSequence + hex ตอน create; Running Doc No ตอนจำแนกเอกสารหลัง RESOLVED (`job.classifyDoc`)
 - [x] **Phase D** — รูปปัญหาใน wrench/detail (`job.issue.upload`, PENDING+IN_PROGRESS, เติมถึง 3) + คอลัมน์/CSV ระยะเวลาจบงาน
 - [x] **Phase E** — ลายเซ็น profile + hard gate (assign/bulk/OOC/fix/reopen) + เซ็นผู้แจ้งตอนปิดงาน
-- [x] **Follow-up** — แยกบันทึกการแก้ไข (`PATCH /jobs/:id/fix`) กับปิดงาน (`PATCH /jobs/:id/close`); ลายเซ็นผู้แจ้งอยู่ที่ `/dashboard/jobs/:id` เท่านั้น
+- [x] **Follow-up** — แยกบันทึกการแก้ไข (`PATCH /jobs/:id/fix`) กับปิดงาน (`PATCH /jobs/:id/close`); ลายเซ็นผู้แจ้งที่ `/dashboard/jobs/:id` และปุ่ม Sign ใน `JobsList` เมื่อรอเซ็น
 - [x] **ข้อ 8 Reports** — เทมเพลต PDF CM (SHF): `JobMaintenancePdfTemplate` + `PdfReportHeader` + `reportPdfConstants.ts` + `logo-FORTH.png`
 - [x] ป้าย「รอเซ็นผู้แจ้ง」ในรายการงาน (`JobsList`) เมื่อ `IN_PROGRESS` แต่ข้อมูลแก้ไขครบ — ไม่เพิ่มสถานะใหม่ — [`TASK.md`](../TASK.md) §34
 
@@ -71,7 +71,7 @@ full-stack (Public + Jobs workflow + Sites/Locations + Profile signature + Expor
 | ป้ายหน่วยงาน / station | ✅ `agency` + `station` | UAT/PRD รัน Sites.xlsx seed ถ้าต้อง |
 | `ticketNo` / Doc No | ✅ hex ตอนสร้าง · Running ตอนจำแนกหลังปิดงาน | UI: `/all` + job detail |
 | Wrench + duration CSV | ✅ | รูปปัญหา: `job.issue.upload` · PENDING/IN_PROGRESS · เติมถึง 3 · **5MB/HEIC** · fallback 413 |
-| ลายเซ็น | ✅ profile + gate + เซ็นปิดงานที่ `/dashboard/jobs/:id` (`PATCH /close`) | ป้าย「รอเซ็นผู้แจ้ง」ในรายการเมื่อแก้ครบแล้วยัง `IN_PROGRESS` |
+| ลายเซ็น | ✅ profile + gate + เซ็นปิดงานที่ `/dashboard/jobs/:id` หรือปุ่ม Sign ใน `JobsList` (`PATCH /close`) | ป้าย「รอเซ็นผู้แจ้ง」ในรายการเมื่อแก้ครบแล้วยัง `IN_PROGRESS` |
 | ข้อ 8 Reports | ✅ | PDF CM/SHF — `/print/jobs/[id]`; แทน copy CCTV; โลโก้ `logo-FORTH.png` (พื้นโปร่งใส) |
 
 ไฟล์แกน: [`frontend/src/app/public/report/page.tsx`](../frontend/src/app/public/report/page.tsx) · [`backend/src/jobs/jobs.service.ts`](../backend/src/jobs/jobs.service.ts) · [`frontend/src/components/JobsList.tsx`](../frontend/src/components/JobsList.tsx) · [`frontend/src/components/jobs/JobClassifyDocDialog.tsx`](../frontend/src/components/jobs/JobClassifyDocDialog.tsx) · [`frontend/src/app/dashboard/jobs/[id]/page.tsx`](../frontend/src/app/dashboard/jobs/[id]/page.tsx) · [`backend/prisma/schema.prisma`](../backend/prisma/schema.prisma) · [`frontend/src/app/dashboard/sites/page.tsx`](../frontend/src/app/dashboard/sites/page.tsx) · [`frontend/src/app/dashboard/profile/page.tsx`](../frontend/src/app/dashboard/profile/page.tsx) · [`backend/src/users/users.service.ts`](../backend/src/users/users.service.ts) · [`backend/src/locations/locations.controller.ts`](../backend/src/locations/locations.controller.ts)
@@ -139,7 +139,7 @@ flowchart LR
 - Prisma: `User.signature` (MinIO key/URL) · `Job.reporterSignature` (+ เวลาเซ็นถ้าต้องการ)
 - Profile: วาด/อัปโหลดลายเซ็น (pad รองรับ touch)
 - Gate: FE เตือนก่อน action + BE ปฏิเสธเฉพาะ **assign / bulk-assign / OOC / fix / reopen / classify-doc** ถ้าผู้กระทำไม่มีลายเซ็นเจ้าหน้าที่ — ไม่บล็อกลบงาน / `PATCH .../status`; ดูรายการ/รายละเอียดได้อย่างเดียว
-- ปิดงานบน job detail: บันทึกการแก้ไขด้วย `PATCH .../fix` (คง `IN_PROGRESS`) แล้วบังคับลายเซ็นผู้แจ้งบน pad ก่อน `PATCH .../close` → `RESOLVED`; เก็บต่อ job; รองรับ laptop/iPad/mobile; รายการงานมีป้าย「รอเซ็นผู้แจ้ง」เมื่อแก้ครบแล้วยังกำลังแก้ไข
+- ปิดงาน: บันทึกการแก้ไขด้วย `PATCH .../fix` (คง `IN_PROGRESS`) แล้วบังคับลายเซ็นผู้แจ้งบน pad ก่อน `PATCH .../close` → `RESOLVED`; UI ที่ `/dashboard/jobs/:id` และปุ่ม Sign ใน `JobsList` เมื่อรอเซ็น; เก็บต่อ job; รองรับ laptop/iPad/mobile; รายการงานมีป้าย「รอเซ็นผู้แจ้ง」เมื่อแก้ครบแล้วยังกำลังแก้ไข
 - PDF ปิดงาน: ฝังลายเซ็นผู้แจ้ง/เจ้าหน้าที่เมื่อมี (phase ย่อยหลังเก็บได้)
 - Go-live: ทีมตั้งลายเซ็นที่ profile ก่อนเปิดใช้ (ไม่มี grace period ในโค้ด)
 

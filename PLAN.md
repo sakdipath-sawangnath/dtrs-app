@@ -9,9 +9,9 @@
 แผน grilling / ส่งงานเป็นเฟส (Public optional → Locations → Doc No → Jobs UX → Signature) บน branch **`feat/breaking-docno-locations-signature`** (base `staging`):  
 [`docs/Meeting-11082026-Requirements-Plan.plan.md`](docs/Meeting-11082026-Requirements-Plan.plan.md)
 
-- **สถานะโค้ด:** Phase A–E ✅ · ข้อ 8 Reports ✅ · Doc No ออกตอนจำแนกหลัง `RESOLVED` · UI จำแนกที่ `/dashboard/all` + `/dashboard/jobs/:id` · อัปโหลดรูปปัญหาที่แจ้งด้วย **`job.issue.upload`** (PENDING/IN_PROGRESS, เติมถึง 3 รูป · **5MB/ไฟล์** JPG/PNG/WebP/HEIC→JPEG; seed ADMIN) · fallback บีบรูปเมื่อ NPM 413 · แยก `PATCH /fix` กับ `PATCH /close` + ป้าย「รอเซ็นผู้แจ้ง」ในรายการ
+- **สถานะโค้ด:** Phase A–E ✅ · ข้อ 8 Reports ✅ · Doc No ออกตอนจำแนกหลัง `RESOLVED` · UI จำแนกที่ `/dashboard/all` + `/dashboard/jobs/:id` · อัปโหลดรูปปัญหาที่แจ้งด้วย **`job.issue.upload`** (PENDING/IN_PROGRESS, เติมถึง 3 รูป · **5MB/ไฟล์** JPG/PNG/WebP/HEIC→JPEG; seed ADMIN) · fallback บีบรูปเมื่อ NPM 413 · แยก `PATCH /fix` กับ `PATCH /close` + ป้าย「รอเซ็นผู้แจ้ง」+ ปุ่ม Sign ปิดงานจาก `JobsList`
 - **ถัดไป:** commit/MR เข้า `staging` เมื่อขอ · ทดสอบอัปโหลดมือถือบน UAT · seed locations/sites/RBAC ถ้ายังว่าง (รวม `job.issue.upload`) · ขอ infra ตั้ง `client_max_body_size 50m` ที่ NPM ถ้าต้องการคุณภาพเต็ม 5MB
-- **UX ✅:** ป้าย「รอเซ็นผู้แจ้ง」ในรายการงาน เมื่อ `IN_PROGRESS` แต่บันทึกการแก้ไขครบแล้ว — ดู [`TASK.md`](TASK.md) §34 — ไม่เพิ่มสถานะใหม่
+- **UX ✅:** ป้าย「รอเซ็นผู้แจ้ง」ในรายการงาน เมื่อ `IN_PROGRESS` แต่บันทึกการแก้ไขครบแล้ว + ปุ่ม Sign ปิดงานจากรายการ — ดู [`TASK.md`](TASK.md) §34 — ไม่เพิ่มสถานะใหม่
 
 ---
 
@@ -97,7 +97,7 @@
   Sidebar เพิ่มเมนู "งานที่รับผิดชอบ" (`/dashboard/my-jobs`) แสดง DataTable งานที่รับมอบหมาย; ปุ่มดูรายละเอียดไปหน้า `/dashboard/jobs/:id` (full page) แทน modal; layout การ์ดซ้าย "ข้อมูลการแจ้งข้อขัดข้อง" และขวา "ข้อมูลการแก้ไข" ให้สอดคล้องกัน; **อัปเดต 2026-08-17:** card รูปปัญหาที่แจ้งอัปโหลดได้เมื่อมี **`job.issue.upload`** (`PENDING`/`IN_PROGRESS`, เติมถึง 3 รูป)
 
 - [x] **ฟอร์มบันทึกการแก้ไขงาน (PATCH /jobs/:id/fix)**  
-  หน้ารายละเอียดงานมีฟอร์ม: ส่วนขัดข้อง (Hardware/Software), สาเหตุ, วิธีแก้ไข, รูปการแก้ไข (สูงสุด 3 รูป), หมายเหตุ, Serial เก่า/ใหม่; RBAC `job.fix.*`; Backend อัปโหลดรูปไป MinIO และ **คง `IN_PROGRESS`** — ปิดงานแยกที่ `PATCH /jobs/:id/close` (ลายเซ็นผู้แจ้ง → `RESOLVED` + `fixDate`); รายการงานมีป้าย「รอเซ็นผู้แจ้ง」เมื่อแก้ครบแล้วยังกำลังแก้ไข — [`TASK.md`](TASK.md) §34
+  หน้ารายละเอียดงานมีฟอร์ม: ส่วนขัดข้อง (Hardware/Software), สาเหตุ, วิธีแก้ไข, รูปการแก้ไข (สูงสุด 3 รูป), หมายเหตุ, Serial เก่า/ใหม่; RBAC `job.fix.*`; Backend อัปโหลดรูปไป MinIO และ **คง `IN_PROGRESS`** — ปิดงานแยกที่ `PATCH /jobs/:id/close` (ลายเซ็นผู้แจ้ง → `RESOLVED` + `fixDate`); รายการงานมีป้าย「รอเซ็นผู้แจ้ง」และปุ่ม Sign เมื่อแก้ครบแล้วยังกำลังแก้ไข — [`TASK.md`](TASK.md) §34
 
 - [x] **Sidebar ไม่แสดงเมนู โปรไฟล์**  
   โปรไฟล์เข้าได้จากเมนูผู้ใช้ (dropdown) เท่านั้น; seed สิทธิ์ `menu.myJobs` สำหรับงานที่รับผิดชอบ
@@ -115,7 +115,7 @@
 - [x] แยก “สัญญา/นอกสัญญา” ด้วย segmented tabs บน `/dashboard/my-jobs`, `/dashboard/all`, และ `/dashboard/in-progress` (default: สัญญา แยกตาม `Job.isOutOfContract`; มองเห็นเมื่อมี **`job.viewContractTabs`**)
 - [x] ซ่อนคอลัมน์ “ผู้รับผิดชอบ” ใน `/dashboard/pending`
 - [x] จัดลำดับปุ่ม “ลบงาน” (`ลบงาน`) ไปท้ายสุด และให้ปุ่ม “ย้ายนอกสัญญา” แสดง `alert ยืนยัน` ก่อนทำรายการ
-- [x] ปุ่ม “อัปเดต” ใน `/dashboard/in-progress` เปิด modal “ข้อมูลการแก้ไข” และบันทึกด้วย `PATCH /jobs/:id/fix` (ส่งฟอร์ม + รูปสูงสุด 3 รูป, คง `IN_PROGRESS`); ปิดงานที่หน้ารายละเอียด (`PATCH /close`); card รูปปัญหาที่แจ้งอัปโหลดเพิ่มได้เมื่อมี **`job.issue.upload`**; ป้าย「รอเซ็นผู้แจ้ง」เมื่อแก้ครบแล้วยัง `IN_PROGRESS`
+- [x] ปุ่ม “อัปเดต” ใน `/dashboard/in-progress` เปิด modal “ข้อมูลการแก้ไข” และบันทึกด้วย `PATCH /jobs/:id/fix` (ส่งฟอร์ม + รูปสูงสุด 3 รูป, คง `IN_PROGRESS`); ปิดงานจากรายการ (ปุ่ม Sign) หรือหน้ารายละเอียด (`PATCH /close`); card รูปปัญหาที่แจ้งอัปโหลดเพิ่มได้เมื่อมี **`job.issue.upload`**; ป้าย「รอเซ็นผู้แจ้ง」เมื่อแก้ครบแล้วยัง `IN_PROGRESS`
 - [x] Header user info: แสดงรูปโปรไฟล์เมื่อ `session.user.image` มีค่า และ fallback เป็น initials เมื่อไม่มี/โหลดไม่สำเร็จ
 - [x] RBAC gating สำหรับปุ่มลบงาน pending ใช้ permission `job.deleteUnassigned` และ unwrap response ให้ถูกต้อง
 

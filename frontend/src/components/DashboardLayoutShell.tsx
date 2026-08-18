@@ -154,6 +154,7 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
       <UserMenuDropdown
         name={session?.user?.name ?? undefined}
         image={(session?.user as { image?: string })?.image}
+        role={userRole}
       />
     </div>
   );

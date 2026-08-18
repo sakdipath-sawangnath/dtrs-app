@@ -6,9 +6,13 @@
 
 **Changelog + app version:** [`CHANGELOG.md`](CHANGELOG.md) — key changes; commit ที่แตะไฟล์นี้จะถาม SemVer bump (`frontend/package.json`) ผ่าน husky · footer แสดง `vX.Y.Z` จาก package (ไม่ใช่ DB) · ครั้งแรก: `npm install` ที่ root
 
+## บันทึกการอัปเดตล่าสุด (2026-08-18)
+
+- **ปิดงานจากรายการ** — ปุ่ม Sign ใน `JobsList` เมื่อป้าย「รอเซ็นผู้แจ้ง」เปิด dialog ลายเซ็นผู้แจ้ง (`PATCH /jobs/:id/close`) โดยไม่ต้องเข้าหน้ารายละเอียด; สิทธิ์เดิม `job.fix.self|any` — [`TASK.md`](TASK.md) §34 · [`CHANGELOG.md`](CHANGELOG.md)
+
 ## บันทึกการอัปเดตล่าสุด (2026-08-17)
 
-- **แยกบันทึกแก้ไข / ปิดงาน** — `PATCH /jobs/:id/fix` คง `IN_PROGRESS`; `PATCH /jobs/:id/close` บังคับลายเซ็นผู้แจ้ง (PNG) → `RESOLVED`; ปิดงานที่ `/dashboard/jobs/:id` เท่านั้น; รายการงานมีป้าย「รอเซ็นผู้แจ้ง」เมื่อแก้ครบแล้วยังกำลังแก้ไข — [`TASK.md`](TASK.md) §34 · [`CHANGELOG.md`](CHANGELOG.md)
+- **แยกบันทึกแก้ไข / ปิดงาน** — `PATCH /jobs/:id/fix` คง `IN_PROGRESS`; `PATCH /jobs/:id/close` บังคับลายเซ็นผู้แจ้ง (PNG) → `RESOLVED`; ปิดงานที่ `/dashboard/jobs/:id`; รายการงานมีป้าย「รอเซ็นผู้แจ้ง」เมื่อแก้ครบแล้วยังกำลังแก้ไข — [`TASK.md`](TASK.md) §34 · [`CHANGELOG.md`](CHANGELOG.md)
 - **อัปโหลดรูปงาน** — **5MB/ไฟล์** · สูงสุด **3 รูป** ต่อช่อง issue/fix · **JPG/PNG/WebP** (magic bytes) · **HEIC/HEIF → JPEG** ฝั่ง Nest; ลายเซ็นผู้แจ้ง PNG เท่านั้น — สิทธิ์รูปปัญหา **`job.issue.upload`** (`PATCH /jobs/:id/issue-images`) ไม่ผูก `job.fix.*`; งาน **PENDING / IN_PROGRESS**; เติมได้ถึง 3 รูป ไม่ลบ/ไม่แทนที่; UI `/dashboard/jobs/:id` + wrench modal; หน้า public ไม่บังคับรูป; seed **ADMIN** เท่านั้น — [`backend/docs/RBAC-Setup.md`](backend/docs/RBAC-Setup.md)
 - **อัปโหลดผ่าน reverse proxy** — แนะนำ `client_max_body_size 50m;` ที่ NPM location `/api/` (ค่าเริ่มต้น nginx ~1MB ได้ **413**) — [`backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md`](backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md). **Fallback ฝั่งแอป:** frontend บีบอัดรูปใน browser เมื่อขนาดรวมใกล้เกิน ~1MB หรือได้ 413 แล้ว retry (`frontend/src/lib/jobImageProxyFallback.ts`) — คุณภาพอาจลด; HEIC ใหญ่เกินงบต้องแปลง JPG เอง
 

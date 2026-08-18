@@ -270,6 +270,12 @@ export default function JobDetailPage() {
     Array.isArray(permissions) && permissions.includes("job.backfillDate");
   const canClassifyDoc =
     Array.isArray(permissions) && permissions.includes("job.classifyDoc");
+  const canClassifyDocContract =
+    Array.isArray(permissions) &&
+    permissions.includes("job.classifyDoc.contract");
+  const canClassifyDocOutOfContract =
+    Array.isArray(permissions) &&
+    permissions.includes("job.classifyDoc.outOfContract");
   const canUploadIssueImages =
     Array.isArray(permissions) &&
     permissions.includes("job.issue.upload") &&
@@ -1642,7 +1648,6 @@ export default function JobDetailPage() {
                                   })
                                 }
                                 disabled={isReadOnlyFix}
-                                placeholder="เช่น DVR / กล้องหน้าประตู"
                                 aria-describedby="job-serial-hint"
                               />
                             </div>
@@ -1916,6 +1921,8 @@ export default function JobDetailPage() {
         }}
         ticketNo={job?.ticketNo}
         submitting={classifySubmitting}
+        canClassifyContract={canClassifyDocContract}
+        canClassifyOutOfContract={canClassifyDocOutOfContract}
         onConfirm={(isOutOfContract) => void handleClassifyDoc(isOutOfContract)}
       />
     </DashboardPageShell>

@@ -1,6 +1,6 @@
 {
   "name": "frontend",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "engines": {
     "node": ">=20.0.0",
@@ -13,7 +13,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npx --yes tsx --test src/lib/reactSelectGlassStyles.test.ts src/lib/jobsListCsvExport.test.ts src/lib/docTicketNo.test.ts src/lib/jobImageUpload.test.ts src/lib/jobImageProxyFallback.test.ts src/lib/jobFixImageSlots.test.ts src/lib/reportPdfConstants.test.ts",
+    "test": "npx --yes tsx --test src/lib/reactSelectGlassStyles.test.ts src/lib/jobsListCsvExport.test.ts src/lib/docTicketNo.test.ts src/lib/jobImageUpload.test.ts src/lib/jobImageProxyFallback.test.ts src/lib/jobFixImageSlots.test.ts src/lib/reportPdfConstants.test.ts src/lib/formatRoleLabel.test.ts",
+    "test:role-label": "npx --yes tsx --test src/lib/formatRoleLabel.test.ts",
     "test:react-select": "npx --yes tsx --test src/lib/reactSelectGlassStyles.test.ts",
     "test:meeting": "npx --yes tsx --test src/lib/jobsListCsvExport.test.ts",
     "security:audit": "npm audit --audit-level=moderate",

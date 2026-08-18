@@ -330,6 +330,107 @@ describe('Jobs Doc No / classify-doc (e2e HTTP)', () => {
   });
 });
 
+describe('PATCH /jobs/:id/classify-doc child keys (e2e HTTP + JobsService)', () => {
+  let app: INestApplication<App>;
+  let rolesService: { getPermissionsForUser: jest.Mock };
+  let prisma: { job: { create: jest.Mock }; $transaction: jest.Mock };
+
+  beforeAll(async () => {
+    rolesService = {
+      getPermissionsForUser: jest.fn(),
+    };
+    prisma = {
+      job: { create: jest.fn() },
+      $transaction: jest.fn(),
+    };
+    const jobsService = new JobsService(
+      prisma as unknown as PrismaService,
+      { findByLocation: jest.fn() } as unknown as SitesService,
+      {
+        assertHasStaffSignature: jest.fn().mockResolvedValue(undefined),
+        findByPhone: jest.fn().mockResolvedValue(null),
+      } as unknown as UsersService,
+      {
+        rewriteStorageUrlForClient: (u?: string) => u,
+      } as unknown as MinioService,
+      {
+        notifyReported: jest.fn(),
+        notifyAssigned: jest.fn(),
+      } as unknown as JobEmailNotificationService,
+      rolesService as unknown as RolesService,
+    );
+
+    const moduleFixture = await Test.createTestingModule({
+      controllers: [JobsController],
+      providers: [
+        { provide: JobsService, useValue: jobsService },
+        { provide: JobsPdfService, useValue: {} },
+        { provide: MinioService, useValue: { uploadJobImage: jest.fn() } },
+        {
+          provide: EventsGateway,
+          useValue: { notifyJobUpdate: jest.fn(), notifyNewJob: jest.fn() },
+        },
+        { provide: RolesService, useValue: rolesService },
+        { provide: APP_FILTER, useClass: AllExceptionsFilter },
+      ],
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useClass(FakeJwtAuthGuard)
+      .overrideGuard(PermissionsGuard)
+      .useClass(FakePermissionsGuard)
+      .compile();
+
+    app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix('api');
+    app.useGlobalInterceptors(new ResponseInterceptor());
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('in-contract without job.classifyDoc.contract → 403 after Guard', async () => {
+    rolesService.getPermissionsForUser.mockResolvedValue([
+      'job.classifyDoc',
+      'job.classifyDoc.outOfContract',
+    ]);
+
+    const res = await request(app.getHttpServer())
+      .patch('/api/jobs/10/classify-doc')
+      .set('Authorization', 'Bearer admin')
+      .send({ isOutOfContract: false })
+      .expect(403);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(String(res.body.error.message)).toMatch(
+      /ไม่มีสิทธิ์จำแนกประเภทเอกสาร/,
+    );
+  });
+
+  it('out-of-contract without job.classifyDoc.outOfContract → 403 after Guard', async () => {
+    rolesService.getPermissionsForUser.mockResolvedValue([
+      'job.classifyDoc',
+      'job.classifyDoc.contract',
+    ]);
+
+    const res = await request(app.getHttpServer())
+      .patch('/api/jobs/10/classify-doc')
+      .set('Authorization', 'Bearer admin')
+      .send({ isOutOfContract: true })
+      .expect(403);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(String(res.body.error.message)).toMatch(
+      /ไม่มีสิทธิ์จำแนกประเภทเอกสาร/,
+    );
+  });
+});
+
 describe('JobsService Doc No (create / assign / classify)', () => {
   let service: JobsService;
   let prisma: {
@@ -339,6 +440,10 @@ describe('JobsService Doc No (create / assign / classify)', () => {
   let usersService: {
     assertHasStaffSignature: jest.Mock;
     findByPhone: jest.Mock;
+  };
+
+  let rolesService: {
+    getPermissionsForUser: jest.Mock;
   };
 
   beforeEach(() => {
@@ -356,6 +461,15 @@ describe('JobsService Doc No (create / assign / classify)', () => {
       assertHasStaffSignature: jest.fn().mockResolvedValue(undefined),
       findByPhone: jest.fn().mockResolvedValue(null),
     };
+    rolesService = {
+      getPermissionsForUser: jest
+        .fn()
+        .mockResolvedValue([
+          'job.classifyDoc',
+          'job.classifyDoc.contract',
+          'job.classifyDoc.outOfContract',
+        ]),
+    };
 
     service = new JobsService(
       prisma as unknown as PrismaService,
@@ -368,7 +482,7 @@ describe('JobsService Doc No (create / assign / classify)', () => {
         notifyReported: jest.fn(),
         notifyAssigned: jest.fn(),
       } as unknown as JobEmailNotificationService,
-      {} as unknown as RolesService,
+      rolesService as unknown as RolesService,
     );
   });
 
@@ -496,6 +610,30 @@ describe('JobsService Doc No (create / assign / classify)', () => {
 
     expect(updated.ticketNo).toBe(`${bangkokYearMonth()}0001`);
     expect(updated.isOutOfContract).toBe(true);
+  });
+
+  it('classifyDoc() in-contract without job.classifyDoc.contract → 403', async () => {
+    rolesService.getPermissionsForUser.mockResolvedValue([
+      'job.classifyDoc',
+      'job.classifyDoc.outOfContract',
+    ]);
+
+    await expect(
+      service.classifyDoc(10, false, ADMIN_ID),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('classifyDoc() out-of-contract without job.classifyDoc.outOfContract → 403', async () => {
+    rolesService.getPermissionsForUser.mockResolvedValue([
+      'job.classifyDoc',
+      'job.classifyDoc.contract',
+    ]);
+
+    await expect(
+      service.classifyDoc(10, true, ADMIN_ID),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('classifyDoc() rejects non-RESOLVED', async () => {

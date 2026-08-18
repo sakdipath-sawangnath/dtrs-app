@@ -84,7 +84,7 @@ Footer แสดงเวอร์ชันจาก **package.json** (หรื
 - **เทมเพลตแอปใหม่** (สำเนา AGENTS + Skills + checklist): `docs/templates/README.md`
 - ดัชนี `docs/`: `docs/README.md`
 - **System workflow / flow chart (mermaid):** `docs/System-Workflow.md`
-- **แผน Meeting-11082026 (Phase A–E):** `docs/Meeting-11082026-Requirements-Plan.plan.md` — Doc No จำแนกหลังปิดงาน; UI `/dashboard/all` + `/dashboard/jobs/:id`; แยก `PATCH /jobs/:id/fix` กับ `/close`; ป้าย「รอเซ็นผู้แจ้ง」ในรายการ
+- **แผน Meeting-11082026 (Phase A–E):** `docs/Meeting-11082026-Requirements-Plan.plan.md` — Doc No จำแนกหลังปิดงาน; UI `/dashboard/all` + `/dashboard/jobs/:id`; แยก `PATCH /jobs/:id/fix` กับ `/close`; ป้าย「รอเซ็นผู้แจ้ง」+ ปุ่ม Sign ในรายการ
 - **Locations master seed (MS SQL → MySQL):** [`docs/Locations-Master-Seed.md`](docs/Locations-Master-Seed.md) · `backend/scripts/seed-locations-from-mssql.ts` · dump `backend/scripts/data/TB_MST_*.sql`
 - **Sites import (Sites.xlsx):** [`docs/Sites-Import.md`](docs/Sites-Import.md) · `npm run script:seed-sites-xlsx` · `:dry` / `:clear` · `backend/scripts/data/Sites.xlsx` sheet `info` — local ✅ 198 แถว
 - Private MinIO + รูปผ่านสิทธิ์: `docs/Project-Plan-Private-MinIO-Images.md`, `docs/minio.md` — GitLab กลุ่ม B ✅ (UAT); bucket UAT `dtrs-app-uat` / PRD `dtrs-app`

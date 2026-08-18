@@ -8,20 +8,24 @@ import { signOut } from "next-auth/react";
 import { confirmDialog } from "@/lib/toast";
 import { MANAGED_IMAGE_SIZES } from "@/components/ManagedImage";
 import ManagedImageFrame from "@/components/ManagedImageFrame";
+import { formatRoleLabel } from "@/lib/formatRoleLabel";
 
 interface UserMenuDropdownProps {
   name?: string | null;
   image?: string | null;
+  /** รหัสบทบาทจาก session (`AppRole.code`) เช่น ADMIN */
+  role?: string | null;
   /** ปิด dropdown เมื่อกดนอก (เช่นเมื่อเปิด sidebar mobile) */
   onClose?: () => void;
 }
 
-export default function UserMenuDropdown({ name, image, onClose }: UserMenuDropdownProps) {
+export default function UserMenuDropdown({ name, image, role, onClose }: UserMenuDropdownProps) {
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [imgError, setImgError] = useState(false);
   const pathname = usePathname();
   const ref = useRef<HTMLDivElement>(null);
+  const roleLabel = formatRoleLabel(role);
 
   useEffect(() => {
     setOpen(false);
@@ -53,6 +57,11 @@ export default function UserMenuDropdown({ name, image, onClose }: UserMenuDropd
         className="flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:min-h-[44px] rounded-lg border border-[var(--glass-input-border)] min-w-0 transition-colors bg-[var(--glass-input-bg)] glass-nav-item hover:bg-[var(--glass-hover)] hover:text-[var(--glass-text)] disabled:opacity-85 disabled:cursor-wait"
         aria-expanded={open}
         aria-haspopup="true"
+        aria-label={
+          roleLabel
+            ? `${name ?? "เจ้าหน้าที่"}, Role: ${roleLabel}`
+            : undefined
+        }
       >
         {signingOut ? (
           <>
@@ -94,7 +103,15 @@ export default function UserMenuDropdown({ name, image, onClose }: UserMenuDropd
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 py-1 rounded-xl glass-card shadow-2xl z-50 min-w-[160px]">
+        <div className="absolute right-0 top-full mt-1 py-1 rounded-xl glass-card shadow-2xl z-50 min-w-[180px]">
+          {roleLabel ? (
+            <div className="px-3 py-2 border-b border-[var(--glass-card-border)]">
+              <p className="text-xs glass-muted-text">
+                Role:{" "}
+                <span className="font-semibold glass-text">{roleLabel}</span>
+              </p>
+            </div>
+          ) : null}
           <Link
             href="/dashboard/profile"
             onClick={() => setOpen(false)}

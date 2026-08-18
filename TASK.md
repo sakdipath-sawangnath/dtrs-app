@@ -64,7 +64,7 @@
   - ปุ่ม "ย้ายนอกสัญญา" — **ไม่อยู่บน `/dashboard/pending` แล้ว** (2026-08-14); API `PATCH /jobs/:id/out-of-contract` ยังมีเมื่อมีสิทธิ์ **`job.assign`**; งานนอกสัญญาหลังปิดใช้จำแนกเอกสาร (`classify-doc`)
   - Backend มี endpoint `PATCH /jobs/:id/out-of-contract` เพื่อย้ายนอกสัญญา (คง `PENDING`)
 - [x] Sidebar: เพิ่ม "งานที่รับผิดชอบ" (`/dashboard/my-jobs`); ไม่แสดงเมนู โปรไฟล์ (เข้าได้จาก dropdown)
-- [x] หน้ารายละเอียดงาน (`/dashboard/jobs/:id`): การ์ดแจ้งข้อขัดข้อง (อัปโหลดรูปปัญหาเมื่อมี **`job.issue.upload`** — ดู §33) + การ์ดข้อมูลการแก้ไข + ฟอร์มบันทึกการแก้ไข (ลำดับ: fixEnvironment ก่อน แล้ว brokenPartType; บังคับ: cause, fixMethod และรูปอย่างน้อย 2 รูปแรก) — `PATCH /jobs/:id/fix` คง `IN_PROGRESS`; ปิดงาน + ลายเซ็นผู้แจ้งที่หน้ารายละเอียด (`PATCH /jobs/:id/close`) — ดู §34; พิมพ์/PDF; **จำแนกเอกสาร** (`job.classifyDoc`) เมื่อ `RESOLVED` + hex
+- [x] หน้ารายละเอียดงาน (`/dashboard/jobs/:id`): การ์ดแจ้งข้อขัดข้อง (อัปโหลดรูปปัญหาเมื่อมี **`job.issue.upload`** — ดู §33) + การ์ดข้อมูลการแก้ไข + ฟอร์มบันทึกการแก้ไข (ลำดับ: fixEnvironment ก่อน แล้ว brokenPartType; บังคับ: cause, fixMethod และรูปอย่างน้อย 2 รูปแรก) — `PATCH /jobs/:id/fix` คง `IN_PROGRESS`; ปิดงาน + ลายเซ็นผู้แจ้งที่หน้ารายละเอียดหรือปุ่ม Sign ในรายการ (`PATCH /jobs/:id/close`) — ดู §34; พิมพ์/PDF; **จำแนกเอกสาร** (`job.classifyDoc`) เมื่อ `RESOLVED` + hex
 - [x] RBAC งานซ่อม: เพิ่ม permission `job.fix.self|any` และ `job.reopen.self|any` เพื่อให้กำหนดผ่าน `/dashboard/roles` ได้ว่า role ใด “บันทึก/ปิดงาน” และ “Reopen” ได้ (เฉพาะงานตัวเองหรือทุกงาน)
 
 ## 8. Phase 4 - MinIO Integration (2026-03-11)
@@ -412,6 +412,7 @@
 
 - [x] สร้างงาน: `ticketNo` hex 8 ตัว; มอบหมาย/bulk/OOC **ไม่** gen Running Doc No
 - [x] `PATCH /jobs/:id/classify-doc` + `job.classifyDoc` (ADMIN/SUPERVISOR) + ลายเซ็น; ในสัญญา `CM-SHF-2002-…` / นอกสัญญา `YYYYMM…`
+- [x] แยกสิทธิ์ปุ่มใน dialog: `job.classifyDoc.contract` / `job.classifyDoc.outOfContract`; บทบาทที่มี `job.classifyDoc` ได้ทั้งคู่รอบแรกที่แคตตาล็อกเพิ่มลูก (และตอน seed) — ติ๊กออกแล้ว restart ไม่คืน; API 403 ตามชนิดที่เลือก
 - [x] UI จำแนก: `/dashboard/all` + `/dashboard/jobs/:id` (`JobClassifyDocDialog` — เลือกแล้วยืนยัน)
 - [x] ซ่อน RESOLVED OOC ที่จำแนกแล้วจาก `/all` + `/my-jobs`; หน้า `/out-of-contract` รับ PENDING + RESOLVED OOC จำแนกแล้ว
 - [x] fix-then-ship job detail: รีโหลดเงียบหลังจำแนก + toast error จาก API
@@ -431,13 +432,14 @@
 
 ## 34. แยกลายเซ็นผู้แจ้งออกจากบันทึกการแก้ไข (2026-08-17)
 
-> Grill: คง `IN_PROGRESS` ระหว่างรอเซ็น · API แยก `/fix` กับ `/close` · ปิดงานที่ `/dashboard/jobs/:id` เท่านั้น
+> Grill: คง `IN_PROGRESS` ระหว่างรอเซ็น · API แยก `/fix` กับ `/close` · ปิดงานที่หน้ารายละเอียดหรือปุ่ม Sign ใน `JobsList`
 
 - [x] `PATCH /jobs/:id/fix` บันทึกการแก้ไขอย่างเดียว (ไม่รับลายเซ็น, คง `IN_PROGRESS`)
 - [x] `PATCH /jobs/:id/close` บังคับลายเซ็นผู้แจ้ง + ตรวจข้อมูลแก้ครบ → `RESOLVED` + อีเมล/PDF
-- [x] UI: หน้ารายละเอียดแยกบล็อก「บันทึกการแก้ไข」กับ「ปิดงาน — ลายเซ็นผู้แจ้ง」; wrench modal บันทึกอย่างเดียว + ลิงก์ไปปิดงาน
+- [x] UI: หน้ารายละเอียดแยกบล็อก「บันทึกการแก้ไข」กับ「ปิดงาน — ลายเซ็นผู้แจ้ง」; wrench modal บันทึกอย่างเดียว แล้วเปิด dialog เซ็นในรายการ
 - [x] fix-then-ship: modal บันทึก `/fix` ก่อนไปปิดงาน; `/close` ตรวจครบก่อนอัปโหลดลายเซ็น; toast แยกกรณีบันทึกแล้วแต่ปิดไม่สำเร็จ; unit `jobs-close.service.spec.ts` + e2e `jobs-close.e2e-spec.ts`
 - [x] ป้าย「รอเซ็นผู้แจ้ง」ในรายการงาน (`JobsList` / `/dashboard/my-jobs` / `in-progress`) เมื่อสถานะยัง `IN_PROGRESS` แต่ข้อมูลแก้ไขครบ (สาเหตุ/วิธีแก้ + รูป ≥ 2) — ไม่เพิ่มสถานะใหม่; unit `jobFixImageSlots.test.ts`
+- [x] ปุ่ม Sign ใน `JobsList` เมื่อรอเซ็น — `JobReporterSignDialog` จากรายการ (`job.fix.self|any`); ไม่เพิ่ม permission key; ปุ่มประแจจำกัดผู้รับงาน
 
 ## 35. Meeting-11082026 — PDF รายงาน CM/SHF (2026-08-17)
 

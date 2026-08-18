@@ -131,7 +131,7 @@ export default function LoginPage() {
                   ระบบจัดการงานซ่อม
                 </h1>
                 <p className="text-sm glass-muted-text">
-                  สำหรับเจ้าหน้าที่และผู้ดูแลระบบ CCTV
+                  สำหรับเจ้าหน้าที่และผู้ดูแลระบบ
                 </p>
               </div>
 
