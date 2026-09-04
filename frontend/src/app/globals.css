@@ -496,8 +496,12 @@ textarea:focus-visible {
 
 /* Native <select> — glass (theme via CSS variables) */
 .select-native-glass {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 2.75rem;
-  padding: 0.375rem 0.75rem;
+  padding: 0.5rem 0.875rem;
   font-size: 0.875rem;
   line-height: 1.25rem;
   font-family: inherit;

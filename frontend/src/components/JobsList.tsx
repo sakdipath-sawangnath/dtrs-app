@@ -46,6 +46,7 @@ import DashboardPageShell from "./DashboardPageShell";
 import DashboardFilterBar from "./DashboardFilterBar";
 import JobClassifyDocDialog from "./jobs/JobClassifyDocDialog";
 import JobReporterSignDialog from "./jobs/JobReporterSignDialog";
+import BreakdownFilterChips from "./jobs/BreakdownFilterChips";
 import Select from "react-select";
 import { getReactSelectGlassStyles } from "@/lib/reactSelectGlassStyles";
 import { useAppTheme } from "@/lib/useAppTheme";
@@ -392,7 +393,7 @@ const CONTRACT_TABS_ROW_WRAP =
 
 /** พื้นหลังรายการแบบ No-Card — glass-card ครอบทั้งแท็บ/ฟิลเตอร์/ตาราง (theme-aware) */
 const NO_CARD_SHELL =
-  "flex flex-col gap-4 flex-1 min-h-0 overflow-auto p-4 sm:p-5 w-full glass-card text-slate-900 dark:text-slate-100";
+  "flex flex-col gap-4 flex-1 min-h-0 min-w-0 max-w-full overflow-x-hidden overflow-y-auto p-4 sm:p-5 w-full glass-card text-slate-900 dark:text-slate-100";
 
 export default function JobsList({
   statusFilter,
@@ -920,11 +921,22 @@ export default function JobsList({
   const showAssignedToColumn = statusFilter !== "PENDING";
 
   const filterBarChildren = (
-    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto text-slate-900 dark:text-slate-100">
+    <div
+      className={cn(
+        "grid w-full min-w-0 max-w-full gap-2.5 text-slate-900 dark:text-slate-100",
+        /* minmax(0,1fr) กัน native <select> ดันคอลัมน์ล้นจากความกว้าง option */
+        "grid-cols-1",
+        "sm:grid-cols-2 sm:gap-3",
+        "lg:grid-cols-3",
+        "xl:grid-cols-4",
+        enableAllBreakdownFilters ? "2xl:grid-cols-5" : "2xl:grid-cols-4",
+        "[&>*]:min-w-0 [&>*]:max-w-full",
+      )}
+    >
       {enableAllBreakdownFilters && (
         <>
           <select
-            className="select-native-glass w-full sm:w-44 md:min-w-[160px] text-slate-900 dark:text-slate-100"
+            className="select-native-glass w-full min-w-0 text-slate-900 dark:text-slate-100"
             value={statusSelect}
             onChange={(e) => setStatusSelect(e.target.value)}
           >
@@ -936,7 +948,7 @@ export default function JobsList({
           </select>
 
           <select
-            className="select-native-glass w-full sm:w-44 md:min-w-[160px] text-slate-900 dark:text-slate-100"
+            className="select-native-glass w-full min-w-0 text-slate-900 dark:text-slate-100"
             value={fixEnvironmentSelect}
             onChange={(e) => setFixEnvironmentSelect(e.target.value)}
           >
@@ -947,7 +959,7 @@ export default function JobsList({
           </select>
 
           <select
-            className="select-native-glass w-full sm:w-44 md:min-w-[160px] text-slate-900 dark:text-slate-100"
+            className="select-native-glass w-full min-w-0 text-slate-900 dark:text-slate-100"
             value={brokenPartSelect}
             onChange={(e) => setBrokenPartSelect(e.target.value)}
           >
@@ -958,7 +970,7 @@ export default function JobsList({
           </select>
 
           <select
-            className="select-native-glass w-full sm:w-44 md:min-w-[160px] text-slate-900 dark:text-slate-100"
+            className="select-native-glass w-full min-w-0 text-slate-900 dark:text-slate-100"
             value={assignedToSelect}
             onChange={(e) => setAssignedToSelect(e.target.value)}
             aria-label="กรองตามผู้รับผิดชอบ"
@@ -974,7 +986,7 @@ export default function JobsList({
         </>
       )}
       <select
-        className="select-native-glass w-full sm:w-44 md:min-w-[160px] text-slate-900 dark:text-slate-100"
+        className="select-native-glass w-full min-w-0 text-slate-900 dark:text-slate-100"
         value={provinceFilter}
         onChange={(e) => setProvinceFilter(e.target.value)}
       >
@@ -984,7 +996,7 @@ export default function JobsList({
         ))}
       </select>
       <select
-        className="select-native-glass w-full sm:w-44 md:min-w-[160px] text-slate-900 dark:text-slate-100"
+        className="select-native-glass w-full min-w-0 text-slate-900 dark:text-slate-100"
         value={districtFilter}
         onChange={(e) => setDistrictFilter(e.target.value)}
         disabled={!provinceFilter && districts.length === 0}
@@ -995,7 +1007,7 @@ export default function JobsList({
         ))}
       </select>
       <select
-        className="select-native-glass w-full sm:w-48 md:min-w-[180px] text-slate-900 dark:text-slate-100"
+        className="select-native-glass w-full min-w-0 text-slate-900 dark:text-slate-100"
         value={jobSortField}
         onChange={(e) => {
           setPage(1);
@@ -1008,7 +1020,7 @@ export default function JobsList({
         <option value="fix">วันที่ปิดงาน</option>
       </select>
       <select
-        className="select-native-glass w-full sm:w-40 md:min-w-[140px] text-slate-900 dark:text-slate-100"
+        className="select-native-glass w-full min-w-0 text-slate-900 dark:text-slate-100"
         value={jobSortDir}
         onChange={(e) => {
           setPage(1);
@@ -1020,7 +1032,7 @@ export default function JobsList({
         <option value="asc">เก่า → ใหม่</option>
       </select>
       <select
-        className="select-native-glass w-full sm:w-28 md:min-w-[112px] text-slate-900 dark:text-slate-100"
+        className="select-native-glass w-full min-w-0 text-slate-900 dark:text-slate-100"
         value={pageSize}
         onChange={(e) => {
           const v = e.target.value;
@@ -1152,140 +1164,95 @@ export default function JobsList({
   }, [enableAllBreakdownFilters, jobsForPartCardCounts]);
 
   const breakdownCards = enableAllBreakdownFilters ? (
-    <div className="space-y-3 mb-2 text-slate-900 dark:text-slate-100" aria-label="การกรองแบบการ์ด">
-      <div>
-        <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">สถานะ</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {[
+    <BreakdownFilterChips
+      groups={[
+        {
+          id: "status",
+          label: "สถานะ",
+          value: statusSelect,
+          onChange: setStatusSelect,
+          options: [
             { value: "", label: "ทั้งหมด", count: statusCardCounts.total },
             {
               value: "PENDING",
               label: STATUS_CONFIG.PENDING.label,
               count: statusCardCounts.pending,
+              dotClassName: "bg-orange-500",
             },
             {
               value: "IN_PROGRESS",
               label: STATUS_CONFIG.IN_PROGRESS.label,
               count: statusCardCounts.inProgress,
+              dotClassName: "bg-blue-500",
             },
             {
               value: "RESOLVED",
               label: STATUS_CONFIG.RESOLVED.label,
               count: statusCardCounts.resolved,
+              dotClassName: "bg-emerald-500",
             },
-          ].map((it) => {
-            const active = statusSelect === it.value;
-            return (
-              <button
-                key={it.value || "ALL"}
-                type="button"
-                aria-pressed={active}
-                onClick={() => setStatusSelect(it.value)}
-                className={[
-                  "rounded-xl border px-3 py-2.5 text-left transition-all active:scale-95 min-h-[44px] cursor-pointer",
-                  active
-                    ? "border-blue-500/50 bg-blue-500/10"
-                    : "border-slate-200 dark:border-[var(--glass-card-border)] bg-white dark:bg-[var(--glass-input-bg)] hover:border-blue-500/30",
-                ].join(" ")}
-              >
-                <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 truncate">
-                  {it.label}
-                </div>
-                <div className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-100 mt-0.5">
-                  {it.count}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div>
-        <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">ประเภทสถานที่</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {[
+          ],
+        },
+        {
+          id: "environment",
+          label: "ประเภทสถานที่",
+          value: fixEnvironmentSelect,
+          onChange: setFixEnvironmentSelect,
+          options: [
             { value: "", label: "ทั้งหมด", count: jobsForEnvCardCounts.length },
             {
               value: "INDOOR",
-              label: "ภายใน (ในอาคาร)",
+              label: "ภายใน",
+              title: "ภายใน (ในอาคาร)",
               count: envCounts.INDOOR,
+              dotClassName: "bg-sky-500",
             },
             {
               value: "OUTDOOR",
-              label: "ภายนอก (นอกอาคาร)",
+              label: "ภายนอก",
+              title: "ภายนอก (นอกอาคาร)",
               count: envCounts.OUTDOOR,
+              dotClassName: "bg-amber-500",
             },
-            { value: "UNKNOWN", label: "ไม่ระบุ", count: envCounts.UNKNOWN },
-          ].map((it) => {
-            const active = fixEnvironmentSelect === it.value;
-            return (
-              <button
-                key={it.value || "ALL"}
-                type="button"
-                aria-pressed={active}
-                onClick={() => setFixEnvironmentSelect(it.value)}
-                className={[
-                  "rounded-xl border px-3 py-2.5 text-left transition-all active:scale-95 min-h-[44px] cursor-pointer",
-                  active
-                    ? "border-blue-500/50 bg-blue-500/10"
-                    : "border-slate-200 dark:border-[var(--glass-card-border)] bg-white dark:bg-[var(--glass-input-bg)] hover:border-blue-500/30",
-                ].join(" ")}
-              >
-                <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 truncate">
-                  {it.label}
-                </div>
-                <div className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-100 mt-0.5">
-                  {it.count}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div>
-        <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">ประเภทงาน</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {[
+            {
+              value: "UNKNOWN",
+              label: "ไม่ระบุ",
+              count: envCounts.UNKNOWN,
+              dotClassName: "bg-slate-400",
+            },
+          ],
+        },
+        {
+          id: "workType",
+          label: "ประเภทงาน",
+          value: brokenPartSelect,
+          onChange: setBrokenPartSelect,
+          options: [
             { value: "", label: "ทั้งหมด", count: jobsForPartCardCounts.length },
             {
               value: "Hardware",
-              label: "Hardware (ฮาร์ดแวร์)",
+              label: "Hardware",
+              title: "Hardware (ฮาร์ดแวร์)",
               count: partCounts.Hardware,
+              dotClassName: "bg-violet-500",
             },
             {
               value: "Software",
-              label: "Software (ซอฟต์แวร์)",
+              label: "Software",
+              title: "Software (ซอฟต์แวร์)",
               count: partCounts.Software,
+              dotClassName: "bg-teal-500",
             },
-            { value: "UNKNOWN", label: "ไม่ระบุ", count: partCounts.UNKNOWN },
-          ].map((it) => {
-            const active = brokenPartSelect === it.value;
-            return (
-              <button
-                key={it.value || "ALL"}
-                type="button"
-                aria-pressed={active}
-                onClick={() => setBrokenPartSelect(it.value)}
-                className={[
-                  "rounded-xl border px-3 py-2.5 text-left transition-all active:scale-95 min-h-[44px] cursor-pointer",
-                  active
-                    ? "border-blue-500/50 bg-blue-500/10"
-                    : "border-slate-200 dark:border-[var(--glass-card-border)] bg-white dark:bg-[var(--glass-input-bg)] hover:border-blue-500/30",
-                ].join(" ")}
-              >
-                <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 truncate">
-                  {it.label}
-                </div>
-                <div className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-100 mt-0.5">
-                  {it.count}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+            {
+              value: "UNKNOWN",
+              label: "ไม่ระบุ",
+              count: partCounts.UNKNOWN,
+              dotClassName: "bg-slate-400",
+            },
+          ],
+        },
+      ]}
+    />
   ) : null;
 
   useEffect(() => {
@@ -1948,8 +1915,16 @@ export default function JobsList({
           )}
           {noCard ? (
             <>
-              <div className={`${GLASS_SECTION} shrink-0`}>
-                <DashboardFilterBar {...filterBarProps} className="border-b-0" />
+              <div
+                className={cn(
+                  GLASS_SECTION,
+                  "flex w-full min-w-0 max-w-full shrink-0 flex-col gap-4 overflow-x-hidden p-4 sm:gap-5 sm:p-5",
+                )}
+              >
+                <DashboardFilterBar
+                  {...filterBarProps}
+                  className="border-b-0 p-0 sm:p-0"
+                />
               </div>
               <div
                 className={`${GLASS_SECTION} flex flex-col flex-1 min-h-[280px] items-center justify-center px-4 py-12 text-center`}
@@ -2513,9 +2488,26 @@ export default function JobsList({
 
         {noCard ? (
           <>
-            <div className={`${GLASS_SECTION} shrink-0`}>
+            <div
+              className={cn(
+                GLASS_SECTION,
+                "flex w-full min-w-0 max-w-full shrink-0 flex-col gap-4 overflow-x-hidden p-4 sm:gap-5 sm:p-5",
+              )}
+            >
               {breakdownCards}
-              <DashboardFilterBar {...filterBarProps} className="border-b-0" />
+              <div
+                className={cn(
+                  "min-w-0 max-w-full",
+                  breakdownCards
+                    ? "border-t border-[var(--glass-card-border)] pt-4 sm:pt-5"
+                    : undefined,
+                )}
+              >
+                <DashboardFilterBar
+                  {...filterBarProps}
+                  className="border-b-0 p-0 sm:p-0"
+                />
+              </div>
             </div>
             <div
               className={`${GLASS_SECTION} flex flex-col flex-1 min-h-0 overflow-hidden`}

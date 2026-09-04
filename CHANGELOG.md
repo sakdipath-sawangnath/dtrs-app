@@ -49,6 +49,15 @@ npm install
 
 ---
 
+## [0.3.3] - 2026-09-04
+
+### Changed
+
+- CSV ส่งออกจากรายการงาน: ไม่รวมคอลัมน์「หัวข้อ」;「หมายเหตุการซ่อม」ตัด `[Reopen …]`; คอลัมน์ S/N แตกหลายอุปกรณ์เป็นข้อความอ่านง่าย +「จำนวนอุปกรณ์」/「รายการ_S/N」(ไม่ส่ง raw JSON `v:1`)
+- หน้าประวัติทั้งหมด (`/dashboard/all`): ตัวกรองการ์ดสถานะ/ประเภทสถานที่/ประเภทงาน เป็น chip/pill (จุดสี + ตัวนับ) — scroll แนวนอนบนมือถือ, wrap บน tablet/desktop; ปรับ spacing/padding ของ chip · แถบค้นหา · dropdown ให้มีจังหวะหายใจและ responsive grid; แก้ dropdown ล้นกรอบจาก min-content ของ native `<select>` + flex wrapper
+
+---
+
 ## [0.3.2] - 2026-09-04
 
 ### Changed
