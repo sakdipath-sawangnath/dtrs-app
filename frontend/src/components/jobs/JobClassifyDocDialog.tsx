@@ -43,7 +43,7 @@ const CHOICES: {
   {
     kind: "in",
     title: "ในสัญญา",
-    description: "เลข CM-SHF-2002-… งานยังอยู่ในประวัติทั้งหมด",
+    description: "เลข CM-SHF-YYYY-… งานยังอยู่ในประวัติทั้งหมด",
     icon: FileCheck2,
   },
   {

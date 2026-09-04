@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { Cctv, Radio, ShieldCheck } from "lucide-react";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 
@@ -30,20 +29,6 @@ const FloatingBubbles = () => (
         />
       );
     })}
-  </div>
-);
-
-const TechCctvWatermark = () => (
-  <div className="relative flex items-center justify-center text-[var(--glass-text)]">
-    <div className="absolute rounded-full border-[1.5px] border-dashed h-[280px] w-[280px] animate-[spin_12s_linear_infinite] border-[var(--glass-text)]/40 dark:border-white/60" />
-    <div className="absolute rounded-full border-[2px] border-t-transparent border-b-transparent h-[210px] w-[210px] animate-[spin_8s_linear_infinite_reverse] border-[var(--glass-text)]/30 dark:border-white/40" />
-    <Cctv size={110} strokeWidth={1.5} className="relative z-10" />
-    <Radio
-      size={48}
-      strokeWidth={1.5}
-      className="absolute -top-10 -right-6 animate-[pulse_2s_ease-in-out_infinite]"
-    />
-    <ShieldCheck size={42} strokeWidth={1.5} className="absolute -bottom-6 -left-4" />
   </div>
 );
 
@@ -87,10 +72,6 @@ export default function PublicLayoutShell({ children, subtitle }: PublicLayoutSh
                   "linear-gradient(to bottom, transparent, var(--glass-scan-line), transparent)",
               }}
             />
-
-            <div className="absolute -right-8 md:right-[5%] top-[10%] z-0 transform -rotate-12 opacity-[0.04] dark:opacity-[0.05]">
-              <TechCctvWatermark />
-            </div>
           </div>
         </div>
 

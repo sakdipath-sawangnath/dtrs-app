@@ -6,6 +6,13 @@
 
 **Changelog + app version:** [`CHANGELOG.md`](CHANGELOG.md) — key changes; commit ที่แตะไฟล์นี้จะถาม SemVer bump (`frontend/package.json`) ผ่าน husky · footer แสดง `vX.Y.Z` จาก package (ไม่ใช่ DB) · ครั้งแรก: `npm install` ที่ root
 
+## บันทึกการอัปเดตล่าสุด (2026-09-04)
+
+- **Doc No ในสัญญา** — รูปแบบ `CM-SHF-YYYY-XXXX` (ปี Asia/Bangkok ณ วันจำแนก; running ไม่รีเซ็ต) แทน `CM-SHF-2002-XXXX`; เลขเก่ายังใช้ได้ — [`docs/System-Workflow.md`](docs/System-Workflow.md) · [`CHANGELOG.md`](CHANGELOG.md)
+- **`job.viewContractTabs` ครอบภาพรวม + PDF** — ไม่มีสิทธิ์นี้: `/dashboard` นับเฉพาะงานในสัญญา (ซ่อน card นอกสัญญา) และ `GET /jobs/reports/summary-pdf` กรองชุดเดียวกัน — สอดคล้อง `JobsList` — [`backend/docs/RBAC-Setup.md`](backend/docs/RBAC-Setup.md) · [`CHANGELOG.md`](CHANGELOG.md)
+- **Public layout** — ลบ watermark ไอคอน CCTV จาก `PublicLayoutShell` (`/public/report`, `/public/status`)
+- **Dashboard** — ลบ section placeholder «แนวทางขยายวิเคราะห์ในอนาคต»
+
 ## บันทึกการอัปเดตล่าสุด (2026-08-18)
 
 - **ปิดงานจากรายการ** — ปุ่ม Sign ใน `JobsList` เมื่อป้าย「รอเซ็นผู้แจ้ง」เปิด dialog ลายเซ็นผู้แจ้ง (`PATCH /jobs/:id/close`) โดยไม่ต้องเข้าหน้ารายละเอียด; สิทธิ์เดิม `job.fix.self|any` — [`TASK.md`](TASK.md) §34 · [`CHANGELOG.md`](CHANGELOG.md)
@@ -19,7 +26,7 @@
 ## บันทึกการอัปเดตล่าสุด (2026-08-14)
 
 - **บทบาทที่สร้างเอง (`User.role`)** — คอลัมน์เป็น **`VARCHAR`** เก็บ `AppRole.code` (เช่น `ADMIN_1`); ไม่ใช้ Prisma/MySQL enum อีกต่อไป เพื่อไม่ให้ `GET /users` 500 — ดู [`backend/docs/RBAC-Setup.md`](backend/docs/RBAC-Setup.md)
-- **แท็บสัญญา/นอกสัญญา** — มองเห็นเมื่อมีสิทธิ์ **`job.viewContractTabs`** (ตั้งที่ `/dashboard/roles`); ไม่ติ๊ก = เห็นแค่งานในสัญญา ไม่มีแท็บสลับ; คนละตัวกับเมนู sidebar `menu.outOfContract` และปุ่มย้ายนอกสัญญา `job.assign` — หลังเพิ่ม permission ให้ restart backend เพื่อ `ensurePermissionCatalogSynced`
+- **แท็บสัญญา/นอกสัญญา** — มองเห็นเมื่อมีสิทธิ์ **`job.viewContractTabs`** (ตั้งที่ `/dashboard/roles`); ไม่ติ๊ก = เห็นแค่งานในสัญญา ไม่มีแท็บสลับ; **หน้าภาพรวม + PDF สรุป** ก็กรองเฉพาะงานในสัญญาเช่นกัน; คนละตัวกับเมนู sidebar `menu.outOfContract` และปุ่มย้ายนอกสัญญา `job.assign` — หลังเพิ่ม permission ให้ restart backend เพื่อ `ensurePermissionCatalogSynced`
 
 ## บันทึกการอัปเดตล่าสุด (2026-08-06)
 

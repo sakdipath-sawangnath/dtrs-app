@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import puppeteer from 'puppeteer-core';
 import { PrismaService } from '../prisma/prisma.service';
+import { RolesService } from '../roles/roles.service';
 import type { DashboardSummaryPdfQueryDto } from './dto/create-job.dto';
 
 /**
@@ -116,7 +117,10 @@ function findEdgeExecutable(): string | undefined {
  */
 @Injectable()
 export class JobsPdfService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly rolesService: RolesService,
+  ) {}
 
   private readonly launchArgs = [
     '--no-sandbox',
@@ -292,13 +296,21 @@ export class JobsPdfService {
 
   async generateDashboardSummaryPdf(
     query: DashboardSummaryPdfQueryDto,
+    actorUserId: number,
   ): Promise<{
     buffer: Buffer;
     filename: string;
   }> {
     const { start, end, labelTh } = this.parseSummaryRange(query);
+    const permissions =
+      await this.rolesService.getPermissionsForUser(actorUserId);
+    const includeOutOfContract = permissions.includes('job.viewContractTabs');
+
     const rows = await this.prisma.job.findMany({
       where: {
+        ...(includeOutOfContract
+          ? {}
+          : { NOT: { isOutOfContract: true } }),
         OR: [
           { reportDate: { gte: start, lte: end } },
           {
@@ -387,6 +399,10 @@ export class JobsPdfService {
       )
       .join('');
 
+    const outOfContractKpi = includeOutOfContract
+      ? `<div class="kpi"><div class="label">นอกสัญญา</div><div class="value">${outOfContract}</div></div>`
+      : '';
+
     const nowLabel = this.formatDateTimeTh(new Date());
     const html = `<!doctype html>
 <html lang="th">
@@ -422,7 +438,7 @@ export class JobsPdfService {
     <div class="kpi"><div class="label">กำลังแก้ไข</div><div class="value">${inProgress}</div></div>
     <div class="kpi"><div class="label">เสร็จสิ้น</div><div class="value">${resolved}</div></div>
     <div class="kpi"><div class="label">ยกเลิก</div><div class="value">${cancelled}</div></div>
-    <div class="kpi"><div class="label">นอกสัญญา</div><div class="value">${outOfContract}</div></div>
+    ${outOfContractKpi}
     <div class="kpi"><div class="label">รอและยังไม่มอบหมาย</div><div class="value">${pendingUnassigned}</div></div>
   </div>
 

@@ -162,7 +162,7 @@ Maintain a running **ledger** of every experiment in this session. Each entry: w
 
 - UI อ่าน `GET /roles/me/permissions` — ต้อง unwrap `data.permissions`
 - Sidebar fallback ตามรหัสบทบาทมาตรฐานเมื่อ permission list ว่าง
-- Permission ที่มักสับสน: `job.assign` (มอบหมาย + ย้ายนอกสัญญา), `job.viewContractTabs` (แท็บสัญญา/นอกสัญญาในรายการงาน — ไม่ใช่เมนู `menu.outOfContract`), `job.issue.upload` (อัปโหลดรูปปัญหาที่แจ้ง — ไม่ใช่ `job.fix.*`; PENDING/IN_PROGRESS เท่านั้น), `job.fix.self|any`, `job.reopen.self|any`, `job.deleteInProgress`, `job.deleteUnassigned`, `menu.*`
+- Permission ที่มักสับสน: `job.assign` (มอบหมาย + ย้ายนอกสัญญา), `job.viewContractTabs` (แท็บสัญญา/นอกสัญญาในรายการงาน + กรองสรุปบน `/dashboard` และ `GET /jobs/reports/summary-pdf` — ไม่ใช่เมนู `menu.outOfContract`), `job.issue.upload` (อัปโหลดรูปปัญหาที่แจ้ง — ไม่ใช่ `job.fix.*`; PENDING/IN_PROGRESS เท่านั้น), `job.fix.self|any`, `job.reopen.self|any`, `job.deleteInProgress`, `job.deleteUnassigned`, `menu.*`
 - หลังเพิ่ม permission ใหม่: restart backend หรือ `seed-roles-permissions.ts`
 - `User.role` เป็น `VARCHAR` (`AppRole.code`) ไม่ใช่ Prisma enum — บทบาทที่สร้างเองเก็บที่ `role` + `roleId`
 
@@ -170,7 +170,7 @@ Maintain a running **ledger** of every experiment in this session. Each entry: w
 
 - สถานะ: `PENDING` → `IN_PROGRESS` → `RESOLVED` (+ Reopen)
 - `assignedToId` null vs มีคนรับ — กระทบปุ่มมอบหมาย/รับงาน/ลบ
-- `isOutOfContract` — แท็บสัญญา/นอกสัญญา (ต้องมี `job.viewContractTabs` ถึงจะเห็นแท็บ)
+- `isOutOfContract` — แท็บสัญญา/นอกสัญญา (ต้องมี `job.viewContractTabs` ถึงจะเห็นแท็บ); ไม่มีสิทธิ์นี้ KPI/PDF สรุปบนภาพรวมนับเฉพาะงานในสัญญา
 - Serial หลายแถว — JSON ใน `Job.oldSerialNumber` (ดู `docs/Job-Serial-Multi-Row.md`)
 - `reportDate` / `fixDate` — timezone Bangkok; backfill ใน `JobsService`
 

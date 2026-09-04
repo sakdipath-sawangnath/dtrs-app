@@ -1,4 +1,5 @@
 import {
+  bangkokYear,
   bangkokYearMonth,
   formatDocRunning,
   formatDocTicketNo,
@@ -25,10 +26,20 @@ describe('doc-ticket-no (Meeting Phase C)', () => {
   });
 
   describe('formatDocTicketNo', () => {
-    it('in-contract uses CM-SHF-2002- prefix', () => {
-      expect(formatDocTicketNo({ isOutOfContract: false, running: 7 })).toBe(
-        'CM-SHF-2002-0007',
-      );
+    it('in-contract uses CM-SHF-YYYY- prefix', () => {
+      expect(
+        formatDocTicketNo({
+          isOutOfContract: false,
+          running: 7,
+          periodYear: '2026',
+        }),
+      ).toBe('CM-SHF-2026-0007');
+    });
+
+    it('rejects missing periodYear for in-contract', () => {
+      expect(() =>
+        formatDocTicketNo({ isOutOfContract: false, running: 1 }),
+      ).toThrow(RangeError);
     });
 
     it('out-of-contract uses YYYYMM + running', () => {
@@ -52,12 +63,12 @@ describe('doc-ticket-no (Meeting Phase C)', () => {
     });
   });
 
-  describe('bangkokYearMonth', () => {
-    it('returns 6-digit YYYYMM for a fixed instant', () => {
+  describe('bangkokYear / bangkokYearMonth', () => {
+    it('returns YYYY and YYYYMM for a fixed instant', () => {
       // 2026-08-13 10:00 UTC → 17:00 Bangkok same day
-      const ym = bangkokYearMonth(new Date('2026-08-13T10:00:00.000Z'));
-      expect(ym).toBe('202608');
-      expect(ym).toMatch(/^\d{6}$/);
+      const d = new Date('2026-08-13T10:00:00.000Z');
+      expect(bangkokYear(d)).toBe('2026');
+      expect(bangkokYearMonth(d)).toBe('202608');
     });
   });
 
@@ -69,8 +80,10 @@ describe('doc-ticket-no (Meeting Phase C)', () => {
       expect(isFormalDocTicketNo(null)).toBe(false);
     });
 
-    it('accepts running Doc No formats', () => {
+    it('accepts running Doc No formats (incl. legacy CM-SHF-2002-)', () => {
+      expect(isFormalDocTicketNo('CM-SHF-2026-0001')).toBe(true);
       expect(isFormalDocTicketNo('CM-SHF-2002-0001')).toBe(true);
+      expect(isFormalDocTicketNo('CM-SHF-2026-10000')).toBe(true);
       expect(isFormalDocTicketNo('2026080001')).toBe(true);
     });
   });

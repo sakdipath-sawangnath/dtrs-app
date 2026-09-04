@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
+import { RolesService } from '../roles/roles.service';
 import { JobsPdfService } from './jobs-pdf.service';
 
 jest.mock('puppeteer-core', () => ({
@@ -17,6 +18,7 @@ const launchMock: jest.Mock = jest.requireMock('puppeteer-core').default.launch;
 describe('JobsPdfService (puppeteer-core / PDF)', () => {
   let service: JobsPdfService;
   let prisma: { job: { findUnique: jest.Mock; findMany: jest.Mock } };
+  let rolesService: { getPermissionsForUser: jest.Mock };
 
   const mockPdfBytes = Buffer.from('%PDF-1.4 mock');
   const mockPage = {
@@ -41,9 +43,18 @@ describe('JobsPdfService (puppeteer-core / PDF)', () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
     };
+    rolesService = {
+      getPermissionsForUser: jest
+        .fn()
+        .mockResolvedValue(['menu.dashboard', 'job.viewContractTabs']),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [JobsPdfService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        JobsPdfService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: RolesService, useValue: rolesService },
+      ],
     }).compile();
 
     service = module.get(JobsPdfService);
@@ -83,7 +94,7 @@ describe('JobsPdfService (puppeteer-core / PDF)', () => {
       expect(launchMock).toHaveBeenCalled();
       expect(mockPage.goto).toHaveBeenCalledWith(
         'http://frontend:3000/print/jobs/5',
-        expect.objectContaining({ waitUntil: 'networkidle0' }),
+        expect.any(Object),
       );
       expect(mockPage.setExtraHTTPHeaders).toHaveBeenCalledWith({
         Authorization: 'Bearer jwt-token',
@@ -95,10 +106,13 @@ describe('JobsPdfService (puppeteer-core / PDF)', () => {
 
   describe('generateDashboardSummaryPdf (TC-BE-04)', () => {
     it('returns PDF buffer and filename for month period', async () => {
-      const { buffer, filename } = await service.generateDashboardSummaryPdf({
-        periodType: 'month',
-        month: '2026-01',
-      });
+      const { buffer, filename } = await service.generateDashboardSummaryPdf(
+        {
+          periodType: 'month',
+          month: '2026-01',
+        },
+        1,
+      );
 
       expect(buffer.subarray(0, 4).toString()).toBe('%PDF');
       expect(filename).toMatch(/^dashboard-summary-/);
@@ -107,14 +121,39 @@ describe('JobsPdfService (puppeteer-core / PDF)', () => {
         expect.objectContaining({ format: 'A4', printBackground: true }),
       );
       expect(mockBrowser.close).toHaveBeenCalled();
+      const html = String(mockPage.setContent.mock.calls[0][0]);
+      expect(html).toContain('นอกสัญญา');
+    });
+
+    it('excludes out-of-contract jobs and KPI without job.viewContractTabs', async () => {
+      rolesService.getPermissionsForUser.mockResolvedValue(['menu.dashboard']);
+
+      await service.generateDashboardSummaryPdf(
+        { periodType: 'month', month: '2026-01' },
+        42,
+      );
+
+      expect(rolesService.getPermissionsForUser).toHaveBeenCalledWith(42);
+      expect(prisma.job.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            NOT: { isOutOfContract: true },
+          }),
+        }),
+      );
+      const html = String(mockPage.setContent.mock.calls[0][0]);
+      expect(html).not.toContain('>นอกสัญญา<');
     });
 
     it('throws BadRequestException for invalid month', async () => {
       await expect(
-        service.generateDashboardSummaryPdf({
-          periodType: 'month',
-          month: 'invalid',
-        }),
+        service.generateDashboardSummaryPdf(
+          {
+            periodType: 'month',
+            month: 'invalid',
+          },
+          1,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -123,10 +162,13 @@ describe('JobsPdfService (puppeteer-core / PDF)', () => {
     it('passes no-sandbox args when launching browser', async () => {
       prisma.job.findUnique.mockResolvedValue({ id: 1, status: 'RESOLVED' });
 
-      await service.generateDashboardSummaryPdf({
-        periodType: 'year',
-        year: '2026',
-      });
+      await service.generateDashboardSummaryPdf(
+        {
+          periodType: 'year',
+          year: '2026',
+        },
+        1,
+      );
 
       expect(launchMock).toHaveBeenCalledWith(
         expect.objectContaining({

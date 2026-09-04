@@ -187,11 +187,11 @@ model Setting {
   value Json
 }
 
-// ตัวนับ Doc No — IN_CONTRACT period='' ; OUT_OF_CONTRACT period=YYYYMM (Asia/Bangkok)
+// ตัวนับ Doc No — IN_CONTRACT period='' (running ไม่รีเซ็ต) ; OUT_OF_CONTRACT period=YYYYMM
 model DocSequence {
   id        Int      @id @default(autoincrement())
   kind      String // IN_CONTRACT | OUT_OF_CONTRACT
-  period    String   @default("") // '' หรือ YYYYMM
+  period    String   @default("") // '' = ในสัญญา (ตลอดอายุ) | YYYYMM = นอกสัญญารายเดือน
   lastValue Int      @default(0)
   updatedAt DateTime @updatedAt
 

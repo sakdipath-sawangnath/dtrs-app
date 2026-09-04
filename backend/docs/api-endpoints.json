@@ -254,7 +254,7 @@
       "path": "/api/jobs/:id/classify-doc",
       "auth": "Bearer JWT",
       "permission": "job.classifyDoc (+ job.classifyDoc.contract | job.classifyDoc.outOfContract ตาม isOutOfContract)",
-      "description": "จำแนกเอกสารหลัง RESOLVED: แทนที่ hex ticketNo ด้วย Running Doc No ครั้งเดียว (ในสัญญา CM-SHF-2002-XXXX ต้อง job.classifyDoc.contract / นอกสัญญา YYYYMM#### ต้อง job.classifyDoc.outOfContract) + ตั้ง isOutOfContract; UI: /dashboard/all และ /dashboard/jobs/:id",
+      "description": "จำแนกเอกสารหลัง RESOLVED: แทนที่ hex ticketNo ด้วย Running Doc No ครั้งเดียว (ในสัญญา CM-SHF-YYYY-XXXX ต้อง job.classifyDoc.contract / นอกสัญญา YYYYMM#### ต้อง job.classifyDoc.outOfContract) + ตั้ง isOutOfContract; UI: /dashboard/all และ /dashboard/jobs/:id",
       "body": { "isOutOfContract": false }
     },
     {

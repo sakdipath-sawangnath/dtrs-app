@@ -101,11 +101,15 @@ export class JobsController {
   @Permissions('menu.dashboard')
   @Get('reports/summary-pdf')
   async dashboardSummaryPdf(
+    @Req() req: { user: { id: number } },
     @Query(new ZodValidationPipe(DashboardSummaryPdfQuerySchema))
     query: DashboardSummaryPdfQueryDto,
   ): Promise<StreamableFile> {
     const { buffer, filename } =
-      await this.jobsPdfService.generateDashboardSummaryPdf(query);
+      await this.jobsPdfService.generateDashboardSummaryPdf(
+        query,
+        req.user.id,
+      );
     return new StreamableFile(buffer, {
       type: 'application/pdf',
       disposition: `attachment; filename="${filename}"`,

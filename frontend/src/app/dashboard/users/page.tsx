@@ -282,7 +282,7 @@ export default function UsersPage() {
 
   const getRoleSummaryText = (code: string) => {
     const c = code.toUpperCase().trim();
-    if (c === "ADMIN") return "เข้าถึงทุกเมนู รวม จัดการผู้ใช้ และ ตั้งค่าระบบ · CRUD ผู้ใช้ได้ทั้งหมด";
+    if (c === "ADMIN") return "เทียบเท่าเจ้าหน้าที่ แต่สามารถมอบหมายงานให้เจ้าหน้าที่ได้";
     if (c === "STAFF") return "ภาพรวม, รอดำเนินการ, กำลังแก้ไข, ประวัติทั้งหมด, นอกสัญญา · ไม่มีเมนู จัดการผู้ใช้ และ ตั้งค่าระบบ";
     if (c === "USER") return "เฉพาะ โปรไฟล์, แจ้งปัญหา, ตรวจสอบสถานะ";
     return "สิทธิ์ตามที่กำหนดไว้ในหน้าบทบาทและสิทธิ์ (RBAC)";

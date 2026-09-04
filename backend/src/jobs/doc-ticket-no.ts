@@ -12,7 +12,7 @@ export function formatDocRunning(n: number): string {
 }
 
 /**
- * ในสัญญา: CM-SHF-2002-XXXX
+ * ในสัญญา: CM-SHF-YYYY-XXXX (YYYY = Asia/Bangkok ณ วันจำแนก; running ไม่รีเซ็ต)
  * นอกสัญญา: YYYYMM + running
  */
 export function formatDocTicketNo(params: {
@@ -20,6 +20,8 @@ export function formatDocTicketNo(params: {
   running: number;
   /** YYYYMM (Asia/Bangkok) — จำเป็นเมื่อ isOutOfContract */
   periodYm?: string;
+  /** YYYY (Asia/Bangkok) — จำเป็นเมื่อในสัญญา */
+  periodYear?: string;
 }): string {
   const running = formatDocRunning(params.running);
   if (params.isOutOfContract) {
@@ -29,14 +31,19 @@ export function formatDocTicketNo(params: {
     }
     return `${period}${running}`;
   }
-  return `CM-SHF-2002-${running}`;
+  const year = (params.periodYear ?? '').trim();
+  if (!/^\d{4}$/.test(year)) {
+    throw new RangeError('periodYear ต้องเป็น YYYY 4 หลัก');
+  }
+  return `CM-SHF-${year}-${running}`;
 }
 
-const IN_CONTRACT_PREFIX = 'CM-SHF-2002-';
+/** เลขในสัญญา: CM-SHF-YYYY- + running ≥4 หลัก (รวมเลขเก่า CM-SHF-2002-…) */
+const IN_CONTRACT_DOC_RE = /^CM-SHF-\d{4}-\d{4,}$/;
 
 /**
  * เลขทางการหลังจำแนกเอกสาร — ไม่ใช่ hex 8 ตัวตอนสร้างงาน
- * ในสัญญา: CM-SHF-2002- + running ≥4 หลัก
+ * ในสัญญา: CM-SHF-YYYY- + running ≥4 หลัก
  * นอกสัญญา: YYYYMM + running ≥4 หลัก (รวมอย่างน้อย 10 หลัก)
  */
 export function isFormalDocTicketNo(
@@ -44,10 +51,13 @@ export function isFormalDocTicketNo(
 ): boolean {
   const s = (ticketNo ?? '').trim();
   if (!s) return false;
-  if (s.startsWith(IN_CONTRACT_PREFIX)) {
-    return /^\d{4,}$/.test(s.slice(IN_CONTRACT_PREFIX.length));
-  }
+  if (IN_CONTRACT_DOC_RE.test(s)) return true;
   return /^\d{10,}$/.test(s);
+}
+
+/** YYYY ตาม Asia/Bangkok */
+export function bangkokYear(now: Date = new Date()): string {
+  return bangkokYearMonth(now).slice(0, 4);
 }
 
 /** YYYYMM ตาม Asia/Bangkok */

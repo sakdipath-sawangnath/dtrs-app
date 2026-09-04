@@ -49,6 +49,25 @@ npm install
 
 ---
 
+## [0.4.0] - 2026-09-04
+
+### Removed
+
+- หน้า public (`/public/report`, `/public/status`): ลบ watermark ไอคอน CCTV บนพื้นหลัง
+- หน้าภาพรวม (`/dashboard`): ลบ section แนวทางขยายวิเคราะห์ในอนาคต และ card placeholder «เร็วๆ นี้»
+
+### Changed
+
+- หน้าภาพรวม: แถบช่วงสรุปเป็น glass-card มี padding คงที่ทุก breakpoint; select ใช้ padding ที่ทับ `.form-input-glass`
+- Doc No ในสัญญา: `CM-SHF-YYYY-XXXX` (YYYY = ปี Asia/Bangkok ณ วันจำแนก; running ไม่รีเซ็ต) แทน `CM-SHF-2002-XXXX` — เลขเก่า `CM-SHF-2002-…` ยังถือว่าเป็นเลขทางการ
+
+### Fixed
+
+- หน้าภาพรวม (`/dashboard`): การ์ดสรุป / กราฟ / สรุปวิเคราะห์นับเฉพาะงานในสัญญาเมื่อไม่มี `job.viewContractTabs` (สอดคล้อง `JobsList`) และซ่อน card «นอกสัญญา · ยังไม่ปิด»
+- `GET /jobs/reports/summary-pdf`: กรองงานนอกสัญญาและซ่อน KPI นอกสัญญาเมื่อผู้ใช้ไม่มี `job.viewContractTabs` (สอดคล้องหน้าภาพรวม)
+
+---
+
 ## [0.3.3] - 2026-09-04
 
 ### Changed

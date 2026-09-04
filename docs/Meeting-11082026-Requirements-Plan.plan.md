@@ -25,7 +25,7 @@ full-stack (Public + Jobs workflow + Sites/Locations + Profile signature + Expor
 ## Decisions จาก grilling / scrutinize
 
 - **Doc No:** สร้างงานออก hex 8 ตัว · มอบหมาย/รับงาน/ย้าย OOC **ไม่** gen Running Doc No · ออกเลขทางการครั้งเดียวตอนจำแนกเอกสารหลัง `RESOLVED` (`PATCH /jobs/:id/classify-doc`, สิทธิ์ `job.classifyDoc`) · Reopen ไม่ gen ใหม่
-- **Format:** ในสัญญา `CM-SHF-2002-` + running · นอกสัญญา `YYYYMM` (Asia/Bangkok) + running · running ใช้ `padStart(4, '0')` (ขั้นต่ำ 4 หลัก; เกิน 9999 → 5 หลัก, เกิน 99999 → 6 หลัก, โตตามค่าจริงไม่มีเพดาน; ไม่ wrap / ไม่ throw เพราะจำนวนหลัก)
+- **Format:** ในสัญญา `CM-SHF-YYYY-` + running ไม่รีเซ็ต (YYYY = Asia/Bangkok ณ วันจำแนก) · นอกสัญญา `YYYYMM` (Asia/Bangkok) + running · running ใช้ `padStart(4, '0')` (ขั้นต่ำ 4 หลัก; เกิน 9999 → 5 หลัก, เกิน 99999 → 6 หลัก, โตตามค่าจริงไม่มีเพดาน; ไม่ wrap / ไม่ throw เพราะจำนวนหลัก) · เลขเก่า `CM-SHF-2002-…` ยังถือว่าเป็นเลขทางการ
 - **Location:** เพิ่ม `Subdistrict` · cascade 5 ขั้น (จังหวัด→อำเภอ→ตำบล→สถานที่/หน่วยงาน→ชื่อสถานี) · `Site.agency` + `Site.station` · `Job.agency` + `Job.location`(station) · import `Sites.xlsx`
 - **Signature:** ลายเซ็นเจ้าหน้าที่ที่ profile (MinIO) · hard gate เฉพาะ assign / bulk-assign / OOC / fix / reopen · ดูได้อย่างเดียว · ลายเซ็นผู้แจ้งเก็บต่อ job ตอนปิดงาน · **ไม่** บล็อกลบงาน / `updateStatus`
 - **Email optional:** identity หลักเป็นเบอร์ · เมื่อไม่มีอีเมลตั้ง `User.username = phone` (normalize เดียวกับ `phone`) · มีอีเมลแล้วอัปเดต `email` ได้ แต่ **ไม่บังคับย้าย username** ตามอีเมล · ข้ามอีเมลแจ้งเตือนถ้าไม่มีที่อยู่ (ใช้ logic ใน `job-email-notification.service` ที่มีอยู่)
@@ -106,7 +106,7 @@ full-stack (Public + Jobs workflow + Sites/Locations + Profile signature + Expor
 - มอบหมาย / รับงาน / bulk-assign / ย้าย PENDING นอกสัญญา: **ไม่** ออก Running Doc No
 - จำแนกเอกสารครั้งเดียวหลัง `RESOLVED`: `PATCH /jobs/:id/classify-doc` + `job.classifyDoc` (ADMIN/SUPERVISOR) + ลายเซ็นโปรไฟล์
   - UI: `/dashboard/all` + `/dashboard/jobs/:id` (`JobClassifyDocDialog` — เลือกประเภทแล้วยืนยัน)
-  - ในสัญญา `CM-SHF-2002-XXXX` · นอกสัญญา `YYYYMM####` · แทนที่ hex
+  - ในสัญญา `CM-SHF-YYYY-XXXX` · นอกสัญญา `YYYYMM####` · แทนที่ hex
   - งานนอกสัญญาที่จำแนกแล้วไม่โชว์ `/dashboard/all` และ `/dashboard/my-jobs` → `/dashboard/out-of-contract`
   - จากหน้ารายละเอียด: อยู่หน้าเดิม + รีโหลดเลข (ถือสำเร็จเมื่อเป็นเลขทางการแล้ว)
 - Padding: `String(n).padStart(4, '0')` — ขั้นต่ำ 4 หลัก แล้วโตตามค่าจริง; `YYYYMM` จาก Asia/Bangkok

@@ -22,6 +22,7 @@ import { JobEmailNotificationService } from './job-email-notification.service';
 import { RolesService } from '../roles/roles.service';
 import {
   bangkokYearMonth as formatBangkokYearMonth,
+  bangkokYear as formatBangkokYear,
   formatDocTicketNo,
   isFormalDocTicketNo,
 } from './doc-ticket-no';
@@ -1298,6 +1299,11 @@ export class JobsService {
     return true;
   }
 
+  /** YYYY ตาม Asia/Bangkok */
+  private bangkokYear(): string {
+    return formatBangkokYear();
+  }
+
   /** YYYYMM ตาม Asia/Bangkok */
   private bangkokYearMonth(): string {
     return formatBangkokYearMonth();
@@ -1328,7 +1334,7 @@ export class JobsService {
 
   /**
    * ออกเลข Doc No ใน transaction (แถว DocSequence ล็อกด้วย SELECT … FOR UPDATE)
-   * ในสัญญา: CM-SHF-2002-XXXX (running ไม่รีเซ็ต)
+   * ในสัญญา: CM-SHF-YYYY-XXXX (YYYY Asia/Bangkok ณ วันจำแนก; running ไม่รีเซ็ต — DocSequence period='')
    * นอกสัญญา: YYYYMM#### (รีเซ็ตรายเดือน Asia/Bangkok; padStart 4 แล้วโตตามค่าจริง)
    */
   private async nextTicketNo(
@@ -1361,7 +1367,9 @@ export class JobsService {
     const ticketNo = formatDocTicketNo({
       isOutOfContract,
       running: next,
-      periodYm: period || undefined,
+      ...(isOutOfContract
+        ? { periodYm: period }
+        : { periodYear: this.bangkokYear() }),
     });
 
     const clash = await tx.job.findUnique({

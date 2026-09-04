@@ -28,6 +28,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { SitesService } from '../src/sites/sites.service';
 import { UsersService } from '../src/users/users.service';
 import {
+  bangkokYear,
   bangkokYearMonth,
   isFormalDocTicketNo,
 } from '../src/jobs/doc-ticket-no';
@@ -138,7 +139,7 @@ describe('Jobs Doc No / classify-doc (e2e HTTP)', () => {
             id,
             ticketNo: isOutOfContract
               ? `${bangkokYearMonth()}0001`
-              : 'CM-SHF-2002-0001',
+              : `CM-SHF-${bangkokYear()}-0001`,
             isOutOfContract,
             status: 'RESOLVED',
           };
@@ -237,7 +238,7 @@ describe('Jobs Doc No / classify-doc (e2e HTTP)', () => {
     expect(res.body.data.ticketNo).toBe(HEX_TICKET);
   });
 
-  it('PATCH /api/jobs/:id/classify-doc in-contract → CM-SHF-2002- running', async () => {
+  it('PATCH /api/jobs/:id/classify-doc in-contract → CM-SHF-YYYY- running', async () => {
     const res = await request(app.getHttpServer())
       .patch('/api/jobs/10/classify-doc')
       .set('Authorization', 'Bearer admin')
@@ -245,7 +246,7 @@ describe('Jobs Doc No / classify-doc (e2e HTTP)', () => {
       .expect(200);
 
     expect(jobsService.classifyDoc).toHaveBeenCalledWith(10, false, ADMIN_ID);
-    expect(res.body.data.ticketNo).toBe('CM-SHF-2002-0001');
+    expect(res.body.data.ticketNo).toBe(`CM-SHF-${bangkokYear()}-0001`);
     expect(isFormalDocTicketNo(res.body.data.ticketNo)).toBe(true);
   });
 
@@ -553,7 +554,7 @@ describe('JobsService Doc No (create / assign / classify)', () => {
     expect(updated.isOutOfContract).toBe(true);
   });
 
-  it('classifyDoc() in-contract replaces hex with CM-SHF-2002- running', async () => {
+  it('classifyDoc() in-contract replaces hex with CM-SHF-YYYY- running', async () => {
     const tx = {
       job: {
         findUnique: jest.fn().mockImplementation(async ({ where }) => {
@@ -578,7 +579,7 @@ describe('JobsService Doc No (create / assign / classify)', () => {
 
     const updated = await service.classifyDoc(10, false, ADMIN_ID);
 
-    expect(updated.ticketNo).toBe('CM-SHF-2002-0001');
+    expect(updated.ticketNo).toBe(`CM-SHF-${bangkokYear()}-0001`);
     expect(updated.isOutOfContract).toBe(false);
     expect(isFormalDocTicketNo(updated.ticketNo)).toBe(true);
   });

@@ -17,8 +17,9 @@ describe("isFormalDocTicketNo", () => {
   });
 
   it("accepts in-contract and out-of-contract running numbers", () => {
+    assert.equal(isFormalDocTicketNo("CM-SHF-2026-0001"), true);
     assert.equal(isFormalDocTicketNo("CM-SHF-2002-0001"), true);
-    assert.equal(isFormalDocTicketNo("CM-SHF-2002-10000"), true);
+    assert.equal(isFormalDocTicketNo("CM-SHF-2026-10000"), true);
     assert.equal(isFormalDocTicketNo("2026080001"), true);
   });
 });
