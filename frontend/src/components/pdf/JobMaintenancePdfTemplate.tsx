@@ -6,6 +6,7 @@ import ManagedImage from "@/components/ManagedImage";
 import { PdfReportHeader } from "@/components/pdf/PdfReportHeader";
 import { sarabun } from "@/lib/fonts";
 import { REPORT_PDF_HEADER } from "@/lib/reportPdfConstants";
+import { stripReopenAuditFromFixNote } from "@/lib/stripReopenAuditFromFixNote";
 
 /** ข้อมูลงานสำหรับเทมเพลต PDF (สอดคล้องกับ JobDetail หน้า dashboard) */
 export type JobMaintenancePdfJob = {
@@ -221,7 +222,7 @@ function SignatureBlock({
     >
       <div
         style={{
-          minHeight: 40,
+          minHeight: 56,
           display: "flex",
           alignItems: "flex-end",
           justifyContent: "center",
@@ -233,7 +234,7 @@ function SignatureBlock({
           <img
             src={signatureSrc}
             alt={caption}
-            style={{ maxHeight: 44, maxWidth: "90%", objectFit: "contain" }}
+            style={{ maxHeight: 58, maxWidth: "92%", objectFit: "contain" }}
           />
         ) : null}
       </div>
@@ -284,8 +285,11 @@ export function JobMaintenancePdfTemplate({
     (isStoredJobTypeOnly(job.brokenPart) ? "" : job.brokenPart?.trim()) ||
     "–";
   const causeLine = job.cause?.trim() || "–";
+  const fixNoteForPdf = stripReopenAuditFromFixNote(job.fixNote);
   const fixParts =
-    [job.fixMethod?.trim(), job.fixNote?.trim()].filter(Boolean).join("\n\n") || "–";
+    [job.fixMethod?.trim(), fixNoteForPdf || undefined]
+      .filter(Boolean)
+      .join("\n\n") || "–";
   const equipLines = formatEquipmentSerialForPdf(
     job.oldSerialNumber,
     job.newSerialNumber,
@@ -393,7 +397,7 @@ export function JobMaintenancePdfTemplate({
                   {job.agency || "–"}
                 </td>
                 <td style={cell}>
-                  <span style={pdfFieldLabel}>ชื่อผู้แจ้ง: </span>
+                  <span style={pdfFieldLabel}>ชื่อผู้แจ้งเหตุขัดข้อง: </span>
                   {job.reporterName || "–"}
                 </td>
               </tr>
