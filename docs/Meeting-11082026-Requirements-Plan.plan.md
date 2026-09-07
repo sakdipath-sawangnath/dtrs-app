@@ -25,7 +25,7 @@ full-stack (Public + Jobs workflow + Sites/Locations + Profile signature + Expor
 ## Decisions จาก grilling / scrutinize
 
 - **Doc No:** สร้างงานออก hex 8 ตัว · มอบหมาย/รับงาน/ย้าย OOC **ไม่** gen Running Doc No · ออกเลขทางการครั้งเดียวตอนจำแนกเอกสารหลัง `RESOLVED` (`PATCH /jobs/:id/classify-doc`, สิทธิ์ `job.classifyDoc`) · Reopen ไม่ gen ใหม่
-- **Format:** ในสัญญา `CM-SHF-2002-` + running · นอกสัญญา `YYYYMM` (Asia/Bangkok) + running · running ใช้ `padStart(4, '0')` (ขั้นต่ำ 4 หลัก; เกิน 9999 → 5 หลัก, เกิน 99999 → 6 หลัก, โตตามค่าจริงไม่มีเพดาน; ไม่ wrap / ไม่ throw เพราะจำนวนหลัก)
+- **Format:** ในสัญญา `CM-SHF-YYYY-` + running ไม่รีเซ็ต (YYYY = Asia/Bangkok ณ วันจำแนก) · นอกสัญญา `YYYYMM` (Asia/Bangkok) + running · running ใช้ `padStart(4, '0')` (ขั้นต่ำ 4 หลัก; เกิน 9999 → 5 หลัก, เกิน 99999 → 6 หลัก, โตตามค่าจริงไม่มีเพดาน; ไม่ wrap / ไม่ throw เพราะจำนวนหลัก) · เลขเก่า `CM-SHF-2002-…` ยังถือว่าเป็นเลขทางการ
 - **Location:** เพิ่ม `Subdistrict` · cascade 5 ขั้น (จังหวัด→อำเภอ→ตำบล→สถานที่/หน่วยงาน→ชื่อสถานี) · `Site.agency` + `Site.station` · `Job.agency` + `Job.location`(station) · import `Sites.xlsx`
 - **Signature:** ลายเซ็นเจ้าหน้าที่ที่ profile (MinIO) · hard gate เฉพาะ assign / bulk-assign / OOC / fix / reopen · ดูได้อย่างเดียว · ลายเซ็นผู้แจ้งเก็บต่อ job ตอนปิดงาน · **ไม่** บล็อกลบงาน / `updateStatus`
 - **Email optional:** identity หลักเป็นเบอร์ · เมื่อไม่มีอีเมลตั้ง `User.username = phone` (normalize เดียวกับ `phone`) · มีอีเมลแล้วอัปเดต `email` ได้ แต่ **ไม่บังคับย้าย username** ตามอีเมล · ข้ามอีเมลแจ้งเตือนถ้าไม่มีที่อยู่ (ใช้ logic ใน `job-email-notification.service` ที่มีอยู่)
@@ -37,9 +37,9 @@ full-stack (Public + Jobs workflow + Sites/Locations + Profile signature + Expor
 - Export บน `/dashboard/all`: คง **CSV UTF-8 BOM** (เปิดใน Excel ได้ตาม remark) + เพิ่มคอลัมน์ระยะเวลา — ไม่บังคับย้ายเป็น `.xlsx` ในรอบนี้
 - ระยะเวลาจบงาน: `fixDate − reportDate` (fallback `createdAt`) แสดงเมื่อมี `fixDate` (หน่วยวัน)
 - เมนู master ใหม่: `/dashboard/locations` + permission `menu.locations` (แยกจาก `/dashboard/sites`)
-- Locations เขียน: ใช้ `site.create` / `site.update`; อ่าน provinces/districts/subdistricts สำหรับ dropdown ตามแบบ public `GET` ที่มีอยู่
+- Locations เขียน: ใช้ **`location.create`** (POST จังหวัด/อำเภอ/ตำบล) — แยกจาก `site.create`; อ่าน provinces/districts/subdistricts สำหรับ dropdown ตามแบบ public `GET` ที่มีอยู่
 - งาน PENDING ที่ยังไม่มีเลข: ไม่เกิดแล้ว (create ออก hex) · Running Doc No แทนที่ hex ตอนจำแนกหลังปิดงาน
-- จำแนกเอกสาร: ครั้งเดียว · ADMIN/SUPERVISOR (`job.classifyDoc`) + ลายเซ็นโปรไฟล์ · UI บน `/dashboard/all` และ `/dashboard/jobs/:id` · งาน `RESOLVED` นอกสัญญาที่จำแนกแล้วไป `/dashboard/out-of-contract` ไม่โชว์ `/dashboard/all` และ `/dashboard/my-jobs`
+- จำแนกเอกสาร: ครั้งเดียว · ADMIN/SUPERVISOR (`job.classifyDoc`) + ลายเซ็นโปรไฟล์ · UI บน `/dashboard/all` และ `/dashboard/jobs/:id` · งาน `RESOLVED` นอกสัญญาที่จำแนกแล้วไปคิวย่อ `/dashboard/out-of-contract` และ**ยังโชว์**บน `/dashboard/all` / `/dashboard/my-jobs` (แท็บ「ทั้งหมด」/「นอกสัญญา」; อัปเดต 2026-09 — ไม่ซ่อนจากประวัติแล้ว)
 - Phase E go-live: ทีมตั้งลายเซ็นที่ profile ก่อนเปิดใช้คิว (ไม่มี grace period ในโค้ด)
 - หลัง deploy ที่มี `menu.locations`: รัน seed RBAC (`backend/scripts/seed-roles-permissions.ts`) บน env นั้น
 - หลัง deploy ที่ Locations ว่าง: รัน `backend/scripts/seed-locations-from-mssql.ts` (ต้องมี `scripts/data/TB_MST_*.sql`) — ดู [`Locations-Master-Seed.md`](./Locations-Master-Seed.md)
@@ -94,7 +94,7 @@ full-stack (Public + Jobs workflow + Sites/Locations + Profile signature + Expor
 ### Phase B — Location master + Site (ข้อ 2, 9, 10)
 
 - Prisma: เพิ่ม `Subdistrict` (`districtId` + `name`, unique ต่ออำเภอ); เพิ่ม `Site.subdistrict` / `Job.subdistrict` เป็น string (denormalize)
-- API: ขยาย [`locations`](../backend/src/locations/locations.controller.ts) (province → district → subdistrict) — create/update ที่จำเป็น; เขียนใช้ `site.create` / `site.update`; อ่านสำหรับ dropdown ตามแบบ public `GET /locations/provinces` ที่มีอยู่
+- API: ขยาย [`locations`](../backend/src/locations/locations.controller.ts) (province → district → subdistrict) — create ที่จำเป็น; เขียนใช้ **`location.create`** (ไม่ใช่ `site.create`); อ่านสำหรับ dropdown ตามแบบ public `GET /locations/provinces` ที่มีอยู่
 - หน้าใหม่ `/dashboard/locations` + เมนู sidebar (`menu.locations` + seed); ย้ายบล็อกจังหวัด–อำเภอออกจากหน้า sites (หรือลิงก์ไปหน้าใหม่)
 - ฟอร์ม Site + public report: select cascade จังหวัด→อำเภอ→ตำบล→สถานที่/หน่วยงาน→ชื่อสถานี; UI ทำงานได้แม้รายการตำบลว่าง
 - Seed จังหวัด/อำเภอ/ตำบล: ✅ dump MS SQL ใน `backend/scripts/data/TB_MST_*.sql` → `scripts/seed-locations-from-mssql.ts` (`DRY_RUN=1` ได้) — คู่มือ [`Locations-Master-Seed.md`](./Locations-Master-Seed.md)
@@ -106,8 +106,8 @@ full-stack (Public + Jobs workflow + Sites/Locations + Profile signature + Expor
 - มอบหมาย / รับงาน / bulk-assign / ย้าย PENDING นอกสัญญา: **ไม่** ออก Running Doc No
 - จำแนกเอกสารครั้งเดียวหลัง `RESOLVED`: `PATCH /jobs/:id/classify-doc` + `job.classifyDoc` (ADMIN/SUPERVISOR) + ลายเซ็นโปรไฟล์
   - UI: `/dashboard/all` + `/dashboard/jobs/:id` (`JobClassifyDocDialog` — เลือกประเภทแล้วยืนยัน)
-  - ในสัญญา `CM-SHF-2002-XXXX` · นอกสัญญา `YYYYMM####` · แทนที่ hex
-  - งานนอกสัญญาที่จำแนกแล้วไม่โชว์ `/dashboard/all` และ `/dashboard/my-jobs` → `/dashboard/out-of-contract`
+  - ในสัญญา `CM-SHF-YYYY-XXXX` · นอกสัญญา `YYYYMM####` · แทนที่ hex
+  - งานนอกสัญญาที่จำแนกแล้ว → คิวย่อ `/dashboard/out-of-contract` และ**ยังโชว์**บน `/dashboard/all` / `/dashboard/my-jobs` (แท็บ「ทั้งหมด」/「นอกสัญญา」; อัปเดต 2026-09)
   - จากหน้ารายละเอียด: อยู่หน้าเดิม + รีโหลดเลข (ถือสำเร็จเมื่อเป็นเลขทางการแล้ว)
 - Padding: `String(n).padStart(4, '0')` — ขั้นต่ำ 4 หลัก แล้วโตตามค่าจริง; `YYYYMM` จาก Asia/Bangkok
 - อัปเดต [`System-Workflow.md`](./System-Workflow.md) ให้ตรง flow นี้
@@ -120,8 +120,8 @@ flowchart LR
   close[PATCH fix RESOLVED]
   classify[Classify doc]
   create --> assign --> close --> classify
-  classify -->|CM-SHF| allPage[dashboard all]
-  classify -->|YYYYMM OOC| oocPage[dashboard out-of-contract]
+  classify -->|CM-SHF| allPage[dashboard all tabs]
+  classify -->|YYYYMM OOC| oocVis[all/my-jobs out tabs + out-of-contract queue]
   allPage -.->|ปุ่มจำแนก| classify
   detail[dashboard jobs id] -.->|ปุ่มจำแนก| classify
 ```

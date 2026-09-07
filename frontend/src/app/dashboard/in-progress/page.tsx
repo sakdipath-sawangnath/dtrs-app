@@ -1,16 +1,16 @@
 "use client";
 import { useState } from "react";
-import JobsList from "@/components/JobsList";
+import JobsList, { type ContractScopeTab } from "@/components/JobsList";
 
 export default function InProgressPage() {
-  const [tab, setTab] = useState<"contract" | "out">("contract");
+  const [tab, setTab] = useState<ContractScopeTab>("contract");
 
   return (
     <JobsList
       statusFilter="IN_PROGRESS"
       showContractTabs
-      showOutOfContract={tab === "out"}
-      onShowOutOfContractChange={(v) => setTab(v ? "out" : "contract")}
+      contractTab={tab}
+      onContractTabChange={setTab}
       noCard={true}
     />
   );

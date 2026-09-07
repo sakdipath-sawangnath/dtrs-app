@@ -129,8 +129,16 @@
   }
 
   .pdf-logo-forth {
-    max-height: 14mm !important;
-    max-width: 48mm !important;
+    display: block !important;
+    margin-left: auto !important;
+    max-height: 11mm !important;
+    max-width: 34mm !important;
+    width: auto !important;
+  }
+
+  .pdf-report-header td:last-child {
+    text-align: right !important;
+    padding-right: 0 !important;
   }
 
   .pdf-signature-block {

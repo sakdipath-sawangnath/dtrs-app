@@ -68,13 +68,27 @@ export function PdfReportHeader({ fontFamily }: Props) {
               <div>{REPORT_PDF_HEADER.line3}</div>
               <div style={{ marginTop: 4 }}>{contractLine}</div>
             </td>
-            <td style={{ ...headerCell, textAlign: "center" }}>
+            <td
+              style={{
+                ...headerCell,
+                textAlign: "right",
+                paddingRight: 0,
+                overflow: "hidden",
+              }}
+            >
               <ManagedImage
                 forceRaw
                 src={REPORT_LOGO_FORTH}
                 alt="FORTH"
                 className="pdf-logo-forth"
-                style={{ maxHeight: 52, maxWidth: 180, objectFit: "contain" }}
+                style={{
+                  display: "block",
+                  marginLeft: "auto",
+                  maxHeight: 36,
+                  maxWidth: "100%",
+                  width: "auto",
+                  objectFit: "contain",
+                }}
               />
             </td>
           </tr>

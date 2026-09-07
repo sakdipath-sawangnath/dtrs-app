@@ -182,7 +182,7 @@
 | 37 | ชื่อไฟล์ PDF แนบอีเมล | `backend/src/jobs/job-email-notification.service.ts` — `DTRS-*.pdf` | ✅ |
 | 38 | หัวข้อ PDF รายงาน | `backend/src/jobs/jobs-pdf.service.ts` | ☐ |
 | 39 | ข้อความใน PDF template | `frontend/src/components/pdf/JobMaintenancePdfTemplate.tsx` + `reportPdfConstants.ts` (โครงการ SHF/CM) | ✅ |
-| 40 | Public layout watermark | `frontend/src/components/PublicLayoutShell.tsx` (icon CCTV — OK ถ้ายังเป็นระบบ CCTV) | ☐ |
+| 40 | Public layout watermark | `frontend/src/components/PublicLayoutShell.tsx` — **ลบ** watermark ไอคอน CCTV แล้ว (เหลือ gradient + grid + particles) | ✅ 2026-09-04 |
 
 ---
 

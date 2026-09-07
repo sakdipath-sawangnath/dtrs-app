@@ -2,7 +2,7 @@ import { buildReportedEmailHtml, type JobEmailPayload } from './job-email-html';
 
 describe('job-email-html location line (agency + station)', () => {
   const base: JobEmailPayload = {
-    ticketNo: 'CM-SHF-2002-0001',
+    ticketNo: 'CM-SHF-2026-0001',
     issueSummary: 'ทดสอบ',
     province: 'กาญจนบุรี',
     district: 'เลาขวัญ',

@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import axios from "axios";
-import { Shield, Plus, Pencil, Trash2 } from "lucide-react";
+import { Shield, Plus, Pencil, Trash2, BookOpen } from "lucide-react";
+import Link from "next/link";
 import DashboardPageShell from "@/components/DashboardPageShell";
 import DashboardFilterBar from "@/components/DashboardFilterBar";
 import DashboardRouteLoading from "@/components/DashboardRouteLoading";
@@ -283,6 +284,15 @@ export default function RolesPage() {
       noCard={true}
     >
       <div className="flex flex-col space-y-6">
+        <p className="text-sm -mt-2">
+          <Link
+            href="/dashboard/user-guide"
+            className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+          >
+            <BookOpen size={16} aria-hidden />
+            อ่านคู่มือ workflow และความหมายสิทธิ์
+          </Link>
+        </p>
         <DashboardFilterBar
           onRefresh={() => { fetchRoles(); fetchPermissions(); }}
           rightActions={

@@ -254,7 +254,7 @@
       "path": "/api/jobs/:id/classify-doc",
       "auth": "Bearer JWT",
       "permission": "job.classifyDoc (+ job.classifyDoc.contract | job.classifyDoc.outOfContract ตาม isOutOfContract)",
-      "description": "จำแนกเอกสารหลัง RESOLVED: แทนที่ hex ticketNo ด้วย Running Doc No ครั้งเดียว (ในสัญญา CM-SHF-2002-XXXX ต้อง job.classifyDoc.contract / นอกสัญญา YYYYMM#### ต้อง job.classifyDoc.outOfContract) + ตั้ง isOutOfContract; UI: /dashboard/all และ /dashboard/jobs/:id",
+      "description": "จำแนกเอกสารหลัง RESOLVED: แทนที่ hex ticketNo ด้วย Running Doc No ครั้งเดียว (ในสัญญา CM-SHF-YYYY-XXXX ต้อง job.classifyDoc.contract / นอกสัญญา YYYYMM#### ต้อง job.classifyDoc.outOfContract) + ตั้ง isOutOfContract; UI: /dashboard/all และ /dashboard/jobs/:id",
       "body": { "isOutOfContract": false }
     },
     {
@@ -310,7 +310,43 @@
       "method": "POST",
       "path": "/api/sites",
       "auth": "Bearer JWT",
-      "description": "สร้าง Site"
+      "description": "สร้าง Site (permission: site.create)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/locations/provinces",
+      "auth": false,
+      "description": "รายการจังหวัด (master lazy-load)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/locations/provinces/:provinceId/districts",
+      "auth": false,
+      "description": "อำเภอตามจังหวัด"
+    },
+    {
+      "method": "GET",
+      "path": "/api/locations/districts/:districtId/subdistricts",
+      "auth": false,
+      "description": "ตำบลตามอำเภอ"
+    },
+    {
+      "method": "POST",
+      "path": "/api/locations/provinces",
+      "auth": "Bearer JWT",
+      "description": "สร้างจังหวัด (permission: location.create)"
+    },
+    {
+      "method": "POST",
+      "path": "/api/locations/provinces/:provinceId/districts",
+      "auth": "Bearer JWT",
+      "description": "สร้างอำเภอ (permission: location.create)"
+    },
+    {
+      "method": "POST",
+      "path": "/api/locations/districts/:districtId/subdistricts",
+      "auth": "Bearer JWT",
+      "description": "สร้างตำบล (permission: location.create)"
     },
     {
       "method": "GET",

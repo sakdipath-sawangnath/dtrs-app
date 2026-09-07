@@ -39,10 +39,10 @@ import {
   FileDown,
   Building2,
   Cpu,
-  Target,
   X,
   ChevronDown,
   Ban,
+  BookOpen,
 } from "lucide-react";
 import {
   PieChart,
@@ -64,6 +64,7 @@ import DashboardRouteLoading from "@/components/DashboardRouteLoading";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { countJobBreakdowns } from "@/lib/jobBreakdownCounts";
 import { useAppTheme } from "@/lib/useAppTheme";
 
@@ -126,13 +127,13 @@ const TH_MONTHS = [
   "ธันวาคม",
 ] as const;
 
-/** ความสูงเดียวกับปุ่ม (44px) — ปรับ line-height / padding ให้ข้อความอยู่กลางดีทั้งบน Windows / macOS */
+/** ความสูงเดียวกับปุ่ม (44px) — !padding ทับ .form-input-glass ที่ใช้ shorthand padding */
 const FILTER_SELECT_CLASS =
-  "form-input-glass h-11 min-h-11 box-border w-full max-w-full appearance-none pl-4 pr-10 py-[6px] text-sm leading-5 cursor-pointer";
+  "form-input-glass h-11 min-h-11 box-border w-full max-w-full appearance-none !pl-4 !pr-10 !py-1.5 text-sm leading-5 cursor-pointer";
 const FILTER_INPUT_CLASS =
-  "form-input-glass h-11 min-h-11 box-border w-full max-w-full px-3 py-[6px] text-sm leading-5 shadow-inner";
+  "form-input-glass h-11 min-h-11 box-border w-full max-w-full !px-3 !py-1.5 text-sm leading-5 shadow-inner";
 const FILTER_DATE_INPUT_CLASS =
-  `${FILTER_INPUT_CLASS} pr-9 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-90 hover:[&::-webkit-calendar-picker-indicator]:opacity-100`;
+  `${FILTER_INPUT_CLASS} !pr-9 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-90 hover:[&::-webkit-calendar-picker-indicator]:opacity-100`;
 
 type DashboardFilterMode = "all" | "year" | "month" | "last7" | "last30" | "custom";
 
@@ -155,11 +156,50 @@ const QUICK_LINKS = [
   { label: "ข้อขัดข้องทั้งหมด", href: "/dashboard/all", desc: "ประวัติการแจ้งข้อขัดข้องและ filter", permission: "menu.all", roles: ["ADMIN", "STAFF"], icon: ClipboardList },
   { label: "จัดการผู้ใช้", href: "/dashboard/users", desc: "รายชื่อผู้ใช้และบทบาท", permission: "menu.users", roles: ["ADMIN"], icon: Users },
   { label: "จัดการบทบาทและสิทธิ์", href: "/dashboard/roles", desc: "กำหนดสิทธิ์เมนูให้แต่ละบทบาท", permission: "menu.roles", roles: ["ADMIN"], icon: Shield },
+  { label: "คู่มือระบบ", href: "/dashboard/user-guide", desc: "Workflow และความหมายสิทธิ์สำหรับแอดมิน", permission: "menu.userGuide", roles: ["ADMIN"], icon: BookOpen },
   { label: "ตั้งค่าระบบ", href: "/dashboard/settings", desc: "กำหนดค่า MinIO และ Email", permission: "menu.settings", roles: ["ADMIN"], icon: Settings },
   { label: "แจ้งปัญหา", href: "/public/report", desc: "แบบฟอร์มแจ้งซ่อม", permission: "menu.report", roles: ["USER", "ADMIN", "STAFF"], icon: FileEdit },
   { label: "ตรวจสอบสถานะ", href: "/public/status", desc: "ตรวจสอบสถานะใบแจ้งซ่อม", permission: "menu.status", roles: ["USER", "ADMIN", "STAFF"], icon: Search },
   { label: "โปรไฟล์", href: "/dashboard/profile", desc: "ข้อมูลส่วนตัวและเปลี่ยนรหัสผ่าน", permission: "menu.profile", roles: ["USER", "ADMIN", "STAFF"], icon: User },
 ];
+
+const METRICS_SKELETON_BLOCK = "rounded-xl bg-slate-200/80 dark:bg-white/10";
+
+/** placeholder จน `/roles/me/permissions` โหลด — กัน KPI fail-open/fail-closed ชั่วคราว */
+function DashboardOverviewMetricsSkeleton() {
+  return (
+    <div className="space-y-6" aria-busy="true" aria-label="กำลังโหลดสรุปภาพรวม">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="glass-card p-4 sm:p-5 flex items-center gap-3 min-h-[88px]">
+            <Skeleton className={`h-11 w-11 shrink-0 ${METRICS_SKELETON_BLOCK}`} />
+            <div className="flex-1 space-y-2 min-w-0">
+              <Skeleton className={`h-7 w-12 ${METRICS_SKELETON_BLOCK}`} />
+              <Skeleton className={`h-3 w-20 ${METRICS_SKELETON_BLOCK}`} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Skeleton className={`h-40 w-full ${METRICS_SKELETON_BLOCK}`} />
+        <Skeleton className={`h-40 w-full ${METRICS_SKELETON_BLOCK}`} />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <Skeleton className={`h-[280px] w-full ${METRICS_SKELETON_BLOCK}`} />
+        <Skeleton className={`h-[280px] w-full ${METRICS_SKELETON_BLOCK}`} />
+      </div>
+      <Skeleton className={`h-[320px] w-full ${METRICS_SKELETON_BLOCK}`} />
+      <div className="space-y-3">
+        <Skeleton className={`h-4 w-52 ${METRICS_SKELETON_BLOCK}`} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          <Skeleton className={`h-28 w-full ${METRICS_SKELETON_BLOCK}`} />
+          <Skeleton className={`h-28 w-full ${METRICS_SKELETON_BLOCK}`} />
+          <Skeleton className={`h-28 w-full ${METRICS_SKELETON_BLOCK}`} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -167,6 +207,7 @@ export default function DashboardPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [permissions, setPermissions] = useState<string[] | null>(null);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const [filterMode, setFilterMode] = useState<DashboardFilterMode>("all");
   const [reportMonth, setReportMonth] = useState(() => format(new Date(), "yyyy-MM"));
   const [reportYear, setReportYear] = useState(() => format(new Date(), "yyyy"));
@@ -178,6 +219,19 @@ export default function DashboardPage() {
   const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4100/api";
   const token = (session as { accessToken?: string })?.accessToken;
   const userRole = (session?.user as { role?: string })?.role ?? "USER";
+
+  /** UI (การ์ดนอกสัญญา) — ซ่อนจนโหลด permissions เสร็จ สอดคล้อง JobsList */
+  const canViewContractTabs = useMemo(() => {
+    if (!permissionsLoaded) return false;
+    return permissions?.includes("job.viewContractTabs") ?? false;
+  }, [permissions, permissionsLoaded]);
+
+  /** KPI/กราฟ — ใช้หลัง `permissionsLoaded` เท่านั้น (ระหว่างโหลดแสดง skeleton) */
+  const scopedJobs = useMemo(() => {
+    if (!permissionsLoaded) return [];
+    if (permissions?.includes("job.viewContractTabs")) return jobs;
+    return jobs.filter((j) => j.isOutOfContract !== true);
+  }, [jobs, permissions, permissionsLoaded]);
 
   const monthYear = useMemo(() => {
     const m = String(reportMonth || "");
@@ -198,7 +252,7 @@ export default function DashboardPage() {
   const activeRange = useMemo((): null | { start: Date; end: Date; labelTh: string; api: ReportApiQuery } => {
     const now = new Date();
     if (filterMode === "all") {
-      const sortedTimes = jobs
+      const sortedTimes = scopedJobs
         .map((j) => jobReportTimeMs(j))
         .filter((t) => Number.isFinite(t))
         .sort((a, b) => a - b);
@@ -256,29 +310,35 @@ export default function DashboardPage() {
       labelTh: `${format(s, "dd/MM/yyyy HH:mm", { locale: th })} – ${format(e, "dd/MM/yyyy HH:mm", { locale: th })}`,
       api: { periodType: "range", start: s.toISOString(), end: e.toISOString() },
     };
-  }, [filterMode, reportYear, reportMonth, rangeStart, rangeEnd, jobs]);
+  }, [filterMode, reportYear, reportMonth, rangeStart, rangeEnd, scopedJobs]);
 
   const filteredJobs = useMemo(() => {
     if (!activeRange) return [];
     const a = activeRange.start.getTime();
     const b = activeRange.end.getTime();
-    return jobs.filter((j) => {
+    return scopedJobs.filter((j) => {
       const t = jobReportTimeMs(j);
       return t >= a && t <= b;
     });
-  }, [jobs, activeRange]);
+  }, [scopedJobs, activeRange]);
 
   useEffect(() => {
     if (!token || !session?.user) {
       setPermissions(null);
+      setPermissionsLoaded(false);
       return;
     }
-    axios.get<{ permissions: string[] }>(`${API}/roles/me/permissions`, { headers: { Authorization: `Bearer ${token}` } })
+    setPermissionsLoaded(false);
+    axios
+      .get<{ permissions: string[] }>(`${API}/roles/me/permissions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
       .then((r) => {
         const payload = unwrapApiData<unknown>(r?.data) as { permissions?: string[] } | null;
         setPermissions(payload?.permissions ?? null);
       })
-      .catch(() => setPermissions(null));
+      .catch(() => setPermissions(null))
+      .finally(() => setPermissionsLoaded(true));
   }, [token, session?.user, API]);
 
   useEffect(() => {
@@ -565,15 +625,15 @@ export default function DashboardPage() {
             สวัสดี, {session?.user?.name || "เจ้าหน้าที่"}
           </h1>
           <p className="text-sm mt-0.5 glass-muted-text wrap-break-word leading-relaxed">
-            ภาพรวมงานแจ้งซ่อม CCTV · สรุปผลและแนวโน้ม
+            ภาพรวมงานแจ้งซ่อม · สรุปผลและแนวโน้ม
           </p>
         </div>
         <div
-          className="w-full shrink-0 glass-card p-2 sm:p-3 xl:w-auto xl:max-w-none xl:border-0 xl:bg-transparent xl:p-0"
+          className="w-full shrink-0 glass-card px-4 py-4 sm:px-5 sm:py-4 xl:w-auto xl:max-w-none"
           role="region"
           aria-label="สรุปรายงานและส่งออก PDF"
         >
-          <div className="min-w-max overflow-x-auto pb-1 flex flex-wrap items-end gap-x-2 gap-y-3 sm:gap-3 xl:flex-nowrap xl:justify-end">
+          <div className="min-w-max overflow-x-auto flex flex-wrap items-end gap-3 sm:gap-4 xl:flex-nowrap xl:justify-end">
             <Label className="relative flex w-[176px] shrink-0 flex-col gap-1">
               <span className="text-[11px] font-medium glass-subtle-text">ช่วงสรุป</span>
               <select
@@ -710,6 +770,10 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {!permissionsLoaded ? (
+        <DashboardOverviewMetricsSkeleton />
+      ) : (
+        <>
       {/* การ์ดสรุป KPI */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {cards.map((card) => (
@@ -962,7 +1026,11 @@ export default function DashboardPage() {
       {/* สรุปวิเคราะห์จากข้อมูลชุดเดียวกับรายการงาน */}
       <div className="space-y-3">
         <h2 className="text-sm font-bold glass-text tracking-tight">สรุปสำหรับวิเคราะห์เพิ่มเติม</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div
+          className={`grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 ${
+            canViewContractTabs ? "lg:grid-cols-4" : "lg:grid-cols-3"
+          }`}
+        >
           <div className="glass-card p-4 bg-[var(--glass-card-bg)] backdrop-blur-sm flex gap-3 min-w-0">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 border border-amber-200 text-amber-700 dark:bg-amber-500/15 dark:border-amber-500/25 dark:text-amber-300">
               <UserX size={20} aria-hidden />
@@ -973,16 +1041,18 @@ export default function DashboardPage() {
               <p className="text-[11px] glass-subtle-text mt-0.5">ควรมอบหมายหรือรับงานเพื่อไม่ให้ค้างที่สถานะรอ</p>
             </div>
           </div>
-          <div className="glass-card p-4 bg-[var(--glass-card-bg)] backdrop-blur-sm flex gap-3 min-w-0">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 border border-orange-200 text-orange-700 dark:bg-orange-500/15 dark:border-orange-500/25 dark:text-orange-300">
-              <FileWarning size={20} aria-hidden />
+          {canViewContractTabs ? (
+            <div className="glass-card p-4 bg-[var(--glass-card-bg)] backdrop-blur-sm flex gap-3 min-w-0">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 border border-orange-200 text-orange-700 dark:bg-orange-500/15 dark:border-orange-500/25 dark:text-orange-300">
+                <FileWarning size={20} aria-hidden />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold glass-muted-text">นอกสัญญา · ยังไม่ปิด</p>
+                <p className="text-2xl font-bold glass-text tabular-nums">{openOutOfContract}</p>
+                <p className="text-[11px] glass-subtle-text mt-0.5">PENDING / IN_PROGRESS ที่ทำเครื่องหมายนอกสัญญา</p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold glass-muted-text">นอกสัญญา · ยังไม่ปิด</p>
-              <p className="text-2xl font-bold glass-text tabular-nums">{openOutOfContract}</p>
-              <p className="text-[11px] glass-subtle-text mt-0.5">PENDING / IN_PROGRESS ที่ทำเครื่องหมายนอกสัญญา</p>
-            </div>
-          </div>
+          ) : null}
           <div className="glass-card p-4 bg-[var(--glass-card-bg)] backdrop-blur-sm flex gap-3 min-w-0">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 border border-sky-200 text-sky-700 dark:bg-sky-500/15 dark:border-sky-500/25 dark:text-sky-300">
               <Timer size={20} aria-hidden />
@@ -995,7 +1065,11 @@ export default function DashboardPage() {
               <p className="text-[11px] glass-subtle-text mt-0.5">วัน จากวันแจ้งถึงวันบันทึกแก้ไขเสร็จ (ทุกใบที่ RESOLVED)</p>
             </div>
           </div>
-          <div className="glass-card p-4 bg-[var(--glass-card-bg)] backdrop-blur-sm min-w-0 sm:col-span-2 lg:col-span-1">
+          <div
+            className={`glass-card p-4 bg-[var(--glass-card-bg)] backdrop-blur-sm min-w-0 ${
+              canViewContractTabs ? "sm:col-span-2 lg:col-span-1" : ""
+            }`}
+          >
             <div className="flex items-center gap-2 mb-2">
               <MapPin size={16} className="glass-muted-text shrink-0" aria-hidden />
               <p className="text-xs font-semibold glass-muted-text">พื้นที่แจ้งถี่ (จังหวัด · อำเภอ Top 5)</p>
@@ -1016,84 +1090,9 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
-
-        <div className="space-y-3">
-          <div>
-            <h3 className="text-sm font-bold glass-text tracking-tight">
-              แนวทางขยายวิเคราะห์ในอนาคต (จากข้อมูลเดิมในระบบ)
-            </h3>
-            <p className="text-xs glass-subtle-text mt-1 leading-relaxed">
-              เตรียมพื้นที่แสดงผลเมื่อระบบพร้อมส่งมอบรายงานเชิงลึกจากข้อมูลเดิม (เช่น คิวงาน สัญญา พื้นที่ SLA)
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div className="glass-card backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 border border-amber-200 text-amber-700 dark:bg-amber-500/15 dark:border-amber-500/25 dark:text-amber-300">
-                  <Users size={20} aria-hidden />
-                </div>
-                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] px-2 py-0.5 glass-muted-text">
-                  เร็วๆ นี้
-                </span>
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold glass-text leading-snug">ภาระงานต่อเจ้าหน้าที่</p>
-                <p className="text-xs glass-subtle-text mt-1 leading-relaxed">
-                  นับจากผู้รับผิดชอบและงานค้าง เพื่อดูความหนาแน่นต่อคน
-                </p>
-              </div>
-            </div>
-            <div className="glass-card backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 border border-violet-200 text-violet-700 dark:bg-violet-500/15 dark:border-violet-500/25 dark:text-violet-300">
-                  <PieChartIcon size={20} aria-hidden />
-                </div>
-                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] px-2 py-0.5 glass-muted-text">
-                  เร็วๆ นี้
-                </span>
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold glass-text leading-snug">ใน / นอกสัญญา · รายเดือน</p>
-                <p className="text-xs glass-subtle-text mt-1 leading-relaxed">
-                  สัดส่วนและแนวโน้มรายเดือนจากข้อมูลสัญญาในระบบ
-                </p>
-              </div>
-            </div>
-            <div className="glass-card backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 border border-sky-200 text-sky-700 dark:bg-sky-500/15 dark:border-sky-500/25 dark:text-sky-300">
-                  <Building2 size={20} aria-hidden />
-                </div>
-                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] px-2 py-0.5 glass-muted-text">
-                  เร็วๆ นี้
-                </span>
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold glass-text leading-snug">เวลาแก้ตามจังหวัด / Site</p>
-                <p className="text-xs glass-subtle-text mt-1 leading-relaxed">
-                  เปรียบเทียบระยะเวลาแก้ตามพื้นที่หรือประเภทสถานที่
-                </p>
-              </div>
-            </div>
-            <div className="glass-card backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3 min-h-[140px] sm:min-h-[160px]">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 border border-emerald-200 text-emerald-700 dark:bg-emerald-500/15 dark:border-emerald-500/25 dark:text-emerald-300">
-                  <Target size={20} aria-hidden />
-                </div>
-                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full border border-[var(--glass-card-border)] bg-[var(--glass-card-bg)] px-2 py-0.5 glass-muted-text">
-                  เร็วๆ นี้
-                </span>
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold glass-text leading-snug">เป้า SLA vs วันปิดจริง</p>
-                <p className="text-xs glass-subtle-text mt-1 leading-relaxed">
-                  เปรียบเทียบนโยบายวันปิดกับวันที่บันทึกแก้ไขเสร็จจริง
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
+        </>
+      )}
 
       {/* เมนูด่วน — แสดงตามสิทธิ์ RBAC */}
       <div

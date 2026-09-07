@@ -3,15 +3,29 @@
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
-import { Loader2, Save, Info, Send, Settings, Eye, EyeOff, Mail, Search, Trash2, ChevronDown, Download } from "lucide-react";
+import { Loader2, Save, Info, Send, Settings, Eye, EyeOff, Mail, Search, Trash2, ChevronDown, Download, AlertTriangle } from "lucide-react";
 import DashboardRouteLoading from "@/components/DashboardRouteLoading";
 import { toastSuccess, toastError } from "@/lib/toast";
 import { FOOTER_ENV_FALLBACK, resolveFooterAppMeta, type AppMeta } from "@/lib/appMeta";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import GlassReactSelect, {
+  glassSelectRequiredValue,
+  type GlassSelectOption,
+} from "@/components/dashboard/GlassReactSelect";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4100/api";
+
+const SMTP_SECURE_OPTIONS: GlassSelectOption[] = [
+  { value: "false", label: "false (STARTTLS / Port 587)" },
+  { value: "true", label: "true (SSL / Port 465)" },
+];
+
+const ORPHAN_OLDER_THAN_OPTIONS: GlassSelectOption[] = [7, 14, 30, 60, 90, 180, 365].map(
+  (d) => ({ value: String(d), label: String(d) }),
+);
 
 function unwrapApiData<T>(root: unknown): T | null {
   if (!root) return null;
@@ -634,6 +648,20 @@ export default function SettingsPage() {
           <ChevronDown size={16} className="glass-muted-text transition-transform group-open:rotate-180" />
         </summary>
 
+        <Alert
+          variant="destructive"
+          className="mb-4 rounded-xl border-red-300 bg-red-50 text-red-800 backdrop-blur-sm dark:border-red-500/25 dark:bg-red-950/40 dark:text-red-200"
+        >
+          <AlertTriangle
+            size={18}
+            className="shrink-0 text-red-600 dark:text-red-400"
+            aria-hidden
+          />
+          <AlertDescription className="text-sm font-semibold text-red-800 dark:text-red-200">
+            สำหรับ IT เท่านั้น
+          </AlertDescription>
+        </Alert>
+
         <form onSubmit={handleSaveAppMeta} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -741,6 +769,20 @@ export default function SettingsPage() {
           <ChevronDown size={16} className="glass-muted-text transition-transform group-open:rotate-180" />
         </summary>
 
+          <Alert
+            variant="destructive"
+            className="mb-4 rounded-xl border-red-300 bg-red-50 text-red-800 backdrop-blur-sm dark:border-red-500/25 dark:bg-red-950/40 dark:text-red-200"
+          >
+            <AlertTriangle
+              size={18}
+              className="shrink-0 text-red-600 dark:text-red-400"
+              aria-hidden
+            />
+            <AlertDescription className="text-sm font-semibold text-red-800 dark:text-red-200">
+              สำหรับ IT เท่านั้น
+            </AlertDescription>
+          </Alert>
+
           <form onSubmit={handleSaveEmail} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
@@ -778,16 +820,23 @@ export default function SettingsPage() {
                     <Label className="mb-1.5 block text-sm font-medium glass-muted-text" htmlFor="smtp-secure">
                       Secure (SSL/TLS)
                     </Label>
-                    <select
-                      id="smtp-secure"
-                      className="select-native-glass w-full"
-                      value={emailForm.secure}
-                      onChange={(e) => setEmailForm({ ...emailForm, secure: e.target.value })}
-                      disabled={disabledForm}
-                    >
-                      <option value="false">false (STARTTLS / Port 587)</option>
-                      <option value="true">true (SSL / Port 465)</option>
-                    </select>
+                    <GlassReactSelect
+                      inputId="smtp-secure"
+                      options={SMTP_SECURE_OPTIONS}
+                      value={glassSelectRequiredValue(
+                        emailForm.secure,
+                        SMTP_SECURE_OPTIONS,
+                        SMTP_SECURE_OPTIONS[0],
+                      )}
+                      onChange={(opt) => {
+                        if (!opt) return;
+                        setEmailForm({ ...emailForm, secure: opt.value });
+                      }}
+                      isDisabled={disabledForm}
+                      isSearchable={false}
+                      isClearable={false}
+                      aria-label="Secure SSL TLS"
+                    />
                   </div>
                 </div>
 
@@ -1158,6 +1207,7 @@ export default function SettingsPage() {
                 <div className="relative">
                   <Input
                     id="default-pass"
+                    key={showDefaultPass ? "default-pass-text" : "default-pass-password"}
                     type={showDefaultPass ? "text" : "password"}
                     className="form-input-glass pr-12"
                     value={defaultPassForm.password}
@@ -1169,13 +1219,15 @@ export default function SettingsPage() {
                   />
                   <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setShowDefaultPass((v) => !v)}
                     disabled={disabledForm || savingDefaultPass}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-lg glass-muted-text hover:text-[var(--glass-text)] hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="absolute right-1.5 top-1/2 size-10 -translate-y-1/2 cursor-pointer glass-muted-text hover:bg-slate-100 hover:text-[var(--glass-text)] dark:hover:bg-white/10"
                     aria-label={showDefaultPass ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
                     aria-pressed={showDefaultPass}
                   >
-                    {showDefaultPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                    {showDefaultPass ? <EyeOff size={18} aria-hidden /> : <Eye size={18} aria-hidden />}
                   </Button>
                 </div>
               </div>
@@ -1210,6 +1262,20 @@ export default function SettingsPage() {
           <ChevronDown size={16} className="glass-muted-text transition-transform group-open:rotate-180" />
         </summary>
 
+        <Alert
+          variant="destructive"
+          className="rounded-xl border-red-300 bg-red-50 text-red-800 backdrop-blur-sm dark:border-red-500/25 dark:bg-red-950/40 dark:text-red-200"
+        >
+          <AlertTriangle
+            size={18}
+            className="shrink-0 text-red-600 dark:text-red-400"
+            aria-hidden
+          />
+          <AlertDescription className="text-sm font-semibold text-red-800 dark:text-red-200">
+            สำหรับ IT เท่านั้น
+          </AlertDescription>
+        </Alert>
+
         <p className="text-xs glass-muted-text leading-relaxed">
           สแกนไฟล์ใน MinIO ที่ไม่ถูกอ้างอิงในฐานข้อมูล (Job.images, Job.fixImages, User.image) และมีอายุเกิน 7 วัน
           จากนั้นเลือกเฉพาะไฟล์ที่ต้องการลบเพื่อความปลอดภัย
@@ -1234,17 +1300,23 @@ export default function SettingsPage() {
             <Label className="mb-1.5 block text-sm font-medium glass-muted-text" htmlFor="older-than-days">
               แสดงอายุเกิน (วัน)
             </Label>
-            <select
-              id="older-than-days"
-              className="select-native-glass w-full"
-              value={olderThanDays}
-              onChange={(e) => setOlderThanDays(Number.parseInt(e.target.value, 10))}
-              disabled={disabledForm || scanLoading || deleteLoading}
-            >
-              {[7, 14, 30, 60, 90, 180, 365].map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
+            <GlassReactSelect
+              inputId="older-than-days"
+              options={ORPHAN_OLDER_THAN_OPTIONS}
+              value={glassSelectRequiredValue(
+                String(olderThanDays),
+                ORPHAN_OLDER_THAN_OPTIONS,
+                ORPHAN_OLDER_THAN_OPTIONS[0],
+              )}
+              onChange={(opt) => {
+                if (!opt) return;
+                setOlderThanDays(Number.parseInt(opt.value, 10));
+              }}
+              isDisabled={disabledForm || scanLoading || deleteLoading}
+              isSearchable={false}
+              isClearable={false}
+              aria-label="แสดงอายุเกิน (วัน)"
+            />
           </div>
           <Button
             type="button"

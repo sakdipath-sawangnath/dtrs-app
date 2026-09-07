@@ -411,10 +411,10 @@
 > แผน: [`docs/Meeting-11082026-Requirements-Plan.plan.md`](docs/Meeting-11082026-Requirements-Plan.plan.md) Phase C (ปรับ)
 
 - [x] สร้างงาน: `ticketNo` hex 8 ตัว; มอบหมาย/bulk/OOC **ไม่** gen Running Doc No
-- [x] `PATCH /jobs/:id/classify-doc` + `job.classifyDoc` (ADMIN/SUPERVISOR) + ลายเซ็น; ในสัญญา `CM-SHF-2002-…` / นอกสัญญา `YYYYMM…`
+- [x] `PATCH /jobs/:id/classify-doc` + `job.classifyDoc` (ADMIN/SUPERVISOR) + ลายเซ็น; ในสัญญา `CM-SHF-YYYY-…` / นอกสัญญา `YYYYMM…`
 - [x] แยกสิทธิ์ปุ่มใน dialog: `job.classifyDoc.contract` / `job.classifyDoc.outOfContract`; บทบาทที่มี `job.classifyDoc` ได้ทั้งคู่รอบแรกที่แคตตาล็อกเพิ่มลูก (และตอน seed) — ติ๊กออกแล้ว restart ไม่คืน; API 403 ตามชนิดที่เลือก
 - [x] UI จำแนก: `/dashboard/all` + `/dashboard/jobs/:id` (`JobClassifyDocDialog` — เลือกแล้วยืนยัน)
-- [x] ซ่อน RESOLVED OOC ที่จำแนกแล้วจาก `/all` + `/my-jobs`; หน้า `/out-of-contract` รับ PENDING + RESOLVED OOC จำแนกแล้ว
+- [x] ~~ซ่อน~~ → **โชว์** RESOLVED OOC ที่จำแนกแล้วบน `/all` + `/my-jobs` (แท็บทั้งหมด/นอกสัญญา); คิวย่อ `/out-of-contract` ยังรับ PENDING + RESOLVED OOC จำแนกแล้ว (แท็บประวัติอาจเป็น superset)
 - [x] fix-then-ship job detail: รีโหลดเงียบหลังจำแนก + toast error จาก API
 - [x] Sync docs: `Meeting` plan, `System-Workflow`, `STATUS`, `PLAN`, `TASK`, `RBAC-Setup`, `docs/README`, `CHANGELOG`
 
@@ -451,3 +451,25 @@
 - [x] `print.css` — signature block, ความสูงช่องรูปหลัง header หน้า 2
 - [x] `frontend/public/logo/logo-FORTH.png` — โลโก้ FORTH ทางการ (ตัดพื้นดำเป็นโปร่งใสสำหรับพิมพ์บนพื้นขาว)
 - [x] Sync docs: `CHANGELOG`, Meeting plan, `DTRS-Migration-Checklist` #39, `System-Workflow`
+
+## 36. Dashboard RBAC สรุป + UI polish (2026-09-04)
+
+- [x] `/dashboard`: ไม่มี **`job.viewContractTabs`** → นับเฉพาะงานในสัญญา; ซ่อน card «นอกสัญญา · ยังไม่ปิด»
+- [x] `GET /jobs/reports/summary-pdf`: กรองงานนอกสัญญา + ซ่อน KPI นอกสัญญาตามสิทธิ์เดียวกัน (`JobsPdfService` + `RolesService`)
+- [x] ลบ watermark ไอคอน CCTV จาก `PublicLayoutShell`; ลบ section placeholder «แนวทางขยายวิเคราะห์ในอนาคต» บนภาพรวม
+- [x] แถบช่วงสรุปบนภาพรวม: padding ชัด + ไม่ตัดบน xl; select ทับ `.form-input-glass` ด้วย `!pl`/`!pr`
+- [x] Sync docs: `CHANGELOG`, `RBAC-Setup`, `STATUS`, `README`, `AGENTS`, `System-Workflow`, `DTRS-Migration-Checklist` #40, `frontend/README`, `TASK`, debug-mantra (FE/BE)
+
+## 37. Doc No ในสัญญา = CM-SHF-YYYY-Running (2026-09-04)
+
+- [x] `formatDocTicketNo` ใช้ `CM-SHF-YYYY-XXXX` (YYYY Asia/Bangkok ณ วันจำแนก); `DocSequence` ในสัญญา `period=''` — running ไม่รีเซ็ต
+- [x] `isFormalDocTicketNo` รับ `CM-SHF-YYYY-…` และเลขเก่า `CM-SHF-2002-…`
+- [x] fix-then-ship (scrutinize): ไม่รีเซ็ตรายปี — คืน `period=''` แล้วส่งแค่ `periodYear` ตอน format
+- [x] UI dialog + unit/e2e + sync docs (`System-Workflow`, Meeting plan, `RBAC-Setup`, `STATUS`, `CHANGELOG`)
+
+## 38. เมนูคู่มือระบบ (user-guide) (2026-09-07)
+
+- [x] Permission **`menu.userGuide`** — catalog + seed + default ADMIN; sync อัตโนมัติเมื่อ restart backend
+- [x] หน้า **`/dashboard/user-guide`** — workflow (numbered steps) + ตารางสิทธิ์ + CTA Roles/Settings
+- [x] Sidebar + เมนูด่วนภาพรวม + ลิงก์จาก `/dashboard/roles`
+- [x] เอกสาร: `CHANGELOG`, `STATUS`, `RBAC-Setup`, `TASK`

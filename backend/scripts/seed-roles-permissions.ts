@@ -25,6 +25,7 @@ const MENU_PERMISSIONS = [
   { code: 'menu.users', name: 'จัดการผู้ใช้', category: 'menu' },
   { code: 'menu.settings', name: 'ตั้งค่าระบบ', category: 'menu' },
   { code: 'menu.roles', name: 'จัดการบทบาทและสิทธิ์', category: 'menu' },
+  { code: 'menu.userGuide', name: 'คู่มือระบบ', category: 'menu' },
 ] as const;
 
 const ACTION_PERMISSIONS = [
@@ -46,6 +47,11 @@ const ACTION_PERMISSIONS = [
   { code: 'site.create', name: 'เพิ่ม Site', category: 'site' },
   { code: 'site.update', name: 'แก้ไข Site', category: 'site' },
   { code: 'site.delete', name: 'ลบ Site', category: 'site' },
+  {
+    code: 'location.create',
+    name: 'เพิ่มจังหวัด/อำเภอ/ตำบล',
+    category: 'location',
+  },
 ] as const;
 
 const ACTION_CODES_ALL = ACTION_PERMISSIONS.map((p) => p.code);
@@ -66,7 +72,7 @@ const DEFAULT_ROLES = [
 ] as const;
 
 const STAFF_MENUS = MENU_PERMISSIONS.map((p) => p.code).filter((c) =>
-  !['menu.users', 'menu.settings', 'menu.roles', 'menu.sites', 'menu.locations'].includes(c),
+  !['menu.users', 'menu.settings', 'menu.roles', 'menu.userGuide', 'menu.sites', 'menu.locations'].includes(c),
 );
 
 // ADMIN ได้ทุก permission; SUPERVISOR ไม่มี job.deleteInProgress (เฉพาะ ADMIN)

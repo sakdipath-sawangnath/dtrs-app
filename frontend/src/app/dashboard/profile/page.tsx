@@ -565,6 +565,7 @@ export default function ProfilePage() {
                     </Label>
                     <div className="relative">
                       <Input
+                        key={showCurrentPassword ? "current-text" : "current-password"}
                         type={showCurrentPassword ? "text" : "password"}
                         required
                         className="form-input-glass pr-11"
@@ -593,6 +594,7 @@ export default function ProfilePage() {
                     </Label>
                     <div className="relative">
                       <Input
+                        key={showNewPassword ? "new-text" : "new-password"}
                         type={showNewPassword ? "text" : "password"}
                         required
                         minLength={6}
@@ -625,6 +627,7 @@ export default function ProfilePage() {
                     </Label>
                     <div className="relative">
                       <Input
+                        key={showConfirmPassword ? "confirm-text" : "confirm-password"}
                         type={showConfirmPassword ? "text" : "password"}
                         required
                         className="form-input-glass pr-11"

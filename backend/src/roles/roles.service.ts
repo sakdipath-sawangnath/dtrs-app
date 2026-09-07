@@ -32,6 +32,7 @@ const RBAC_MENU_PERMISSIONS = [
   { code: 'menu.users', name: 'จัดการผู้ใช้', category: 'menu' },
   { code: 'menu.settings', name: 'ตั้งค่าระบบ', category: 'menu' },
   { code: 'menu.roles', name: 'จัดการบทบาทและสิทธิ์', category: 'menu' },
+  { code: 'menu.userGuide', name: 'คู่มือระบบ', category: 'menu' },
 ] as const;
 
 const RBAC_ACTION_PERMISSIONS = [
@@ -93,6 +94,11 @@ const RBAC_ACTION_PERMISSIONS = [
   { code: 'site.create', name: 'เพิ่ม Site', category: 'site' },
   { code: 'site.update', name: 'แก้ไข Site', category: 'site' },
   { code: 'site.delete', name: 'ลบ Site', category: 'site' },
+  {
+    code: 'location.create',
+    name: 'เพิ่มจังหวัด/อำเภอ/ตำบล',
+    category: 'location',
+  },
 ] as const;
 
 const RBAC_ACTION_CODES_ALL = RBAC_ACTION_PERMISSIONS.map((p) => p.code);
@@ -146,6 +152,7 @@ const RBAC_STAFF_MENU_CODES = RBAC_MENU_PERMISSIONS.map((p) => p.code).filter(
       'menu.users',
       'menu.settings',
       'menu.roles',
+      'menu.userGuide',
       'menu.sites',
       'menu.locations',
     ].includes(c),

@@ -79,7 +79,7 @@ flowchart TD
   Resolved --> PrintOpt[พิมพ์ /print/jobs/:id<br/>หรือดาวน์โหลด PDF]
 
   Resolved --> ClassifyQ{จำแนกเอกสาร?<br/>job.classifyDoc}
-  ClassifyQ -->|ใช่| Classify["PATCH /classify-doc<br/>hex → CM-SHF-2002-XXXX<br/>หรือ YYYYMM####"]
+  ClassifyQ -->|ใช่| Classify["PATCH /classify-doc<br/>hex → CM-SHF-YYYY-XXXX<br/>หรือ YYYYMM####"]
   ClassifyQ -->|ไม่| Done([จบ flow ปิดงาน])
   Classify --> Done
 
@@ -215,7 +215,7 @@ stateDiagram-v2
 | รับงานเอง | `PATCH /jobs/:id/assign` (ตัวเอง) | `menu.pending` (หรือมี `job.assign`) + ลายเซ็น | เช่นเดียวกับมอบหมาย |
 | ย้ายนอกสัญญา | `PATCH /jobs/:id/out-of-contract` | `job.assign` + ลายเซ็น | คง `PENDING`, ตั้ง `isOutOfContract`; **ไม่** ออกเลข — **ไม่มีปุ่ม** บน `/dashboard/pending` |
 | ยกเลิกคิว | `PATCH /jobs/:id/cancel` | `job.cancel` | `PENDING` → `CANCELLED`; งานที่ยกเลิกแล้วเปลี่ยนสถานะต่อไม่ได้ |
-| จำแนกเอกสาร | `PATCH /jobs/:id/classify-doc` | `job.classifyDoc` + `.contract` / `.outOfContract` + ลายเซ็น | เฉพาะ `RESOLVED` ที่ยังเป็น hex; แทนที่ `ticketNo` ด้วย `CM-SHF-2002-XXXX` หรือ `YYYYMM####` ครั้งเดียว + ตั้ง `isOutOfContract`; UI: `/dashboard/all` + `/dashboard/jobs/:id` |
+| จำแนกเอกสาร | `PATCH /jobs/:id/classify-doc` | `job.classifyDoc` + `.contract` / `.outOfContract` + ลายเซ็น | เฉพาะ `RESOLVED` ที่ยังเป็น hex; แทนที่ `ticketNo` ด้วย `CM-SHF-YYYY-XXXX` หรือ `YYYYMM####` ครั้งเดียว + ตั้ง `isOutOfContract`; UI: `/dashboard/all` + `/dashboard/jobs/:id` |
 | อัปโหลดรูปปัญหาที่แจ้ง | `PATCH /jobs/:id/issue-images` | `job.issue.upload` | งาน `PENDING` / `IN_PROGRESS` (รวมยังไม่มีผู้รับ); เติมได้ถึง 3 รูป ไม่ลบ/ไม่แทนที่; **5MB/ไฟล์** JPG/PNG/WebP/HEIC→JPEG; ไม่ใช้ `job.fix.*`; UI: job detail + wrench modal; fallback บีบรูปเมื่อ NPM 413 |
 | บันทึกการแก้ไข | `PATCH /jobs/:id/fix` | `job.fix.self` / `job.fix.any` + ลายเซ็น | คง `IN_PROGRESS`; บังคับ Indoor/Outdoor, Hardware/Software, cause, fixMethod และรูปแก้ไข ≥ 2; Serial ไม่บังคับ (สูงสุด 4 แถว) |
 | ปิดงาน | `PATCH /jobs/:id/close` | `job.fix.self` / `job.fix.any` + ลายเซ็นเจ้าหน้าที่ | → `RESOLVED` + `fixDate` + ลายเซ็นผู้แจ้ง (PNG) — **ห้าม** ตั้ง `RESOLVED` ผ่าน `PATCH /status` |
@@ -239,15 +239,15 @@ flowchart LR
   close[PATCH /close → RESOLVED]
   classify[จำแนกเอกสาร]
   create --> assign --> fix --> close --> classify
-  classify -->|ในสัญญา CM-SHF-2002-XXXX| allPage["/dashboard/all"]
-  classify -->|นอกสัญญา YYYYMM####| oocPage["/dashboard/out-of-contract"]
+  classify -->|ในสัญญา CM-SHF-YYYY-XXXX| allPage["/dashboard/all แท็บสัญญา·ทั้งหมด"]
+  classify -->|นอกสัญญา YYYYMM####| oocVis["/all·my-jobs แท็บนอกสัญญา·ทั้งหมด + คิวย่อ /out-of-contract"]
   allPage -.->|ปุ่มจำแนก| classify
   detail["/dashboard/jobs/:id"] -.->|ปุ่มจำแนก| classify
 ```
 
-- ในสัญญา: `CM-SHF-2002-` + running (ไม่รีเซ็ต) · นอกสัญญา: `YYYYMM` (Asia/Bangkok) + running รายเดือน
+- ในสัญญา: `CM-SHF-YYYY-` + running ไม่รีเซ็ต (ปี = Asia/Bangkok ณ วันจำแนก) · นอกสัญญา: `YYYYMM` (Asia/Bangkok) + running รายเดือน · เลขเก่า `CM-SHF-2002-…` ยังถือว่าเป็นเลขทางการ
 - Padding: `padStart(4, '0')` แล้วโตตามค่าจริง (เกิน 9999 → 5 หลัก … ไม่ wrap)
-- งาน `RESOLVED` นอกสัญญาที่จำแนกแล้ว **ไม่โชว์** `/dashboard/all` และ `/dashboard/my-jobs`
+- งาน `RESOLVED` นอกสัญญาที่จำแนกแล้ว **โชว์** บน `/dashboard/all` และ `/dashboard/my-jobs` (แท็บ「ทั้งหมด」/「นอกสัญญา」) และยังอยู่ในคิวย่อ `/dashboard/out-of-contract` (`PENDING` OOC + RESOLVED OOC ที่จำแนกแล้วเท่านั้น — แท็บประวัติอาจเป็น **superset** รวมสถานะ OOC อื่น)
 
 ### 3.2 ลายเซ็นอิเล็กทรอนิกส์
 
@@ -344,20 +344,20 @@ flowchart TD
 
 | หน้า | โฟกัส |
 |------|--------|
-| `/dashboard` | สถิติ / กราฟ / เมนูด่วนตาม RBAC (รวมสถานะ `CANCELLED`) |
+| `/dashboard` | สถิติ / กราฟ / เมนูด่วนตาม RBAC (รวมสถานะ `CANCELLED`) — สรุป + `summary-pdf` ตาม **`job.viewContractTabs`** |
 | `/dashboard/pending` | มอบหมาย · รับงาน · ลบไม่มอบหมาย · ยกเลิก (`job.cancel`) — **ไม่มี** ปุ่มย้ายนอกสัญญา (ย้าย OOC หลังปิดงานผ่านจำแนกเอกสาร) |
-| `/dashboard/in-progress` | อัปเดตแก้ไข · อัปโหลดรูปปัญหา (`job.issue.upload`) ใน wrench · **ปิดงานจากรายการ** (ปุ่ม Sign เมื่อรอเซ็น, `job.fix.self\|any`) · ลบ IN_PROGRESS (ถ้ามีสิทธิ์) · แท็บสัญญา/นอกสัญญา (`job.viewContractTabs`) · ป้าย「รอเซ็นผู้แจ้ง」เมื่อแก้ครบแล้วยัง `IN_PROGRESS` |
-| `/dashboard/my-jobs` | งานที่รับผิดชอบ · แท็บสัญญา/นอกสัญญา · ป้าย「รอเซ็นผู้แจ้ง」เมื่อแก้ครบแล้วยัง `IN_PROGRESS` · **ปิดงานจากรายการ** (ปุ่ม Sign) หรือเข้าหน้ารายละเอียด |
+| `/dashboard/in-progress` | อัปเดตแก้ไข · อัปโหลดรูปปัญหา (`job.issue.upload`) ใน wrench · **ปิดงานจากรายการ** (ปุ่ม Sign เมื่อรอเซ็น, `job.fix.self\|any`) · ลบ IN_PROGRESS (ถ้ามีสิทธิ์) · แท็บทั้งหมด/สัญญา/นอกสัญญา (`job.viewContractTabs`) · ป้าย「รอเซ็นผู้แจ้ง」เมื่อแก้ครบแล้วยัง `IN_PROGRESS` |
+| `/dashboard/my-jobs` | งานที่รับผิดชอบ · แท็บทั้งหมด/สัญญา/นอกสัญญา · ป้าย「รอเซ็นผู้แจ้ง」เมื่อแก้ครบแล้วยัง `IN_PROGRESS` · **ปิดงานจากรายการ** (ปุ่ม Sign) หรือเข้าหน้ารายละเอียด |
 | `/dashboard/jobs/:id` | รายละเอียดเต็ม · ไทม์ไลน์ · บันทึกการแก้ไข (`PATCH /fix`) · ปิดงาน + ลายเซ็นผู้แจ้ง (`PATCH /close`) · อัปโหลดรูปปัญหา (`job.issue.upload`, `PENDING`/`IN_PROGRESS`) · Backfill วันที่ · พิมพ์ · จำแนกเอกสาร (`RESOLVED` ที่ยังเป็น hex) |
-| `/dashboard/all` | ประวัติทั้งหมด · bulk-assign · **ปิดงานจากรายการ** เมื่อรอเซ็น · **จำแนกเอกสาร** (`job.classifyDoc`, dialog เลือกในสัญญา/นอกสัญญาก่อนยืนยัน) · คอลัมน์/CSV「ระยะเวลาจบงาน」(`fixDate − reportDate`) · ซ่อน RESOLVED OOC ที่จำแนกแล้ว |
-| `/dashboard/out-of-contract` | PENDING นอกสัญญา + RESOLVED นอกสัญญาที่จำแนกแล้ว (`menu.outOfContract`) |
+| `/dashboard/all` | ประวัติทั้งหมด · bulk-assign · **ปิดงานจากรายการ** เมื่อรอเซ็น · **จำแนกเอกสาร** (`job.classifyDoc`, dialog เลือกในสัญญา/นอกสัญญาก่อนยืนยัน) · คอลัมน์/CSV「ระยะเวลาจบงาน」(`fixDate − reportDate`) · แท็บทั้งหมด/นอกสัญญารวม RESOLVED OOC ที่จำแนกแล้ว (อาจรวมสถานะ OOC อื่น — **superset** ของคิวเมนู) |
+| `/dashboard/out-of-contract` | คิวย่อ: `PENDING` นอกสัญญา + `RESOLVED` นอกสัญญาที่จำแนกแล้ว (`menu.outOfContract`) — ดูประวัติ OOC ครบได้ที่แท็บนอกสัญญาบน `/dashboard/all` |
 | `/dashboard/sites` | Site: จังหวัด/อำเภอ/ตำบล + `agency` (สถานที่) + `station` (ชื่อสถานี) — `menu.sites` |
 | `/dashboard/locations` | Master จังหวัด/อำเภอ/ตำบล (`menu.locations`) — แยกจาก Sites |
 | `/dashboard/profile` | โปรไฟล์ + **ลายเซ็นเจ้าหน้าที่** (ไม่แสดงใน sidebar) |
 | `/dashboard/settings` | SMTP · เทมเพลตอีเมล · รหัสผ่านเริ่มต้น · MinIO orphan · `app_meta` |
 | `/dashboard/roles` · `/dashboard/users` | จัดการตาม `menu.*` — `User.role` = `VARCHAR` (`AppRole.code`) |
 
-แท็บ **สัญญา / นอกสัญญา** (`SegmentedTabs`) บน `my-jobs` / `all` / `in-progress` แสดงเมื่อมี **`job.viewContractTabs`** — แยกด้วย `Job.isOutOfContract` + badge งานค้าง (ไม่นับ `RESOLVED` / `CANCELLED`); ไม่มีสิทธิ์ = ไม่มีแท็บ และเห็นแค่งานในสัญญา
+แท็บ **ทั้งหมด / สัญญา / นอกสัญญา** (`SegmentedTabs`) บน `my-jobs` / `all` / `in-progress` แสดงเมื่อมี **`job.viewContractTabs`** (default = สัญญา) — แยกด้วย `Job.isOutOfContract` + badge งานค้าง (ไม่นับ `RESOLVED` / `CANCELLED`; แท็บทั้งหมด = ผลรวม); แท็บทั้งหมดโชว์ป้ายสัญญา/นอกสัญญาในแถว; ไม่มีสิทธิ์ = ไม่มีแท็บ และเห็นแค่งานในสัญญา (รวม KPI/กราฟบน `/dashboard` และ `GET /jobs/reports/summary-pdf`)
 
 ---
 

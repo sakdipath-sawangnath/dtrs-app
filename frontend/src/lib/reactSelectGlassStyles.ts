@@ -3,7 +3,7 @@ import type { GroupBase, StylesConfig } from "react-select";
 
 /**
  * react-select — Dark / Light Glass (สอดคล้อง AGENTS.md: inputs + โหมดมืดของแดชบอร์ด)
- * ใช้ร่วมกัน: JobsList (มอบหมายงาน), หน้าแจ้งปัญหา, รายละเอียดงาน
+ * ใช้ร่วมกัน: JobsList (มอบหมายงาน), หน้าแจ้งปัญหา, รายละเอียดงาน, modal Site/locations, DataTablePageSizeSelect
  *
  * หมายเหตุ: ใช้ `StylesConfig` แบบหลวม เพื่อไม่ให้ `onChange` ของ `Select` ถูกบังคับเป็น `unknown`
  */
@@ -33,7 +33,7 @@ export function getReactSelectGlassStyles(
         : isDark
           ? "rgba(15, 23, 42, 0.4)"
           : "#ffffff",
-      minHeight: "42px",
+      minHeight: "44px",
       cursor: state.isDisabled ? "not-allowed" : "pointer",
       "&:hover": {
         borderColor: state.isFocused

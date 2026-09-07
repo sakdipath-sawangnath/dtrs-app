@@ -30,6 +30,7 @@ import {
   Download,
   Stamp,
   FileSignature,
+  List,
 } from "lucide-react";
 import { toastSuccess, toastError, confirmDialog, toastWarning } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
@@ -46,12 +47,19 @@ import DashboardPageShell from "./DashboardPageShell";
 import DashboardFilterBar from "./DashboardFilterBar";
 import JobClassifyDocDialog from "./jobs/JobClassifyDocDialog";
 import JobReporterSignDialog from "./jobs/JobReporterSignDialog";
+import BreakdownFilterChips from "./jobs/BreakdownFilterChips";
 import Select from "react-select";
 import { getReactSelectGlassStyles } from "@/lib/reactSelectGlassStyles";
 import { useAppTheme } from "@/lib/useAppTheme";
+import GlassReactSelect, {
+  glassSelectRequiredValue,
+  glassSelectValue,
+  type GlassSelectOption,
+} from "@/components/dashboard/GlassReactSelect";
 import { useRouter } from "next/navigation";
 import { io, Socket } from "socket.io-client";
 import DataTablePagination, { DataTablePageSize } from "./DataTablePagination";
+import DataTablePageSizeSelect from "./dashboard/DataTablePageSizeSelect";
 import { createPortal } from "react-dom";
 import { TextHoverTooltip } from "./TextHoverTooltip";
 import SegmentedTabs from "./SegmentedTabs";
@@ -99,10 +107,7 @@ import {
   runMultipartUploadWithProxyFallback,
 } from "@/lib/jobImageProxyFallback";
 import { jobNeedsAssignee } from "@/lib/jobAssignEligibility";
-import {
-  isClassifiedOutOfContractResolved,
-  isFormalDocTicketNo,
-} from "@/lib/docTicketNo";
+import { isFormalDocTicketNo } from "@/lib/docTicketNo";
 import {
   buildFixPreviewUrlsFromJob,
   hasRequiredFixImageSlots,
@@ -287,6 +292,33 @@ const STATUS_CONFIG: Record<
   },
 };
 
+const STATUS_FILTER_OPTIONS: GlassSelectOption[] = (
+  ["PENDING", "IN_PROGRESS", "RESOLVED", "CANCELLED"] as const
+).map((k) => ({ value: k, label: STATUS_CONFIG[k].label }));
+
+const FIX_ENV_FILTER_OPTIONS: GlassSelectOption[] = [
+  { value: "INDOOR", label: "Indoor (ในอาคาร)" },
+  { value: "OUTDOOR", label: "Outdoor (นอกอาคาร)" },
+  { value: "UNKNOWN", label: "ไม่ระบุ" },
+];
+
+const BROKEN_PART_FILTER_OPTIONS: GlassSelectOption[] = [
+  { value: "Hardware", label: "Hardware (ฮาร์ดแวร์)" },
+  { value: "Software", label: "Software (ซอฟต์แวร์)" },
+  { value: "UNKNOWN", label: "ไม่ระบุ" },
+];
+
+const JOB_SORT_FIELD_OPTIONS: GlassSelectOption[] = [
+  { value: "report", label: "วันที่แจ้ง (report → สร้าง)" },
+  { value: "created", label: "วันที่สร้างในระบบ" },
+  { value: "fix", label: "วันที่ปิดงาน" },
+];
+
+const JOB_SORT_DIR_OPTIONS: GlassSelectOption[] = [
+  { value: "desc", label: "ใหม่ → เก่า" },
+  { value: "asc", label: "เก่า → ใหม่" },
+];
+
 const AWAITING_SIGNATURE_BADGE_CLS =
   "h-auto px-2 py-1 text-xs font-semibold shadow-none ring-0 border border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/35 dark:bg-amber-950/30 dark:text-amber-100";
 
@@ -298,16 +330,25 @@ function AwaitingReporterSignatureBadge() {
   );
 }
 
+/** แท็บขอบเขตสัญญาใน JobsList (เมื่อมี job.viewContractTabs) */
+export type ContractScopeTab = "all" | "contract" | "out";
+
 function getPageTitle(
   statusFilter?: string,
-  showOutOfContract?: boolean,
-  assignedToMe?: boolean
+  scope: ContractScopeTab | "dedicated-out" = "contract",
+  assignedToMe?: boolean,
 ): { title: string; subtitle: string } {
   if (assignedToMe) {
-    if (showOutOfContract === true) {
+    if (scope === "out" || scope === "dedicated-out") {
       return {
         title: "งานที่รับผิดชอบ · นอกสัญญา",
         subtitle: "รายการงานที่คุณได้รับมอบหมาย (นอกสัญญา)",
+      };
+    }
+    if (scope === "all") {
+      return {
+        title: "งานที่รับผิดชอบ · ทั้งหมด",
+        subtitle: "รายการงานที่คุณได้รับมอบหมาย (สัญญาและนอกสัญญา)",
       };
     }
     return {
@@ -315,27 +356,38 @@ function getPageTitle(
       subtitle: "รายการงานที่คุณได้รับมอบหมายทั้งหมด (สัญญา)",
     };
   }
-  if (showOutOfContract)
+  if (scope === "dedicated-out" || (scope === "out" && !statusFilter)) {
     return { title: "นอกสัญญา", subtitle: "รายการแจ้งซ่อมนอกสัญญา" };
+  }
+  const scopeSuffix =
+    scope === "all" ? " · ทั้งหมด" : scope === "out" ? " · นอกสัญญา" : "";
   switch (statusFilter) {
     case "PENDING":
-      return { title: "รอดำเนินการ", subtitle: "รายการที่รอรับเข้าระบบ" };
+      return {
+        title: `รอดำเนินการ${scopeSuffix}`,
+        subtitle: "รายการที่รอรับเข้าระบบ",
+      };
     case "IN_PROGRESS":
-      return { title: "กำลังแก้ไข", subtitle: "รายการที่กำลังดำเนินการ" };
+      return {
+        title: `กำลังแก้ไข${scopeSuffix}`,
+        subtitle: "รายการที่กำลังดำเนินการ",
+      };
     default:
+      if (scope === "all") {
+        return {
+          title: "ข้อขัดข้อง · ทั้งหมด",
+          subtitle: "ประวัติการแจ้งข้อขัดข้อง (สัญญาและนอกสัญญา)",
+        };
+      }
+      if (scope === "out") {
+        return { title: "นอกสัญญา", subtitle: "รายการแจ้งซ่อมนอกสัญญา" };
+      }
       return {
         title: "ข้อขัดข้อง",
         subtitle: "ประวัติการแจ้งข้อขัดข้องทั้งหมด",
       };
   }
 }
-
-const PAGE_SIZE_OPTIONS = [
-  { value: 15, label: "15" },
-  { value: 30, label: "30" },
-  { value: 45, label: "45" },
-  { value: "all", label: "ทั้งหมด" },
-] as const;
 
 /** เรียงรายการงาน — ค่า null/parse ไม่ได้ = ไปท้ายรายการเสมอ (ตามแผนตรวจสอบข้อมูล) */
 export type JobListSortField = "report" | "created" | "fix";
@@ -392,7 +444,7 @@ const CONTRACT_TABS_ROW_WRAP =
 
 /** พื้นหลังรายการแบบ No-Card — glass-card ครอบทั้งแท็บ/ฟิลเตอร์/ตาราง (theme-aware) */
 const NO_CARD_SHELL =
-  "flex flex-col gap-4 flex-1 min-h-0 overflow-auto p-4 sm:p-5 w-full glass-card text-slate-900 dark:text-slate-100";
+  "flex flex-col gap-4 flex-1 min-h-0 min-w-0 max-w-full overflow-x-hidden overflow-y-auto p-4 sm:p-5 w-full glass-card text-slate-900 dark:text-slate-100";
 
 export default function JobsList({
   statusFilter,
@@ -400,7 +452,8 @@ export default function JobsList({
   showOutOfContract = false,
   assignedToMe = false,
   showContractTabs = false,
-  onShowOutOfContractChange,
+  contractTab = "contract",
+  onContractTabChange,
   title: customTitle,
   subtitle: customSubtitle,
   noCard = false,
@@ -410,10 +463,15 @@ export default function JobsList({
   statusFilter?: string;
   /** หลายสถานะ (เช่น หน้า นอกสัญญา = PENDING + RESOLVED ที่จำแนกแล้ว) */
   statusAllowlist?: string[];
+  /**
+   * หน้า dedicated นอกสัญญา (`/dashboard/out-of-contract`) — ไม่ใช้คู่กับ showContractTabs
+   */
   showOutOfContract?: boolean;
   assignedToMe?: boolean;
   showContractTabs?: boolean;
-  onShowOutOfContractChange?: (value: boolean) => void;
+  /** แท็บขอบเขตเมื่อมี showContractTabs + job.viewContractTabs */
+  contractTab?: ContractScopeTab;
+  onContractTabChange?: (tab: ContractScopeTab) => void;
   title?: string;
   subtitle?: string;
   noCard?: boolean;
@@ -464,8 +522,6 @@ export default function JobsList({
   const [assignSubmitting, setAssignSubmitting] = useState(false);
   const [myPermissions, setMyPermissions] = useState<string[] | null>(null);
   const { data: session } = useSession();
-  const userRole = (session?.user as { role?: string })?.role ?? "";
-  const userRoleUpper = String(userRole).toUpperCase();
   const [movingOutOfContractJobId, setMovingOutOfContractJobId] = useState<number | null>(null);
   const [classifyJob, setClassifyJob] = useState<Job | null>(null);
   const [signJob, setSignJob] = useState<Job | null>(null);
@@ -570,22 +626,18 @@ export default function JobsList({
     run();
   }, [token, API]);
 
-  /** สิทธิ์จากหน้า /dashboard/roles — ถ้ายังไม่โหลดให้ fallback ตาม role ใน JWT */
+  /** สิทธิ์จากหน้า /dashboard/roles — ซ่อน action จนกว่าโหลด permissions เสร็จ (ไม่ fallback JWT role) */
   const canAssignJob = useMemo(() => {
-    if (myPermissions !== null) {
-      return myPermissions.includes("job.assign");
-    }
-    return userRoleUpper === "SUPERVISOR" || userRoleUpper === "ADMIN";
-  }, [myPermissions, userRoleUpper]);
+    if (myPermissions === null) return false;
+    return myPermissions.includes("job.assign");
+  }, [myPermissions]);
 
   const enableBulkAssign = enableAllBreakdownFilters && canAssignJob;
 
   const canMoveOutOfContract = useMemo(() => {
-    if (myPermissions !== null) {
-      return myPermissions.includes("job.assign");
-    }
-    return userRoleUpper === "ADMIN" || userRoleUpper === "SUPERVISOR";
-  }, [myPermissions, userRoleUpper]);
+    if (myPermissions === null) return false;
+    return myPermissions.includes("job.assign");
+  }, [myPermissions]);
 
   const canClassifyDoc = useMemo(() => {
     if (myPermissions === null) return false;
@@ -602,40 +654,32 @@ export default function JobsList({
     return myPermissions.includes("job.classifyDoc.outOfContract");
   }, [myPermissions]);
 
-  const canDeleteUnassigned =
-    myPermissions != null
-      ? myPermissions.includes("job.deleteUnassigned")
-      : ["ADMIN", "SUPERVISOR"].includes(userRoleUpper);
+  const canDeleteUnassigned = useMemo(() => {
+    if (myPermissions === null) return false;
+    return myPermissions.includes("job.deleteUnassigned");
+  }, [myPermissions]);
 
   /** หน้า «กำลังแก้ไข» — ลบ IN_PROGRESS ตามสิทธิ์ job.deleteInProgress (สอดคล้อง API) */
   const canAdminDeleteInProgress = useMemo(() => {
     if (statusFilter !== "IN_PROGRESS") return false;
-    if (myPermissions !== null) {
-      return myPermissions.includes("job.deleteInProgress");
-    }
-    return userRoleUpper === "ADMIN";
-  }, [statusFilter, myPermissions, userRoleUpper]);
+    if (myPermissions === null) return false;
+    return myPermissions.includes("job.deleteInProgress");
+  }, [statusFilter, myPermissions]);
 
   const canCancelPending = useMemo(() => {
-    if (myPermissions !== null) {
-      return myPermissions.includes("job.cancel");
-    }
-    return userRoleUpper === "ADMIN" || userRoleUpper === "SUPERVISOR";
-  }, [myPermissions, userRoleUpper]);
+    if (myPermissions === null) return false;
+    return myPermissions.includes("job.cancel");
+  }, [myPermissions]);
 
   const canFixAny = useMemo(() => {
-    if (myPermissions !== null) {
-      return myPermissions.includes("job.fix.any");
-    }
-    return userRoleUpper === "ADMIN";
-  }, [myPermissions, userRoleUpper]);
+    if (myPermissions === null) return false;
+    return myPermissions.includes("job.fix.any");
+  }, [myPermissions]);
 
   const canFixSelf = useMemo(() => {
-    if (myPermissions !== null) {
-      return myPermissions.includes("job.fix.self");
-    }
-    return ["STAFF", "SUPERVISOR", "ADMIN"].includes(userRoleUpper);
-  }, [myPermissions, userRoleUpper]);
+    if (myPermissions === null) return false;
+    return myPermissions.includes("job.fix.self");
+  }, [myPermissions]);
 
   const canUserCloseJob = useCallback(
     (job: Job) => {
@@ -648,19 +692,30 @@ export default function JobsList({
 
   /** แท็บสัญญา/นอกสัญญา — ตั้งที่ /dashboard/roles (`job.viewContractTabs`) */
   const canViewContractTabs = useMemo(() => {
-    if (myPermissions !== null) {
-      return myPermissions.includes("job.viewContractTabs");
-    }
-    return ["ADMIN", "STAFF", "SUPERVISOR"].includes(userRoleUpper);
-  }, [myPermissions, userRoleUpper]);
+    if (myPermissions === null) return false;
+    return myPermissions.includes("job.viewContractTabs");
+  }, [myPermissions]);
 
   const effectiveShowContractTabs = showContractTabs && canViewContractTabs;
-  const effectiveShowOutOfContract =
-    effectiveShowContractTabs && showOutOfContract;
+  const dedicatedOutOfContractPage =
+    showOutOfContract === true && !showContractTabs;
+  const activeContractTab: ContractScopeTab = effectiveShowContractTabs
+    ? contractTab
+    : dedicatedOutOfContractPage
+      ? "out"
+      : "contract";
+  const showContractScopeInRows =
+    effectiveShowContractTabs && activeContractTab === "all";
+
+  const titleScope: ContractScopeTab | "dedicated-out" = dedicatedOutOfContractPage
+    ? "dedicated-out"
+    : effectiveShowContractTabs
+      ? activeContractTab
+      : "contract";
 
   const { title: derivedTitle, subtitle: derivedSubtitle } = getPageTitle(
     statusFilter,
-    effectiveShowOutOfContract,
+    titleScope,
     assignedToMe,
   );
   const title = customTitle || derivedTitle || "ข้อขัดข้อง";
@@ -691,23 +746,22 @@ export default function JobsList({
       } else {
         setJobsForContractCounts([]);
       }
-      const dedicatedOutOfContractPage =
+      const dedicatedOutPage =
         showOutOfContract === true && !showContractTabs;
-      if (effectiveShowContractTabs || dedicatedOutOfContractPage) {
-        if (showOutOfContract === true) {
+      if (effectiveShowContractTabs) {
+        if (contractTab === "out") {
           data = data.filter((j) => j.isOutOfContract === true);
-        } else {
+        } else if (contractTab === "contract") {
           data = data.filter((j) => j.isOutOfContract !== true);
         }
+        // contractTab === "all" → ไม่กรองขอบเขตสัญญา
+      } else if (dedicatedOutPage) {
+        data = data.filter((j) => j.isOutOfContract === true);
       } else {
         data = data.filter((j) => j.isOutOfContract !== true);
       }
-      // ประวัติทั้งหมด / งานของฉัน: งาน RESOLVED นอกสัญญาที่จำแนกแล้วไปหน้าเมนูนอกสัญญา
-      if (enableAllBreakdownFilters || assignedToMe) {
-        data = data.filter((j) => !isClassifiedOutOfContractResolved(j));
-      }
       // คิวหน้า นอกสัญญา: RESOLVED เฉพาะที่จำแนกแล้ว (PENDING คงเดิม)
-      if (dedicatedOutOfContractPage) {
+      if (dedicatedOutPage) {
         data = data.filter(
           (j) =>
             j.status !== "RESOLVED" || isFormalDocTicketNo(j.ticketNo),
@@ -733,13 +787,12 @@ export default function JobsList({
     currentUserId,
     router,
     effectiveShowContractTabs,
-    effectiveShowOutOfContract,
+    contractTab,
     statusFilter,
     statusAllowlist,
     token,
     showOutOfContract,
     showContractTabs,
-    enableAllBreakdownFilters,
   ]);
 
   useEffect(() => {
@@ -858,23 +911,49 @@ export default function JobsList({
     return Array.from(set).sort();
   }, [jobs, provinceFilter]);
 
+  const assigneeSelectOptions = useMemo(
+    (): GlassSelectOption[] => [
+      { value: "__unassigned__", label: "ยังไม่มีผู้รับผิดชอบ" },
+      ...assigneeFilterOptions.map(([id, name]) => ({
+        value: String(id),
+        label: name,
+      })),
+    ],
+    [assigneeFilterOptions],
+  );
+
+  const provinceSelectOptions = useMemo(
+    (): GlassSelectOption[] => provinces.map((p) => ({ value: p, label: p })),
+    [provinces],
+  );
+
+  const districtSelectOptions = useMemo(
+    (): GlassSelectOption[] => districts.map((d) => ({ value: d, label: d })),
+    [districts],
+  );
+
   /** งานค้าง = ยังไม่เสร็จสิ้น (ไม่นับ RESOLVED / CANCELLED) — แยกนับตามสัญญา/นอกสัญญา */
   const contractTabBadgeCounts = useMemo(() => {
-    if (!effectiveShowContractTabs) return { contract: 0, out: 0 };
+    if (!effectiveShowContractTabs) return { all: 0, contract: 0, out: 0 };
     const unfinished = (j: Job) =>
       j.status !== "RESOLVED" && j.status !== "CANCELLED";
-    return {
-      contract: jobsForContractCounts.filter(
-        (j) => j.isOutOfContract !== true && unfinished(j),
-      ).length,
-      out: jobsForContractCounts.filter(
-        (j) => j.isOutOfContract === true && unfinished(j),
-      ).length,
-    };
+    const contract = jobsForContractCounts.filter(
+      (j) => j.isOutOfContract !== true && unfinished(j),
+    ).length;
+    const out = jobsForContractCounts.filter(
+      (j) => j.isOutOfContract === true && unfinished(j),
+    ).length;
+    return { all: contract + out, contract, out };
   }, [effectiveShowContractTabs, jobsForContractCounts]);
 
   const contractSegmentTabs = useMemo(
     () => [
+      {
+        id: "all" as const,
+        label: "ทั้งหมด",
+        icon: List,
+        badgeCount: contractTabBadgeCounts.all,
+      },
       {
         id: "contract" as const,
         label: "สัญญา",
@@ -907,7 +986,12 @@ export default function JobsList({
       toastError("ไม่มีข้อมูลที่ส่งออก", "ลองปรับตัวกรองหรือรีเฟรชรายการ");
       return;
     }
-    const tab = effectiveShowOutOfContract ? "นอกสัญญา" : "สัญญา";
+    const tab =
+      activeContractTab === "all"
+        ? "ทั้งหมด"
+        : activeContractTab === "out"
+          ? "นอกสัญญา"
+          : "สัญญา";
     const stamp = format(new Date(), "yyyy-MM-dd_HHmm", { locale: th });
     const filename = `รายการงาน_${tab}_${stamp}.csv`;
     const body = buildJobsListAuditCsv(sortedFilteredJobs);
@@ -915,124 +999,117 @@ export default function JobsList({
     toastSuccess(
       `ส่งออก CSV แล้ว · รวม ${sortedFilteredJobs.length} แถว (ตามตัวกรองและการเรียงปัจจุบัน ไม่จำกัดเฉพาะหน้าตาราง)`,
     );
-  }, [sortedFilteredJobs, effectiveShowOutOfContract]);
+  }, [sortedFilteredJobs, activeContractTab]);
 
   const showAssignedToColumn = statusFilter !== "PENDING";
 
   const filterBarChildren = (
-    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto text-slate-900 dark:text-slate-100">
+    <div
+      className={cn(
+        "grid w-full min-w-0 max-w-full gap-2.5 text-slate-900 dark:text-slate-100",
+        /* minmax(0,1fr) กัน react-select ดันคอลัมน์ล้นจากความกว้าง label */
+        "grid-cols-1",
+        "sm:grid-cols-2 sm:gap-3",
+        "lg:grid-cols-3",
+        "xl:grid-cols-4",
+        enableAllBreakdownFilters ? "2xl:grid-cols-5" : "2xl:grid-cols-4",
+        "[&>*]:min-w-0 [&>*]:max-w-full",
+      )}
+    >
       {enableAllBreakdownFilters && (
         <>
-          <select
-            className="select-native-glass w-full sm:w-44 md:min-w-[160px] text-slate-900 dark:text-slate-100"
-            value={statusSelect}
-            onChange={(e) => setStatusSelect(e.target.value)}
-          >
-            <option value="">ทุกสถานะ</option>
-            <option value="PENDING">{STATUS_CONFIG.PENDING.label}</option>
-            <option value="IN_PROGRESS">{STATUS_CONFIG.IN_PROGRESS.label}</option>
-            <option value="RESOLVED">{STATUS_CONFIG.RESOLVED.label}</option>
-            <option value="CANCELLED">{STATUS_CONFIG.CANCELLED.label}</option>
-          </select>
+          <GlassReactSelect
+            options={STATUS_FILTER_OPTIONS}
+            placeholder="ทุกสถานะ"
+            value={glassSelectValue(statusSelect, STATUS_FILTER_OPTIONS)}
+            onChange={(opt) => setStatusSelect(opt?.value ?? "")}
+            isSearchable={false}
+            aria-label="กรองตามสถานะ"
+          />
 
-          <select
-            className="select-native-glass w-full sm:w-44 md:min-w-[160px] text-slate-900 dark:text-slate-100"
-            value={fixEnvironmentSelect}
-            onChange={(e) => setFixEnvironmentSelect(e.target.value)}
-          >
-            <option value="">ทุกประเภทสถานที่</option>
-            <option value="INDOOR">Indoor (ในอาคาร)</option>
-            <option value="OUTDOOR">Outdoor (นอกอาคาร)</option>
-            <option value="UNKNOWN">ไม่ระบุ</option>
-          </select>
+          <GlassReactSelect
+            options={FIX_ENV_FILTER_OPTIONS}
+            placeholder="ทุกประเภทสถานที่"
+            value={glassSelectValue(fixEnvironmentSelect, FIX_ENV_FILTER_OPTIONS)}
+            onChange={(opt) => setFixEnvironmentSelect(opt?.value ?? "")}
+            isSearchable={false}
+            aria-label="กรองตามประเภทสถานที่"
+          />
 
-          <select
-            className="select-native-glass w-full sm:w-44 md:min-w-[160px] text-slate-900 dark:text-slate-100"
-            value={brokenPartSelect}
-            onChange={(e) => setBrokenPartSelect(e.target.value)}
-          >
-            <option value="">ทุกประเภทงาน</option>
-            <option value="Hardware">Hardware (ฮาร์ดแวร์)</option>
-            <option value="Software">Software (ซอฟต์แวร์)</option>
-            <option value="UNKNOWN">ไม่ระบุ</option>
-          </select>
+          <GlassReactSelect
+            options={BROKEN_PART_FILTER_OPTIONS}
+            placeholder="ทุกประเภทงาน"
+            value={glassSelectValue(brokenPartSelect, BROKEN_PART_FILTER_OPTIONS)}
+            onChange={(opt) => setBrokenPartSelect(opt?.value ?? "")}
+            isSearchable={false}
+            aria-label="กรองตามประเภทงาน"
+          />
 
-          <select
-            className="select-native-glass w-full sm:w-44 md:min-w-[160px] text-slate-900 dark:text-slate-100"
-            value={assignedToSelect}
-            onChange={(e) => setAssignedToSelect(e.target.value)}
+          <GlassReactSelect
+            options={assigneeSelectOptions}
+            placeholder="ทุกผู้รับผิดชอบ"
+            value={glassSelectValue(assignedToSelect, assigneeSelectOptions)}
+            onChange={(opt) => setAssignedToSelect(opt?.value ?? "")}
             aria-label="กรองตามผู้รับผิดชอบ"
-          >
-            <option value="">ทุกผู้รับผิดชอบ</option>
-            <option value="__unassigned__">ยังไม่มีผู้รับผิดชอบ</option>
-            {assigneeFilterOptions.map(([id, name]) => (
-              <option key={id} value={String(id)}>
-                {name}
-              </option>
-            ))}
-          </select>
+          />
         </>
       )}
-      <select
-        className="select-native-glass w-full sm:w-44 md:min-w-[160px] text-slate-900 dark:text-slate-100"
-        value={provinceFilter}
-        onChange={(e) => setProvinceFilter(e.target.value)}
-      >
-        <option value="">ทุกจังหวัด</option>
-        {provinces.map((p) => (
-          <option key={p} value={p}>{p}</option>
-        ))}
-      </select>
-      <select
-        className="select-native-glass w-full sm:w-44 md:min-w-[160px] text-slate-900 dark:text-slate-100"
-        value={districtFilter}
-        onChange={(e) => setDistrictFilter(e.target.value)}
-        disabled={!provinceFilter && districts.length === 0}
-      >
-        <option value="">{provinceFilter ? "ทุกอำเภอ" : "ทุกอำเภอ"}</option>
-        {districts.map((d) => (
-          <option key={d} value={d}>{d}</option>
-        ))}
-      </select>
-      <select
-        className="select-native-glass w-full sm:w-48 md:min-w-[180px] text-slate-900 dark:text-slate-100"
-        value={jobSortField}
-        onChange={(e) => {
+      <GlassReactSelect
+        options={provinceSelectOptions}
+        placeholder="ทุกจังหวัด"
+        value={glassSelectValue(provinceFilter, provinceSelectOptions)}
+        onChange={(opt) => setProvinceFilter(opt?.value ?? "")}
+        aria-label="กรองตามจังหวัด"
+      />
+      <GlassReactSelect
+        options={districtSelectOptions}
+        placeholder={provinceFilter ? "ทุกอำเภอ" : "ทุกอำเภอ"}
+        value={glassSelectValue(districtFilter, districtSelectOptions)}
+        onChange={(opt) => setDistrictFilter(opt?.value ?? "")}
+        isDisabled={!provinceFilter && districts.length === 0}
+        aria-label="กรองตามอำเภอ"
+      />
+      <GlassReactSelect
+        options={JOB_SORT_FIELD_OPTIONS}
+        value={glassSelectRequiredValue(
+          jobSortField,
+          JOB_SORT_FIELD_OPTIONS,
+          JOB_SORT_FIELD_OPTIONS[0],
+        )}
+        onChange={(opt) => {
+          if (!opt) return;
           setPage(1);
-          setJobSortField(e.target.value as JobListSortField);
+          setJobSortField(opt.value as JobListSortField);
         }}
+        isSearchable={false}
+        isClearable={false}
         aria-label="เรียงตามวันที่"
-      >
-        <option value="report">วันที่แจ้ง (report → สร้าง)</option>
-        <option value="created">วันที่สร้างในระบบ</option>
-        <option value="fix">วันที่ปิดงาน</option>
-      </select>
-      <select
-        className="select-native-glass w-full sm:w-40 md:min-w-[140px] text-slate-900 dark:text-slate-100"
-        value={jobSortDir}
-        onChange={(e) => {
+      />
+      <GlassReactSelect
+        options={JOB_SORT_DIR_OPTIONS}
+        value={glassSelectRequiredValue(
+          jobSortDir,
+          JOB_SORT_DIR_OPTIONS,
+          JOB_SORT_DIR_OPTIONS[0],
+        )}
+        onChange={(opt) => {
+          if (!opt) return;
           setPage(1);
-          setJobSortDir(e.target.value as JobListSortDir);
+          setJobSortDir(opt.value as JobListSortDir);
         }}
+        isSearchable={false}
+        isClearable={false}
         aria-label="ทิศทางการเรียง"
-      >
-        <option value="desc">ใหม่ → เก่า</option>
-        <option value="asc">เก่า → ใหม่</option>
-      </select>
-      <select
-        className="select-native-glass w-full sm:w-28 md:min-w-[112px] text-slate-900 dark:text-slate-100"
+      />
+      <DataTablePageSizeSelect
         value={pageSize}
-        onChange={(e) => {
-          const v = e.target.value;
-          setPageSize(v === "all" ? "all" : (Number(v) as 15 | 30 | 45));
+        onChange={(v) => {
+          setPage(1);
+          setPageSize(v);
         }}
-      >
-        {PAGE_SIZE_OPTIONS.map((o) => (
-          <option key={String(o.value)} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+        className="w-full min-w-0"
+        aria-label="จำนวนแถวต่อหน้า"
+      />
     </div>
   );
 
@@ -1152,140 +1229,95 @@ export default function JobsList({
   }, [enableAllBreakdownFilters, jobsForPartCardCounts]);
 
   const breakdownCards = enableAllBreakdownFilters ? (
-    <div className="space-y-3 mb-2 text-slate-900 dark:text-slate-100" aria-label="การกรองแบบการ์ด">
-      <div>
-        <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">สถานะ</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {[
+    <BreakdownFilterChips
+      groups={[
+        {
+          id: "status",
+          label: "สถานะ",
+          value: statusSelect,
+          onChange: setStatusSelect,
+          options: [
             { value: "", label: "ทั้งหมด", count: statusCardCounts.total },
             {
               value: "PENDING",
               label: STATUS_CONFIG.PENDING.label,
               count: statusCardCounts.pending,
+              dotClassName: "bg-orange-500",
             },
             {
               value: "IN_PROGRESS",
               label: STATUS_CONFIG.IN_PROGRESS.label,
               count: statusCardCounts.inProgress,
+              dotClassName: "bg-blue-500",
             },
             {
               value: "RESOLVED",
               label: STATUS_CONFIG.RESOLVED.label,
               count: statusCardCounts.resolved,
+              dotClassName: "bg-emerald-500",
             },
-          ].map((it) => {
-            const active = statusSelect === it.value;
-            return (
-              <button
-                key={it.value || "ALL"}
-                type="button"
-                aria-pressed={active}
-                onClick={() => setStatusSelect(it.value)}
-                className={[
-                  "rounded-xl border px-3 py-2.5 text-left transition-all active:scale-95 min-h-[44px] cursor-pointer",
-                  active
-                    ? "border-blue-500/50 bg-blue-500/10"
-                    : "border-slate-200 dark:border-[var(--glass-card-border)] bg-white dark:bg-[var(--glass-input-bg)] hover:border-blue-500/30",
-                ].join(" ")}
-              >
-                <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 truncate">
-                  {it.label}
-                </div>
-                <div className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-100 mt-0.5">
-                  {it.count}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div>
-        <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">ประเภทสถานที่</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {[
+          ],
+        },
+        {
+          id: "environment",
+          label: "ประเภทสถานที่",
+          value: fixEnvironmentSelect,
+          onChange: setFixEnvironmentSelect,
+          options: [
             { value: "", label: "ทั้งหมด", count: jobsForEnvCardCounts.length },
             {
               value: "INDOOR",
-              label: "ภายใน (ในอาคาร)",
+              label: "ภายใน",
+              title: "ภายใน (ในอาคาร)",
               count: envCounts.INDOOR,
+              dotClassName: "bg-sky-500",
             },
             {
               value: "OUTDOOR",
-              label: "ภายนอก (นอกอาคาร)",
+              label: "ภายนอก",
+              title: "ภายนอก (นอกอาคาร)",
               count: envCounts.OUTDOOR,
+              dotClassName: "bg-amber-500",
             },
-            { value: "UNKNOWN", label: "ไม่ระบุ", count: envCounts.UNKNOWN },
-          ].map((it) => {
-            const active = fixEnvironmentSelect === it.value;
-            return (
-              <button
-                key={it.value || "ALL"}
-                type="button"
-                aria-pressed={active}
-                onClick={() => setFixEnvironmentSelect(it.value)}
-                className={[
-                  "rounded-xl border px-3 py-2.5 text-left transition-all active:scale-95 min-h-[44px] cursor-pointer",
-                  active
-                    ? "border-blue-500/50 bg-blue-500/10"
-                    : "border-slate-200 dark:border-[var(--glass-card-border)] bg-white dark:bg-[var(--glass-input-bg)] hover:border-blue-500/30",
-                ].join(" ")}
-              >
-                <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 truncate">
-                  {it.label}
-                </div>
-                <div className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-100 mt-0.5">
-                  {it.count}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div>
-        <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">ประเภทงาน</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {[
+            {
+              value: "UNKNOWN",
+              label: "ไม่ระบุ",
+              count: envCounts.UNKNOWN,
+              dotClassName: "bg-slate-400",
+            },
+          ],
+        },
+        {
+          id: "workType",
+          label: "ประเภทงาน",
+          value: brokenPartSelect,
+          onChange: setBrokenPartSelect,
+          options: [
             { value: "", label: "ทั้งหมด", count: jobsForPartCardCounts.length },
             {
               value: "Hardware",
-              label: "Hardware (ฮาร์ดแวร์)",
+              label: "Hardware",
+              title: "Hardware (ฮาร์ดแวร์)",
               count: partCounts.Hardware,
+              dotClassName: "bg-violet-500",
             },
             {
               value: "Software",
-              label: "Software (ซอฟต์แวร์)",
+              label: "Software",
+              title: "Software (ซอฟต์แวร์)",
               count: partCounts.Software,
+              dotClassName: "bg-teal-500",
             },
-            { value: "UNKNOWN", label: "ไม่ระบุ", count: partCounts.UNKNOWN },
-          ].map((it) => {
-            const active = brokenPartSelect === it.value;
-            return (
-              <button
-                key={it.value || "ALL"}
-                type="button"
-                aria-pressed={active}
-                onClick={() => setBrokenPartSelect(it.value)}
-                className={[
-                  "rounded-xl border px-3 py-2.5 text-left transition-all active:scale-95 min-h-[44px] cursor-pointer",
-                  active
-                    ? "border-blue-500/50 bg-blue-500/10"
-                    : "border-slate-200 dark:border-[var(--glass-card-border)] bg-white dark:bg-[var(--glass-input-bg)] hover:border-blue-500/30",
-                ].join(" ")}
-              >
-                <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 truncate">
-                  {it.label}
-                </div>
-                <div className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-100 mt-0.5">
-                  {it.count}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+            {
+              value: "UNKNOWN",
+              label: "ไม่ระบุ",
+              count: partCounts.UNKNOWN,
+              dotClassName: "bg-slate-400",
+            },
+          ],
+        },
+      ]}
+    />
   ) : null;
 
   useEffect(() => {
@@ -1295,7 +1327,7 @@ export default function JobsList({
     districtFilter,
     search,
     pageSize,
-    effectiveShowOutOfContract,
+    activeContractTab,
     statusSelect,
     fixEnvironmentSelect,
     brokenPartSelect,
@@ -1884,7 +1916,7 @@ export default function JobsList({
               : "flex flex-col h-full"
           }
         >
-          {effectiveShowContractTabs && onShowOutOfContractChange && (
+          {effectiveShowContractTabs && onContractTabChange && (
             <div
               className={
                 noCard
@@ -1894,9 +1926,9 @@ export default function JobsList({
             >
               <SegmentedTabs
                 tabs={contractSegmentTabs}
-                activeId={effectiveShowOutOfContract ? "out" : "contract"}
-                onChange={(id) => onShowOutOfContractChange(id === "out")}
-                ariaLabel="แท็บงานสัญญา/นอกสัญญา"
+                activeId={activeContractTab}
+                onChange={onContractTabChange}
+                ariaLabel="แท็บงานทั้งหมด สัญญา และนอกสัญญา"
               />
             </div>
           )}
@@ -1930,7 +1962,7 @@ export default function JobsList({
               : "flex flex-col h-full"
           }
         >
-          {effectiveShowContractTabs && onShowOutOfContractChange && (
+          {effectiveShowContractTabs && onContractTabChange && (
             <div
               className={
                 noCard
@@ -1940,16 +1972,24 @@ export default function JobsList({
             >
               <SegmentedTabs
                 tabs={contractSegmentTabs}
-                activeId={effectiveShowOutOfContract ? "out" : "contract"}
-                onChange={(id) => onShowOutOfContractChange(id === "out")}
-                ariaLabel="แท็บงานสัญญา/นอกสัญญา"
+                activeId={activeContractTab}
+                onChange={onContractTabChange}
+                ariaLabel="แท็บงานทั้งหมด สัญญา และนอกสัญญา"
               />
             </div>
           )}
           {noCard ? (
             <>
-              <div className={`${GLASS_SECTION} shrink-0`}>
-                <DashboardFilterBar {...filterBarProps} className="border-b-0" />
+              <div
+                className={cn(
+                  GLASS_SECTION,
+                  "flex w-full min-w-0 max-w-full shrink-0 flex-col gap-4 overflow-x-hidden p-4 sm:gap-5 sm:p-5",
+                )}
+              >
+                <DashboardFilterBar
+                  {...filterBarProps}
+                  className="border-b-0 p-0 sm:p-0"
+                />
               </div>
               <div
                 className={`${GLASS_SECTION} flex flex-col flex-1 min-h-[280px] items-center justify-center px-4 py-12 text-center`}
@@ -2318,6 +2358,19 @@ export default function JobsList({
                       >
                         {cfg.label}
                       </Badge>
+                      {showContractScopeInRows && (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "h-auto px-2 py-0.5 text-[11px] font-semibold shadow-none ring-0",
+                            job.isOutOfContract === true
+                              ? "bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/25"
+                              : "bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/25",
+                          )}
+                        >
+                          {job.isOutOfContract === true ? "นอกสัญญา" : "สัญญา"}
+                        </Badge>
+                      )}
                       {isAwaitingReporterSignature(job) && (
                         <AwaitingReporterSignatureBadge />
                       )}
@@ -2372,7 +2425,7 @@ export default function JobsList({
 
                       {enableMoveOutOfContract &&
                         job.status === "PENDING" &&
-                        !effectiveShowOutOfContract &&
+                        activeContractTab !== "out" &&
                         canMoveOutOfContract &&
                         !!token &&
                         job.isOutOfContract !== true && (
@@ -2494,7 +2547,7 @@ export default function JobsList({
             : "flex flex-col h-full"
         }
       >
-        {effectiveShowContractTabs && onShowOutOfContractChange && (
+        {effectiveShowContractTabs && onContractTabChange && (
           <div
             className={
               noCard
@@ -2504,18 +2557,35 @@ export default function JobsList({
           >
             <SegmentedTabs
               tabs={contractSegmentTabs}
-              activeId={effectiveShowOutOfContract ? "out" : "contract"}
-              onChange={(id) => onShowOutOfContractChange(id === "out")}
-              ariaLabel="แท็บงานสัญญา/นอกสัญญา"
+              activeId={activeContractTab}
+              onChange={onContractTabChange}
+              ariaLabel="แท็บงานทั้งหมด สัญญา และนอกสัญญา"
             />
           </div>
         )}
 
         {noCard ? (
           <>
-            <div className={`${GLASS_SECTION} shrink-0`}>
+            <div
+              className={cn(
+                GLASS_SECTION,
+                "flex w-full min-w-0 max-w-full shrink-0 flex-col gap-4 overflow-x-hidden p-4 sm:gap-5 sm:p-5",
+              )}
+            >
               {breakdownCards}
-              <DashboardFilterBar {...filterBarProps} className="border-b-0" />
+              <div
+                className={cn(
+                  "min-w-0 max-w-full",
+                  breakdownCards
+                    ? "border-t border-[var(--glass-card-border)] pt-4 sm:pt-5"
+                    : undefined,
+                )}
+              >
+                <DashboardFilterBar
+                  {...filterBarProps}
+                  className="border-b-0 p-0 sm:p-0"
+                />
+              </div>
             </div>
             <div
               className={`${GLASS_SECTION} flex flex-col flex-1 min-h-0 overflow-hidden`}

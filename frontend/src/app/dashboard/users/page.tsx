@@ -26,6 +26,12 @@ import CrudModal from "@/components/CrudModal";
 import RoleBadge from "@/components/RoleBadge";
 import { toastSuccess, toastError, toastWarning, confirmDialog } from "@/lib/toast";
 import DataTablePagination, { DataTablePageSize } from "@/components/DataTablePagination";
+import DataTablePageSizeSelect from "@/components/dashboard/DataTablePageSizeSelect";
+import GlassReactSelect, {
+  glassSelectRequiredValue,
+  glassSelectValue,
+  type GlassSelectOption,
+} from "@/components/dashboard/GlassReactSelect";
 import { buildRoleBadgeStyleMap, type RoleBadgeStyleMap } from "@/lib/roleBadge";
 import {
   mergeUserRoleOptions,
@@ -80,12 +86,10 @@ const ROLE_OPTIONS = [
 
 const DEFAULT_PASS_SENTINEL = "__DEFAULT_PASS__";
 
-const PAGE_SIZE_OPTIONS = [
-  { value: 15, label: "15" },
-  { value: 30, label: "30" },
-  { value: 45, label: "45" },
-  { value: "all", label: "ทั้งหมด" },
-] as const;
+const LOCK_FILTER_OPTIONS: GlassSelectOption[] = [
+  { value: "unlocked", label: "เข้าใช้ได้" },
+  { value: "locked", label: "ล็อกแล้ว" },
+];
 
 /** รูปโปรไฟล์เท่านั้น — ชี้ชื่อ/username ใน tooltip (Dark Glass) — คลิกเปิดดูรูปใหญ่ได้ */
 function UserAvatarCell({
@@ -273,6 +277,12 @@ export default function UsersPage() {
     [roleCatalog],
   );
 
+  const roleSelectOptions = useMemo(
+    (): GlassSelectOption[] =>
+      allRoleOptions.map((o) => ({ value: o.value, label: o.label })),
+    [allRoleOptions],
+  );
+
   const roleLabelByCode = useMemo(() => {
     return allRoleOptions.reduce<Record<string, string>>((acc, o) => {
       acc[o.value] = o.label;
@@ -282,7 +292,7 @@ export default function UsersPage() {
 
   const getRoleSummaryText = (code: string) => {
     const c = code.toUpperCase().trim();
-    if (c === "ADMIN") return "เข้าถึงทุกเมนู รวม จัดการผู้ใช้ และ ตั้งค่าระบบ · CRUD ผู้ใช้ได้ทั้งหมด";
+    if (c === "ADMIN") return "เทียบเท่าเจ้าหน้าที่ แต่สามารถมอบหมายงานให้เจ้าหน้าที่ได้";
     if (c === "STAFF") return "ภาพรวม, รอดำเนินการ, กำลังแก้ไข, ประวัติทั้งหมด, นอกสัญญา · ไม่มีเมนู จัดการผู้ใช้ และ ตั้งค่าระบบ";
     if (c === "USER") return "เฉพาะ โปรไฟล์, แจ้งปัญหา, ตรวจสอบสถานะ";
     return "สิทธิ์ตามที่กำหนดไว้ในหน้าบทบาทและสิทธิ์ (RBAC)";
@@ -667,42 +677,30 @@ export default function UsersPage() {
         ) : undefined}
       >
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <select
-            className="select-native-glass w-full sm:w-56 md:min-w-[180px]"
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-          >
-            <option value="">ทุกบทบาท</option>
-            {allRoleOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <select
-            className="select-native-glass w-full sm:w-44 md:min-w-[160px]"
-            value={lockFilter}
-            onChange={(e) => setLockFilter(e.target.value as "" | "locked" | "unlocked")}
+          <GlassReactSelect
+            className="w-full sm:w-56 md:min-w-[180px]"
+            options={roleSelectOptions}
+            placeholder="ทุกบทบาท"
+            value={glassSelectValue(roleFilter, roleSelectOptions)}
+            onChange={(opt) => setRoleFilter(opt?.value ?? "")}
+            aria-label="กรองตามบทบาท"
+          />
+          <GlassReactSelect
+            className="w-full sm:w-44 md:min-w-[160px]"
+            options={LOCK_FILTER_OPTIONS}
+            placeholder="ทุกสถานะการเข้าใช้"
+            value={glassSelectValue(lockFilter, LOCK_FILTER_OPTIONS)}
+            onChange={(opt) =>
+              setLockFilter((opt?.value ?? "") as "" | "locked" | "unlocked")
+            }
+            isSearchable={false}
             aria-label="กรองสถานะการเข้าใช้"
-          >
-            <option value="">ทุกสถานะการเข้าใช้</option>
-            <option value="unlocked">เข้าใช้ได้</option>
-            <option value="locked">ล็อกแล้ว</option>
-          </select>
-          <select
-            className="select-native-glass w-full sm:w-32 md:min-w-[112px]"
+          />
+          <DataTablePageSizeSelect
             value={pageSize}
-            onChange={(e) => {
-              const v = e.target.value;
-              setPageSize(v === "all" ? "all" : (Number(v) as 15 | 30 | 45));
-            }}
-          >
-            {PAGE_SIZE_OPTIONS.map((o) => (
-              <option key={String(o.value)} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+            onChange={setPageSize}
+            className="w-full sm:w-32 md:min-w-[112px]"
+          />
         </div>
       </DashboardFilterBar>
 
@@ -1065,12 +1063,24 @@ export default function UsersPage() {
         {modalTab === "role" && (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1 glass-muted-text">บทบาท (Role)</label>
-              <select className="select-native-glass w-full" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                {allRoleOptions.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
+              <label className="block text-sm font-medium mb-1 glass-muted-text" htmlFor="user-form-role">
+                บทบาท (Role)
+              </label>
+              <GlassReactSelect
+                inputId="user-form-role"
+                options={roleSelectOptions}
+                value={glassSelectRequiredValue(
+                  form.role,
+                  roleSelectOptions,
+                  roleSelectOptions[0] ?? { value: form.role, label: form.role },
+                )}
+                onChange={(opt) => {
+                  if (!opt) return;
+                  setForm({ ...form, role: opt.value });
+                }}
+                isClearable={false}
+                aria-label="บทบาทผู้ใช้"
+              />
             </div>
             <div className="rounded-2xl p-4 text-xs space-y-2 bg-[var(--glass-card-bg)] backdrop-blur-sm border border-[var(--glass-card-border)] glass-muted-text shadow-inner">
               <p className="font-semibold glass-muted-text">สิทธิ์ตามบทบาท (RBAC)</p>
