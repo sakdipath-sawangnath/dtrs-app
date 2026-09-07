@@ -310,7 +310,43 @@
       "method": "POST",
       "path": "/api/sites",
       "auth": "Bearer JWT",
-      "description": "สร้าง Site"
+      "description": "สร้าง Site (permission: site.create)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/locations/provinces",
+      "auth": false,
+      "description": "รายการจังหวัด (master lazy-load)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/locations/provinces/:provinceId/districts",
+      "auth": false,
+      "description": "อำเภอตามจังหวัด"
+    },
+    {
+      "method": "GET",
+      "path": "/api/locations/districts/:districtId/subdistricts",
+      "auth": false,
+      "description": "ตำบลตามอำเภอ"
+    },
+    {
+      "method": "POST",
+      "path": "/api/locations/provinces",
+      "auth": "Bearer JWT",
+      "description": "สร้างจังหวัด (permission: location.create)"
+    },
+    {
+      "method": "POST",
+      "path": "/api/locations/provinces/:provinceId/districts",
+      "auth": "Bearer JWT",
+      "description": "สร้างอำเภอ (permission: location.create)"
+    },
+    {
+      "method": "POST",
+      "path": "/api/locations/districts/:districtId/subdistricts",
+      "auth": "Bearer JWT",
+      "description": "สร้างตำบล (permission: location.create)"
     },
     {
       "method": "GET",

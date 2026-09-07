@@ -1,6 +1,10 @@
 "use client";
 
 import type { DataTablePageSize } from "@/components/DataTablePagination";
+import GlassReactSelect, {
+  glassSelectRequiredValue,
+  type GlassSelectOption,
+} from "@/components/dashboard/GlassReactSelect";
 
 const OPTIONS: { value: DataTablePageSize; label: string }[] = [
   { value: 15, label: "15" },
@@ -8,6 +12,11 @@ const OPTIONS: { value: DataTablePageSize; label: string }[] = [
   { value: 45, label: "45" },
   { value: "all", label: "ทั้งหมด" },
 ];
+
+const SELECT_OPTIONS: GlassSelectOption[] = OPTIONS.map((o) => ({
+  value: String(o.value),
+  label: o.label,
+}));
 
 interface DataTablePageSizeSelectProps {
   value: DataTablePageSize;
@@ -18,32 +27,33 @@ interface DataTablePageSizeSelectProps {
 }
 
 /**
- * เลือกจำนวนแถวต่อหน้า — สไตล์เดียวกับหน้า users / รายการ dashboard
+ * เลือกจำนวนแถวต่อหน้า — react-select glass (pattern เดียวกับ dropdown อื่นในแดชบอร์ด/public)
  */
 export default function DataTablePageSizeSelect({
   value,
   onChange,
-  className = "select-native-glass w-full sm:w-32 md:min-w-[112px]",
+  className = "w-full sm:w-32 md:min-w-[112px]",
   id,
   "aria-label": ariaLabel = "จำนวนแถวต่อหน้า",
 }: DataTablePageSizeSelectProps) {
+  const selected = glassSelectRequiredValue(String(value), SELECT_OPTIONS, SELECT_OPTIONS[0]);
+
   return (
-    <select
-      id={id}
+    <GlassReactSelect
       className={className}
-      aria-label={ariaLabel}
-      value={value}
-      onChange={(e) => {
-        const v = e.target.value;
-        onChange(v === "all" ? "all" : (Number(v) as 15 | 30 | 45));
+      inputId={id}
+      options={SELECT_OPTIONS}
+      value={selected}
+      onChange={(opt) => {
+        if (!opt) return;
+        onChange(
+          opt.value === "all" ? "all" : (Number(opt.value) as 15 | 30 | 45),
+        );
       }}
-    >
-      {OPTIONS.map((o) => (
-        <option key={String(o.value)} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+      isSearchable={false}
+      isClearable={false}
+      aria-label={ariaLabel}
+    />
   );
 }
 

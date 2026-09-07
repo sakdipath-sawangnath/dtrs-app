@@ -308,9 +308,7 @@ export class JobsPdfService {
 
     const rows = await this.prisma.job.findMany({
       where: {
-        ...(includeOutOfContract
-          ? {}
-          : { NOT: { isOutOfContract: true } }),
+        ...(includeOutOfContract ? {} : { NOT: { isOutOfContract: true } }),
         OR: [
           { reportDate: { gte: start, lte: end } },
           {

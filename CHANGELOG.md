@@ -49,6 +49,35 @@ npm install
 
 ---
 
+## [0.5.0] - 2026-09-07
+
+### Added
+
+- เมนู **คู่มือระบบ** (`/dashboard/user-guide`, สิทธิ์ `menu.userGuide`) — สรุป workflow งานแจ้งซ่อมและความหมาย permission สำหรับแอดมิน พร้อมลิงก์ไปจัดการบทบาท/ตั้งค่าระบบ (default ADMIN)
+- หน้าคู่มือระบบ: แท็บ **ผู้แจ้งปัญหา / เจ้าหน้าที่ / ผู้ดูแลระบบ** — ขั้นตอน end user, checklist ช่าง, ตารางสถานะงาน, FAQ และส่วน RBAC เดิม
+- คู่มือระบบ (แท็บผู้ดูแล): ส่วน **Master Site / พื้นที่** — อธิบาย `menu.locations` vs `location.create` แยกจาก `site.*` ในตารางสิทธิ์
+
+### Fixed
+
+- หน้าภาพรวม (`/dashboard`): แสดง skeleton สรุป KPI/กราฟจนโหลด permissions เสร็จ — กัน KPI fail-open (ผู้ไม่มี `job.viewContractTabs`) และ fail-closed (ผู้มีสิทธิ์) ชั่วคราว; การ์ดนอกสัญญายังซ่อนจนโหลดเสร็จ
+- หน้า `/dashboard/locations`: ซ่อนปุ่มเพิ่มจังหวัด/อำเภอ/ตำบล จนกว่าโหลด permissions เสร็จ และแสดงเฉพาะเมื่อมี **`location.create`** (แยกจาก `site.create`; `menu.locations` = เข้าดูหน้าเท่านั้น)
+- **`JobsList`** (`/dashboard/my-jobs`, `/dashboard/all`, `/dashboard/in-progress`): ซ่อนแท็บทั้งหมด/สัญญา/นอกสัญญา จนกว่าโหลด permissions เสร็จ — แสดงเฉพาะเมื่อมี `job.viewContractTabs` (ไม่ fallback ตาม JWT role ตอน loading); ปุ่ม action อื่นใน `JobsList` (`job.assign`, `job.fix.*`, `job.delete*`) ใช้ pattern เดียวกัน
+- ปุ่มตาแสดง/ซ่อนรหัสผ่าน (Default Pass ใน Settings, หน้า Login, Profile): remount input เมื่อสลับ type เพราะ Base UI Input ไม่อัปเดต attribute `type` บน DOM ทำให้ยังเห็นเป็นจุดแม้ state เป็น text
+
+### Changed
+
+- สิทธิ์ใหม่ **`location.create`** — ปุ่มเพิ่มจังหวัด/อำเภอ/ตำบล และ `POST /locations/*` ใช้ key นี้แทน `site.create` (ดู master ด้วย `menu.locations` อย่างเดียวได้โดยไม่มีปุ่มสร้าง); บทบาทกำหนดเองที่เคยพึ่ง `site.create` ต้องติ๊ก `location.create` ที่ `/dashboard/roles`; หลัง deploy restart backend หรือรัน seed
+- **`RBAC-Setup.md` / `api-endpoints.json` / คู่มือระบบ:** สอดคล้อง `location.create` และ pattern ซ่อน UI จนโหลด permissions
+- หน้าจัดการ Site (`/dashboard/sites`): ตัวกรองสรุปจังหวัด/อำเภอจากบัตรใหญ่เป็น chip แบบเดียวกับ `/dashboard/all` (แสดงทุกจังหวัด ไม่จำกัด 12 อันดับ; เลือก「ทั้งหมด」เพื่อล้าง)
+- Modal เพิ่ม/แก้ Site (`/dashboard/sites`): จังหวัด–อำเภอ–ตำบล ใช้ **`react-select`** ค้นหาได้ (glass theme + portal ใน modal) แทน native `<select>`
+- ตัวกรองจังหวัด/อำเภอ และ modal เพิ่มอำเภอ/ตำบล บน `/dashboard/locations` + ตัวกรองจังหวัด/อำเภอบน `/dashboard/sites` ใช้ **`react-select`** แบบเดียวกัน (ค้นหาได้, glass theme)
+- **`DataTablePageSizeSelect`** (จำนวนแถวต่อหน้า): ใช้ **`react-select`** แทน native `<select>` — ใช้ใน `JobsList`, `/dashboard/users`, `/dashboard/sites`, `/public/status`
+- **`GlassReactSelect`**: component ร่วมสำหรับ dropdown แบบ glass (theme + portal) — ตัวกรอง `JobsList` (สถานะ/ประเภท/จังหวัด/อำเภอ/ผู้รับงาน/เรียงลำดับ), `/dashboard/users` (กรองบทบาท·สถานะล็อก + บทบาทในฟอร์ม), `/dashboard/settings` (SMTP secure, อายุ orphan cleanup) แทน native `<select>` ที่เหลือ
+- ลบ modal master จังหวัด/อำเภอที่ไม่ได้ใช้บน `/dashboard/sites` (จัดการ master ที่ `/dashboard/locations` เท่านั้น)
+- แท็บขอบเขตสัญญาในรายการงาน (`/dashboard/all`, `my-jobs`, `in-progress`): เพิ่ม「ทั้งหมด」ซ้ายสุด (default ยังเป็น「สัญญา」) — ใช้สิทธิ์ `job.viewContractTabs` เดิม; แท็บทั้งหมด/นอกสัญญารวมงานนอกสัญญาที่จำแนกแล้ว (คิวย่อเมนูนอกสัญญายังจำกัด `PENDING` + RESOLVED ที่จำแนก — แท็บประวัติเป็น **superset** ได้) + ป้าย สัญญา/นอกสัญญา ในแถวเมื่อแท็บทั้งหมด; badge เป็นผลรวมงานค้าง
+
+---
+
 ## [0.4.0] - 2026-09-04
 
 ### Removed

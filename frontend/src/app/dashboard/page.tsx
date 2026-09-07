@@ -42,6 +42,7 @@ import {
   X,
   ChevronDown,
   Ban,
+  BookOpen,
 } from "lucide-react";
 import {
   PieChart,
@@ -63,6 +64,7 @@ import DashboardRouteLoading from "@/components/DashboardRouteLoading";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { countJobBreakdowns } from "@/lib/jobBreakdownCounts";
 import { useAppTheme } from "@/lib/useAppTheme";
 
@@ -154,11 +156,50 @@ const QUICK_LINKS = [
   { label: "ข้อขัดข้องทั้งหมด", href: "/dashboard/all", desc: "ประวัติการแจ้งข้อขัดข้องและ filter", permission: "menu.all", roles: ["ADMIN", "STAFF"], icon: ClipboardList },
   { label: "จัดการผู้ใช้", href: "/dashboard/users", desc: "รายชื่อผู้ใช้และบทบาท", permission: "menu.users", roles: ["ADMIN"], icon: Users },
   { label: "จัดการบทบาทและสิทธิ์", href: "/dashboard/roles", desc: "กำหนดสิทธิ์เมนูให้แต่ละบทบาท", permission: "menu.roles", roles: ["ADMIN"], icon: Shield },
+  { label: "คู่มือระบบ", href: "/dashboard/user-guide", desc: "Workflow และความหมายสิทธิ์สำหรับแอดมิน", permission: "menu.userGuide", roles: ["ADMIN"], icon: BookOpen },
   { label: "ตั้งค่าระบบ", href: "/dashboard/settings", desc: "กำหนดค่า MinIO และ Email", permission: "menu.settings", roles: ["ADMIN"], icon: Settings },
   { label: "แจ้งปัญหา", href: "/public/report", desc: "แบบฟอร์มแจ้งซ่อม", permission: "menu.report", roles: ["USER", "ADMIN", "STAFF"], icon: FileEdit },
   { label: "ตรวจสอบสถานะ", href: "/public/status", desc: "ตรวจสอบสถานะใบแจ้งซ่อม", permission: "menu.status", roles: ["USER", "ADMIN", "STAFF"], icon: Search },
   { label: "โปรไฟล์", href: "/dashboard/profile", desc: "ข้อมูลส่วนตัวและเปลี่ยนรหัสผ่าน", permission: "menu.profile", roles: ["USER", "ADMIN", "STAFF"], icon: User },
 ];
+
+const METRICS_SKELETON_BLOCK = "rounded-xl bg-slate-200/80 dark:bg-white/10";
+
+/** placeholder จน `/roles/me/permissions` โหลด — กัน KPI fail-open/fail-closed ชั่วคราว */
+function DashboardOverviewMetricsSkeleton() {
+  return (
+    <div className="space-y-6" aria-busy="true" aria-label="กำลังโหลดสรุปภาพรวม">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="glass-card p-4 sm:p-5 flex items-center gap-3 min-h-[88px]">
+            <Skeleton className={`h-11 w-11 shrink-0 ${METRICS_SKELETON_BLOCK}`} />
+            <div className="flex-1 space-y-2 min-w-0">
+              <Skeleton className={`h-7 w-12 ${METRICS_SKELETON_BLOCK}`} />
+              <Skeleton className={`h-3 w-20 ${METRICS_SKELETON_BLOCK}`} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Skeleton className={`h-40 w-full ${METRICS_SKELETON_BLOCK}`} />
+        <Skeleton className={`h-40 w-full ${METRICS_SKELETON_BLOCK}`} />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <Skeleton className={`h-[280px] w-full ${METRICS_SKELETON_BLOCK}`} />
+        <Skeleton className={`h-[280px] w-full ${METRICS_SKELETON_BLOCK}`} />
+      </div>
+      <Skeleton className={`h-[320px] w-full ${METRICS_SKELETON_BLOCK}`} />
+      <div className="space-y-3">
+        <Skeleton className={`h-4 w-52 ${METRICS_SKELETON_BLOCK}`} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          <Skeleton className={`h-28 w-full ${METRICS_SKELETON_BLOCK}`} />
+          <Skeleton className={`h-28 w-full ${METRICS_SKELETON_BLOCK}`} />
+          <Skeleton className={`h-28 w-full ${METRICS_SKELETON_BLOCK}`} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -166,6 +207,7 @@ export default function DashboardPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [permissions, setPermissions] = useState<string[] | null>(null);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const [filterMode, setFilterMode] = useState<DashboardFilterMode>("all");
   const [reportMonth, setReportMonth] = useState(() => format(new Date(), "yyyy-MM"));
   const [reportYear, setReportYear] = useState(() => format(new Date(), "yyyy"));
@@ -177,20 +219,19 @@ export default function DashboardPage() {
   const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4100/api";
   const token = (session as { accessToken?: string })?.accessToken;
   const userRole = (session?.user as { role?: string })?.role ?? "USER";
-  const userRoleUpper = String(userRole || "").toUpperCase();
 
-  /** สอดคล้อง JobsList — ไม่มีสิทธิ์นี้จะไม่นับ/ไม่โชว์งานนอกสัญญา */
+  /** UI (การ์ดนอกสัญญา) — ซ่อนจนโหลด permissions เสร็จ สอดคล้อง JobsList */
   const canViewContractTabs = useMemo(() => {
-    if (permissions !== null) {
-      return permissions.includes("job.viewContractTabs");
-    }
-    return ["ADMIN", "STAFF", "SUPERVISOR"].includes(userRoleUpper);
-  }, [permissions, userRoleUpper]);
+    if (!permissionsLoaded) return false;
+    return permissions?.includes("job.viewContractTabs") ?? false;
+  }, [permissions, permissionsLoaded]);
 
+  /** KPI/กราฟ — ใช้หลัง `permissionsLoaded` เท่านั้น (ระหว่างโหลดแสดง skeleton) */
   const scopedJobs = useMemo(() => {
-    if (canViewContractTabs) return jobs;
+    if (!permissionsLoaded) return [];
+    if (permissions?.includes("job.viewContractTabs")) return jobs;
     return jobs.filter((j) => j.isOutOfContract !== true);
-  }, [jobs, canViewContractTabs]);
+  }, [jobs, permissions, permissionsLoaded]);
 
   const monthYear = useMemo(() => {
     const m = String(reportMonth || "");
@@ -284,14 +325,20 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!token || !session?.user) {
       setPermissions(null);
+      setPermissionsLoaded(false);
       return;
     }
-    axios.get<{ permissions: string[] }>(`${API}/roles/me/permissions`, { headers: { Authorization: `Bearer ${token}` } })
+    setPermissionsLoaded(false);
+    axios
+      .get<{ permissions: string[] }>(`${API}/roles/me/permissions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
       .then((r) => {
         const payload = unwrapApiData<unknown>(r?.data) as { permissions?: string[] } | null;
         setPermissions(payload?.permissions ?? null);
       })
-      .catch(() => setPermissions(null));
+      .catch(() => setPermissions(null))
+      .finally(() => setPermissionsLoaded(true));
   }, [token, session?.user, API]);
 
   useEffect(() => {
@@ -723,6 +770,10 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {!permissionsLoaded ? (
+        <DashboardOverviewMetricsSkeleton />
+      ) : (
+        <>
       {/* การ์ดสรุป KPI */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {cards.map((card) => (
@@ -1040,6 +1091,8 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+        </>
+      )}
 
       {/* เมนูด่วน — แสดงตามสิทธิ์ RBAC */}
       <div

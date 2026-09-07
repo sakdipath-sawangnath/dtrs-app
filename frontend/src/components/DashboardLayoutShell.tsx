@@ -21,6 +21,7 @@ import {
   Shield,
   Loader2,
   Landmark,
+  BookOpen,
 } from "lucide-react";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
@@ -44,6 +45,7 @@ const navigation = [
   { name: "จัดการพื้นที่ (Master)", href: "/dashboard/locations", icon: Landmark, permission: "menu.locations", roles: ["ADMIN", "SUPERVISOR"] },
   { name: "จัดการผู้ใช้", href: "/dashboard/users", icon: UserCog, permission: "menu.users", roles: ["ADMIN"] },
   { name: "จัดการบทบาทและสิทธิ์", href: "/dashboard/roles", icon: Shield, permission: "menu.roles", roles: ["ADMIN"] },
+  { name: "คู่มือระบบ", href: "/dashboard/user-guide", icon: BookOpen, permission: "menu.userGuide", roles: ["ADMIN"] },
   { name: "ตั้งค่าระบบ", href: "/dashboard/settings", icon: Settings, permission: "menu.settings", roles: ["ADMIN"] },
 ];
 

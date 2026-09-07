@@ -414,7 +414,7 @@
 - [x] `PATCH /jobs/:id/classify-doc` + `job.classifyDoc` (ADMIN/SUPERVISOR) + ลายเซ็น; ในสัญญา `CM-SHF-YYYY-…` / นอกสัญญา `YYYYMM…`
 - [x] แยกสิทธิ์ปุ่มใน dialog: `job.classifyDoc.contract` / `job.classifyDoc.outOfContract`; บทบาทที่มี `job.classifyDoc` ได้ทั้งคู่รอบแรกที่แคตตาล็อกเพิ่มลูก (และตอน seed) — ติ๊กออกแล้ว restart ไม่คืน; API 403 ตามชนิดที่เลือก
 - [x] UI จำแนก: `/dashboard/all` + `/dashboard/jobs/:id` (`JobClassifyDocDialog` — เลือกแล้วยืนยัน)
-- [x] ซ่อน RESOLVED OOC ที่จำแนกแล้วจาก `/all` + `/my-jobs`; หน้า `/out-of-contract` รับ PENDING + RESOLVED OOC จำแนกแล้ว
+- [x] ~~ซ่อน~~ → **โชว์** RESOLVED OOC ที่จำแนกแล้วบน `/all` + `/my-jobs` (แท็บทั้งหมด/นอกสัญญา); คิวย่อ `/out-of-contract` ยังรับ PENDING + RESOLVED OOC จำแนกแล้ว (แท็บประวัติอาจเป็น superset)
 - [x] fix-then-ship job detail: รีโหลดเงียบหลังจำแนก + toast error จาก API
 - [x] Sync docs: `Meeting` plan, `System-Workflow`, `STATUS`, `PLAN`, `TASK`, `RBAC-Setup`, `docs/README`, `CHANGELOG`
 
@@ -466,3 +466,10 @@
 - [x] `isFormalDocTicketNo` รับ `CM-SHF-YYYY-…` และเลขเก่า `CM-SHF-2002-…`
 - [x] fix-then-ship (scrutinize): ไม่รีเซ็ตรายปี — คืน `period=''` แล้วส่งแค่ `periodYear` ตอน format
 - [x] UI dialog + unit/e2e + sync docs (`System-Workflow`, Meeting plan, `RBAC-Setup`, `STATUS`, `CHANGELOG`)
+
+## 38. เมนูคู่มือระบบ (user-guide) (2026-09-07)
+
+- [x] Permission **`menu.userGuide`** — catalog + seed + default ADMIN; sync อัตโนมัติเมื่อ restart backend
+- [x] หน้า **`/dashboard/user-guide`** — workflow (numbered steps) + ตารางสิทธิ์ + CTA Roles/Settings
+- [x] Sidebar + เมนูด่วนภาพรวม + ลิงก์จาก `/dashboard/roles`
+- [x] เอกสาร: `CHANGELOG`, `STATUS`, `RBAC-Setup`, `TASK`

@@ -14,6 +14,11 @@ export function isFormalDocTicketNo(
   return /^\d{10,}$/.test(s);
 }
 
+/**
+ * งานนอกสัญญาที่จำแนกเลขทางการแล้ว (RESOLVED + formal ticket).
+ * ใช้ตรวจ semantic / unit test — ไม่ใช้ซ่อนรายการจาก `/dashboard/all` หรือ `/my-jobs` แล้ว
+ * (คิวย่อ `/dashboard/out-of-contract` กรองด้วย `isFormalDocTicketNo` โดยตรง)
+ */
 export function isClassifiedOutOfContractResolved(job: {
   status?: string;
   isOutOfContract?: boolean;

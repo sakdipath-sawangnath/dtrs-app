@@ -52,7 +52,7 @@ export class LocationsController {
   }
 
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('site.create')
+  @Permissions('location.create')
   @Post('provinces')
   async createProvince(
     @Body(new ZodValidationPipe(CreateProvinceSchema)) body: CreateProvinceDto,
@@ -61,7 +61,7 @@ export class LocationsController {
   }
 
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('site.create')
+  @Permissions('location.create')
   @Post('provinces/:provinceId/districts')
   async createDistrict(
     @Param('provinceId', new ParseIntPipe({ errorHttpStatusCode: 400 }))
@@ -72,7 +72,7 @@ export class LocationsController {
   }
 
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('site.create')
+  @Permissions('location.create')
   @Post('districts/:districtId/subdistricts')
   async createSubdistrict(
     @Param('districtId', new ParseIntPipe({ errorHttpStatusCode: 400 }))

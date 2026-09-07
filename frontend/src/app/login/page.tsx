@@ -183,6 +183,7 @@ export default function LoginPage() {
                   <div className="relative">
                     <Input
                       id="login-password"
+                      key={showPassword ? "login-password-text" : "login-password-password"}
                       required
                       type={showPassword ? "text" : "password"}
                       className="form-input-glass h-auto min-h-11 pr-12 text-sm"

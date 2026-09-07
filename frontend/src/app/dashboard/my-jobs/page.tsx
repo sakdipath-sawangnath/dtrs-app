@@ -1,21 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import JobsList from "@/components/JobsList";
-
-type TabId = "contract" | "out";
+import JobsList, { type ContractScopeTab } from "@/components/JobsList";
 
 export default function MyJobsPage() {
-  const [tab, setTab] = useState<TabId>("contract");
+  const [tab, setTab] = useState<ContractScopeTab>("contract");
 
   return (
     <JobsList
       assignedToMe
       showContractTabs
-      showOutOfContract={tab === "out"}
-      onShowOutOfContractChange={(v) => setTab(v ? "out" : "contract")}
+      contractTab={tab}
+      onContractTabChange={setTab}
       noCard={true}
     />
   );
 }
-

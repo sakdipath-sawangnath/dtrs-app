@@ -106,10 +106,7 @@ export class JobsController {
     query: DashboardSummaryPdfQueryDto,
   ): Promise<StreamableFile> {
     const { buffer, filename } =
-      await this.jobsPdfService.generateDashboardSummaryPdf(
-        query,
-        req.user.id,
-      );
+      await this.jobsPdfService.generateDashboardSummaryPdf(query, req.user.id);
     return new StreamableFile(buffer, {
       type: 'application/pdf',
       disposition: `attachment; filename="${filename}"`,

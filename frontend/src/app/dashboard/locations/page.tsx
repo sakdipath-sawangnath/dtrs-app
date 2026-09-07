@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
 import { ChevronDown, ChevronRight, Landmark, MapPin, MapPinned, Plus } from "lucide-react";
+import Select from "react-select";
 import DashboardPageShell from "@/components/DashboardPageShell";
 import DashboardRouteLoading from "@/components/DashboardRouteLoading";
 import CrudModal from "@/components/CrudModal";
@@ -18,9 +19,15 @@ import {
   type LocationProvinceOption,
   type LocationSubdistrictOption,
 } from "@/lib/locationsApi";
+import { getReactSelectGlassStyles } from "@/lib/reactSelectGlassStyles";
+import { useAppTheme } from "@/lib/useAppTheme";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4100/api";
 
+type IdSelectOption = { value: string; label: string };
+
+const SELECT_MENU_PORTAL =
+  typeof document !== "undefined" ? document.body : null;
 type AxiosErr = {
   response?: { data?: { error?: { message?: string }; message?: string } };
 };
@@ -36,7 +43,8 @@ function apiErrorMessage(err: unknown): string {
 export default function DashboardLocationsPage() {
   const { data: session, status } = useSession();
   const token = (session as { accessToken?: string })?.accessToken;
-
+  const { theme } = useAppTheme();
+  const selectStyles = useMemo(() => getReactSelectGlassStyles(theme), [theme]);
   const [provinces, setProvinces] = useState<LocationProvinceOption[]>([]);
   const [districtsByProvince, setDistrictsByProvince] = useState<
     Record<number, LocationDistrictOption[]>
@@ -62,13 +70,19 @@ export default function DashboardLocationsPage() {
   const [modalDistricts, setModalDistricts] = useState<LocationDistrictOption[]>([]);
   const [saving, setSaving] = useState(false);
 
-  const canCreate =
-    permCodes == null
-      ? true
-      : permCodes.includes("site.create") || permCodes.includes("menu.locations");
+  /** สอดคล้อง API POST /locations/* — ต้องมี location.create (menu.locations = เข้าดูหน้าเท่านั้น) */
+  const canCreate = permCodes?.includes("location.create") ?? false;
 
-  const authHeaders = useCallback(() => {
-    return token ? { Authorization: `Bearer ${token}` } : {};
+  const provinceSelectOptions = useMemo(
+    () => provinces.map((p) => ({ value: String(p.id), label: p.name })),
+    [provinces],
+  );
+  const modalDistrictSelectOptions = useMemo(
+    () => modalDistricts.map((d) => ({ value: String(d.id), label: d.name })),
+    [modalDistricts],
+  );
+
+  const authHeaders = useCallback(() => {    return token ? { Authorization: `Bearer ${token}` } : {};
   }, [token]);
 
   const fetchProvinces = useCallback(async () => {
@@ -91,20 +105,19 @@ export default function DashboardLocationsPage() {
   }, [status, fetchProvinces]);
 
   useEffect(() => {
-    if (status !== "authenticated" || !token) return;
+    if (status !== "authenticated" || !token) {
+      setPermCodes(null);
+      return;
+    }
     void (async () => {
       try {
         const r = await axios.get(`${API}/roles/me/permissions`, {
           headers: authHeaders(),
           timeout: 15000,
         });
-        const data = unwrapApiData(r.data);
-        const codes = Array.isArray(data)
-          ? data.map((x: { code?: string } | string) =>
-              typeof x === "string" ? x : String(x?.code ?? ""),
-            )
-          : [];
-        setPermCodes(codes.filter(Boolean));
+        const payload = unwrapApiData<{ permissions?: string[] }>(r.data);
+        const list = payload?.permissions;
+        setPermCodes(Array.isArray(list) ? list : null);
       } catch {
         setPermCodes(null);
       }
@@ -472,26 +485,36 @@ export default function DashboardLocationsPage() {
         submitLabel="บันทึก"
         onSubmit={() => void submitDistrict()}
       >
-        <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="loc-district-province">
+        <label
+          id="loc-district-province-label"
+          className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100"
+          htmlFor="loc-district-province"
+        >
           จังหวัด
         </label>
-        <select
-          id="loc-district-province"
-          className="form-input-glass w-full min-h-11 mb-3"
-          value={districtProvinceId === "" ? "" : String(districtProvinceId)}
-          onChange={(e) =>
-            setDistrictProvinceId(e.target.value ? Number(e.target.value) : "")
+        <Select<IdSelectOption, false>
+          inputId="loc-district-province"
+          options={provinceSelectOptions}
+          styles={selectStyles}
+          placeholder="-- เลือกจังหวัด --"
+          menuPosition="fixed"
+          menuPortalTarget={SELECT_MENU_PORTAL}
+          value={
+            districtProvinceId === ""
+              ? null
+              : provinceSelectOptions.find(
+                  (o) => o.value === String(districtProvinceId),
+                ) ?? null
           }
-          aria-label="เลือกจังหวัดที่อำเภอสังกัด"
-        >
-          <option value="">-- เลือกจังหวัด --</option>
-          {provinces.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="loc-district">
+          onChange={(opt) =>
+            setDistrictProvinceId(opt?.value ? Number(opt.value) : "")
+          }
+          isClearable
+          isSearchable
+          noOptionsMessage={() => "ไม่พบข้อมูล"}
+          aria-labelledby="loc-district-province-label"
+        />
+        <label className="block text-sm font-medium mb-1.5 mt-3 text-slate-900 dark:text-slate-100" htmlFor="loc-district">
           ชื่ออำเภอ
         </label>
         <input
@@ -510,44 +533,66 @@ export default function DashboardLocationsPage() {
         submitLabel="บันทึก"
         onSubmit={() => void submitSubdistrict()}
       >
-        <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="loc-sub-province">
+        <label
+          id="loc-sub-province-label"
+          className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100"
+          htmlFor="loc-sub-province"
+        >
           จังหวัด
         </label>
-        <select
-          id="loc-sub-province"
-          className="form-input-glass w-full min-h-11 mb-3"
-          value={subProvinceId === "" ? "" : String(subProvinceId)}
-          onChange={(e) => setSubProvinceId(e.target.value ? Number(e.target.value) : "")}
-          aria-label="เลือกจังหวัดก่อนเลือกอำเภอ"
+        <Select<IdSelectOption, false>
+          inputId="loc-sub-province"
+          options={provinceSelectOptions}
+          styles={selectStyles}
+          placeholder="-- เลือกจังหวัด --"
+          menuPosition="fixed"
+          menuPortalTarget={SELECT_MENU_PORTAL}
+          value={
+            subProvinceId === ""
+              ? null
+              : provinceSelectOptions.find((o) => o.value === String(subProvinceId)) ??
+                null
+          }
+          onChange={(opt) => {
+            setSubProvinceId(opt?.value ? Number(opt.value) : "");
+            setSubdistrictDistrictId("");
+          }}
+          isClearable
+          isSearchable
+          noOptionsMessage={() => "ไม่พบข้อมูล"}
+          aria-labelledby="loc-sub-province-label"
+        />
+        <label
+          id="loc-sub-district-label"
+          className="block text-sm font-medium mb-1.5 mt-3 text-slate-900 dark:text-slate-100"
+          htmlFor="loc-sub-district"
         >
-          <option value="">-- เลือกจังหวัด --</option>
-          {provinces.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="loc-sub-district">
           อำเภอ
         </label>
-        <select
-          id="loc-sub-district"
-          className="form-input-glass w-full min-h-11 mb-3"
-          value={subdistrictDistrictId === "" ? "" : String(subdistrictDistrictId)}
-          onChange={(e) =>
-            setSubdistrictDistrictId(e.target.value ? Number(e.target.value) : "")
+        <Select<IdSelectOption, false>
+          inputId="loc-sub-district"
+          options={modalDistrictSelectOptions}
+          styles={selectStyles}
+          placeholder="-- เลือกอำเภอ --"
+          menuPosition="fixed"
+          menuPortalTarget={SELECT_MENU_PORTAL}
+          value={
+            subdistrictDistrictId === ""
+              ? null
+              : modalDistrictSelectOptions.find(
+                  (o) => o.value === String(subdistrictDistrictId),
+                ) ?? null
           }
-          aria-label="เลือกอำเภอที่ตำบลสังกัด"
-          disabled={subProvinceId === ""}
-        >
-          <option value="">-- เลือกอำเภอ --</option>
-          {modalDistricts.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
-            </option>
-          ))}
-        </select>
-        <label className="block text-sm font-medium mb-1.5 text-slate-900 dark:text-slate-100" htmlFor="loc-subdistrict">
+          onChange={(opt) =>
+            setSubdistrictDistrictId(opt?.value ? Number(opt.value) : "")
+          }
+          isDisabled={subProvinceId === ""}
+          isClearable
+          isSearchable
+          noOptionsMessage={() => "ไม่พบข้อมูล"}
+          aria-labelledby="loc-sub-district-label"
+        />
+        <label className="block text-sm font-medium mb-1.5 mt-3 text-slate-900 dark:text-slate-100" htmlFor="loc-subdistrict">
           ชื่อตำบล
         </label>
         <input
@@ -556,7 +601,6 @@ export default function DashboardLocationsPage() {
           value={subdistrictName}
           onChange={(e) => setSubdistrictName(e.target.value)}
         />
-      </CrudModal>
-    </DashboardPageShell>
+      </CrudModal>    </DashboardPageShell>
   );
 }

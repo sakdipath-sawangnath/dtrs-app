@@ -742,7 +742,7 @@ function StatusPageInner() {
                   <DataTablePageSizeSelect
                     value={phonePageSize}
                     onChange={setPhonePageSize}
-                    className="select-native-glass w-full sm:w-32 min-h-11 cursor-pointer order-1 sm:order-2"
+                    className="w-full sm:w-32 min-h-11 order-1 sm:order-2"
                     aria-label="จำนวนแถวต่อหน้า"
                   />
                 </div>

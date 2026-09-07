@@ -22,7 +22,8 @@ export type BreakdownFilterGroup = {
 };
 
 /**
- * ตัวกรองแบบ chip/pill สำหรับหน้าประวัติทั้งหมด —
+ * ตัวกรองแบบ chip/pill —
+ * ใช้บน `/dashboard/all` และ `/dashboard/sites` (และหน้าที่ต้องการรูปแบบเดียวกัน)
  * กระชับกว่าการ์ดกริด, scroll แนวนอนบนมือถือ, wrap บน tablet/desktop
  */
 export default function BreakdownFilterChips({
