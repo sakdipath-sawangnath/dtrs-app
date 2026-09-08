@@ -427,7 +427,7 @@ export function JobMaintenancePdfTemplate({
               <tr>
                 <SignatureBlock
                   signatureSrc={prefetchedImages?.staffSignature}
-                  caption="ผู้ดำเนินการ"
+                  caption="ผู้เข้าดำเนินการ"
                 />
                 <SignatureBlock
                   signatureSrc={prefetchedImages?.reporterSignature}
