@@ -248,11 +248,12 @@ build:frontend:
     - npm ci --prefer-offline --no-audit
     - npm run build
   artifacts:
+    # ci-runner COPY แค่ standalone + static + public — อย่าส่งทั้ง `.next`
+    # (`.next/cache` webpack มัก >500MB → GitLab coordinator 413)
     paths:
-      - frontend/.next
+      - frontend/.next/standalone
+      - frontend/.next/static
       - frontend/public
-      - frontend/package.json
-      - frontend/package-lock.json
     expire_in: 1 hour
 
 build:backend:
