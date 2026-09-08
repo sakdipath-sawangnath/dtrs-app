@@ -49,6 +49,14 @@ npm install
 
 ---
 
+## [0.6.1] - 2026-09-08
+
+### Fixed
+
+- GitLab `build:frontend`: artifact ส่งเฉพาะ `.next/standalone` + `.next/static` + `public` (ไม่ส่ง webpack cache) เพื่อไม่ให้ upload โดน 413
+
+---
+
 ## [0.6.0] - 2026-09-08
 
 ### Added

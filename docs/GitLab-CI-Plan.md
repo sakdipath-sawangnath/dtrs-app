@@ -137,7 +137,7 @@ flowchart TD
 |-----|-------|--------|---------|----------|
 | `test:frontend` | test | `staging`, `main`, `master` | ไม่ | `npm ci` → **`npm run lint`** — fail = หยุด |
 | `test:backend` | test | `staging`, `main`, `master` | ไม่ | `npm ci` → `npx prisma generate` → **`npx eslint …` (ห้าม `--fix`)** → **`npm test`** — fail = หยุด |
-| `build:frontend` | build | `staging`, `main`, `master` | ไม่ | ขยายจาก PRD-only ปัจจุบัน |
+| `build:frontend` | build | `staging`, `main`, `master` | ไม่ | artifacts = `.next/standalone` + `.next/static` + `public` (ไม่ส่ง `.next/cache`) |
 | `build:backend` | build | `staging`, `main`, `master` | ไม่ | ขยายจาก PRD-only ปัจจุบัน |
 | `deploy:summary` | deploy | ทั้งสองกลุ่ม branch | ไม่ | รายงานสั้น ๆ (optional) |
 | `docker_build:uat` | deploy_docker | `staging` | **ใช่** | build 2 images บน `.115` — **manual** |
