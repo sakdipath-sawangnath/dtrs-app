@@ -7,6 +7,8 @@
 #   NEXT_PUBLIC_API_BASE_URL (build-arg frontend image), FRONTEND_BASE_URL,
 #   ALLOWED_ORIGINS, MINIO_*, SMTP_TLS_REJECT_UNAUTHORIZED, CRON_SECRET
 #   API_INTERNAL_BASE_URL — default ในไฟล์นี้ (NextAuth server-side → backend บน Docker network)
+#   GlitchTip (optional): NEXT_PUBLIC_SENTRY_DSN (bake ตอน build:frontend), SENTRY_DSN + SENTRY_URL (runtime frontend)
+#   NEXT_PUBLIC_APP_ENV — default ตาม branch (staging/production) ใน .rules_ci_branches_with_env
 #
 # อ้างอิง: docs/GitLab-CI-Plan.md, docs/GitLab-CI-Variables-Checklist.md
 
@@ -118,9 +120,11 @@ variables:
     - if: '$CI_COMMIT_BRANCH == "staging"'
       variables:
         DTRS_CI_ENV: staging
+        NEXT_PUBLIC_APP_ENV: staging
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
       variables:
         DTRS_CI_ENV: production
+        NEXT_PUBLIC_APP_ENV: production
 
 .rules_staging:
   rules:
@@ -234,6 +238,11 @@ build:frontend:
       if [ -z "$NEXT_PUBLIC_API_BASE_URL" ]; then
         echo "ERROR: NEXT_PUBLIC_API_BASE_URL is empty (required at next build, check CI/CD Variables + scope ${DTRS_CI_ENV})"
         exit 1
+      fi
+      if [ -n "$NEXT_PUBLIC_SENTRY_DSN" ]; then
+        echo "GlitchTip: NEXT_PUBLIC_SENTRY_DSN is set (env=${NEXT_PUBLIC_APP_ENV:-unset})"
+      else
+        echo "GlitchTip: NEXT_PUBLIC_SENTRY_DSN is empty — browser error tracking disabled for this build"
       fi
     - cd frontend
     - npm ci --prefer-offline --no-audit
@@ -379,6 +388,8 @@ deploy:uat:docker:
         -e NEXTAUTH_SECRET='${NEXTAUTH_SECRET}' \
         -e NEXTAUTH_URL='${NEXTAUTH_URL}' \
         -e API_INTERNAL_BASE_URL='${API_INTERNAL_BASE_URL}' \
+        -e SENTRY_DSN='${SENTRY_DSN}' \
+        -e SENTRY_URL='${SENTRY_URL}' \
         '${FRONTEND_IMAGE}'
       sleep 5
       for c in dtrs-app-backend dtrs-app-frontend; do
@@ -536,6 +547,8 @@ deploy:prd:docker:
         -e NEXTAUTH_SECRET='${NEXTAUTH_SECRET}' \
         -e NEXTAUTH_URL='${NEXTAUTH_URL}' \
         -e API_INTERNAL_BASE_URL='${API_INTERNAL_BASE_URL}' \
+        -e SENTRY_DSN='${SENTRY_DSN}' \
+        -e SENTRY_URL='${SENTRY_URL}' \
         '${FRONTEND_IMAGE}'
       sleep 5
       for c in dtrs-app-backend dtrs-app-frontend; do
