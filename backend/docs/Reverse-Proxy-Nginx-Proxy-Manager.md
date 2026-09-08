@@ -6,7 +6,7 @@
 
 | บริการ | พอร์ต host (ตัวอย่าง) | หน้าที่ |
 |--------|----------------------|---------|
-| Next.js | `8404` → 3000 | หน้าเว็บ, NextAuth (`/api/auth/*`), พิมพ์รายงาน (`/api/print-jobs/*`), **รูปงาน (`/job-images/*`)**, **รูปโปรไฟล์แดชบอร์ด (`/user-images/*`)** |
+| Next.js | `8404` → 3000 | หน้าเว็บ, NextAuth (`/api/auth/*`), พิมพ์รายงาน (`/api/print-jobs/*`), **รูปงาน (`/job-images/*`)**, **รูปโปรไฟล์แดชบอร์ด (`/user-images/*`)**, **GlitchTip tunnel (`/monitoring`)** |
 | NestJS | `8405` → 4100 | REST API ภายใต้ `/api/*` (เช่น `/api/jobs/...`, `/api/roles/...`), PDF (`/api/jobs/:id/report-pdf`), Socket.IO |
 
 - Backend ตั้ง `app.setGlobalPrefix('api')` — path ที่ส่งเข้า Nest ต้องมี **`/api`** นำหน้า (ห้าม strip `/api` ออกจน Nest ได้แค่ `/jobs/...` โดยไม่มี prefix)
@@ -44,7 +44,9 @@
    API หลักของงาน (`GET /api/jobs/:id`, list ฯลฯ) ไป Nest ถูกต้อง  
    **รูปใน `<img>` หน้าพิมพ์** ใช้ **`/job-images/:id/:kind/:index`** บน Next (8404) — path ไม่อยู่ใต้ `/api` จึงโดน forward ไป Next ตามปกติแม้ NPM ไม่ได้แยก `/api/job-images` (ถ้าแยกไป Nest จะได้ **404**) — route แนบ Bearer จาก session cookie แล้วค่อยดึงจาก Nest ภายใน ถ้าเบราว์เซอร์เรียก `GET /api/jobs/.../image/...` ไปชน Nest โดยตรงจะได้ **401** เพราะแท็ก `<img>` ไม่ส่ง header `Authorization`  
    *(ทางเลือก)* **`/api/job-images/...`** ทำงานเหมือนกัน แต่ต้องตั้ง NPM แยกไป Next เหมือน `/api/print-jobs`  
-   **`/user-images/*`** — โหลดรูปโปรไฟล์แดชบอร์ดบน Next เช่นเดียวกับ `/job-images/*` (แนบ session cookie → proxy ไป Nest `GET /api/users/.../avatar`) — ถ้า forward ทั้งโดเมนหลักไป Next สำหรับ path ที่ไม่ใช่ `/api` อยู่แล้ว มักไม่ต้องแยก location พิเศษ
+   **`/user-images/*`** — โหลดรูปโปรไฟล์แดชบอร์ดบน Next เช่นเดียวกับ `/job-images/*` (แนบ session cookie → proxy ไป Nest `GET /api/users/.../avatar`) — ถ้า forward ทั้งโดเมนหลักไป Next สำหรับ path ที่ไม่ใช่ `/api` อยู่แล้ว มักไม่ต้องแยก location พิเศษ  
+   **`/monitoring`** — tunnel envelope ของ `@sentry/nextjs` บน Next (`frontend/src/app/monitoring/route.ts`) — **อย่า** ใส่ใต้ `/api/` (จะไปชน Nest) และ **ไม่ต้อง** ตั้ง Custom Location ถ้า default ของโดเมนชี้ Next `:8404` อยู่แล้ว (เหมือน `/job-images`) — Next จะ forward ไป GlitchTip ที่ `SENTRY_URL` ภายใน LAN เอง  
+   **เครือข่าย:** container frontend ทั้ง UAT (`192.168.0.115`) และ PRD (`192.168.0.128`) ต้องออกไป `SENTRY_URL` (ค่าเริ่มต้น `http://192.168.0.115:8700`) ได้ — ถ้า PRD ถึงพอร์ต 8700 ไม่ได้ เบราว์เซอร์นอก LAN จะได้ 502 ที่ `/monitoring` และ server SDK จะส่ง event ไม่ถึง
 
 2. **WebSocket**  
    ที่ Proxy Host หลักควรเปิด **Websockets Support** (ถ้ามี) และ location `/socket.io` ต้องชี้ไป backend

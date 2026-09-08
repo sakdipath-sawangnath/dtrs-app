@@ -65,6 +65,10 @@
 | ☐ | `API_INTERNAL_BASE_URL` | ไม่บังคับ | มี default ใน `.gitlab-ci.yml`: `http://dtrs-app-backend:4100/api` (NextAuth / server-side fetch) |
 | ☐ | `SMTP_TLS_REJECT_UNAUTHORIZED` | ไม่บังคับ | `false` ถ้า SMTP ภายใน / certificate self-signed |
 | ☐ | `CRON_SECRET` | ไม่บังคับ | ถ้ามี scheduled job ที่ backend ตรวจ secret |
+| ☐ | `NEXT_PUBLIC_SENTRY_DSN` | ไม่บังคับ | GlitchTip DSN ฝั่งเบราว์เซอร์ — **bake ตอน `build:frontend`** (แยกค่า staging vs production); ว่าง = ไม่ส่ง event จาก client; **ต้องเป็นโปรเจกต์เดียวกับ `SENTRY_DSN`** ของ env นั้น (tunnel จะ 403 ถ้า project/key ไม่ตรง) |
+| ☐ | `SENTRY_DSN` | ไม่บังคับ | DSN ฝั่ง server ของ Next (tunnel `/monitoring` + server SDK); ส่ง `-e` ตอน `docker run` frontend |
+| ☐ | `SENTRY_URL` | ไม่บังคับ | `http://192.168.0.115:8700` — ingest origin ของ GlitchTip (default ในโค้ดถ้าไม่ตั้ง); **โฮสต์ที่รัน frontend (UAT `.115` และ PRD `.128`) ต้องออกไปพอร์ตนี้ได้** |
+| ☐ | `NEXT_PUBLIC_APP_ENV` | ไม่บังคับ | YAML ตั้ง `staging` / `production` ตาม branch แล้ว — **อย่าตั้งใน GitLab UI**; หน้า `/debug/glitchtip` ปิดเมื่อเป็น `production` และต้องล็อกอินแดชบอร์ด |
 
 ---
 
@@ -192,7 +196,10 @@ CRON_SECRET=***
 | `NEXTAUTH_SECRET` | | ✅ `-e` | |
 | `NEXTAUTH_URL` | | ✅ `-e` | |
 | `API_INTERNAL_BASE_URL` | | ✅ `-e` | |
-| `NEXT_PUBLIC_API_BASE_URL` | | | ✅ `--build-arg` |
+| `NEXT_PUBLIC_API_BASE_URL` | | | ✅ bake ตอน `build:frontend` |
+| `NEXT_PUBLIC_SENTRY_DSN` | | | ✅ bake ตอน `build:frontend` (optional) |
+| `SENTRY_DSN` | | ✅ `-e` | |
+| `SENTRY_URL` | | ✅ `-e` | |
 | `SSH_PRIVATE_KEY` | deploy script only | | | ✅ ก่อน SSH |
 
 ---

@@ -50,6 +50,11 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8405/api}
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        SENTRY_DSN: ${SENTRY_DSN:-}
+        NEXT_PUBLIC_APP_ENV: ${NEXT_PUBLIC_APP_ENV:-}
+        NEXT_PUBLIC_APP_RELEASE: ${NEXT_PUBLIC_APP_RELEASE:-}
+        SENTRY_URL: ${SENTRY_URL:-http://192.168.0.115:8700}
     container_name: dtrs-app-frontend
     restart: unless-stopped
     # ลดความเสี่ยงรัน binary จาก /tmp (ให้ใช้คู่กับ deploy ผ่าน NPM + ปิดพอร์ต 8404 ที่ firewall)
@@ -63,6 +68,8 @@ services:
       # service name ใน compose = `backend` (คนละแบบกับ CI ที่ใช้ชื่อ container `dtrs-app-backend`)
       API_INTERNAL_BASE_URL: ${API_INTERNAL_BASE_URL:-http://backend:4100/api}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_URL: ${SENTRY_URL:-http://192.168.0.115:8700}
     depends_on:
       - backend
     # ไม่มี volumes: — ไม่ผูก path บน host

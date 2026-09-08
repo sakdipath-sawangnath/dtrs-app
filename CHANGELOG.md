@@ -49,6 +49,18 @@ npm install
 
 ---
 
+## [0.6.0] - 2026-09-08
+
+### Added
+
+- Next.js ส่ง error เข้า GlitchTip ผ่าน same-origin `/monitoring` (ผู้ใช้นอก LAN ไม่ต้องเข้า ingest ในวงภายใน); หน้าทดสอบ `/debug/glitchtip` เปิดเฉพาะนอก production และต้องล็อกอินแดชบอร์ด
+
+### Security
+
+- `/monitoring` forward เฉพาะ envelope ที่โปรเจกต์และ public key ตรง DSN ของ env, จำกัดขนาด 1MB, และตอบ 503 ถ้ายังไม่ตั้ง DSN
+
+---
+
 ## [0.5.1] - 2026-09-08
 
 ### Changed

@@ -83,6 +83,9 @@ npm run dev
 | `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:4100/api` |
 | `NEXTAUTH_URL` | `http://localhost:3000` |
 | `API_INTERNAL_BASE_URL` | `http://localhost:4100/api` (NextAuth / route ฝั่ง server) |
+| `NEXT_PUBLIC_SENTRY_DSN` / `SENTRY_DSN` | DSN ของ GlitchTip โปรเจกต์ **dev** (ดู `.env.example`) |
+| `SENTRY_URL` | `http://192.168.0.115:8700` |
+| `NEXT_PUBLIC_APP_ENV` | `development` |
 
 PRD/Docker: ดูคอมเมนต์ใน [`.env.example`](.env.example) และ [../docs/DTRS-Migration-Checklist.md](../docs/DTRS-Migration-Checklist.md)
 
@@ -98,5 +101,5 @@ PRD/Docker: ดูคอมเมนต์ใน [`.env.example`](.env.example) 
 
 - สถานะโปรเจกต์และ API: root [STATUS.md](../STATUS.md), [README.md](../README.md) (ดัชนีเอกสาร)
 - Private MinIO + proxy รูป: [../docs/Project-Plan-Private-MinIO-Images.md](../docs/Project-Plan-Private-MinIO-Images.md), [../docs/minio.md](../docs/minio.md)
-- Reverse proxy (NPM): [../backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md](../backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md) — `client_max_body_size 50m` ที่ `/api/`; ถ้ายังไม่ได้ตั้ง แอปบีบรูปแล้ว retry หลัง 413
+- Reverse proxy (NPM): [../backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md](../backend/docs/Reverse-Proxy-Nginx-Proxy-Manager.md) — `client_max_body_size 50m` ที่ `/api/`; ถ้ายังไม่ได้ตั้ง แอปบีบรูปแล้ว retry หลัง 413; path `/monitoring` ต้องไป Next `:8404` (อย่าใส่ใต้ `/api/`)
 - ดัชนีโฟลเดอร์ `docs/`: [../docs/README.md](../docs/README.md)
