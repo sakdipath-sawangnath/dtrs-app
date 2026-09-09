@@ -49,6 +49,14 @@ npm install
 
 ---
 
+## [0.7.0] - 2026-09-09
+
+### Added
+
+- GlitchTip performance traces: sample rate ตาม env (staging 1 / production 0.1 / local 0) override ได้ด้วย `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE` ตอน `build:frontend`
+
+---
+
 ## [0.6.1] - 2026-09-08
 
 ### Fixed

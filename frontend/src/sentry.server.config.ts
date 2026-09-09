@@ -3,6 +3,7 @@ import {
   getConfiguredSentryDsn,
   getSentryEnvironment,
   getSentryRelease,
+  getSentryTracesSampleRate,
 } from "@/lib/sentryEnv";
 
 const dsn = getConfiguredSentryDsn();
@@ -12,6 +13,6 @@ Sentry.init({
   enabled: Boolean(dsn),
   environment: getSentryEnvironment(),
   release: getSentryRelease(),
-  tracesSampleRate: 0,
+  tracesSampleRate: getSentryTracesSampleRate(),
   sendDefaultPii: false,
 });

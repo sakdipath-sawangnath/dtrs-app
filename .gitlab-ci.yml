@@ -8,6 +8,7 @@
 #   ALLOWED_ORIGINS, MINIO_*, SMTP_TLS_REJECT_UNAUTHORIZED, CRON_SECRET
 #   API_INTERNAL_BASE_URL — default ในไฟล์นี้ (NextAuth server-side → backend บน Docker network)
 #   GlitchTip (optional): NEXT_PUBLIC_SENTRY_DSN (bake ตอน build:frontend), SENTRY_DSN + SENTRY_URL (runtime frontend)
+#   NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE — bake ตอน build:frontend (optional override; ว่างใช้ fallback ตาม NEXT_PUBLIC_APP_ENV)
 #   NEXT_PUBLIC_APP_ENV — default ตาม branch (staging/production) ใน .rules_ci_branches_with_env
 #
 # อ้างอิง: docs/GitLab-CI-Plan.md, docs/GitLab-CI-Variables-Checklist.md
@@ -243,6 +244,11 @@ build:frontend:
         echo "GlitchTip: NEXT_PUBLIC_SENTRY_DSN is set (env=${NEXT_PUBLIC_APP_ENV:-unset})"
       else
         echo "GlitchTip: NEXT_PUBLIC_SENTRY_DSN is empty — browser error tracking disabled for this build"
+      fi
+      if [ -n "$NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE" ]; then
+        echo "GlitchTip: NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE=${NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE} (baked)"
+      else
+        echo "GlitchTip: NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE empty — code fallback by NEXT_PUBLIC_APP_ENV=${NEXT_PUBLIC_APP_ENV:-unset}"
       fi
     - cd frontend
     - npm ci --prefer-offline --no-audit

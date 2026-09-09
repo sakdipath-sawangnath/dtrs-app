@@ -161,7 +161,7 @@ UAT และ PRD ใช้รูปแบบเดียวกับ [`deploy:p
 
 **Backend env ที่ส่งเข้า container** — sync กับ [GitLab-CI-Variables-Checklist.md § Mapping](./GitLab-CI-Variables-Checklist.md#mapping-variable--container)
 
-**Frontend build-arg:** `NEXT_PUBLIC_API_BASE_URL` (bake ตอน build — ต้องแยกค่า UAT vs PRD) · optional GlitchTip: `NEXT_PUBLIC_SENTRY_DSN` (bake) + `SENTRY_DSN` / `SENTRY_URL` (`-e` ตอน docker run) — `SENTRY_DSN` กับ `NEXT_PUBLIC_SENTRY_DSN` ต้องเป็นโปรเจกต์เดียวกัน; โฮสต์ frontend (UAT `.115` / PRD `.128`) ต้องถึง `SENTRY_URL:8700`
+**Frontend build-arg:** `NEXT_PUBLIC_API_BASE_URL` (bake ตอน build — ต้องแยกค่า UAT vs PRD) · optional GlitchTip: `NEXT_PUBLIC_SENTRY_DSN` (bake) + `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE` (bake, optional) + `SENTRY_DSN` / `SENTRY_URL` (`-e` ตอน docker run) — `SENTRY_DSN` กับ `NEXT_PUBLIC_SENTRY_DSN` ต้องเป็นโปรเจกต์เดียวกัน; โฮสต์ frontend (UAT `.115` / PRD `.128`) ต้องถึง `SENTRY_URL:8700`
 
 ### Deploy env validation (ก่อน manual deploy)
 
