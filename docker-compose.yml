@@ -55,6 +55,7 @@ services:
         NEXT_PUBLIC_APP_ENV: ${NEXT_PUBLIC_APP_ENV:-}
         NEXT_PUBLIC_APP_RELEASE: ${NEXT_PUBLIC_APP_RELEASE:-}
         SENTRY_URL: ${SENTRY_URL:-http://192.168.0.115:8700}
+        NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: ${NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE:-}
     container_name: dtrs-app-frontend
     restart: unless-stopped
     # ลดความเสี่ยงรัน binary จาก /tmp (ให้ใช้คู่กับ deploy ผ่าน NPM + ปิดพอร์ต 8404 ที่ firewall)

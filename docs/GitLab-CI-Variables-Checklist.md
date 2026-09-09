@@ -69,6 +69,7 @@
 | ☐ | `SENTRY_DSN` | ไม่บังคับ | DSN ฝั่ง server ของ Next (tunnel `/monitoring` + server SDK); ส่ง `-e` ตอน `docker run` frontend |
 | ☐ | `SENTRY_URL` | ไม่บังคับ | `http://192.168.0.115:8700` — ingest origin ของ GlitchTip (default ในโค้ดถ้าไม่ตั้ง); **โฮสต์ที่รัน frontend (UAT `.115` และ PRD `.128`) ต้องออกไปพอร์ตนี้ได้** |
 | ☐ | `NEXT_PUBLIC_APP_ENV` | ไม่บังคับ | YAML ตั้ง `staging` / `production` ตาม branch แล้ว — **อย่าตั้งใน GitLab UI**; หน้า `/debug/glitchtip` ปิดเมื่อเป็น `production` และต้องล็อกอินแดชบอร์ด |
+| ☐ | `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE` | ไม่บังคับ | bake ตอน `build:frontend` — ค่า 0–1; **อย่าใส่ใน YAML rules** (จะทับ UI); ว่าง = fallback `staging`/`uat` → 1, `production` → 0.1, อื่น ๆ → 0; ค่าเพี้ยน/นอกช่วงใช้ fallback ชุดเดียวกัน |
 
 ---
 
@@ -198,6 +199,7 @@ CRON_SECRET=***
 | `API_INTERNAL_BASE_URL` | | ✅ `-e` | |
 | `NEXT_PUBLIC_API_BASE_URL` | | | ✅ bake ตอน `build:frontend` |
 | `NEXT_PUBLIC_SENTRY_DSN` | | | ✅ bake ตอน `build:frontend` (optional) |
+| `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE` | | | ✅ bake ตอน `build:frontend` (optional; ว่างใช้ fallback ตาม `NEXT_PUBLIC_APP_ENV`) |
 | `SENTRY_DSN` | | ✅ `-e` | |
 | `SENTRY_URL` | | ✅ `-e` | |
 | `SSH_PRIVATE_KEY` | deploy script only | | | ✅ ก่อน SSH |

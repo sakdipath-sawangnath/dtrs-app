@@ -84,6 +84,7 @@ npm run dev
 | `NEXTAUTH_URL` | `http://localhost:3000` |
 | `API_INTERNAL_BASE_URL` | `http://localhost:4100/api` (NextAuth / route ฝั่ง server) |
 | `NEXT_PUBLIC_SENTRY_DSN` / `SENTRY_DSN` | DSN ของ GlitchTip โปรเจกต์ **dev** (ดู `.env.example`) |
+| `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE` | ว่าง = local ไม่ส่ง performance traces (ดู `.env.example`) |
 | `SENTRY_URL` | `http://192.168.0.115:8700` |
 | `NEXT_PUBLIC_APP_ENV` | `development` |
 
