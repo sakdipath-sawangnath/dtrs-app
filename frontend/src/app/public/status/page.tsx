@@ -498,7 +498,7 @@ function StatusPageInner() {
   const headerClass = "flex items-center gap-2 mb-4 pb-3 border-b border-[var(--glass-card-border)]";
   const headerIconClass = "text-blue-500";
   const headerTitleClass = "text-base font-bold glass-text";
-  const inputClass = "form-input-glass w-full text-sm pl-10 pr-4 py-2.5 min-w-0";
+  const inputClass = "form-input-glass w-full text-sm pr-4 py-2.5 min-w-0";
   const pageContent = (
         <div
           className={`w-full space-y-4 animate-fade-up min-w-0 ${
@@ -614,12 +614,16 @@ function StatusPageInner() {
                     isStaffFlow ? "sm:max-w-sm" : ""
                   }`}
                 >
-                  <Phone size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 glass-subtle-text`} aria-hidden />
+                  <Phone
+                    size={16}
+                    className="pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 text-slate-600 dark:text-slate-400"
+                    aria-hidden
+                  />
                   <Input
                     type="text"
                     inputMode="numeric"
                     autoComplete="tel"
-                    className={cn(inputClass, "min-h-11 h-auto pl-10")}
+                    className={cn(inputClass, "has-leading-icon min-h-11 h-auto")}
                     placeholder="เบอร์โทรผู้แจ้ง (9–12 หลัก)"
                     aria-label="เบอร์โทรผู้แจ้งซ่อม"
                     value={phone}
@@ -647,10 +651,14 @@ function StatusPageInner() {
                     isStaffFlow ? "sm:max-w-sm" : ""
                   }`}
                 >
-                  <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 glass-subtle-text`} />
+                  <Search
+                    size={16}
+                    className="pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 text-slate-600 dark:text-slate-400"
+                    aria-hidden
+                  />
                   <Input
                     type="text"
-                    className={cn(inputClass, "min-h-11 h-auto")}
+                    className={cn(inputClass, "has-leading-icon min-h-11 h-auto")}
                     placeholder="กรอกเลขที่ใบแจ้งซ่อม"
                     aria-label="เลขที่ใบแจ้งซ่อม"
                     value={ticketNo}

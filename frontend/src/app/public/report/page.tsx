@@ -775,13 +775,18 @@ function ReportPageContent() {
                       isStaffFlow ? "sm:max-w-[16rem]" : ""
                     }`}
                   >
-                    <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 glass-subtle-text" />
+                    <Phone
+                      size={16}
+                      className="pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 text-slate-600 dark:text-slate-400"
+                      aria-hidden
+                    />
                     <Input
                       type="tel"
                       required
                       maxLength={10}
                       placeholder="กรอกเบอร์โทรศัพท์มือถือ"
-                      className={cn(inputClass, "min-h-11 h-auto pl-10")}
+                      className={cn(inputClass, "has-leading-icon min-h-11 h-auto")}
+                      aria-label="เบอร์โทรศัพท์"
                       value={form.reporterPhone}
                       onChange={(e) => {
                         const val = e.target.value.replace(/\D/g, '');
