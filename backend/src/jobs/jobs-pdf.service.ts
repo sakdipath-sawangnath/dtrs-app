@@ -427,7 +427,7 @@ export class JobsPdfService {
   </style>
 </head>
 <body>
-  <h1>รายงานสรุปงานแจ้งซ่อม CCTV</h1>
+  <h1>รายงานสรุปงานแจ้งซ่อม</h1>
   <div class="sub">ช่วงเวลา: ${this.htmlEscape(labelTh)} | ออกรายงาน: ${this.htmlEscape(nowLabel)}</div>
 
   <div class="grid">

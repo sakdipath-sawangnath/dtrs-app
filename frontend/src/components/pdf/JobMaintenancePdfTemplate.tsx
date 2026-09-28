@@ -136,18 +136,6 @@ function fmtDate(d: string | null | undefined): string {
   });
 }
 
-function fmtTime(d: string | null | undefined): string {
-  if (!d) return "–";
-  const dt = new Date(d);
-  if (Number.isNaN(dt.getTime())) return "–";
-  return dt.toLocaleTimeString("th-TH", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-}
-
 function isStoredJobTypeOnly(v: string | null | undefined): boolean {
   if (!v?.trim()) return false;
   const lower = v.trim().toLowerCase();
@@ -205,11 +193,14 @@ function FieldCell({ label, value }: { label: string; value: string }) {
 
 function SignatureBlock({
   signatureSrc,
+  printedName,
   caption,
 }: {
   signatureSrc?: string | null;
+  printedName?: string | null;
   caption: string;
 }) {
+  const name = printedName?.trim() || "";
   return (
     <td
       style={{
@@ -222,29 +213,62 @@ function SignatureBlock({
     >
       <div
         style={{
-          minHeight: 56,
           display: "flex",
           alignItems: "flex-end",
           justifyContent: "center",
-          marginBottom: 4,
+          gap: 6,
+          margin: "0 8px 4px",
+          minHeight: 56,
         }}
       >
-        {signatureSrc ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={signatureSrc}
-            alt={caption}
-            style={{ maxHeight: 58, maxWidth: "92%", objectFit: "contain" }}
-          />
-        ) : null}
+        <span style={{ fontSize: 9, flexShrink: 0, paddingBottom: 2 }}>ลงชื่อ</span>
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            borderBottom: "1px dotted #000000",
+            minHeight: 56,
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "center",
+            paddingBottom: 2,
+          }}
+        >
+          {signatureSrc ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={signatureSrc}
+              alt={caption}
+              style={{ maxHeight: 52, maxWidth: "100%", objectFit: "contain" }}
+            />
+          ) : null}
+        </div>
       </div>
       <div
         style={{
-          borderBottom: "1px dotted #000000",
-          margin: "0 12px 6px",
-          minHeight: 1,
+          fontSize: 9,
+          textAlign: "center",
+          margin: "0 8px 6px",
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "center",
+          gap: 4,
         }}
-      />
+      >
+        <span style={{ flexShrink: 0 }}>ชื่อ (</span>
+        <span
+          style={{
+            flex: 1,
+            minWidth: 48,
+            borderBottom: name ? "none" : "1px dotted #000000",
+            textAlign: "center",
+            paddingBottom: 1,
+          }}
+        >
+          {name || "\u00a0"}
+        </span>
+        <span style={{ flexShrink: 0 }}>)</span>
+      </div>
       <div style={{ fontSize: 9, textAlign: "center" }}>({caption})</div>
     </td>
   );
@@ -294,7 +318,7 @@ export function JobMaintenancePdfTemplate({
     job.oldSerialNumber,
     job.newSerialNumber,
   );
-  const statusLine = job.systemStatus?.trim() || "แล้วเสร็จ";
+  const statusLine = job.systemStatus?.trim() || "ใช้งานได้ปกติ";
 
   const issueImgs = padImages(job.images as string[] | null, 3);
   const fixImgs = padImages(job.fixImages as string[] | null, 3);
@@ -352,15 +376,18 @@ export function JobMaintenancePdfTemplate({
               </tr>
               <tr>
                 <FieldCell label="ชื่อสถานี" value={job.location || "–"} />
-                <FieldCell label="เวลาแจ้งซ่อม" value={fmtTime(reportDt)} />
+                <FieldCell
+                  label="วันที่ดำเนินการแล้วเสร็จ"
+                  value={fmtDate(fixDt)}
+                />
               </tr>
               <tr>
                 <FieldCell label="ตำบล" value={job.subdistrict || "–"} />
-                <FieldCell label="วันที่แก้ไข" value={fmtDate(fixDt)} />
+                <td style={cell}>&nbsp;</td>
               </tr>
               <tr>
                 <FieldCell label="อำเภอ" value={job.district || "–"} />
-                <FieldCell label="เวลาที่แก้ไข" value={fmtTime(fixDt)} />
+                <td style={cell}>&nbsp;</td>
               </tr>
               <tr>
                 <FieldCell label="จังหวัด" value={job.province || "–"} />
@@ -407,11 +434,16 @@ export function JobMaintenancePdfTemplate({
                   {job.reporterPhone || "–"}
                 </td>
               </tr>
-              <FullRow label="ข้อขัดข้อง" body={issueLine} />
+              <FullRow label="เหตุขัดข้อง" body={issueLine} />
               <FullRow label="สาเหตุ" body={causeLine} />
-              <FullRow label="วิธีแก้ไข" body={fixParts} tall />
+              <FullRow
+                label="วิธีการแก้ไขและผลทดสอบ"
+                body={fixParts}
+                tall
+                stackLabel
+              />
               <FullRow label="รายการอุปกรณ์" body={equipLines} tall stackLabel />
-              <FullRow label="สถานะระบบ" body={statusLine} />
+              <FullRow label="สถานะการแก้ไข" body={statusLine} />
             </tbody>
           </table>
 
@@ -427,10 +459,12 @@ export function JobMaintenancePdfTemplate({
               <tr>
                 <SignatureBlock
                   signatureSrc={prefetchedImages?.staffSignature}
+                  printedName={job.assignedTo?.name}
                   caption="ผู้เข้าดำเนินการ"
                 />
                 <SignatureBlock
                   signatureSrc={prefetchedImages?.reporterSignature}
+                  printedName={job.reporterName}
                   caption="ผู้แจ้งเหตุขัดข้อง"
                 />
               </tr>

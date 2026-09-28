@@ -10,7 +10,7 @@
     "predev": "node -e \"require('fs').rmSync('.next', { recursive: true, force: true })\"",
     "dev": "next dev",
     "prebuild": "node -e \"require('fs').rmSync('.next', { recursive: true, force: true })\"",
-    "build": "next build",
+    "build": "NODE_ENV=production next build",
     "start": "next start",
     "lint": "eslint",
     "test": "npx --yes tsx --test src/lib/reactSelectGlassStyles.test.ts src/lib/jobsListCsvExport.test.ts src/lib/docTicketNo.test.ts src/lib/jobImageUpload.test.ts src/lib/jobImageProxyFallback.test.ts src/lib/jobFixImageSlots.test.ts src/lib/reportPdfConstants.test.ts src/lib/formatRoleLabel.test.ts src/lib/userManagementAccess.test.ts src/lib/stripReopenAuditFromFixNote.test.ts src/lib/glitchtipTunnel.test.ts src/lib/sentryEnv.test.ts",

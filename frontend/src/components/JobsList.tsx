@@ -2169,7 +2169,16 @@ export default function JobsList({
       )}
 
       <div className="flex-1 min-h-0 overflow-auto">
-        <table className="w-full min-w-full text-left border-collapse table-fixed text-slate-900 dark:text-slate-100">
+        {/*
+          table-fixed + คอลัมน์กว้างคงที่หลายช่องบน /dashboard/all จะบีบคอลัมน์ที่ไม่มี width
+          (โดยเฉพาะรายละเอียดปัญหา) จน header ทับสถานะ — ใช้ min-w ให้เลื่อนแนวนอนแทนการบีบ
+        */}
+        <table
+          className={cn(
+            "w-full text-left border-collapse table-fixed text-slate-900 dark:text-slate-100",
+            enableAllBreakdownFilters ? "min-w-[1480px]" : "min-w-[1100px]",
+          )}
+        >
           <thead>
             <tr className="text-xs font-semibold uppercase tracking-wide sticky top-0 z-10 bg-white/95 dark:bg-[var(--glass-header-bg)] backdrop-blur-sm text-slate-600 dark:text-slate-400">
               {enableBulkAssign && (
@@ -2187,14 +2196,14 @@ export default function JobsList({
               )}
               <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-24">เลขที่</th>
               <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-24">วันที่</th>
-              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-52">ผู้แจ้ง</th>
-              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-64">สถานที่</th>
+              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-44">ผู้แจ้ง</th>
+              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-48">สถานที่</th>
               {enableAllBreakdownFilters && (
                 <>
-                  <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-40">
+                  <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-36">
                     ประเภทสถานที่
                   </th>
-                  <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-40">
+                  <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-36">
                     ประเภทงาน
                   </th>
                   <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-28">
@@ -2202,16 +2211,20 @@ export default function JobsList({
                   </th>
                 </>
               )}
-              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap">รายละเอียดปัญหา</th>
-              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-52">สถานะ</th>
+              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-40 overflow-hidden text-ellipsis">
+                รายละเอียดปัญหา
+              </th>
+              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-56">
+                สถานะ
+              </th>
               {showAssignedToColumn && (
                 <th
-                  className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-44"
+                  className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-40"
                 >
                   ผู้รับผิดชอบ
                 </th>
               )}
-              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] text-right whitespace-nowrap w-44">
+              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] text-right whitespace-nowrap w-40">
                 จัดการ
               </th>
             </tr>
@@ -2336,7 +2349,7 @@ export default function JobsList({
                       </td>
                     </>
                   )}
-                  <td className="px-2.5 py-2.5 truncate text-sm text-slate-800 dark:text-slate-200">
+                  <td className="px-2.5 py-2.5 max-w-0 truncate text-sm text-slate-800 dark:text-slate-200">
                     {desc.clipped && desc.full ? (
                       <TextHoverTooltip text={desc.full}>
                         <span className="truncate block">{desc.short}</span>
@@ -2347,8 +2360,8 @@ export default function JobsList({
                       </span>
                     )}
                   </td>
-                  <td className="px-2.5 py-2.5">
-                    <div className="flex flex-wrap items-center gap-1.5">
+                  <td className="px-2.5 py-2.5 align-middle">
+                    <div className="flex flex-col items-start gap-1">
                       <Badge
                         variant="outline"
                         className={cn(
