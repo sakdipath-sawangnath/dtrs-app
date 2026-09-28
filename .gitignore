@@ -1,8 +1,10 @@
-# โปรเจกต์นี้ขึ้น Git เฉพาะ: backend/, frontend/, README PLAN AGENT_INSTRUCTIONS AGENTS TASK STATUS
+# โปรเจกต์นี้ขึ้น Git เฉพาะ: backend/, frontend/, .agents/, README PLAN AGENT_INSTRUCTIONS AGENTS TASK STATUS
 # ทุกอย่างที่ root นอกจากรายการด้านล่าง — ไม่ติดตาม
 /*
 !/backend/
 !/frontend/
+!/.agents/
+!/.agents/**
 !/README.md
 !/CHANGELOG.md
 !/minio.md
