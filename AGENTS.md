@@ -32,11 +32,18 @@
 ### Fail-Safe
 ถ้า **ไม่แน่ใจ** เรื่อง path, ขอบเขต, หรือผลกระทบ → **อย่ารัน** → **ถามผู้ใช้ก่อน**
 
+### ทีมรับช่วง (ไม่ใช่ software dev ประจำ)
+- โหลด **`.agents/skills/handoff-safety/SKILL.md`** เป็นค่าเริ่มต้นเมื่อผู้ใช้เป็นทีม handoff/ops หรือขอให้ “ทำตาม AI ทั้งชุด”
+- ห้ามปิด auth/RBAC/validation/CORS เพื่อ “ให้เข้าได้ก่อน”; งาน Red (DB wipe, deploy UAT/PRD, force-push, secrets) ต้องมี YES ระบุสภาพแวดล้อม
+- คู่กับ `backend/.agents/skills/db-safety/SKILL.md` ทุกครั้งที่แตะ Prisma/MySQL
+
 ## MUST READ (Skills พื้นฐาน)
+- Handoff / ทีมรับช่วง (กัน worst case — deploy/DB/secrets/ปิด security): `.agents/skills/handoff-safety/SKILL.md`
 - Frontend UI/UX: `frontend/.agents/skills/ui-ux-pro-max/SKILL.md`
 - Frontend shadcn/ui: `frontend/.agents/skills/shadcn/SKILL.md`
 - Backend API: `backend/.agents/skills/backend-api-pro/SKILL.md`
 - Backend NestJS: `backend/.agents/skills/nestjs-best-practices/SKILL.md`
+- Backend DB safety (Prisma/MySQL — ห้าม reset/drop/wipe โดยไม่ยืนยัน): `backend/.agents/skills/db-safety/SKILL.md`
 - Debug (repro → fail path → falsify → breadcrumb): `frontend/.agents/skills/debug-mantra/SKILL.md` (full-stack) · `backend/.agents/skills/debug-mantra/SKILL.md` (Nest/Prisma/MinIO)
 - Post-mortem / RCA (หลัง fix ที่ validate แล้ว): `frontend/.agents/skills/post-mortem/SKILL.md` (full-stack / UI + Next seam) · `backend/.agents/skills/post-mortem/SKILL.md` (Nest/Prisma/MinIO) — ปลายทาง `docs/postmortems/`
 
