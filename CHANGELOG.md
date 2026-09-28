@@ -54,6 +54,7 @@ npm install
 ### Fixed
 
 - Frontend `next build`: บังคับ `NODE_ENV=production` ในสคริปต์ build และเลิกแนะนำตั้ง `NODE_ENV=development` ใน `.env` — กันพังตอน prerender `/404` (`Html` / `_document`)
+- `/public/report` + `/public/status`: ไอคอนนำหน้าในช่องเบอร์/เลขที่ใบไม่ทับ placeholder และมองเห็นใน light mode — `.form-input-glass.has-leading-icon` + `z-10` บนไอคอน (พื้น input ทึบบัง SVG ที่อยู่ใต้)
 
 ### Changed
 
