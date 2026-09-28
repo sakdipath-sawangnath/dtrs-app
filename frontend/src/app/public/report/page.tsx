@@ -1094,7 +1094,7 @@ function ReportPageContent() {
             </div>
             <div>
               <Label className={labelClass} htmlFor="report-description">
-                อาการที่พบ <span className="text-red-500">*</span>
+                เหตุขัดข้อง <span className="text-red-500">*</span>
               </Label>
               <p
                 id="report-description-hint"
@@ -1108,7 +1108,7 @@ function ReportPageContent() {
                 <span className="glass-muted-text font-medium">
                   {REPORT_DESCRIPTION_MAX_LENGTH} ตัวอักษร
                 </span>
-                {' '}กรุณาเขียนให้ครบอย่างน้อยหนึ่งประโยค เช่น อาการที่เห็น (เสียง ภาพ ไฟ ฯลฯ) จุดที่เกิด
+                {' '}กรุณาเขียนให้ครบอย่างน้อยหนึ่งประโยค เช่น เหตุขัดข้องที่พบ (เสียง ภาพ ไฟ ฯลฯ) จุดที่เกิด
                 (ห้อง/ชั้น/อุปกรณ์) เวลาที่พบ หรือความถี่ของปัญหา
               </p>
               <Textarea
@@ -1117,7 +1117,7 @@ function ReportPageContent() {
                 minLength={REPORT_DESCRIPTION_MIN_LENGTH}
                 maxLength={REPORT_DESCRIPTION_MAX_LENGTH}
                 className={cn(inputClass, "min-h-[140px] resize-y")}
-                placeholder="ระบุอาการ, จุดสังเกต หรือปัญหาที่พบให้ละเอียด..."
+                placeholder="ระบุเหตุขัดข้อง, จุดสังเกต หรือปัญหาที่พบให้ละเอียด..."
                 value={form.description}
                 onChange={(e) =>
                   setForm({

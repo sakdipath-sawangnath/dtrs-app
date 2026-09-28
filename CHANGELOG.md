@@ -47,6 +47,21 @@ npm install
 
 ## [Unreleased]
 
+### Added
+
+- Sidebar เดสกท็อปย่อ–ขยายได้ (icon-rail) ใน `DashboardLayoutShell` — จำสถานะใน `localStorage` (`dtrs-sidebar-collapsed`); มือถือคง drawer เดิม
+
+### Fixed
+
+- Frontend `next build`: บังคับ `NODE_ENV=production` ในสคริปต์ build และเลิกแนะนำตั้ง `NODE_ENV=development` ใน `.env` — กันพังตอน prerender `/404` (`Html` / `_document`)
+
+### Changed
+
+- รายงานพิมพ์/PDF: ปรับหัวข้อฟิลด์ (เหตุขัดข้อง, วิธีการแก้ไขและผลทดสอบ, วันที่ดำเนินการแล้วเสร็จ, สถานะการแก้ไข), ลบเวลาแจ้งซ่อม/เวลาที่แก้ไข, บล็อคลายเซ็นแสดงชื่อใต้ลายเซ็น, และวาง label ยาวแบบ stack; ค่าเริ่มต้น「สถานะการแก้ไข」เป็น「ใช้งานได้ปกติ」เมื่อไม่มี `systemStatus`
+- `/public/report`: เปลี่ยน label/hint/placeholder จาก「อาการที่พบ」เป็น「เหตุขัดข้อง」
+- `/public/status`: เปลี่ยน label รายละเอียดผู้ซ่อมจาก「วิธีการแก้ไข」เป็น「วิธีการแก้ไขและผลทดสอบ」
+- `JobsList` (`/dashboard/all`): แก้คอลัมน์「รายละเอียดปัญหา」/「สถานะ」ทับกันจาก `table-fixed` — กำหนดความกว้างชัด + min-width ให้เลื่อนแนวนอน
+
 ---
 
 ## [0.7.0] - 2026-09-09

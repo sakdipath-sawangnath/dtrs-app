@@ -209,7 +209,7 @@ function CauseFixFields({
         className={`rounded-xl border border-[var(--glass-card-border)] border-l-4 border-l-emerald-400/90 bg-[var(--glass-card-bg)] backdrop-blur-sm shadow-inner ${blockPad}`}
       >
         <p className="text-sm sm:text-[0.9375rem] font-bold tracking-wide text-emerald-800 dark:text-emerald-100">
-          วิธีการแก้ไข
+          วิธีการแก้ไขและผลทดสอบ
         </p>
         <p className={m ? bodyCls : dashCls} role={m ? undefined : 'status'}>
           {m || '–'}
