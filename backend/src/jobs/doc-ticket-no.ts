@@ -39,23 +39,77 @@ export function isRequestTicketNo(
   return REQUEST_TICKET_RE.test(s);
 }
 
+export const REQUEST_OOC_TICKET_PREFIX = 'RQ-OOC-';
+export const REQUEST_OOC_TICKET_RE = /^RQ-OOC-\d{4}\d{4,}$/;
+
+/**
+ * รูปแบบเลขที่ใบแจ้งซ่อมนอกสัญญาเริ่มต้น: RQ-OOC-YYYYXXXX
+ */
+export function formatRequestOocTicketNo(params: {
+  year: string;
+  running: number;
+}): string {
+  const year = (params.year ?? '').trim();
+  if (!/^\d{4}$/.test(year)) {
+    throw new RangeError('year ต้องเป็น YYYY 4 หลัก');
+  }
+  const running = formatDocRunning(params.running);
+  return `${REQUEST_OOC_TICKET_PREFIX}${year}${running}`;
+}
+
+export function isRequestOocTicketNo(
+  ticketNo: string | null | undefined,
+): boolean {
+  const s = (ticketNo ?? '').trim();
+  return REQUEST_OOC_TICKET_RE.test(s);
+}
+
+export function isAnyRequestTicketNo(
+  ticketNo: string | null | undefined,
+): boolean {
+  return isRequestTicketNo(ticketNo) || isRequestOocTicketNo(ticketNo);
+}
+
+export const OOC_DOC_RE = /^OOC-\d{4}-\d{4,}$/;
+
+/**
+ * รูปแบบเลขเอกสารทางการนอกสัญญาใหม่: OOC-YYYY-XXXX
+ */
+export function formatOocDocTicketNo(params: {
+  year: string;
+  running: number;
+}): string {
+  const year = (params.year ?? '').trim();
+  if (!/^\d{4}$/.test(year)) {
+    throw new RangeError('year ต้องเป็น YYYY 4 หลัก');
+  }
+  const running = formatDocRunning(params.running);
+  return `OOC-${year}-${running}`;
+}
+
 /**
  * ในสัญญา: CM-SHF-YYYY-XXXX (YYYY = Asia/Bangkok ณ วันจำแนก; running ไม่รีเซ็ต)
- * นอกสัญญา: YYYYMM + running
+ * นอกสัญญา: OOC-YYYY-XXXX (หรือ legacy YYYYMM + running)
  */
 export function formatDocTicketNo(params: {
   isOutOfContract: boolean;
   running: number;
-  /** YYYYMM (Asia/Bangkok) — จำเป็นเมื่อ isOutOfContract */
+  /** YYYYMM (Asia/Bangkok) — legacy หรือ fallback */
   periodYm?: string;
-  /** YYYY (Asia/Bangkok) — จำเป็นเมื่อในสัญญา */
+  /** YYYY (Asia/Bangkok) */
   periodYear?: string;
 }): string {
   const running = formatDocRunning(params.running);
   if (params.isOutOfContract) {
+    if (params.periodYear) {
+      return formatOocDocTicketNo({ year: params.periodYear, running: params.running });
+    }
     const period = (params.periodYm ?? '').trim();
+    if (/^\d{4}$/.test(period)) {
+      return formatOocDocTicketNo({ year: period, running: params.running });
+    }
     if (!/^\d{6}$/.test(period)) {
-      throw new RangeError('periodYm ต้องเป็น YYYYMM 6 หลัก');
+      throw new RangeError('periodYm ต้องเป็น YYYYMM 6 หลัก หรือ periodYear 4 หลัก');
     }
     return `${period}${running}`;
   }
@@ -67,12 +121,12 @@ export function formatDocTicketNo(params: {
 }
 
 /** เลขในสัญญา: CM-SHF-YYYY- + running ≥4 หลัก (รวมเลขเก่า CM-SHF-2002-…) */
-const IN_CONTRACT_DOC_RE = /^CM-SHF-\d{4}-\d{4,}$/;
+export const IN_CONTRACT_DOC_RE = /^CM-SHF-\d{4}-\d{4,}$/;
 
 /**
- * เลขทางการหลังจำแนกเอกสาร — ไม่ใช่ hex 8 ตัวตอนสร้างงาน
+ * เลขทางการหลังจำแนกเอกสาร
  * ในสัญญา: CM-SHF-YYYY- + running ≥4 หลัก
- * นอกสัญญา: YYYYMM + running ≥4 หลัก (รวมอย่างน้อย 10 หลัก)
+ * นอกสัญญา: OOC-YYYY-XXXX หรือ legacy YYYYMM + running ≥4 หลัก
  */
 export function isFormalDocTicketNo(
   ticketNo: string | null | undefined,
@@ -80,6 +134,7 @@ export function isFormalDocTicketNo(
   const s = (ticketNo ?? '').trim();
   if (!s) return false;
   if (IN_CONTRACT_DOC_RE.test(s)) return true;
+  if (OOC_DOC_RE.test(s)) return true;
   return /^\d{10,}$/.test(s);
 }
 

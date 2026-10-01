@@ -101,7 +101,8 @@ export function PrintJobPageClient({ jobId }: Props) {
     );
   }
 
-  const ticketLabel = job.ticketNo?.trim() || `งาน #${job.id}`;
+  const ticketLabel =
+    job.ticketNo?.trim() || job.requestTicketNo?.trim() || `งาน #${job.id}`;
 
   return (
     <div

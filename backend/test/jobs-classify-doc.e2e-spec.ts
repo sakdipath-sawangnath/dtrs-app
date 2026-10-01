@@ -124,7 +124,8 @@ describe('Jobs Doc No / classify-doc (e2e HTTP)', () => {
     jobsService = {
       createFromPublicReport: jest.fn().mockResolvedValue({
         id: 101,
-        ticketNo: HEX_TICKET,
+        requestTicketNo: HEX_TICKET,
+        ticketNo: null,
         status: 'PENDING',
         isOutOfContract: false,
       }),
@@ -132,7 +133,8 @@ describe('Jobs Doc No / classify-doc (e2e HTTP)', () => {
         .fn()
         .mockImplementation(async (id: number, staffId: number) => ({
           id,
-          ticketNo: HEX_TICKET,
+          requestTicketNo: HEX_TICKET,
+          ticketNo: null,
           assignedToId: staffId,
           status: 'IN_PROGRESS',
         })),
@@ -140,7 +142,8 @@ describe('Jobs Doc No / classify-doc (e2e HTTP)', () => {
         .fn()
         .mockImplementation(async (id: number, isOutOfContract: boolean) => ({
           id,
-          ticketNo: HEX_TICKET,
+          requestTicketNo: HEX_TICKET,
+          ticketNo: null,
           isOutOfContract,
           status: 'PENDING',
         })),
@@ -157,8 +160,9 @@ describe('Jobs Doc No / classify-doc (e2e HTTP)', () => {
           }
           return {
             id,
+            requestTicketNo: HEX_TICKET,
             ticketNo: isOutOfContract
-              ? `${bangkokYearMonth()}0001`
+              ? `OOC-${bangkokYear()}-0001`
               : `CM-SHF-${bangkokYear()}-0001`,
             isOutOfContract,
             status: 'RESOLVED',
@@ -220,18 +224,18 @@ describe('Jobs Doc No / classify-doc (e2e HTTP)', () => {
     jest.clearAllMocks();
   });
 
-  it('POST /api/public/jobs creates with RQ-CM ticketNo (not Running Doc No)', async () => {
+  it('POST /api/public/jobs creates with RQ-CM requestTicketNo (not Running Doc No)', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/public/jobs')
       .send(publicReportBody)
       .expect(201);
 
     expect(jobsService.createFromPublicReport).toHaveBeenCalled();
-    expect(res.body.data.ticketNo).toBe(INITIAL_TICKET);
-    expect(isFormalDocTicketNo(res.body.data.ticketNo)).toBe(false);
+    expect(res.body.data.requestTicketNo).toBe(INITIAL_TICKET);
+    expect(res.body.data.ticketNo).toBeNull();
   });
 
-  it('PATCH /api/jobs/:id/assign keeps RQ-CM ticketNo (does not generate Doc No)', async () => {
+  it('PATCH /api/jobs/:id/assign keeps RQ-CM requestTicketNo (does not generate Doc No)', async () => {
     const res = await request(app.getHttpServer())
       .patch('/api/jobs/101/assign')
       .set('Authorization', 'Bearer admin')
@@ -239,11 +243,11 @@ describe('Jobs Doc No / classify-doc (e2e HTTP)', () => {
       .expect(200);
 
     expect(jobsService.assignStaff).toHaveBeenCalledWith(101, 3, ADMIN_ID);
-    expect(res.body.data.ticketNo).toBe(INITIAL_TICKET);
-    expect(isFormalDocTicketNo(res.body.data.ticketNo)).toBe(false);
+    expect(res.body.data.requestTicketNo).toBe(INITIAL_TICKET);
+    expect(res.body.data.ticketNo).toBeNull();
   });
 
-  it('PATCH /api/jobs/:id/out-of-contract keeps RQ-CM ticketNo', async () => {
+  it('PATCH /api/jobs/:id/out-of-contract keeps RQ-CM requestTicketNo', async () => {
     const res = await request(app.getHttpServer())
       .patch('/api/jobs/101/out-of-contract')
       .set('Authorization', 'Bearer admin')
@@ -255,7 +259,8 @@ describe('Jobs Doc No / classify-doc (e2e HTTP)', () => {
       true,
       ADMIN_ID,
     );
-    expect(res.body.data.ticketNo).toBe(HEX_TICKET);
+    expect(res.body.data.requestTicketNo).toBe(HEX_TICKET);
+    expect(res.body.data.ticketNo).toBeNull();
   });
 
   it('PATCH /api/jobs/:id/classify-doc in-contract → CM-SHF-YYYY- running', async () => {
@@ -270,7 +275,7 @@ describe('Jobs Doc No / classify-doc (e2e HTTP)', () => {
     expect(isFormalDocTicketNo(res.body.data.ticketNo)).toBe(true);
   });
 
-  it('PATCH /api/jobs/:id/classify-doc out-of-contract → YYYYMM running', async () => {
+  it('PATCH /api/jobs/:id/classify-doc out-of-contract → OOC-YYYY- running', async () => {
     const res = await request(app.getHttpServer())
       .patch('/api/jobs/10/classify-doc')
       .set('Authorization', 'Bearer admin')
@@ -278,8 +283,7 @@ describe('Jobs Doc No / classify-doc (e2e HTTP)', () => {
       .expect(200);
 
     expect(jobsService.classifyDoc).toHaveBeenCalledWith(10, true, ADMIN_ID);
-    expect(res.body.data.ticketNo).toMatch(/^\d{10,}$/);
-    expect(res.body.data.ticketNo.startsWith(bangkokYearMonth())).toBe(true);
+    expect(res.body.data.ticketNo).toBe(`OOC-${bangkokYear()}-0001`);
     expect(isFormalDocTicketNo(res.body.data.ticketNo)).toBe(true);
   });
 
@@ -507,7 +511,7 @@ describe('JobsService Doc No (create / assign / classify)', () => {
     );
   });
 
-  it('create() assigns RQ-CM-YYYYXXXX ticketNo and ignores client ticketNo', async () => {
+  it('create() assigns RQ-CM-YYYYXXXX requestTicketNo and keeps ticketNo null', async () => {
     const created = await service.create({
       description: 'รายละเอียดปัญหาอย่างน้อยสิบตัวอักษร',
       reporterName: 'ผู้แจ้ง',
@@ -517,13 +521,13 @@ describe('JobsService Doc No (create / assign / classify)', () => {
 
     expect(prisma.job.create).toHaveBeenCalled();
     const saved = prisma.job.create.mock.calls[0][0].data;
-    expect(saved.ticketNo).toMatch(/^RQ-CM-\d{4}\d{4,}$/);
-    expect(isRequestTicketNo(saved.ticketNo)).toBe(true);
-    expect(saved.ticketNo).not.toBe('CM-SHF-2002-9999');
+    expect(saved.requestTicketNo).toMatch(/^RQ-CM-\d{4}\d{4,}$/);
+    expect(isRequestTicketNo(saved.requestTicketNo)).toBe(true);
+    expect(saved.ticketNo).toBeNull();
     expect(isFormalDocTicketNo(created.ticketNo)).toBe(false);
   });
 
-  it('create() generates sequential RQ-CM-YYYYXXXX numbers', async () => {
+  it('create() generates sequential RQ-CM-YYYYXXXX numbers in requestTicketNo', async () => {
     let mockLastValue = 0;
     const tx = {
       $executeRaw: jest.fn().mockImplementation(async () => 1),
@@ -555,8 +559,8 @@ describe('JobsService Doc No (create / assign / classify)', () => {
       reporterPhone: '0812345678',
     } as never);
 
-    expect(j1.ticketNo).toMatch(/^RQ-CM-\d{4}0001$/);
-    expect(j2.ticketNo).toMatch(/^RQ-CM-\d{4}0002$/);
+    expect(j1.requestTicketNo).toMatch(/^RQ-CM-\d{4}0001$/);
+    expect(j2.requestTicketNo).toMatch(/^RQ-CM-\d{4}0002$/);
   });
 
   it('assignStaff() does not write ticketNo', async () => {
@@ -616,11 +620,12 @@ describe('JobsService Doc No (create / assign / classify)', () => {
       job: {
         findUnique: jest.fn().mockImplementation(async ({ where }) => {
           if (where.id === 10) {
-            return { id: 10, status: 'RESOLVED', ticketNo: HEX_TICKET };
+            return { id: 10, status: 'RESOLVED', ticketNo: null, requestTicketNo: HEX_TICKET };
           }
           if (where.ticketNo) return null;
           return null;
         }),
+        findFirst: jest.fn().mockResolvedValue(null),
         update: jest.fn().mockImplementation(async ({ data }) => ({
           id: 10,
           status: 'RESOLVED',
@@ -641,16 +646,17 @@ describe('JobsService Doc No (create / assign / classify)', () => {
     expect(isFormalDocTicketNo(updated.ticketNo)).toBe(true);
   });
 
-  it('classifyDoc() out-of-contract uses YYYYMM + running', async () => {
+  it('classifyDoc() out-of-contract uses OOC-YYYY-XXXX', async () => {
     const tx = {
       job: {
         findUnique: jest.fn().mockImplementation(async ({ where }) => {
           if (where.id === 10) {
-            return { id: 10, status: 'RESOLVED', ticketNo: HEX_TICKET };
+            return { id: 10, status: 'RESOLVED', ticketNo: null, requestTicketNo: HEX_TICKET };
           }
           if (where.ticketNo) return null;
           return null;
         }),
+        findFirst: jest.fn().mockResolvedValue(null),
         update: jest.fn().mockImplementation(async ({ data }) => ({
           id: 10,
           status: 'RESOLVED',
@@ -666,7 +672,7 @@ describe('JobsService Doc No (create / assign / classify)', () => {
 
     const updated = await service.classifyDoc(10, true, ADMIN_ID);
 
-    expect(updated.ticketNo).toBe(`${bangkokYearMonth()}0001`);
+    expect(updated.ticketNo).toBe(`OOC-${bangkokYear()}-0001`);
     expect(updated.isOutOfContract).toBe(true);
   });
 

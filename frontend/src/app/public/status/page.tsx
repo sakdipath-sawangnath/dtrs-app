@@ -135,6 +135,7 @@ function ReporterAvatarGlass({
 type PhoneStatusListItem = {
   id?: number;
   ticketNo: string | null;
+  requestTicketNo?: string | null;
   status: string;
   reportDate: string | null;
   /** อาการ/รายละเอียดคร่าวๆ (description หรือ fallback title) */
@@ -160,7 +161,7 @@ function formatIssuePreview(full: string | null | undefined) {
 /** คีย์คงที่สำหรับแถวรายการตามเบอร์ (เปิด/ปิดรายละเอียดสาเหตุ–วิธีแก้) */
 function phoneFixDetailRowKey(row: PhoneStatusListItem): string {
   const idPart = typeof row.id === 'number' ? String(row.id) : 'noid';
-  return `${idPart}|${row.ticketNo ?? ''}|${row.reportDate ?? ''}`;
+  return `${idPart}|${row.ticketNo ?? ''}|${row.requestTicketNo ?? ''}|${row.reportDate ?? ''}`;
 }
 
 function CauseFixFields({
@@ -242,7 +243,8 @@ function StatusPageInner() {
   const [phoneDetailExpandedKey, setPhoneDetailExpandedKey] = useState<string | null>(null);
   const [result, setResult] = useState<{
     id?: number;
-    ticketNo: string;
+    ticketNo?: string | null;
+    requestTicketNo?: string | null;
     status: string;
     reportDate: string | null;
     detailLevel?: 'masked' | 'full';
@@ -264,7 +266,8 @@ function StatusPageInner() {
 
   const isStatusResult = (v: unknown): v is {
     id?: number;
-    ticketNo: string;
+    ticketNo?: string | null;
+    requestTicketNo?: string | null;
     status: string;
     reportDate: string | null;
     detailLevel?: 'masked' | 'full';
@@ -283,7 +286,11 @@ function StatusPageInner() {
   } => {
     if (!v || typeof v !== 'object') return false;
     const o = v as Record<string, unknown>;
-    return typeof o.ticketNo === 'string' && typeof o.status === 'string';
+    const hasTn = typeof o.ticketNo === 'string' && o.ticketNo.length > 0;
+    const hasReq = typeof o.requestTicketNo === 'string' && o.requestTicketNo.length > 0;
+    const tnValid = o.ticketNo === null || o.ticketNo === undefined || typeof o.ticketNo === 'string';
+    const reqValid = o.requestTicketNo === null || o.requestTicketNo === undefined || typeof o.requestTicketNo === 'string';
+    return (hasTn || hasReq) && tnValid && reqValid && typeof o.status === 'string';
   };
 
   const isPhoneListPayload = (v: unknown): v is {
@@ -297,6 +304,7 @@ function StatusPageInner() {
       if (!row || typeof row !== 'object') return false;
       const r = row as Record<string, unknown>;
       const tnOk = r.ticketNo === null || typeof r.ticketNo === 'string';
+      const reqTnOk = r.requestTicketNo === undefined || r.requestTicketNo === null || typeof r.requestTicketNo === 'string';
       const idOk = r.id === undefined || typeof r.id === 'number';
       const issueOk =
         r.issueSummary === undefined ||
@@ -311,6 +319,7 @@ function StatusPageInner() {
       return (
         idOk &&
         tnOk &&
+        reqTnOk &&
         typeof r.status === 'string' &&
         (r.reportDate === null || typeof r.reportDate === 'string') &&
         issueOk &&
@@ -453,7 +462,13 @@ function StatusPageInner() {
     if (!token) return;
     if (!result || result.detailLevel !== 'masked') return;
     const no =
-      ticketNo.trim() || initialTicketFromUrl || (typeof result.ticketNo === 'string' ? result.ticketNo : '');
+      ticketNo.trim() ||
+      initialTicketFromUrl ||
+      (typeof result.ticketNo === 'string' && result.ticketNo
+        ? result.ticketNo
+        : typeof result.requestTicketNo === 'string'
+          ? result.requestTicketNo
+          : '');
     if (!no) return;
     performSearch(no);
   }, [status, session, result, ticketNo, initialTicketFromUrl, performSearch]);
@@ -659,8 +674,8 @@ function StatusPageInner() {
                   <Input
                     type="text"
                     className={cn(inputClass, "has-leading-icon min-h-11 h-auto")}
-                    placeholder="กรอกเลขที่ใบแจ้งซ่อม เช่น RQ-CM-20260001"
-                    aria-label="เลขที่ใบแจ้งซ่อม"
+                    placeholder="กรอกเลขรับแจ้ง หรือเลขเอกสาร เช่น RQ-CM-20260001 หรือ CM-SHF-2026-0001"
+                    aria-label="เลขที่รับแจ้งหรือเลขที่เอกสาร"
                     value={ticketNo}
                     onChange={(e) => setTicketNo(e.target.value)}
                   />
@@ -801,8 +816,22 @@ function StatusPageInner() {
                       return (
                         <Fragment key={`${phonePage}-${rowIdx}-${rowKey}`}>
                           <tr className="border-b border-[var(--glass-card-border)] last:border-0">
-                            <td className="py-2.5 pl-3 pr-2 align-top font-mono text-[0.8125rem] sm:text-sm glass-text tracking-tight whitespace-nowrap" title={row.ticketNo?.trim() || undefined}>
-                              {row.ticketNo?.trim() ? row.ticketNo : '–'}
+                            <td className="py-2.5 pl-3 pr-2 align-top font-mono text-[0.8125rem] sm:text-sm glass-text tracking-tight whitespace-nowrap">
+                              {row.ticketNo?.trim() ? (
+                                <div>
+                                  <div className="font-semibold">{row.ticketNo}</div>
+                                  {row.requestTicketNo?.trim() && (
+                                    <div className="text-[11px] glass-muted-text font-normal font-mono">
+                                      {row.requestTicketNo}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div>
+                                  <div className="font-semibold">{row.requestTicketNo?.trim() || '–'}</div>
+                                  <div className="text-[10px] text-amber-500/90 font-sans font-normal">ยังไม่จำแนกเอกสาร</div>
+                                </div>
+                              )}
                             </td>
                             <td className="py-2.5 pr-2 sm:pr-3 glass-muted-text align-top min-w-48 sm:min-w-72 wrap-break-word">
                               {issue.clipped ? (
@@ -835,7 +864,7 @@ function StatusPageInner() {
                                   setPhoneDetailExpandedKey(expanded ? null : rowKey)
                                 }
                                 className={cn(GLASS_BUTTON_PRIMARY_TABLE_ROW, "cursor-pointer")}
-                                aria-label={expanded ? `ซ่อนรายละเอียดสาเหตุ ใบ ${row.ticketNo ?? ''}` : `สาเหตุและวิธีแก้ ใบ ${row.ticketNo ?? ''}`}
+                                aria-label={expanded ? `ซ่อนรายละเอียดสาเหตุ ใบ ${row.ticketNo || row.requestTicketNo || ''}` : `สาเหตุและวิธีแก้ ใบ ${row.ticketNo || row.requestTicketNo || ''}`}
                               >
                                 <Wrench size={14} className="shrink-0 text-white/95" aria-hidden />
                                 <span className="whitespace-nowrap text-left leading-tight">
@@ -876,9 +905,9 @@ function StatusPageInner() {
                                     <Wrench size={16} className="text-blue-400 shrink-0" aria-hidden />
                                     <p className="text-sm font-semibold glass-text">
                                       รายละเอียดจากผู้ซ่อม
-                                      {row.ticketNo?.trim() ? (
+                                      {row.ticketNo?.trim() || row.requestTicketNo?.trim() ? (
                                         <span className="font-normal glass-muted-text ms-1 break-all">
-                                          ({row.ticketNo.trim()})
+                                          ({[row.ticketNo?.trim(), row.requestTicketNo?.trim()].filter(Boolean).join(' / ')})
                                         </span>
                                       ) : null}
                                     </p>
@@ -930,8 +959,23 @@ function StatusPageInner() {
               <section className={GLASS_SECTION}>
                 <div className="flex flex-wrap items-start justify-between gap-3 pb-5 mb-5 border-b border-[var(--glass-card-border)]">
                   <div className="min-w-0">
-                    <p className="text-xs font-medium glass-muted-text">เลขที่ใบแจ้งซ่อม</p>
-                    <p className="text-base font-semibold glass-text break-all mt-0.5">{result.ticketNo}</p>
+                    <p className="text-xs font-medium glass-muted-text">
+                      {result.ticketNo ? 'เลขที่เอกสาร / ใบแจ้งซ่อม' : 'เลขที่รับแจ้ง'}
+                    </p>
+                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 mt-0.5">
+                      {result.ticketNo ? (
+                        <>
+                          <p className="text-base font-semibold glass-text break-all">{result.ticketNo}</p>
+                          {result.requestTicketNo && (
+                            <p className="text-xs glass-muted-text font-mono">
+                              (เลขรับแจ้ง: {result.requestTicketNo})
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-base font-semibold glass-text break-all">{result.requestTicketNo ?? '–'}</p>
+                      )}
+                    </div>
                   </div>
                   {session && result.id != null && (
                     <Link
@@ -1133,7 +1177,9 @@ function StatusPageInner() {
                   ข้อมูลการแจ้งข้อขัดข้อง
                 </h1>
                 <p className="text-sm mt-0.5 glass-muted-text break-all">
-                  เลขที่ {result.ticketNo}
+                  {result.ticketNo
+                    ? `เลขที่ ${result.ticketNo}${result.requestTicketNo ? ` (เลขรับแจ้ง: ${result.requestTicketNo})` : ''}`
+                    : `เลขรับแจ้ง: ${result.requestTicketNo ?? '–'}`}
                 </p>
               </>
             ) : phoneList !== undefined && phoneList.length > 0 ? (

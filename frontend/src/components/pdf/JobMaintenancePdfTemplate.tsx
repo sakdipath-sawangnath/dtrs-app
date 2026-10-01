@@ -14,6 +14,7 @@ export type JobMaintenancePdfJob = {
   /** ใช้ตรวจบนหน้าพิมพ์ (เช่น ต้องเป็น RESOLVED) */
   status?: string;
   ticketNo?: string;
+  requestTicketNo?: string | null;
   reportDate?: string;
   createdAt: string;
   reporterName?: string;
@@ -371,7 +372,16 @@ export function JobMaintenancePdfTemplate({
             </colgroup>
             <tbody>
               <tr>
-                <FieldCell label="เลขที่ใบแจ้งซ่อม" value={job.ticketNo || "–"} />
+                <FieldCell
+                  label="เลขที่ใบแจ้งซ่อม"
+                  value={
+                    job.ticketNo
+                      ? job.requestTicketNo
+                        ? `${job.ticketNo} (เลขรับแจ้ง: ${job.requestTicketNo})`
+                        : job.ticketNo
+                      : job.requestTicketNo || "–"
+                  }
+                />
                 <FieldCell
                   label="วันที่ได้รับแจ้งซ่อม"
                   value={fmtDate(reportDt)}

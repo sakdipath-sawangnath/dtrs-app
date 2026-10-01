@@ -25,6 +25,8 @@ import {
   bangkokYear as formatBangkokYear,
   formatDocTicketNo,
   formatRequestTicketNo,
+  formatRequestOocTicketNo,
+  formatOocDocTicketNo,
   isFormalDocTicketNo,
 } from './doc-ticket-no';
 import axios from 'axios';
@@ -145,8 +147,10 @@ export class JobsService implements OnModuleInit {
       (createData as any).isOutOfContract = rawOut === 'true' || rawOut === '1';
     }
 
-    // ticketNo = RQ-CM-YYYYXXXX ตอนสร้าง — Running Doc No ออกตอนจำแนกเอกสารหลัง RESOLVED
+    // requestTicketNo = RQ-CM-YYYYXXXX / RQ-OOC-YYYYXXXX ตอนสร้าง (ถาวร ห้ามเขียนทับ)
+    // ticketNo = เลขเอกสารทางการ (Doc No) ออกตอนจำแนกเอกสาร (ค่าเริ่มต้น null)
     delete (createData as { ticketNo?: unknown }).ticketNo;
+    delete (createData as { requestTicketNo?: unknown }).requestTicketNo;
     if (!createData.reportDate) {
       createData.reportDate = new Date();
     }
@@ -166,12 +170,17 @@ export class JobsService implements OnModuleInit {
         ? createData.reportDate
         : new Date(String(createData.reportDate));
 
+    const isOutOfContract = Boolean((createData as any).isOutOfContract);
+
     const created = await this.runInTransaction(async (tx) => {
-      const ticketNo = await this.allocateRequestTicketNo(tx, reportDate);
+      const requestTicketNo = isOutOfContract
+        ? await this.allocateRequestOocTicketNo(tx, reportDate)
+        : await this.allocateRequestTicketNo(tx, reportDate);
       return tx.job.create({
         data: {
           ...createData,
-          ticketNo,
+          requestTicketNo,
+          ticketNo: null,
         },
       });
     });
@@ -227,6 +236,7 @@ export class JobsService implements OnModuleInit {
       select: {
         id: true,
         ticketNo: true,
+        requestTicketNo: true,
         status: true,
         reportDate: true,
         province: true,
@@ -384,13 +394,24 @@ export class JobsService implements OnModuleInit {
    * - includeSensitive=false: สาธารณะ — มาสก์ PII/สถานที่, ไม่ส่ง URL รูป (ส่ง issueImageCount แทน), รายละเอียดปัญหา/สาเหตุ/วิธีแก้ไขแสดงเต็ม (ข้อความจากช่าง ไม่ใช่ข้อมูลส่วนบุคคล)
    * - includeSensitive=true: มี JWT ที่ถูกต้อง — ข้อมูลเต็ม
    */
-  async findByTicketNoForStatus(ticketNo: string, includeSensitive: boolean) {
+  async findByTicketNoForStatus(searchNo: string, includeSensitive: boolean) {
+    const trimmed = (searchNo ?? '').trim();
+    if (!trimmed) {
+      return null;
+    }
+
     if (includeSensitive) {
-      const job = await this.prisma.job.findUnique({
-        where: { ticketNo },
+      const job = await this.prisma.job.findFirst({
+        where: {
+          OR: [
+            { requestTicketNo: trimmed },
+            { ticketNo: trimmed },
+          ],
+        },
         select: {
           id: true,
           ticketNo: true,
+          requestTicketNo: true,
           status: true,
           reportDate: true,
           description: true,
@@ -418,10 +439,17 @@ export class JobsService implements OnModuleInit {
       return { ...mapped, detailLevel: 'full' as const };
     }
 
-    const job = await this.prisma.job.findUnique({
-      where: { ticketNo },
+    const job = await this.prisma.job.findFirst({
+      where: {
+        OR: [
+          { requestTicketNo: trimmed },
+          { ticketNo: trimmed },
+        ],
+      },
       select: {
+        id: true,
         ticketNo: true,
+        requestTicketNo: true,
         status: true,
         reportDate: true,
         description: true,
@@ -454,7 +482,9 @@ export class JobsService implements OnModuleInit {
       : null;
 
     return {
+      id: job.id,
       ticketNo: job.ticketNo,
+      requestTicketNo: job.requestTicketNo,
       status: job.status,
       reportDate: job.reportDate,
       description: job.description,
@@ -549,6 +579,7 @@ export class JobsService implements OnModuleInit {
         select: {
           id: true,
           ticketNo: true,
+          requestTicketNo: true,
           status: true,
           reportDate: true,
           createdAt: true,
@@ -573,6 +604,7 @@ export class JobsService implements OnModuleInit {
             select: {
               id: true,
               ticketNo: true,
+              requestTicketNo: true,
               status: true,
               reportDate: true,
               createdAt: true,
@@ -590,6 +622,7 @@ export class JobsService implements OnModuleInit {
       {
         id: number;
         ticketNo: string | null;
+        requestTicketNo: string | null;
         status: JobStatus;
         reportDate: Date | null;
         createdAt: Date;
@@ -621,6 +654,7 @@ export class JobsService implements OnModuleInit {
         const issueSummary = d || t || null;
         const base = {
           ticketNo: j.ticketNo,
+          requestTicketNo: j.requestTicketNo,
           status: j.status,
           reportDate: j.reportDate ? j.reportDate.toISOString() : null,
           issueSummary,
@@ -1244,7 +1278,8 @@ export class JobsService implements OnModuleInit {
   }
 
   /**
-   * จำแนกเอกสาร: แทนที่ ticketNo เริ่มต้นด้วย Running Doc No (ครั้งเดียว)
+   * จำแนกเอกสาร: กำหนดเลขเอกสารทางการ (Doc No) ใน ticketNo (ครั้งเดียว)
+   * โดย requestTicketNo จะยังคงเดิมไม่ถูกแตะต้อง
    */
   async classifyDoc(id: number, isOutOfContract: boolean, actorUserId: number) {
     await this.assertUserCanClassifyDocKind(actorUserId, isOutOfContract);
@@ -1252,13 +1287,13 @@ export class JobsService implements OnModuleInit {
     return this.prisma.$transaction(async (tx) => {
       const job = await tx.job.findUnique({
         where: { id },
-        select: { id: true, status: true, ticketNo: true },
+        select: { id: true, status: true, ticketNo: true, requestTicketNo: true },
       });
       if (!job) throw new NotFoundException(`ไม่พบ Job id=${id}`);
       if (job.status === JobStatus.CANCELLED) {
         throw new BadRequestException('ไม่สามารถจำแนกเอกสารงานที่ถูกยกเลิกได้');
       }
-      if (isFormalDocTicketNo(job.ticketNo)) {
+      if (job.ticketNo && isFormalDocTicketNo(job.ticketNo)) {
         throw new ConflictException('งานนี้จำแนกเอกสารแล้ว');
       }
 
@@ -1387,12 +1422,18 @@ export class JobsService implements OnModuleInit {
       let current = Number(locked[0]?.lastValue ?? 0);
       if (current === 0 && typeof (tx as any).job?.findFirst === 'function') {
         const existing = await (tx as any).job.findFirst({
-          where: { ticketNo: { startsWith: `RQ-CM-${year}` } },
-          orderBy: { ticketNo: 'desc' },
-          select: { ticketNo: true },
+          where: {
+            OR: [
+              { requestTicketNo: { startsWith: `RQ-CM-${year}` } },
+              { ticketNo: { startsWith: `RQ-CM-${year}` } },
+            ],
+          },
+          orderBy: [{ requestTicketNo: 'desc' }, { ticketNo: 'desc' }],
+          select: { requestTicketNo: true, ticketNo: true },
         });
-        if (existing?.ticketNo) {
-          const numPart = existing.ticketNo.slice(`RQ-CM-${year}`.length);
+        const matched = existing?.requestTicketNo || existing?.ticketNo;
+        if (matched) {
+          const numPart = matched.slice(`RQ-CM-${year}`.length);
           const parsed = parseInt(numPart, 10);
           if (!isNaN(parsed) && parsed > current) {
             current = parsed;
@@ -1408,12 +1449,18 @@ export class JobsService implements OnModuleInit {
       `;
     } else if (typeof (tx as any).job?.findFirst === 'function') {
       const existing = await (tx as any).job.findFirst({
-        where: { ticketNo: { startsWith: `RQ-CM-${year}` } },
-        orderBy: { ticketNo: 'desc' },
-        select: { ticketNo: true },
+        where: {
+          OR: [
+            { requestTicketNo: { startsWith: `RQ-CM-${year}` } },
+            { ticketNo: { startsWith: `RQ-CM-${year}` } },
+          ],
+        },
+        orderBy: [{ requestTicketNo: 'desc' }, { ticketNo: 'desc' }],
+        select: { requestTicketNo: true, ticketNo: true },
       });
-      if (existing?.ticketNo) {
-        const numPart = existing.ticketNo.slice(`RQ-CM-${year}`.length);
+      const matched = existing?.requestTicketNo || existing?.ticketNo;
+      if (matched) {
+        const numPart = matched.slice(`RQ-CM-${year}`.length);
         const parsed = parseInt(numPart, 10);
         if (!isNaN(parsed) && parsed >= 1) {
           next = parsed + 1;
@@ -1423,9 +1470,136 @@ export class JobsService implements OnModuleInit {
 
     const ticketNo = formatRequestTicketNo({ year, running: next });
 
-    if (typeof (tx as any).job?.findUnique === 'function') {
-      const clash = await (tx as any).job.findUnique({
-        where: { ticketNo },
+    if (typeof (tx as any).job?.findFirst === 'function') {
+      const clash = await (tx as any).job.findFirst({
+        where: {
+          OR: [
+            { requestTicketNo: ticketNo },
+            { ticketNo },
+          ],
+        },
+        select: { id: true },
+      });
+      if (clash) {
+        throw new ConflictException(
+          `เลขที่ใบแจ้งซ่อมซ้ำ (${ticketNo}) — ลองใหม่อีกครั้ง`,
+        );
+      }
+    }
+    return ticketNo;
+  }
+
+  /** ออกเลขที่ใบแจ้งซ่อมนอกสัญญาเริ่มต้น RQ-OOC-YYYYXXXX พร้อม retry เมื่อชนเลขที่มีอยู่แล้ว */
+  private async allocateRequestOocTicketNo(
+    tx: Prisma.TransactionClient | PrismaService,
+    date: Date = new Date(),
+    maxAttempts = 5,
+  ): Promise<string> {
+    const year = this.bangkokYear(date);
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        return await this.nextRequestOocTicketNo(tx, year);
+      } catch (err) {
+        lastErr = err;
+        if (
+          !(err instanceof ConflictException) ||
+          attempt === maxAttempts - 1
+        ) {
+          throw err;
+        }
+      }
+    }
+    throw lastErr;
+  }
+
+  /**
+   * ออกเลขที่ใบแจ้งซ่อมนอกสัญญาเริ่มต้น (Reference No.) ใน transaction:
+   * รูปแบบ RQ-OOC-YYYYXXXX (RQ-OOC = fixed prefix, YYYY = ปี 4 หลัก Asia/Bangkok, XXXX = running 4 หลัก)
+   * แถว DocSequence ล็อกด้วย SELECT … FOR UPDATE
+   */
+  private async nextRequestOocTicketNo(
+    tx: Prisma.TransactionClient | PrismaService,
+    year: string,
+  ): Promise<string> {
+    const kind = 'RQ_OOC';
+    const period = year;
+
+    let next = 1;
+
+    if (typeof (tx as any).$executeRaw === 'function') {
+      await (tx as any).$executeRaw`
+        INSERT INTO \`DocSequence\` (\`kind\`, \`period\`, \`lastValue\`, \`updatedAt\`)
+        VALUES (${kind}, ${period}, 0, NOW(3))
+        ON DUPLICATE KEY UPDATE \`id\` = \`id\`
+      `;
+
+      const locked = await (tx as any).$queryRaw<
+        Array<{ lastValue: number | bigint }>
+      >`
+        SELECT \`lastValue\` FROM \`DocSequence\`
+        WHERE \`kind\` = ${kind} AND \`period\` = ${period}
+        FOR UPDATE
+      `;
+      let current = Number(locked[0]?.lastValue ?? 0);
+      if (current === 0 && typeof (tx as any).job?.findFirst === 'function') {
+        const existing = await (tx as any).job.findFirst({
+          where: {
+            OR: [
+              { requestTicketNo: { startsWith: `RQ-OOC-${year}` } },
+              { ticketNo: { startsWith: `RQ-OOC-${year}` } },
+            ],
+          },
+          orderBy: [{ requestTicketNo: 'desc' }, { ticketNo: 'desc' }],
+          select: { requestTicketNo: true, ticketNo: true },
+        });
+        const matched = existing?.requestTicketNo || existing?.ticketNo;
+        if (matched) {
+          const numPart = matched.slice(`RQ-OOC-${year}`.length);
+          const parsed = parseInt(numPart, 10);
+          if (!isNaN(parsed) && parsed > current) {
+            current = parsed;
+          }
+        }
+      }
+      next = current + 1;
+
+      await (tx as any).$executeRaw`
+        UPDATE \`DocSequence\`
+        SET \`lastValue\` = ${next}, \`updatedAt\` = NOW(3)
+        WHERE \`kind\` = ${kind} AND \`period\` = ${period}
+      `;
+    } else if (typeof (tx as any).job?.findFirst === 'function') {
+      const existing = await (tx as any).job.findFirst({
+        where: {
+          OR: [
+            { requestTicketNo: { startsWith: `RQ-OOC-${year}` } },
+            { ticketNo: { startsWith: `RQ-OOC-${year}` } },
+          ],
+        },
+        orderBy: [{ requestTicketNo: 'desc' }, { ticketNo: 'desc' }],
+        select: { requestTicketNo: true, ticketNo: true },
+      });
+      const matched = existing?.requestTicketNo || existing?.ticketNo;
+      if (matched) {
+        const numPart = matched.slice(`RQ-OOC-${year}`.length);
+        const parsed = parseInt(numPart, 10);
+        if (!isNaN(parsed) && parsed >= 1) {
+          next = parsed + 1;
+        }
+      }
+    }
+
+    const ticketNo = formatRequestOocTicketNo({ year, running: next });
+
+    if (typeof (tx as any).job?.findFirst === 'function') {
+      const clash = await (tx as any).job.findFirst({
+        where: {
+          OR: [
+            { requestTicketNo: ticketNo },
+            { ticketNo },
+          ],
+        },
         select: { id: true },
       });
       if (clash) {
@@ -1480,10 +1654,10 @@ export class JobsService implements OnModuleInit {
           const newTicketNo = await this.allocateRequestTicketNo(tx, date);
           await tx.job.update({
             where: { id: job.id },
-            data: { ticketNo: newTicketNo },
+            data: { requestTicketNo: newTicketNo, ticketNo: null },
           });
           this.logger.log(
-            `Migrated Job #${job.id}: ${job.ticketNo} -> ${newTicketNo}`,
+            `Migrated Job #${job.id}: ${job.ticketNo} -> requestTicketNo ${newTicketNo}`,
           );
         });
         count++;
@@ -1523,14 +1697,14 @@ export class JobsService implements OnModuleInit {
   /**
    * ออกเลข Doc No ใน transaction (แถว DocSequence ล็อกด้วย SELECT … FOR UPDATE)
    * ในสัญญา: CM-SHF-YYYY-XXXX (YYYY Asia/Bangkok ณ วันจำแนก; running ไม่รีเซ็ต — DocSequence period='')
-   * นอกสัญญา: YYYYMM#### (รีเซ็ตรายเดือน Asia/Bangkok; padStart 4 แล้วโตตามค่าจริง)
+   * นอกสัญญา: OOC-YYYY-XXXX (รีเซ็ตรายปี Asia/Bangkok; DocSequence kind='OOC_DOC', period=YYYY)
    */
   private async nextTicketNo(
     tx: Prisma.TransactionClient,
     isOutOfContract: boolean,
   ): Promise<string> {
-    const kind = isOutOfContract ? 'OUT_OF_CONTRACT' : 'IN_CONTRACT';
-    const period = isOutOfContract ? this.bangkokYearMonth() : '';
+    const kind = isOutOfContract ? 'OOC_DOC' : 'IN_CONTRACT';
+    const period = isOutOfContract ? this.bangkokYear() : '';
 
     await tx.$executeRaw`
       INSERT INTO \`DocSequence\` (\`kind\`, \`period\`, \`lastValue\`, \`updatedAt\`)
@@ -1552,16 +1726,21 @@ export class JobsService implements OnModuleInit {
       WHERE \`kind\` = ${kind} AND \`period\` = ${period}
     `;
 
-    const ticketNo = formatDocTicketNo({
-      isOutOfContract,
-      running: next,
-      ...(isOutOfContract
-        ? { periodYm: period }
-        : { periodYear: this.bangkokYear() }),
-    });
+    const ticketNo = isOutOfContract
+      ? formatOocDocTicketNo({ year: period, running: next })
+      : formatDocTicketNo({
+          isOutOfContract: false,
+          running: next,
+          periodYear: this.bangkokYear(),
+        });
 
-    const clash = await tx.job.findUnique({
-      where: { ticketNo },
+    const clash = await tx.job.findFirst({
+      where: {
+        OR: [
+          { ticketNo },
+          { requestTicketNo: ticketNo },
+        ],
+      },
       select: { id: true },
     });
     if (clash) {

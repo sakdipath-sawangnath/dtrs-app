@@ -49,6 +49,33 @@ npm install
 
 ---
 
+## [0.8.3] - 2026-10-01
+
+### Added
+
+- แยกหมายเลขใบรับแจ้ง (`requestTicketNo`) ถาวรจากหมายเลขเอกสารทางการ (`ticketNo`):
+  - สร้าง `requestTicketNo` ทันทีเมื่อผู้ใช้ส่งแจ้งปัญหา (`RQ-CM-YYYYXXXX` ในสัญญา, `RQ-OOC-YYYYXXXX` นอกสัญญา) โดยไม่ถูกเขียนทับ
+  - หมายเลขเอกสารทางการ (`ticketNo`) เริ่มต้นเป็น `null` และจะถูกสร้างเมื่อผ่านการจำแนกเอกสาร (`classifyDoc`) เท่านั้น (`CM-SHF-YYYY-XXXX` ในสัญญา, `OOC-YYYY-XXXX` นอกสัญญา)
+- หน้าแจ้งปัญหานอกสัญญาเฉพาะเจ้าหน้าที่ (`/public/report-ooc`): รองรับการแจ้งงานนอกสัญญาพร้อม Guard ตรวจสอบสิทธิ์ (STAFF, ADMIN, SUPERVISOR) และป้ายกำกับสีส้มชัดเจน
+- เมนูนำทาง "แจ้งงานนอกสัญญา" ใน `SiteHeader` สำหรับเจ้าหน้าที่และผู้ดูแลระบบ
+- คอลัมน์ `เลขรับแจ้ง` ในการส่งออก CSV จากหน้ารายการงาน
+
+### Changed
+
+- อัปเดตการค้นหาในหน้ารายการงาน (`JobsList`) และหน้าติดตามสถานะ (`/public/status`) ให้ค้นหาได้ทั้งเลขรับแจ้ง (`requestTicketNo`) และเลขเอกสาร (`ticketNo`)
+- ปรับปรุงการแสดงผลหมายเลขใบงานในทุกหน้า (JobsList, รายละเอียดงาน, ไทม์ไลน์, การแจ้งเตือน, แม่แบบ PDF) ให้แสดงเลขเอกสารเป็นหลักคู่กับเลขรับแจ้งอย่างชัดเจน
+- ปรับปรุงกล่องข้อความจำแนกประเภทเอกสาร (`JobClassifyDocDialog`): แก้ไขเลย์เอาต์ footer หลุดขอบ, เพิ่มโครงสร้าง 3 ส่วน (header/body/footer) ปักหมุด footer ไม่หลุดจอ, รองรับคีย์บอร์ด roving tabindex (ปุ่มลูกศร/Home/End/Space/Enter), เพิ่มสถานะ checked ชัดเจน (ขอบ 2px + ไอคอน CheckCircle2), ป้ายกำกับปุ่มและพรีวิวเลขระบุสัญญาชัดเจนสำหรับ irreversible action, ป้องกัน double submission พร้อม spinner และ inline error alert, เพิ่มปุ่มคัดลอกเลขรับแจ้งเดิมพร้อม aria-live, และปรับใช้ semantic design tokens พร้อม touch target ≥44px
+
+### Fixed
+
+- ปรับปรุงการเข้าถึงหน้าแจ้งงานนอกสัญญา (`/public/report-ooc`):
+  - คืนปุ่มเมนู "งานนอกสัญญา" ใน `SiteHeader` โดยกรองการแสดงผลตามสิทธิ์ `menu.outOfContract` หรือบทบาทเจ้าหน้าที่ (STAFF/ADMIN/SUPERVISOR) และซ่อนสำหรับผู้ใช้ทั่วไป (USER)
+  - แก้ไขปัญหา direct URL access ถูก redirect ไปยัง `/dashboard`: ปรับ `DashboardLayoutShell` ให้จำกัดการตรวจสิทธิ์และ redirect เฉพาะเส้นทาง `/dashboard/**` เท่านั้น โดยไม่แทรกแซงหรือ redirect เส้นทางฟอร์มสาธารณะ (`/public/report-ooc`) ที่มี `ReportOocGuard` ควบคุมอยู่แล้ว
+  - แก้ไข React runtime error `Cannot read properties of undefined (reading 'startTime')`: เพิ่มโมดูล `safePerformance` ในการดักและกรอง performance entries ที่ไม่สมบูรณ์จาก PerformanceObserver / Web Vitals พร้อม global error guard
+  - แก้ไข 504 Gateway Timeout และ request retry loop ใน GlitchTip monitoring tunnel (`/monitoring`): เพิ่ม circuit breaker 30 วินาที และตอบกลับด้วย HTTP 202 Accepted ทันทีเมื่อ upstream ออฟไลน์ ป้องกัน console error และไม่รบกวนการเปลี่ยนหน้าของระบบ
+
+---
+
 ## [0.7.6] - 2026-10-01
 
 ### Added

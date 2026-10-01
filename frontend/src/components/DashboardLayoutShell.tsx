@@ -81,7 +81,9 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
   const [isMdUp, setIsMdUp] = useState(false);
   const [permissions, setPermissions] = useState<string[] | null>(null);
   const userRole = (
-    (session?.user as { role?: string })?.role ?? "USER"
+    (session as { userRole?: string })?.userRole ??
+    (session?.user as { role?: string })?.role ??
+    "USER"
   ).toUpperCase();
   const token = (session as { accessToken?: string })?.accessToken;
   const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4100/api";
@@ -122,14 +124,21 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
       setPermissions(null);
       return;
     }
+    let cancelled = false;
     fetch(`${API}/roles/me/permissions`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => (r.ok ? r.json() : null))
       .then((raw) => {
+        if (cancelled) return;
         const payload = unwrapApiData<{ permissions?: string[] }>(raw);
         const list = payload?.permissions;
         setPermissions(Array.isArray(list) ? list : null);
       })
-      .catch(() => setPermissions(null));
+      .catch(() => {
+        if (!cancelled) setPermissions(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [token, status, API]);
 
   useEffect(() => {
@@ -160,25 +169,16 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
 
   useEffect(() => {
     if (status !== "authenticated" || !session?.user) return;
-    // กันกรณี permissions กำลังโหลด: ถ้าเพิ่งเข้า route `/dashboard/...`
-    // แล้ว state permissions ยังเป็น `null` จะทำให้ fallback byRole ตัดเมนูออกและ redirect ทันที
-    // รอให้ permissions โหลดเสร็จก่อน (โดยเฉพาะ route ที่อาศัย permission เช่น `/dashboard/profile`)
-    if (pathname.startsWith("/dashboard") && permissions === null) return;
+    // เฉพาะเส้นทางภายใต้ /dashboard/** เท่านั้นที่ DashboardLayoutShell จะทำการตรวจสิทธิ์และ redirect
+    // เส้นทาง public / report (เช่น /public/report, /public/report-ooc, /public/status)
+    // มี Guard ของตัวเอง (ReportOocGuard) และต้องไม่ถูก redirect อัตโนมัติไปยัง /dashboard
+    if (!pathname.startsWith("/dashboard")) return;
+    if (permissions === null) return;
+
     const allowedPaths = navFiltered.flatMap((n) => (n.href === "/dashboard" ? [n.href] : [n.href, n.href + "/"]));
-    const pathAllowed =
-      pathname === "/public/report" ||
-      pathname === "/public/status" ||
-      pathname === "/report" ||
-      pathname === "/status" ||
-      allowedPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
-    if (
-      !pathAllowed &&
-      (pathname.startsWith("/dashboard") ||
-        pathname === "/report" ||
-        pathname === "/status" ||
-        pathname === "/public/report" ||
-        pathname === "/public/status")
-    ) {
+    const pathAllowed = allowedPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
+
+    if (!pathAllowed) {
       router.replace(allowedPaths[0] || "/public/report");
     }
   }, [status, session, pathname, router, navFiltered, permissions]);
@@ -312,7 +312,11 @@ export default function DashboardLayoutShell({ children }: { children: React.Rea
 
   return (
     <div className="h-screen flex flex-col overflow-hidden glass-page">
-      <SiteHeader right={headerRight} subtitle={currentPage?.name} />
+      <SiteHeader
+        right={headerRight}
+        subtitle={currentPage?.name}
+        permissions={permissions}
+      />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {sidebarOpen && (

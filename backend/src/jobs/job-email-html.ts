@@ -2,6 +2,7 @@
 
 export type JobEmailPayload = {
   ticketNo: string | null;
+  requestTicketNo?: string | null;
   /** แสดงในอีเมล: หัวข้อหรือรายละเอียดข้อขัดข้อง (title ก่อน แล้วค่อย description) */
   issueSummary: string | null;
   province: string | null;

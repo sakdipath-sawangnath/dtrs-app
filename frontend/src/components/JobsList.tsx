@@ -222,7 +222,8 @@ const GLASS_MODAL_TEXTAREA = `${GLASS_MODAL_FIELD} min-h-[100px] resize-y`;
 
 interface Job {
   id: number;
-  ticketNo?: string;
+  ticketNo?: string | null;
+  requestTicketNo?: string | null;
   title?: string;
   description?: string;
   location?: string;
@@ -827,6 +828,7 @@ export default function JobsList({
       list = list.filter(
         (j) =>
           (j.ticketNo && j.ticketNo.toLowerCase().includes(q)) ||
+          (j.requestTicketNo && j.requestTicketNo.toLowerCase().includes(q)) ||
           (j.description && j.description.toLowerCase().includes(q)) ||
           (j.reporterName && j.reporterName.toLowerCase().includes(q)) ||
           (j.assignedTo?.name && j.assignedTo.name.toLowerCase().includes(q)) ||
@@ -2304,14 +2306,27 @@ export default function JobsList({
                           className="size-4 rounded border-slate-300 dark:border-[var(--glass-card-border)] bg-white dark:bg-[var(--glass-input-bg)] cursor-pointer accent-blue-500"
                           checked={bulkAssignSelectedIds.has(job.id)}
                           onChange={() => toggleBulkAssignSelect(job.id)}
-                          aria-label={`เลือกงาน ${job.ticketNo ?? job.id}`}
+                          aria-label={`เลือกงาน ${job.ticketNo ?? job.requestTicketNo ?? job.id}`}
                         />
                       ) : null}
                     </td>
                   )}
                   <td className="px-2.5 py-2.5 font-mono text-sm font-medium whitespace-nowrap text-slate-900 dark:text-slate-100 max-w-0">
-                    <div className="truncate" title={job.ticketNo?.trim() || undefined}>
-                      {job.ticketNo?.trim() ? job.ticketNo : "—"}
+                    <div className="truncate" title={job.ticketNo?.trim() || job.requestTicketNo?.trim() || undefined}>
+                      {job.ticketNo?.trim() ? (
+                        <>
+                          <div className="font-semibold text-slate-900 dark:text-slate-100">{job.ticketNo}</div>
+                          {job.requestTicketNo?.trim() ? (
+                            <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400">
+                              {job.requestTicketNo}
+                            </div>
+                          ) : null}
+                        </>
+                      ) : job.requestTicketNo?.trim() ? (
+                        <div className="text-slate-900 dark:text-slate-100">{job.requestTicketNo}</div>
+                      ) : (
+                        "—"
+                      )}
                     </div>
                   </td>
                   <td className="px-2.5 py-2.5 text-sm whitespace-nowrap text-slate-600 dark:text-slate-400">
@@ -2677,7 +2692,7 @@ export default function JobsList({
                 className="font-bold text-base sm:text-lg"
                 style={{ color: "#334155" }}
               >
-                รายละเอียดข้อขัดข้อง {detailJob?.ticketNo && `· ${detailJob.ticketNo}`}
+                รายละเอียดข้อขัดข้อง {(detailJob?.ticketNo || detailJob?.requestTicketNo) && `· ${detailJob.ticketNo || detailJob.requestTicketNo}`}
               </DialogTitle>
               <button
                 type="button"
@@ -2912,7 +2927,7 @@ export default function JobsList({
                 id="update-fix-modal-title"
                 className="font-bold text-base glass-text sm:text-lg"
               >
-                ข้อมูลการแก้ไข {updateFixJob?.ticketNo && `· ${updateFixJob.ticketNo}`}
+                ข้อมูลการแก้ไข {(updateFixJob?.ticketNo || updateFixJob?.requestTicketNo) && `· ${updateFixJob.ticketNo || updateFixJob.requestTicketNo}`}
               </DialogTitle>
               <button
                 type="button"
@@ -3597,7 +3612,7 @@ export default function JobsList({
               <DialogTitle className="font-bold text-base glass-text">
                 {assignBulkIds.length > 0
                   ? `มอบหมายงาน ${assignBulkIds.length} รายการ`
-                  : `เลขที่แจ้งซ่อม ${assignJob?.ticketNo ? `· ${assignJob.ticketNo}` : ""}`}
+                  : `เลขที่แจ้งซ่อม ${(assignJob?.ticketNo || assignJob?.requestTicketNo) ? `· ${assignJob.ticketNo || assignJob.requestTicketNo}` : ""}`}
               </DialogTitle>
               <button
                 type="button"
@@ -3673,7 +3688,7 @@ export default function JobsList({
         onOpenChange={(open) => {
           if (!open && !classifySubmitting) setClassifyJob(null);
         }}
-        ticketNo={classifyJob?.ticketNo}
+        ticketNo={classifyJob?.requestTicketNo || classifyJob?.ticketNo || undefined}
         submitting={classifySubmitting}
         canClassifyContract={canClassifyDocContract}
         canClassifyOutOfContract={canClassifyDocOutOfContract}

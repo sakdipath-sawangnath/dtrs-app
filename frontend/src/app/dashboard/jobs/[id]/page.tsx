@@ -89,7 +89,8 @@ import {
 
 interface JobDetail {
   id: number;
-  ticketNo?: string;
+  ticketNo?: string | null;
+  requestTicketNo?: string | null;
   status: string;
   reportDate?: string;
   createdAt: string;
@@ -250,8 +251,10 @@ export default function JobDetailPage() {
 
   const title = "รายละเอียดข้อขัดข้อง";
   const subtitle = job?.ticketNo
-    ? `เลขที่ใบแจ้งซ่อม: ${job.ticketNo}`
-    : "ดูรายละเอียดงานแจ้งซ่อม";
+    ? `เลขเอกสาร: ${job.ticketNo}${job.requestTicketNo ? ` · เลขรับแจ้ง: ${job.requestTicketNo}` : ""}`
+    : job?.requestTicketNo
+      ? `เลขรับแจ้ง: ${job.requestTicketNo}`
+      : "ดูรายละเอียดงานแจ้งซ่อม";
 
   const isResolved = job?.status === "RESOLVED";
   const userRole = (session?.user as { role?: string })?.role ?? "USER";
@@ -917,7 +920,7 @@ export default function JobDetailPage() {
         );
       const filename = match
         ? decodeURIComponent(match[1] || match[2] || match[3] || "")
-        : `report-${job.ticketNo || job.id}.pdf`;
+        : `report-${job.ticketNo || job.requestTicketNo || job.id}.pdf`;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
@@ -1918,7 +1921,7 @@ export default function JobDetailPage() {
       <JobAssignDialog
         open={assignOpen}
         onOpenChange={setAssignOpen}
-        ticketNo={job?.ticketNo}
+        ticketNo={job?.requestTicketNo || job?.ticketNo || undefined}
         assignLoading={assignLoading}
         assignOptions={assignOptions}
         assignSelectedId={assignSelectedId}
@@ -1932,7 +1935,7 @@ export default function JobDetailPage() {
         onOpenChange={(open) => {
           if (!open && !classifySubmitting) setClassifyOpen(false);
         }}
-        ticketNo={job?.ticketNo}
+        ticketNo={job?.requestTicketNo || job?.ticketNo || undefined}
         submitting={classifySubmitting}
         canClassifyContract={canClassifyDocContract || canClassifyDoc}
         canClassifyOutOfContract={canClassifyDocOutOfContract || canClassifyDoc}

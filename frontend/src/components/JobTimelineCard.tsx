@@ -18,7 +18,8 @@ export type JobTimelineJob = {
   reportDate?: string;
   createdAt: string;
   fixDate?: string | null;
-  ticketNo?: string;
+  ticketNo?: string | null;
+  requestTicketNo?: string | null;
   /** หัวข้อ/เรื่องที่แจ้ง — แสดงใต้ขั้นแจ้งซ่อมถ้ามี */
   title?: string;
   reporterName?: string;
@@ -354,9 +355,9 @@ export default function JobTimelineCard({ job }: { job: JobTimelineJob }) {
           >
             ไทม์ไลน์งาน
           </h2>
-          {job.ticketNo ? (
+          {job.ticketNo || job.requestTicketNo ? (
             <span className="text-xs font-mono glass-subtle-text">
-              #{job.ticketNo}
+              #{job.ticketNo || job.requestTicketNo}
             </span>
           ) : null}
         </div>
