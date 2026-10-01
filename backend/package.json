@@ -27,7 +27,8 @@
     "script:seed-locations-mssql": "ts-node scripts/seed-locations-from-mssql.ts",
     "script:seed-sites-xlsx": "ts-node scripts/seed-sites-from-xlsx.ts",
     "script:seed-sites-xlsx:dry": "ts-node scripts/seed-sites-from-xlsx.ts --dry-run",
-    "script:seed-sites-xlsx:clear": "ts-node scripts/seed-sites-from-xlsx.ts --clear"
+    "script:seed-sites-xlsx:clear": "ts-node scripts/seed-sites-from-xlsx.ts --clear",
+    "script:migrate-hex-tickets": "ts-node scripts/migrate-hex-tickets.ts"
   },
   "engines": {
     "npm": ">=10.0.0",

@@ -10,6 +10,13 @@ import { getConfiguredSentryDsn, getSentryUrl } from "@/lib/sentryEnv";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** GlitchTip ingest timeout — fail fast instead of hanging 30s+ */
+/** GlitchTip ingest timeout — fail fast (2s) so monitoring drops quietly if host unreachable */
+const GLITCHTIP_INGEST_TIMEOUT_MS = 2_000;
+/** Circuit breaker cooldown when upstream is offline — avoid blocking every request for 2s */
+const CIRCUIT_BREAKER_COOLDOWN_MS = 30_000;
+let lastFailureTimestamp = 0;
+
 /**
  * Same-origin envelope tunnel → GlitchTip
  * เบราว์เซอร์ยิงมาที่นี่ แล้ว Next (ใน LAN) forward ไป ingest
@@ -51,6 +58,16 @@ export async function POST(req: Request): Promise<Response> {
     return new Response("sentry not configured", { status: 503 });
   }
 
+  // Circuit breaker: If upstream is known to be offline, return 202 Accepted immediately
+  // to prevent request queuing, browser 504 errors, and Sentry client retry storms.
+  const now = Date.now();
+  if (now - lastFailureTimestamp < CIRCUIT_BREAKER_COOLDOWN_MS) {
+    return Response.json(
+      { status: "dropped", reason: "circuit_breaker_open" },
+      { status: 202 },
+    );
+  }
+
   const ingestUrl = sentryEnvelopeIngestUrl(allowedParsed, sentryUrl);
   const contentType =
     req.headers.get("content-type") || "application/x-sentry-envelope";
@@ -60,7 +77,10 @@ export async function POST(req: Request): Promise<Response> {
       method: "POST",
       body: new Uint8Array(bodyResult.body),
       headers: { "Content-Type": contentType },
+      signal: AbortSignal.timeout(GLITCHTIP_INGEST_TIMEOUT_MS),
     });
+    // Upstream responded successfully; reset circuit breaker
+    lastFailureTimestamp = 0;
     return new Response(upstream.body, {
       status: upstream.status,
       statusText: upstream.statusText,
@@ -70,8 +90,16 @@ export async function POST(req: Request): Promise<Response> {
       },
     });
   } catch (err) {
+    lastFailureTimestamp = Date.now();
     const message = err instanceof Error ? err.message : "upstream failed";
-    console.error("[glitchtip-tunnel] ingest error", { message });
-    return new Response("glitchtip unreachable", { status: 502 });
+    console.warn("[glitchtip-tunnel] upstream offline, entering 30s circuit breaker", {
+      message,
+    });
+    // Return 202 Accepted so Sentry client treats envelope as processed/dropped,
+    // preventing 504 console errors, retry loops, and interference with page navigation.
+    return Response.json(
+      { status: "dropped", reason: "upstream_offline" },
+      { status: 202 },
+    );
   }
 }

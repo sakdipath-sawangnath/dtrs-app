@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Controller,
   Get,
+  Logger,
   Post,
   Param,
   Query,
@@ -28,6 +29,8 @@ import {
  */
 @Controller('public/jobs')
 export class PublicJobsController {
+  private readonly logger = new Logger(PublicJobsController.name);
+
   constructor(
     private readonly jobsService: JobsService,
     private readonly minioService: MinioService,
@@ -71,14 +74,20 @@ export class PublicJobsController {
     if (created?.id && issueFiles.length > 0) {
       let index = 1;
       for (const file of issueFiles) {
-        const url = await this.minioService.uploadJobImage(
-          created.id,
-          'issue',
-          index,
-          file,
-        );
-        uploadedUrls.push(url);
-        index++;
+        try {
+          const url = await this.minioService.uploadJobImage(
+            created.id,
+            'issue',
+            index,
+            file,
+          );
+          uploadedUrls.push(url);
+          index++;
+        } catch (uploadErr: any) {
+          this.logger.error(
+            `Failed to upload issue image #${index} for job ${created.id}: ${uploadErr?.message || uploadErr}`,
+          );
+        }
       }
     }
 

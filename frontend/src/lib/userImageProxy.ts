@@ -7,6 +7,10 @@ import { getServerApiBaseUrl } from "@/lib/serverApiBase";
  * Proxy รูปโปรไฟล์ — JWT จาก cookie แล้วเรียก Nest `GET /users/:id/avatar`
  * Path **`/user-images/:userId`** ไม่อยู่ใต้ `/api` (เหมือน `/job-images`)
  */
+
+/** Avatar proxy timeout — fail fast when backend is unreachable */
+const AVATAR_PROXY_TIMEOUT_MS = 8_000;
+
 export async function userImageProxyGET(
   request: NextRequest,
   params: { userId: string },
@@ -34,6 +38,7 @@ export async function userImageProxyGET(
       Authorization: `Bearer ${token}`,
     },
     cache: "no-store",
+    signal: AbortSignal.timeout(AVATAR_PROXY_TIMEOUT_MS),
   });
 
   if (!res.ok) {

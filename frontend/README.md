@@ -21,7 +21,7 @@ Next.js 15 (App Router) สำหรับระบบแจ้งปัญห�
 
 - **/report**
   - กรอกเบอร์โทรศัพท์ได้เฉพาะตัวเลข 10 หลัก และต้องตรงกับผู้แจ้งที่มีอยู่ในระบบ (`/api/users/reporter-by-phone/:phone`) การ์ดอื่น (สถานที่, รายละเอียด, รูปภาพ) จะใช้งานได้เมื่อเบอร์โทรถูกต้องและพบผู้ใช้เท่านั้น
-  - เมื่อส่งฟอร์ม ระบบจะสร้าง `Job` ใหม่ + เลขที่ใบแจ้งซ่อม (`ticketNo` เป็นรหัส hex 8 ตัว) แสดง Toast แจ้งเลข Ticket แล้ว redirect ไปหน้า `/status?ticketNo=...`
+  - เมื่อส่งฟอร์ม ระบบจะสร้าง `Job` ใหม่ + เลขที่ใบแจ้งซ่อม (`ticketNo` ในรูปแบบ `RQ-CM-YYYYXXXX`) แสดง Toast แจ้งเลข Ticket แล้ว redirect ไปหน้า `/status?ticketNo=...`
 
 - **/status**
   - ฟอร์มค้นหารับเลขที่ใบแจ้งซ่อม แล้วเรียก `GET /api/jobs/status/:ticketNo`
@@ -31,7 +31,7 @@ Next.js 15 (App Router) สำหรับระบบแจ้งปัญห�
   - งานที่รับผิดชอบ — JobsList แสดงเฉพาะงานที่รับมอบหมายให้ผู้ใช้ปัจจุบัน; filter + DataTable; ป้าย「รอเซ็นผู้แจ้ง」เมื่อแก้ครบแล้วยัง `IN_PROGRESS`; ปุ่ม Sign ปิดงานจากรายการ (`JobReporterSignDialog`)
 
 - **/dashboard/jobs/[id]**
-  - รายละเอียดงานเต็มหน้า: การ์ดข้อมูลการแจ้งข้อขัดข้อง (card **รูปภาพปัญหาที่แจ้ง** อัปโหลดได้เมื่อมี **`job.issue.upload`** และงาน `PENDING`/`IN_PROGRESS`; เติมถึง 3 รูป · **5MB/ไฟล์** JPG/PNG/WebP/HEIC ไม่ลบ/ไม่แทนที่) + การ์ดข้อมูลการแก้ไข + ฟอร์ม**บันทึกการแก้ไข** (`PATCH /jobs/:id/fix`, คง `IN_PROGRESS`) และบล็อกแยก **ปิดงาน — ลายเซ็นผู้แจ้ง** (`PATCH /jobs/:id/close`); **บันทึก/ปิดงาน / Reopen — ตาม RBAC** (`job.fix.*` / `job.reopen.*`); Reopen มี `confirmDialog` ก่อนเรียก API; เมื่อสถานะ Resolved — พิมพ์/PDF + **จำแนกเอกสาร** (`job.classifyDoc`, ยังเป็น hex) ผ่าน `JobClassifyDocDialog`; พิมพ์ผ่านหน้า **`/print/jobs/[id]`** + `JobMaintenancePdfTemplate` + `print.css` (หรือดาวน์โหลด PDF ฝั่ง backend `GET /jobs/:id/report-pdf`)
+  - รายละเอียดงานเต็มหน้า: การ์ดข้อมูลการแจ้งข้อขัดข้อง (card **รูปภาพปัญหาที่แจ้ง** อัปโหลดได้เมื่อมี **`job.issue.upload`** และงาน `PENDING`/`IN_PROGRESS`; เติมถึง 3 รูป · **5MB/ไฟล์** JPG/PNG/WebP/HEIC ไม่ลบ/ไม่แทนที่) + การ์ดข้อมูลการแก้ไข + ฟอร์ม**บันทึกการแก้ไข** (`PATCH /jobs/:id/fix`, คง `IN_PROGRESS`) และบล็อกแยก **ปิดงาน — ลายเซ็นผู้แจ้ง** (`PATCH /jobs/:id/close`); **บันทึก/ปิดงาน / Reopen — ตาม RBAC** (`job.fix.*` / `job.reopen.*`); Reopen มี `confirmDialog` ก่อนเรียก API; เมื่อสถานะ Resolved — พิมพ์/PDF + **จำแนกเอกสาร** (`job.classifyDoc`, เลขเริ่มต้น `RQ-CM-YYYYXXXX`) ผ่าน `JobClassifyDocDialog`; พิมพ์ผ่านหน้า **`/print/jobs/[id]`** + `JobMaintenancePdfTemplate` + `print.css` (หรือดาวน์โหลด PDF ฝั่ง backend `GET /jobs/:id/report-pdf`)
 
 - **`/print/jobs/[id]` (พิมพ์)**
   - ข้อมูล JSON จาก **`GET /api/print-jobs/:id/data`** (Next API route); รูปในเทมเพลตใช้ **`/job-images/:id/:kind/:index`** (ไม่อยู่ใต้ `/api` — reverse proxy ส่งต่อไป Next ตาม host หลักได้โดยไม่ต้องแยก location เพิ่ม) หรือ alias **`/api/job-images/...`** ถ้าตั้ง NPM แยกเหมือน `/api/print-jobs`

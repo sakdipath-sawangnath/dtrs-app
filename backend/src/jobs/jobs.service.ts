@@ -6,6 +6,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -13,7 +14,6 @@ import {
   maskPhoneForPublic,
   maskTextForPublic,
 } from '../common/utils/mask-public-text';
-import { randomBytes } from 'crypto';
 import { JobStatus, Prisma } from '@prisma/client';
 import { SitesService } from '../sites/sites.service';
 import { UsersService } from '../users/users.service';
@@ -24,12 +24,15 @@ import {
   bangkokYearMonth as formatBangkokYearMonth,
   bangkokYear as formatBangkokYear,
   formatDocTicketNo,
+  formatRequestTicketNo,
+  formatRequestOocTicketNo,
+  formatOocDocTicketNo,
   isFormalDocTicketNo,
 } from './doc-ticket-no';
 import axios from 'axios';
 
 @Injectable()
-export class JobsService {
+export class JobsService implements OnModuleInit {
   private readonly logger = new Logger(JobsService.name);
 
   constructor(
@@ -40,6 +43,10 @@ export class JobsService {
     private jobEmailNotifications: JobEmailNotificationService,
     private rolesService: RolesService,
   ) {}
+
+  async onModuleInit() {
+    await this.backfillLegacyHexTicketNumbers();
+  }
 
   /** ปรับ URL รูปผู้ใช้ (avatar) ให้เบราว์เซอร์เข้าถึง MinIO ภายนอกได้ */
   private mapUserImage<T extends { image?: string | null } | null | undefined>(
@@ -140,9 +147,10 @@ export class JobsService {
       (createData as any).isOutOfContract = rawOut === 'true' || rawOut === '1';
     }
 
-    // ticketNo = hex 8 ตัวตอนสร้าง — Running Doc No ออกตอนจำแนกเอกสารหลัง RESOLVED
+    // requestTicketNo = RQ-CM-YYYYXXXX / RQ-OOC-YYYYXXXX ตอนสร้าง (ถาวร ห้ามเขียนทับ)
+    // ticketNo = เลขเอกสารทางการ (Doc No) ออกตอนจำแนกเอกสาร (ค่าเริ่มต้น null)
     delete (createData as { ticketNo?: unknown }).ticketNo;
-    createData.ticketNo = randomBytes(4).toString('hex');
+    delete (createData as { requestTicketNo?: unknown }).requestTicketNo;
     if (!createData.reportDate) {
       createData.reportDate = new Date();
     }
@@ -157,8 +165,24 @@ export class JobsService {
       }
     }
 
-    const created = await this.prisma.job.create({
-      data: createData,
+    const reportDate =
+      createData.reportDate instanceof Date
+        ? createData.reportDate
+        : new Date(String(createData.reportDate));
+
+    const isOutOfContract = Boolean((createData as any).isOutOfContract);
+
+    const created = await this.runInTransaction(async (tx) => {
+      const requestTicketNo = isOutOfContract
+        ? await this.allocateRequestOocTicketNo(tx, reportDate)
+        : await this.allocateRequestTicketNo(tx, reportDate);
+      return tx.job.create({
+        data: {
+          ...createData,
+          requestTicketNo,
+          ticketNo: null,
+        },
+      });
     });
     void this.jobEmailNotifications.notifyReported(created.id);
     return created;
@@ -212,6 +236,7 @@ export class JobsService {
       select: {
         id: true,
         ticketNo: true,
+        requestTicketNo: true,
         status: true,
         reportDate: true,
         province: true,
@@ -369,13 +394,24 @@ export class JobsService {
    * - includeSensitive=false: สาธารณะ — มาสก์ PII/สถานที่, ไม่ส่ง URL รูป (ส่ง issueImageCount แทน), รายละเอียดปัญหา/สาเหตุ/วิธีแก้ไขแสดงเต็ม (ข้อความจากช่าง ไม่ใช่ข้อมูลส่วนบุคคล)
    * - includeSensitive=true: มี JWT ที่ถูกต้อง — ข้อมูลเต็ม
    */
-  async findByTicketNoForStatus(ticketNo: string, includeSensitive: boolean) {
+  async findByTicketNoForStatus(searchNo: string, includeSensitive: boolean) {
+    const trimmed = (searchNo ?? '').trim();
+    if (!trimmed) {
+      return null;
+    }
+
     if (includeSensitive) {
-      const job = await this.prisma.job.findUnique({
-        where: { ticketNo },
+      const job = await this.prisma.job.findFirst({
+        where: {
+          OR: [
+            { requestTicketNo: trimmed },
+            { ticketNo: trimmed },
+          ],
+        },
         select: {
           id: true,
           ticketNo: true,
+          requestTicketNo: true,
           status: true,
           reportDate: true,
           description: true,
@@ -403,10 +439,17 @@ export class JobsService {
       return { ...mapped, detailLevel: 'full' as const };
     }
 
-    const job = await this.prisma.job.findUnique({
-      where: { ticketNo },
+    const job = await this.prisma.job.findFirst({
+      where: {
+        OR: [
+          { requestTicketNo: trimmed },
+          { ticketNo: trimmed },
+        ],
+      },
       select: {
+        id: true,
         ticketNo: true,
+        requestTicketNo: true,
         status: true,
         reportDate: true,
         description: true,
@@ -439,7 +482,9 @@ export class JobsService {
       : null;
 
     return {
+      id: job.id,
       ticketNo: job.ticketNo,
+      requestTicketNo: job.requestTicketNo,
       status: job.status,
       reportDate: job.reportDate,
       description: job.description,
@@ -534,6 +579,7 @@ export class JobsService {
         select: {
           id: true,
           ticketNo: true,
+          requestTicketNo: true,
           status: true,
           reportDate: true,
           createdAt: true,
@@ -558,6 +604,7 @@ export class JobsService {
             select: {
               id: true,
               ticketNo: true,
+              requestTicketNo: true,
               status: true,
               reportDate: true,
               createdAt: true,
@@ -575,6 +622,7 @@ export class JobsService {
       {
         id: number;
         ticketNo: string | null;
+        requestTicketNo: string | null;
         status: JobStatus;
         reportDate: Date | null;
         createdAt: Date;
@@ -606,6 +654,7 @@ export class JobsService {
         const issueSummary = d || t || null;
         const base = {
           ticketNo: j.ticketNo,
+          requestTicketNo: j.requestTicketNo,
           status: j.status,
           reportDate: j.reportDate ? j.reportDate.toISOString() : null,
           issueSummary,
@@ -1229,7 +1278,8 @@ export class JobsService {
   }
 
   /**
-   * จำแนกเอกสารหลังปิดงาน: แทนที่ hex ด้วย Running Doc No (ครั้งเดียว)
+   * จำแนกเอกสาร: กำหนดเลขเอกสารทางการ (Doc No) ใน ticketNo (ครั้งเดียว)
+   * โดย requestTicketNo จะยังคงเดิมไม่ถูกแตะต้อง
    */
   async classifyDoc(id: number, isOutOfContract: boolean, actorUserId: number) {
     await this.assertUserCanClassifyDocKind(actorUserId, isOutOfContract);
@@ -1237,15 +1287,13 @@ export class JobsService {
     return this.prisma.$transaction(async (tx) => {
       const job = await tx.job.findUnique({
         where: { id },
-        select: { id: true, status: true, ticketNo: true },
+        select: { id: true, status: true, ticketNo: true, requestTicketNo: true },
       });
       if (!job) throw new NotFoundException(`ไม่พบ Job id=${id}`);
-      if (job.status !== JobStatus.RESOLVED) {
-        throw new BadRequestException(
-          'จำแนกเอกสารได้เฉพาะงานสถานะเสร็จสิ้น (RESOLVED)',
-        );
+      if (job.status === JobStatus.CANCELLED) {
+        throw new BadRequestException('ไม่สามารถจำแนกเอกสารงานที่ถูกยกเลิกได้');
       }
-      if (isFormalDocTicketNo(job.ticketNo)) {
+      if (job.ticketNo && isFormalDocTicketNo(job.ticketNo)) {
         throw new ConflictException('งานนี้จำแนกเอกสารแล้ว');
       }
 
@@ -1300,13 +1348,327 @@ export class JobsService {
   }
 
   /** YYYY ตาม Asia/Bangkok */
-  private bangkokYear(): string {
-    return formatBangkokYear();
+  private bangkokYear(now: Date = new Date()): string {
+    return formatBangkokYear(now);
   }
 
   /** YYYYMM ตาม Asia/Bangkok */
-  private bangkokYearMonth(): string {
-    return formatBangkokYearMonth();
+  private bangkokYearMonth(now: Date = new Date()): string {
+    return formatBangkokYearMonth(now);
+  }
+
+  private async runInTransaction<T>(
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    if (typeof this.prisma.$transaction === 'function') {
+      const res = await this.prisma.$transaction(fn);
+      if (res !== undefined) return res;
+    }
+    return fn(this.prisma as unknown as Prisma.TransactionClient);
+  }
+
+  /** ออกเลขที่ใบแจ้งซ่อมเริ่มต้น RQ-CM-YYYYXXXX พร้อม retry เมื่อชนเลขที่มีอยู่แล้ว */
+  private async allocateRequestTicketNo(
+    tx: Prisma.TransactionClient | PrismaService,
+    date: Date = new Date(),
+    maxAttempts = 5,
+  ): Promise<string> {
+    const year = this.bangkokYear(date);
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        return await this.nextRequestTicketNo(tx, year);
+      } catch (err) {
+        lastErr = err;
+        if (
+          !(err instanceof ConflictException) ||
+          attempt === maxAttempts - 1
+        ) {
+          throw err;
+        }
+      }
+    }
+    throw lastErr;
+  }
+
+  /**
+   * ออกเลขที่ใบแจ้งซ่อมเริ่มต้น (Reference No.) ใน transaction:
+   * รูปแบบ RQ-CM-YYYYXXXX (RQ-CM = fixed prefix, YYYY = ปี 4 หลัก Asia/Bangkok, XXXX = running 4 หลัก)
+   * แถว DocSequence ล็อกด้วย SELECT … FOR UPDATE
+   */
+  private async nextRequestTicketNo(
+    tx: Prisma.TransactionClient | PrismaService,
+    year: string,
+  ): Promise<string> {
+    const kind = 'RQ_CM';
+    const period = year;
+
+    let next = 1;
+
+    if (typeof (tx as any).$executeRaw === 'function') {
+      await (tx as any).$executeRaw`
+        INSERT INTO \`DocSequence\` (\`kind\`, \`period\`, \`lastValue\`, \`updatedAt\`)
+        VALUES (${kind}, ${period}, 0, NOW(3))
+        ON DUPLICATE KEY UPDATE \`id\` = \`id\`
+      `;
+
+      const locked = await (tx as any).$queryRaw<
+        Array<{ lastValue: number | bigint }>
+      >`
+        SELECT \`lastValue\` FROM \`DocSequence\`
+        WHERE \`kind\` = ${kind} AND \`period\` = ${period}
+        FOR UPDATE
+      `;
+      let current = Number(locked[0]?.lastValue ?? 0);
+      if (current === 0 && typeof (tx as any).job?.findFirst === 'function') {
+        const existing = await (tx as any).job.findFirst({
+          where: {
+            OR: [
+              { requestTicketNo: { startsWith: `RQ-CM-${year}` } },
+              { ticketNo: { startsWith: `RQ-CM-${year}` } },
+            ],
+          },
+          orderBy: [{ requestTicketNo: 'desc' }, { ticketNo: 'desc' }],
+          select: { requestTicketNo: true, ticketNo: true },
+        });
+        const matched = existing?.requestTicketNo || existing?.ticketNo;
+        if (matched) {
+          const numPart = matched.slice(`RQ-CM-${year}`.length);
+          const parsed = parseInt(numPart, 10);
+          if (!isNaN(parsed) && parsed > current) {
+            current = parsed;
+          }
+        }
+      }
+      next = current + 1;
+
+      await (tx as any).$executeRaw`
+        UPDATE \`DocSequence\`
+        SET \`lastValue\` = ${next}, \`updatedAt\` = NOW(3)
+        WHERE \`kind\` = ${kind} AND \`period\` = ${period}
+      `;
+    } else if (typeof (tx as any).job?.findFirst === 'function') {
+      const existing = await (tx as any).job.findFirst({
+        where: {
+          OR: [
+            { requestTicketNo: { startsWith: `RQ-CM-${year}` } },
+            { ticketNo: { startsWith: `RQ-CM-${year}` } },
+          ],
+        },
+        orderBy: [{ requestTicketNo: 'desc' }, { ticketNo: 'desc' }],
+        select: { requestTicketNo: true, ticketNo: true },
+      });
+      const matched = existing?.requestTicketNo || existing?.ticketNo;
+      if (matched) {
+        const numPart = matched.slice(`RQ-CM-${year}`.length);
+        const parsed = parseInt(numPart, 10);
+        if (!isNaN(parsed) && parsed >= 1) {
+          next = parsed + 1;
+        }
+      }
+    }
+
+    const ticketNo = formatRequestTicketNo({ year, running: next });
+
+    if (typeof (tx as any).job?.findFirst === 'function') {
+      const clash = await (tx as any).job.findFirst({
+        where: {
+          OR: [
+            { requestTicketNo: ticketNo },
+            { ticketNo },
+          ],
+        },
+        select: { id: true },
+      });
+      if (clash) {
+        throw new ConflictException(
+          `เลขที่ใบแจ้งซ่อมซ้ำ (${ticketNo}) — ลองใหม่อีกครั้ง`,
+        );
+      }
+    }
+    return ticketNo;
+  }
+
+  /** ออกเลขที่ใบแจ้งซ่อมนอกสัญญาเริ่มต้น RQ-OOC-YYYYXXXX พร้อม retry เมื่อชนเลขที่มีอยู่แล้ว */
+  private async allocateRequestOocTicketNo(
+    tx: Prisma.TransactionClient | PrismaService,
+    date: Date = new Date(),
+    maxAttempts = 5,
+  ): Promise<string> {
+    const year = this.bangkokYear(date);
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        return await this.nextRequestOocTicketNo(tx, year);
+      } catch (err) {
+        lastErr = err;
+        if (
+          !(err instanceof ConflictException) ||
+          attempt === maxAttempts - 1
+        ) {
+          throw err;
+        }
+      }
+    }
+    throw lastErr;
+  }
+
+  /**
+   * ออกเลขที่ใบแจ้งซ่อมนอกสัญญาเริ่มต้น (Reference No.) ใน transaction:
+   * รูปแบบ RQ-OOC-YYYYXXXX (RQ-OOC = fixed prefix, YYYY = ปี 4 หลัก Asia/Bangkok, XXXX = running 4 หลัก)
+   * แถว DocSequence ล็อกด้วย SELECT … FOR UPDATE
+   */
+  private async nextRequestOocTicketNo(
+    tx: Prisma.TransactionClient | PrismaService,
+    year: string,
+  ): Promise<string> {
+    const kind = 'RQ_OOC';
+    const period = year;
+
+    let next = 1;
+
+    if (typeof (tx as any).$executeRaw === 'function') {
+      await (tx as any).$executeRaw`
+        INSERT INTO \`DocSequence\` (\`kind\`, \`period\`, \`lastValue\`, \`updatedAt\`)
+        VALUES (${kind}, ${period}, 0, NOW(3))
+        ON DUPLICATE KEY UPDATE \`id\` = \`id\`
+      `;
+
+      const locked = await (tx as any).$queryRaw<
+        Array<{ lastValue: number | bigint }>
+      >`
+        SELECT \`lastValue\` FROM \`DocSequence\`
+        WHERE \`kind\` = ${kind} AND \`period\` = ${period}
+        FOR UPDATE
+      `;
+      let current = Number(locked[0]?.lastValue ?? 0);
+      if (current === 0 && typeof (tx as any).job?.findFirst === 'function') {
+        const existing = await (tx as any).job.findFirst({
+          where: {
+            OR: [
+              { requestTicketNo: { startsWith: `RQ-OOC-${year}` } },
+              { ticketNo: { startsWith: `RQ-OOC-${year}` } },
+            ],
+          },
+          orderBy: [{ requestTicketNo: 'desc' }, { ticketNo: 'desc' }],
+          select: { requestTicketNo: true, ticketNo: true },
+        });
+        const matched = existing?.requestTicketNo || existing?.ticketNo;
+        if (matched) {
+          const numPart = matched.slice(`RQ-OOC-${year}`.length);
+          const parsed = parseInt(numPart, 10);
+          if (!isNaN(parsed) && parsed > current) {
+            current = parsed;
+          }
+        }
+      }
+      next = current + 1;
+
+      await (tx as any).$executeRaw`
+        UPDATE \`DocSequence\`
+        SET \`lastValue\` = ${next}, \`updatedAt\` = NOW(3)
+        WHERE \`kind\` = ${kind} AND \`period\` = ${period}
+      `;
+    } else if (typeof (tx as any).job?.findFirst === 'function') {
+      const existing = await (tx as any).job.findFirst({
+        where: {
+          OR: [
+            { requestTicketNo: { startsWith: `RQ-OOC-${year}` } },
+            { ticketNo: { startsWith: `RQ-OOC-${year}` } },
+          ],
+        },
+        orderBy: [{ requestTicketNo: 'desc' }, { ticketNo: 'desc' }],
+        select: { requestTicketNo: true, ticketNo: true },
+      });
+      const matched = existing?.requestTicketNo || existing?.ticketNo;
+      if (matched) {
+        const numPart = matched.slice(`RQ-OOC-${year}`.length);
+        const parsed = parseInt(numPart, 10);
+        if (!isNaN(parsed) && parsed >= 1) {
+          next = parsed + 1;
+        }
+      }
+    }
+
+    const ticketNo = formatRequestOocTicketNo({ year, running: next });
+
+    if (typeof (tx as any).job?.findFirst === 'function') {
+      const clash = await (tx as any).job.findFirst({
+        where: {
+          OR: [
+            { requestTicketNo: ticketNo },
+            { ticketNo },
+          ],
+        },
+        select: { id: true },
+      });
+      if (clash) {
+        throw new ConflictException(
+          `เลขที่ใบแจ้งซ่อมซ้ำ (${ticketNo}) — ลองใหม่อีกครั้ง`,
+        );
+      }
+    }
+    return ticketNo;
+  }
+
+  /**
+   * ตรวจสอบและแปลงเลขที่ใบแจ้งซ่อมแบบ hex 8 ตัวเดิม (เช่น 9530f95f)
+   * ให้เป็นรูปแบบทางการ RQ-CM-YYYYXXXX เรียงตามวันที่แจ้ง/สร้าง
+   */
+  async backfillLegacyHexTicketNumbers(): Promise<number> {
+    try {
+      if (!this.prisma.job || typeof this.prisma.job.findMany !== 'function') {
+        return 0;
+      }
+      const candidates = await this.prisma.job.findMany({
+        where: {
+          ticketNo: {
+            not: null,
+          },
+        },
+        select: {
+          id: true,
+          ticketNo: true,
+          reportDate: true,
+          createdAt: true,
+        },
+        orderBy: [{ reportDate: 'asc' }, { id: 'asc' }],
+      });
+
+      const hexJobs = candidates.filter(
+        (j) => j.ticketNo && /^[0-9a-f]{8}$/i.test(j.ticketNo.trim()),
+      );
+
+      if (hexJobs.length === 0) {
+        return 0;
+      }
+
+      this.logger.log(
+        `Found ${hexJobs.length} legacy hex ticket(s) to backfill to RQ-CM-YYYYXXXX`,
+      );
+
+      let count = 0;
+      for (const job of hexJobs) {
+        const date = job.reportDate || job.createdAt || new Date();
+        await this.runInTransaction(async (tx) => {
+          const newTicketNo = await this.allocateRequestTicketNo(tx, date);
+          await tx.job.update({
+            where: { id: job.id },
+            data: { requestTicketNo: newTicketNo, ticketNo: null },
+          });
+          this.logger.log(
+            `Migrated Job #${job.id}: ${job.ticketNo} -> requestTicketNo ${newTicketNo}`,
+          );
+        });
+        count++;
+      }
+      return count;
+    } catch (err) {
+      this.logger.warn(
+        `backfillLegacyHexTicketNumbers skipped: ${(err as Error)?.message}`,
+      );
+      return 0;
+    }
   }
 
   /** ออกเลข Doc No พร้อม retry เมื่อชนเลขที่มีอยู่แล้ว */
@@ -1335,14 +1697,14 @@ export class JobsService {
   /**
    * ออกเลข Doc No ใน transaction (แถว DocSequence ล็อกด้วย SELECT … FOR UPDATE)
    * ในสัญญา: CM-SHF-YYYY-XXXX (YYYY Asia/Bangkok ณ วันจำแนก; running ไม่รีเซ็ต — DocSequence period='')
-   * นอกสัญญา: YYYYMM#### (รีเซ็ตรายเดือน Asia/Bangkok; padStart 4 แล้วโตตามค่าจริง)
+   * นอกสัญญา: OOC-YYYY-XXXX (รีเซ็ตรายปี Asia/Bangkok; DocSequence kind='OOC_DOC', period=YYYY)
    */
   private async nextTicketNo(
     tx: Prisma.TransactionClient,
     isOutOfContract: boolean,
   ): Promise<string> {
-    const kind = isOutOfContract ? 'OUT_OF_CONTRACT' : 'IN_CONTRACT';
-    const period = isOutOfContract ? this.bangkokYearMonth() : '';
+    const kind = isOutOfContract ? 'OOC_DOC' : 'IN_CONTRACT';
+    const period = isOutOfContract ? this.bangkokYear() : '';
 
     await tx.$executeRaw`
       INSERT INTO \`DocSequence\` (\`kind\`, \`period\`, \`lastValue\`, \`updatedAt\`)
@@ -1364,16 +1726,21 @@ export class JobsService {
       WHERE \`kind\` = ${kind} AND \`period\` = ${period}
     `;
 
-    const ticketNo = formatDocTicketNo({
-      isOutOfContract,
-      running: next,
-      ...(isOutOfContract
-        ? { periodYm: period }
-        : { periodYear: this.bangkokYear() }),
-    });
+    const ticketNo = isOutOfContract
+      ? formatOocDocTicketNo({ year: period, running: next })
+      : formatDocTicketNo({
+          isOutOfContract: false,
+          running: next,
+          periodYear: this.bangkokYear(),
+        });
 
-    const clash = await tx.job.findUnique({
-      where: { ticketNo },
+    const clash = await tx.job.findFirst({
+      where: {
+        OR: [
+          { ticketNo },
+          { requestTicketNo: ticketNo },
+        ],
+      },
       select: { id: true },
     });
     if (clash) {

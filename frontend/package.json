@@ -1,6 +1,6 @@
 {
   "name": "frontend",
-  "version": "0.7.0",
+  "version": "0.8.3",
   "private": true,
   "engines": {
     "node": ">=20.0.0",
@@ -13,7 +13,7 @@
     "build": "NODE_ENV=production next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npx --yes tsx --test src/lib/reactSelectGlassStyles.test.ts src/lib/jobsListCsvExport.test.ts src/lib/docTicketNo.test.ts src/lib/jobImageUpload.test.ts src/lib/jobImageProxyFallback.test.ts src/lib/jobFixImageSlots.test.ts src/lib/reportPdfConstants.test.ts src/lib/formatRoleLabel.test.ts src/lib/userManagementAccess.test.ts src/lib/stripReopenAuditFromFixNote.test.ts src/lib/glitchtipTunnel.test.ts src/lib/sentryEnv.test.ts",
+    "test": "npx --yes tsx --test src/lib/reactSelectGlassStyles.test.ts src/lib/jobsListCsvExport.test.ts src/lib/docTicketNo.test.ts src/lib/jobImageUpload.test.ts src/lib/jobImageProxyFallback.test.ts src/lib/jobFixImageSlots.test.ts src/lib/reportPdfConstants.test.ts src/lib/formatRoleLabel.test.ts src/lib/userManagementAccess.test.ts src/lib/outOfContractAccess.test.ts src/lib/stripReopenAuditFromFixNote.test.ts src/lib/glitchtipTunnel.test.ts src/lib/sentryEnv.test.ts src/lib/safePerformance.test.ts src/components/jobs/JobClassifyDocDialog.test.ts",
     "test:users-rbac": "npx --yes tsx --test src/lib/userManagementAccess.test.ts",
     "test:role-label": "npx --yes tsx --test src/lib/formatRoleLabel.test.ts",
     "test:react-select": "npx --yes tsx --test src/lib/reactSelectGlassStyles.test.ts",

@@ -6,10 +6,12 @@ import assert from "node:assert/strict";
 import {
   formatJobImageUploadError,
   isHttp413Error,
+  isNetworkOrConnectionError,
   JobImageProxyLimitError,
   PROXY_LIMIT_GENERIC_MESSAGE,
   PROXY_LIMIT_HEIC_MESSAGE,
   runMultipartUploadWithProxyFallback,
+  STORAGE_CONNECTION_ERROR_MESSAGE,
 } from "./jobImageProxyFallback";
 
 function fakeFile(name: string, type: string, size: number): File {
@@ -40,6 +42,19 @@ describe("isHttp413Error / formatJobImageUploadError", () => {
       PROXY_LIMIT_GENERIC_MESSAGE,
     );
     assert.equal(formatJobImageUploadError(new Error("x"), "fallback"), "fallback");
+  });
+
+  it("sanitizes network timeouts and internal IP socket errors to user-friendly Thai message", () => {
+    assert.equal(isNetworkOrConnectionError("connect ETIMEDOUT 192.168.0.71:9000"), true);
+    assert.equal(isNetworkOrConnectionError("ECONNREFUSED 127.0.0.1:4100"), true);
+    assert.equal(
+      formatJobImageUploadError(new Error("connect ETIMEDOUT 192.168.0.71:9000"), "raw"),
+      STORAGE_CONNECTION_ERROR_MESSAGE,
+    );
+    assert.equal(
+      formatJobImageUploadError(new Error("generic"), "connect ETIMEDOUT 192.168.0.71:9000"),
+      STORAGE_CONNECTION_ERROR_MESSAGE,
+    );
   });
 });
 

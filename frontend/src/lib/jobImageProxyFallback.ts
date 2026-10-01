@@ -19,6 +19,35 @@ export const PROXY_LIMIT_HEIC_MESSAGE =
 export const PROXY_LIMIT_GENERIC_MESSAGE =
   "ขนาดไฟล์รูปรวมเกินขีดจำกัดของเซิร์ฟเวอร์ — กรุณาลดจำนวนรูป ใช้ JPG แทน HEIC หรือติดต่อผู้ดูแลระบบ";
 
+export const STORAGE_CONNECTION_ERROR_MESSAGE =
+  "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์หรือระบบจัดเก็บไฟล์ได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง";
+
+export function isNetworkOrConnectionError(textOrErr: unknown): boolean {
+  if (!textOrErr) return false;
+  if (axios.isAxiosError(textOrErr)) {
+    if (textOrErr.code === "ECONNABORTED" || textOrErr.code === "ERR_NETWORK") return true;
+    if (!textOrErr.response && textOrErr.message?.toLowerCase().includes("network error")) return true;
+  }
+  const str =
+    typeof textOrErr === "string"
+      ? textOrErr
+      : textOrErr instanceof Error
+        ? textOrErr.message
+        : String(textOrErr);
+  const lower = str.toLowerCase();
+  return (
+    lower.includes("etimedout") ||
+    lower.includes("econnrefused") ||
+    lower.includes("ehostunreach") ||
+    lower.includes("enetunreach") ||
+    lower.includes("enotfound") ||
+    lower.includes("econnreset") ||
+    lower.includes("network error") ||
+    lower.includes("connect ") ||
+    /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+\b/.test(str)
+  );
+}
+
 export function isHttp413Error(err: unknown): boolean {
   return axios.isAxiosError(err) && err.response?.status === 413;
 }
@@ -30,6 +59,9 @@ export function formatJobImageUploadError(
   if (err instanceof JobImageProxyLimitError) return err.message;
   if (axios.isAxiosError(err) && err.response?.status === 413) {
     return PROXY_LIMIT_GENERIC_MESSAGE;
+  }
+  if (isNetworkOrConnectionError(err) || isNetworkOrConnectionError(fallback)) {
+    return STORAGE_CONNECTION_ERROR_MESSAGE;
   }
   return fallback;
 }

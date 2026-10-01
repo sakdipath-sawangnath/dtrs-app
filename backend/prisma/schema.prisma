@@ -125,7 +125,8 @@ model Site {
 
 model Job {
   id         Int       @id @default(autoincrement())
-  ticketNo   String?   @unique // เลขที่ใบแจ้งซ่อม
+  ticketNo        String?   @unique // เลขเอกสารทางการ (Doc No) — CM-SHF-YYYY-XXXX / OOC-YYYY-XXXX
+  requestTicketNo String?   @unique // เลขรับแจ้ง (Request No) — RQ-CM-YYYYXXXX / RQ-OOC-YYYYXXXX (ห้ามเขียนทับ)
   reportDate DateTime? // วัน เวลาที่แจ้งซ่อม Auto
 
   // Location

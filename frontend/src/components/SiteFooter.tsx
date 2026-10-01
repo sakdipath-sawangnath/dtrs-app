@@ -13,7 +13,8 @@ type SiteFooterProps = {
 
 const API = getClientApiBaseUrl();
 
-export default function SiteFooter(_props: SiteFooterProps) {
+export default function SiteFooter(props?: SiteFooterProps) {
+  void props;
   const currentYear = new Date().getFullYear();
   const [dbMeta, setDbMeta] = useState<Partial<AppMeta> | null>(null);
 

@@ -9,6 +9,7 @@ import { io, Socket } from "socket.io-client";
 type NotificationJob = {
   id: number;
   ticketNo: string | null;
+  requestTicketNo?: string | null;
   status: string;
   reportDate: string | null;
   province: string | null;
@@ -172,7 +173,8 @@ export default function NotificationsBell({
             ) : (
               <ul className="divide-y divide-[var(--glass-card-border)]">
                 {items.map((j) => {
-                  const title = j.ticketNo ? `Ticket ${j.ticketNo}` : `Job #${j.id}`;
+                  const displayNo = j.ticketNo || j.requestTicketNo;
+                  const title = displayNo ? `Ticket ${displayNo}` : `Job #${j.id}`;
                   const place = [j.province, j.district, j.location].filter(Boolean).join(" · ");
                   const pending = (j.status || "").toUpperCase() === "PENDING";
                   return (

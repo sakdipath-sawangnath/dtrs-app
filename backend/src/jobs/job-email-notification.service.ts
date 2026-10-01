@@ -126,6 +126,7 @@ export class JobEmailNotificationService {
       select: {
         id: true,
         ticketNo: true,
+        requestTicketNo: true,
         title: true,
         description: true,
         status: true,
@@ -146,7 +147,7 @@ export class JobEmailNotificationService {
     if (!job) return null;
 
     const base = await this.resolveEmailLinkBase();
-    const ticket = job.ticketNo ?? String(job.id);
+    const ticket = job.ticketNo ?? job.requestTicketNo ?? String(job.id);
     const publicStatusUrl = `${base}/public/status?ticketNo=${encodeURIComponent(ticket)}`;
     const dashboardUrl = `${base}/dashboard/jobs/${job.id}`;
 
@@ -154,7 +155,8 @@ export class JobEmailNotificationService {
     const statusLabel = STATUS_TH[st] ?? st;
 
     return {
-      ticketNo: job.ticketNo,
+      ticketNo: job.ticketNo ?? job.requestTicketNo,
+      requestTicketNo: job.requestTicketNo,
       issueSummary: pickIssueSummary(job.title, job.description),
       province: job.province,
       district: job.district,
@@ -349,6 +351,7 @@ export class JobEmailNotificationService {
           reporterEmail: true,
           reporter: { select: { email: true } },
           ticketNo: true,
+          requestTicketNo: true,
         },
       });
       if (!job) return;
@@ -413,7 +416,7 @@ export class JobEmailNotificationService {
           attachments: pdf
             ? [
                 {
-                  filename: `DTRS-${job.ticketNo ?? jobId}.pdf`,
+                  filename: `DTRS-${job.ticketNo ?? job.requestTicketNo ?? jobId}.pdf`,
                   content: pdf,
                   contentType: 'application/pdf',
                 },

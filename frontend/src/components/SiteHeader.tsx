@@ -9,6 +9,9 @@ import ManagedImage, { MANAGED_IMAGE_SIZES } from "@/components/ManagedImage";
 import ManagedImageFrame from "@/components/ManagedImageFrame";
 import ThemeToggle from "@/components/ThemeToggle";
 
+import { resolveOutOfContractAccess } from "@/lib/outOfContractAccess";
+import { unwrapApiData } from "@/lib/apiResponse";
+
 /** ความสูงรวมของ header (stripe + แถบหลัก) ใช้สำหรับ spacer */
 export const SITE_HEADER_HEIGHT = 62; // px
 
@@ -18,6 +21,7 @@ const STEP_MENU_BASE = [
 ] as const;
 
 const MENU_OVERVIEW = { label: "ภาพรวม", href: "/dashboard", icon: LayoutDashboard } as const;
+const MENU_OOC = { label: "งานนอกสัญญา", href: "/public/report-ooc", icon: FileWarning } as const;
 
 interface SiteHeaderProps {
   /** เนื้อหาด้านขวา (ถ้าไม่ส่ง = ตามสถานะ login หรือลิงก์ เจ้าหน้าที่) */
@@ -26,12 +30,59 @@ interface SiteHeaderProps {
   subtitle?: string;
   /** คงไว้เพื่อ API เดิม — สไตล์ใช้ CSS tokens ไม่พึ่ง isDark (กัน hydration mismatch) */
   isDark?: boolean;
+  /** permissions จาก parent (เช่น DashboardLayoutShell) ถ้ามี ไม่ต้อง fetch ซ้ำ */
+  permissions?: string[] | null;
 }
 
-export default function SiteHeader({ right, subtitle }: SiteHeaderProps) {
+export default function SiteHeader({
+  right,
+  subtitle,
+  permissions: propPermissions,
+}: SiteHeaderProps) {
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const isLoggedIn = status === "authenticated" && !!session?.user;
+
+  const [fetchedPermissions, setFetchedPermissions] = useState<string[] | null>(null);
+  const token = (session as { accessToken?: string })?.accessToken;
+  const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4100/api";
+
+  useEffect(() => {
+    if (propPermissions !== undefined || !token || status !== "authenticated") {
+      setFetchedPermissions(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`${API}/roles/me/permissions`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((raw) => {
+        if (cancelled) return;
+        const payload = unwrapApiData<{ permissions?: string[] }>(raw);
+        setFetchedPermissions(Array.isArray(payload?.permissions) ? payload.permissions : []);
+      })
+      .catch(() => {
+        if (!cancelled) setFetchedPermissions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [propPermissions, token, status, API]);
+
+  const effectivePermissions =
+    propPermissions !== undefined ? propPermissions : fetchedPermissions;
+  const userRole = (
+    (session as { userRole?: string })?.userRole ??
+    (session?.user as { role?: string })?.role ??
+    ""
+  ).toUpperCase();
+
+  const oocAccess = resolveOutOfContractAccess({
+    permissions: effectivePermissions,
+    userRole,
+  });
+  const showOoc = isLoggedIn && oocAccess.canAccess;
 
   const avatarImage = useMemo(
     () => (session?.user as { image?: string })?.image as string | undefined,
@@ -44,7 +95,9 @@ export default function SiteHeader({ right, subtitle }: SiteHeaderProps) {
   }, [avatarImage]);
 
   const stepMenu = isLoggedIn
-    ? [MENU_OVERVIEW, STEP_MENU_BASE[0], STEP_MENU_BASE[1]]
+    ? showOoc
+      ? [MENU_OVERVIEW, STEP_MENU_BASE[0], MENU_OOC, STEP_MENU_BASE[1]]
+      : [MENU_OVERVIEW, STEP_MENU_BASE[0], STEP_MENU_BASE[1]]
     : [...STEP_MENU_BASE];
 
   const getInitials = () => {
@@ -112,11 +165,11 @@ export default function SiteHeader({ right, subtitle }: SiteHeaderProps) {
               <ManagedImage
                 src="/logo/NBTC.png"
                 alt="DOPA"
-                width={28}
-                height={28}
+                width={960}
+                height={1265}
                 sizes={MANAGED_IMAGE_SIZES.avatarXs}
                 className="shrink-0"
-                style={{ objectFit: "contain" }}
+                style={{ width: 28, height: "auto", objectFit: "contain" }}
               />
             </div>
             <div className="leading-tight min-w-0 hidden sm:block">
@@ -130,12 +183,13 @@ export default function SiteHeader({ right, subtitle }: SiteHeaderProps) {
           <nav className="flex items-center gap-1 sm:gap-2 flex-1 justify-center min-w-0" aria-label="เมนูหลัก">
             {stepMenu.map((item) => {
               const isActive =
-                pathname === item.href ||
-                (item.href !== "/public/report" &&
-                  item.href !== "/public/status" &&
-                  pathname.startsWith(item.href)) ||
-                (item.href === "/public/status" && pathname.startsWith("/public/status")) ||
-                (item.href === "/public/report" && pathname.startsWith("/public/report"));
+                item.href === "/public/report-ooc"
+                  ? pathname === "/public/report-ooc" || pathname.startsWith("/public/report-ooc/")
+                  : item.href === "/public/report"
+                    ? pathname === "/public/report" || (pathname.startsWith("/public/report/") && !pathname.startsWith("/public/report-ooc"))
+                    : item.href === "/public/status"
+                      ? pathname.startsWith("/public/status")
+                      : pathname.startsWith("/dashboard");
               return (
                 <Link
                   key={item.href}

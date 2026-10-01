@@ -9,7 +9,8 @@ import { stripReopenAuditFromFixNote } from "@/lib/stripReopenAuditFromFixNote";
 /** ฟิลด์ที่ต้องมีสำหรับส่งออก CSV จาก JobsList */
 export interface JobsListCsvJob {
   id: number;
-  ticketNo?: string;
+  ticketNo?: string | null;
+  requestTicketNo?: string | null;
   title?: string;
   description?: string;
   location?: string;
@@ -138,7 +139,8 @@ export function csvEscapeCell(value: unknown): string {
 export function buildJobsListAuditCsv(jobs: readonly JobsListCsvJob[]): string {
   const headers = [
     "id",
-    "เลขที่",
+    "เลขเอกสาร",
+    "เลขรับแจ้ง",
     "กลุ่มสัญญา",
     "สถานะ",
     "วันที่แจ้ง_raw",
@@ -178,6 +180,7 @@ export function buildJobsListAuditCsv(jobs: readonly JobsListCsvJob[]): string {
     const row = [
       j.id,
       j.ticketNo ?? "",
+      j.requestTicketNo ?? "",
       contract,
       STATUS_TH[j.status] ?? j.status,
       j.reportDate ?? "",
