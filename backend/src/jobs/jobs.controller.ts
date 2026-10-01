@@ -10,6 +10,7 @@ import {
   UseGuards,
   Req,
   ForbiddenException,
+  NotFoundException,
   UseInterceptors,
   UploadedFiles,
   Query,
@@ -72,14 +73,22 @@ export class JobsController {
    */
   @UseGuards(JwtAuthGuard)
   @Get('list')
-  async findAll() {
-    return this.jobsService.findAll();
+  async findAll(@Req() req: ReqUser) {
+    const codes = await this.rolesService.getPermissionsForUser(req.user.id);
+    const canViewOoc =
+      codes.includes('job.viewContractTabs') ||
+      codes.includes('menu.outOfContract');
+    return this.jobsService.findAll({ includeOutOfContract: canViewOoc });
   }
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  async findAllRoot() {
-    return this.jobsService.findAll();
+  async findAllRoot(@Req() req: ReqUser) {
+    const codes = await this.rolesService.getPermissionsForUser(req.user.id);
+    const canViewOoc =
+      codes.includes('job.viewContractTabs') ||
+      codes.includes('menu.outOfContract');
+    return this.jobsService.findAll({ includeOutOfContract: canViewOoc });
   }
 
   /** แจ้งเตือน: รายการงานใหม่สำหรับกระดิ่ง (PENDING ล่าสุด) */
@@ -160,6 +169,7 @@ export class JobsController {
     @Param('id', ParseIntPipe) id: number,
     @Param('kind') kind: string,
     @Param('index', ParseIntPipe) index: number,
+    @Req() req: ReqUser,
     @Res() res: Response,
   ) {
     if (kind !== 'issue' && kind !== 'fix') {
@@ -167,6 +177,19 @@ export class JobsController {
     }
     if (index < 0 || index > 2) {
       throw new BadRequestException('index ต้องอยู่ระหว่าง 0 ถึง 2');
+    }
+    const job = await this.jobsService.findOne(id);
+    if (!job) {
+      throw new NotFoundException('ไม่พบงานที่ระบุ');
+    }
+    if (job.isOutOfContract) {
+      const codes = await this.rolesService.getPermissionsForUser(req.user.id);
+      const canViewOoc =
+        codes.includes('job.viewContractTabs') ||
+        codes.includes('menu.outOfContract');
+      if (!canViewOoc) {
+        throw new NotFoundException('ไม่พบงานที่ระบุ');
+      }
     }
     const { buffer, contentType } = await this.jobsService.getJobImageBuffer(
       id,
@@ -186,8 +209,21 @@ export class JobsController {
   @Get(':id/report-pdf')
   async reportPdf(
     @Param('id', ParseIntPipe) id: number,
-    @Req() req: { headers: { authorization?: string } },
+    @Req() req: { user: { id: number }; headers: { authorization?: string } },
   ): Promise<StreamableFile> {
+    const job = await this.jobsService.findOne(id);
+    if (!job) {
+      throw new NotFoundException('ไม่พบงานที่ระบุ');
+    }
+    if (job.isOutOfContract) {
+      const codes = await this.rolesService.getPermissionsForUser(req.user.id);
+      const canViewOoc =
+        codes.includes('job.viewContractTabs') ||
+        codes.includes('menu.outOfContract');
+      if (!canViewOoc) {
+        throw new NotFoundException('ไม่พบงานที่ระบุ');
+      }
+    }
     const raw = req.headers.authorization;
     const token =
       typeof raw === 'string' && raw.startsWith('Bearer ')
@@ -202,8 +238,21 @@ export class JobsController {
 
   @UseGuards(JwtAuthGuard)
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    return this.jobsService.findOne(+id);
+  async findOne(@Param('id') id: string, @Req() req: ReqUser) {
+    const job = await this.jobsService.findOne(+id);
+    if (!job) {
+      throw new NotFoundException('ไม่พบงานที่ระบุ');
+    }
+    if (job.isOutOfContract) {
+      const codes = await this.rolesService.getPermissionsForUser(req.user.id);
+      const canViewOoc =
+        codes.includes('job.viewContractTabs') ||
+        codes.includes('menu.outOfContract');
+      if (!canViewOoc) {
+        throw new NotFoundException('ไม่พบงานที่ระบุ');
+      }
+    }
+    return job;
   }
 
   @UseGuards(JwtAuthGuard)

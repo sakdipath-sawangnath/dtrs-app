@@ -214,8 +214,10 @@ export class JobsService implements OnModuleInit {
     });
   }
 
-  async findAll() {
+  async findAll(options?: { includeOutOfContract?: boolean }) {
+    const includeOoc = options?.includeOutOfContract !== false;
     const rows = await this.prisma.job.findMany({
+      where: includeOoc ? {} : { NOT: { isOutOfContract: true } },
       include: {
         assignedTo: {
           select: { id: true, name: true, image: true },
@@ -445,6 +447,7 @@ export class JobsService implements OnModuleInit {
           { requestTicketNo: trimmed },
           { ticketNo: trimmed },
         ],
+        NOT: { isOutOfContract: true },
       },
       select: {
         id: true,
@@ -575,7 +578,10 @@ export class JobsService implements OnModuleInit {
 
     const [byReporterPhone, reporterUsers] = await Promise.all([
       this.prisma.job.findMany({
-        where: { OR: orClause },
+        where: {
+          OR: orClause,
+          ...(includeJobId ? {} : { NOT: { isOutOfContract: true } }),
+        },
         select: {
           id: true,
           ticketNo: true,
@@ -600,7 +606,10 @@ export class JobsService implements OnModuleInit {
     const byReporterId =
       reporterUsers.length > 0
         ? await this.prisma.job.findMany({
-            where: { reporterId: { in: reporterUsers.map((u) => u.id) } },
+            where: {
+              reporterId: { in: reporterUsers.map((u) => u.id) },
+              ...(includeJobId ? {} : { NOT: { isOutOfContract: true } }),
+            },
             select: {
               id: true,
               ticketNo: true,

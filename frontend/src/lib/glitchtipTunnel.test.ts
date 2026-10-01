@@ -1,11 +1,16 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  calculateCircuitBreakerCooldown,
   contentLengthExceedsLimit,
   isAllowedGlitchTipEnvelopeDsn,
+  isCircuitBreakerOpen,
   parseEnvelopeHeaderDsn,
   parseSentryDsn,
   readRequestBodyWithLimit,
+  recordCircuitBreakerFailure,
+  recordCircuitBreakerSuccess,
+  resetCircuitBreakerForTest,
   sentryEnvelopeIngestUrl,
 } from "./glitchtipTunnel";
 
@@ -153,3 +158,54 @@ describe("parseEnvelopeHeaderDsn", () => {
     assert.equal(parseEnvelopeHeaderDsn("not-json\n"), null);
   });
 });
+
+describe("circuitBreaker", () => {
+  it("calculates exponential backoff correctly", () => {
+    assert.equal(calculateCircuitBreakerCooldown(1), 30_000);
+    assert.equal(calculateCircuitBreakerCooldown(2), 60_000);
+    assert.equal(calculateCircuitBreakerCooldown(3), 120_000);
+    assert.equal(calculateCircuitBreakerCooldown(4), 240_000);
+    assert.equal(calculateCircuitBreakerCooldown(5), 300_000); // capped at max
+    assert.equal(calculateCircuitBreakerCooldown(10), 300_000);
+  });
+
+  it("manages circuit breaker open/close states and recovery", () => {
+    resetCircuitBreakerForTest();
+    const t0 = 1000000;
+
+    // Initially closed
+    assert.equal(isCircuitBreakerOpen(t0), false);
+
+    // 1st failure
+    const r1 = recordCircuitBreakerFailure(t0);
+    assert.equal(r1.isFirstFailure, true);
+    assert.equal(r1.cooldownMs, 30_000);
+    assert.equal(r1.consecutiveFailures, 1);
+
+    // Open during cooldown
+    assert.equal(isCircuitBreakerOpen(t0 + 10_000), true);
+    assert.equal(isCircuitBreakerOpen(t0 + 29_999), true);
+    // Closed after cooldown passes
+    assert.equal(isCircuitBreakerOpen(t0 + 30_000), false);
+
+    // 2nd failure at t0 + 30_001
+    const t1 = t0 + 30_001;
+    const r2 = recordCircuitBreakerFailure(t1);
+    assert.equal(r2.isFirstFailure, false);
+    assert.equal(r2.cooldownMs, 60_000);
+    assert.equal(r2.consecutiveFailures, 2);
+
+    // Open during 60s cooldown
+    assert.equal(isCircuitBreakerOpen(t1 + 59_999), true);
+    assert.equal(isCircuitBreakerOpen(t1 + 60_000), false);
+
+    // Recovery on success
+    const recovered = recordCircuitBreakerSuccess();
+    assert.equal(recovered, true);
+    assert.equal(isCircuitBreakerOpen(t1 + 60_001), false);
+
+    // Subsequent success when already closed
+    assert.equal(recordCircuitBreakerSuccess(), false);
+  });
+});
+

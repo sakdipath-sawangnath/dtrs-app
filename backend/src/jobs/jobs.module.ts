@@ -12,6 +12,8 @@ import { SettingsModule } from '../settings/settings.module';
 import { RolesModule } from '../roles/roles.module';
 import { PermissionsGuard } from '../auth/permissions.guard';
 
+import { AuthModule } from '../auth/auth.module';
+
 @Module({
   imports: [
     SitesModule,
@@ -20,6 +22,7 @@ import { PermissionsGuard } from '../auth/permissions.guard';
     UsersModule,
     SettingsModule,
     RolesModule,
+    AuthModule,
   ],
   providers: [
     JobsService,

@@ -49,6 +49,31 @@ npm install
 
 ---
 
+## [0.8.6] - 2026-10-01
+
+### Security
+
+- **Out-of-Contract Authorization Overhaul**: บังคับใช้นโยบาย Authorization Matrix ตาม `/roles` สำหรับงานนอกสัญญา ("งานนอกสัญญา") ในทุกเลเยอร์ — Route, Database/API, Data Query และ UI
+- **404 Not Found vs 403 Decision**: กำหนดให้การเข้าถึงทรัพยากรหรือเส้นทางงานนอกสัญญาโดยผู้ใช้ที่ไม่มีสิทธิ์ ส่งคืน **404 Not Found** (ไม่ใช่ 403 Forbidden) เพื่อป้องกัน Information Disclosure เนื่องจากการตอบ 403 เป็นการยืนยันการมีอยู่ของทรัพยากรแก่ผู้ไม่ได้รับอนุญาต
+- **Server-Side Route Guard**: แปลง `/public/report-ooc` เป็น Server Component ที่ทำงาน Authoritative บน Server ก่อนเรนเดอร์ข้อมูลใดๆ — หากยังไม่ล็อกอินจะ redirect ไป `/login?returnTo=...` หากไม่มีสิทธิ์จะส่งคืน 404 ทันที พร้อมประกาศ `dynamic = 'force-dynamic'` และ `robots: { index: false, follow: false }`
+- **Database Row-Level Filtering**: กรองข้อมูลงานนอกสัญญาออกจาก `GET /jobs/list`, `GET /jobs/:id`, `GET /public/jobs/status/:ticketNo`, `GET /public/jobs/status-by-phone`, PDF Reports และ File Proxy โดยผู้ใช้ที่ไม่มีสิทธิ์จะไม่ได้รับข้อมูลหรือตัวเลขนับรวมข้าม Network
+- **API Submission Gating**: ป้องกันการส่ง `isOutOfContract: true` ผ่าน `POST /public/jobs` โดยตรวจสอบสิทธิ์ `menu.outOfContract` / `job.classifyDoc.outOfContract` จาก JWT Bearer token หากไม่มีสิทธิ์จะปฏิเสธด้วย `ForbiddenException` ทันที
+
+### Fixed
+
+- **Next.js allowedDevOrigins Configuration**: กำหนด `allowedDevOrigins` ใน `next.config.mjs` โดยตรวจจับ IP/interface ของเครื่อง (รวม LAN IP `192.168.202.53`) และ `localhost` โดยอัตโนมัติ เพื่อป้องกันคำเตือน Cross-origin request detected ไปยัง `/_next/*`
+- **GlitchTip Tunnel Circuit Breaker with Exponential Backoff**: ปรับปรุง GlitchTip monitoring tunnel (`/monitoring`) ให้ใช้ Exponential Backoff (30s → 60s → 120s → สูงสุด 5 นาที) พร้อมระบบตัดการบันทึก log ซ้ำซ้อนเมื่อ upstream ออฟไลน์ต่อเนื่อง ไม่ให้เกิด warning รบกวน และคงการตอบกลับ 202 Accepted แบบ Fast-drop ไว้อย่างถูกต้อง
+- **Conditional Navigation Link**: แถบนำทาง `SiteHeader.tsx` จะเรนเดอร์ลิงก์ "งานนอกสัญญา" เฉพาะเมื่อ `can(user, PERMISSIONS.OOC_VIEW)` เป็นจริงเท่านั้น โดยจะไม่ปล่อย Markup ใดๆ ออกสู่ DOM หากไม่มีสิทธิ์
+- **Navigation Active State**: แก้ไขการคำนวณ Active Class ให้เป็นไดนามิกตาม Pathname จริง ไม่ติดสถานะ Active ค้าง และผูก `aria-current="page"`
+- **Accessibility Defects (WCAG 2.1 AA)**: กำหนด `aria-label="งานนอกสัญญา"` และ `sr-only` ข้อความบนมือถือ, ปรับขนาด Touch Target ให้ได้ขนาดอย่างน้อย 44×44px ทุก Breakpoint, เพิ่ม Focus-Visible Ring (Contrast ≥ 3:1), และเคารพ `prefers-reduced-motion`
+
+### Changed
+
+- **Path Recommendation & Canonical Route**: เพิ่มเส้นทาง `/dashboard/report-ooc` เป็นเส้นทางหลักสำหรับงานนอกสัญญาภายในระบบ เพื่อแก้ไข Design Smell ของการมี Restricted Page อยู่ภายใต้ `/public/`
+- **Centralized Typed Permissions Module**: รวมศูนย์การตรวจสอบสิทธิ์ใน `frontend/src/lib/auth/permissions.ts` พร้อมฟังก์ชัน `can()` และ `assertCan()` ปราศจาก `any` และบันทึก Security Audit Log ที่ระดับ WARN เมื่อพบความพยายามเข้าถึงที่ไม่มีสิทธิ์
+
+---
+
 ## [0.8.3] - 2026-10-01
 
 ### Added
