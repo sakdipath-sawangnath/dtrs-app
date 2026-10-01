@@ -276,16 +276,12 @@ export default function JobDetailPage() {
   const canClassifyDocOutOfContract =
     Array.isArray(permissions) &&
     permissions.includes("job.classifyDoc.outOfContract");
+  const canClassifyDocAny =
+    canClassifyDoc || canClassifyDocContract || canClassifyDocOutOfContract;
   const canUploadIssueImages =
     Array.isArray(permissions) &&
     permissions.includes("job.issue.upload") &&
     jobStatusAllowsIssueImageUpload(job?.status);
-  const showClassifyDoc =
-    !!job &&
-    isResolved &&
-    canClassifyDoc &&
-    !isFormalDocTicketNo(job.ticketNo) &&
-    !!token;
 
   /** ผู้รับงาน (Owner) = ผู้ที่ถูกมอบหมายในงาน (assignedTo) — Reopen/บันทึกแก้ไขได้เฉพาะคนนี้ */
   const isAssignee =
@@ -1246,7 +1242,21 @@ export default function JobDetailPage() {
                       </Alert>
 
                       <div className="mt-2 flex flex-col gap-2.5 sm:flex-row">
-                      {job && jobNeedsAssignee(job) && canAssignAny && (
+                        {canClassifyDocAny && !isFormalDocTicketNo(job.ticketNo) && (
+                          <button
+                            type="button"
+                            tabIndex={0}
+                            data-slot="button"
+                            disabled={classifySubmitting}
+                            onClick={() => void openClassifyDocDialog()}
+                            className="group/button shrink-0 border border-transparent bg-clip-padding whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [a]:hover:bg-primary/80 h-8 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-lg hover:bg-blue-500 focus-visible:ring-blue-500/40 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <Stamp width={14} height={14} />
+                            จำแนกเอกสาร
+                          </button>
+                        )}
+
+                        {job && jobNeedsAssignee(job) && canAssignAny && (
                           <Button
                             type="button"
                             variant="outline"
@@ -1258,7 +1268,7 @@ export default function JobDetailPage() {
                           </Button>
                         )}
 
-                      {job && jobNeedsAssignee(job) && canTakeJob && (
+                        {job && jobNeedsAssignee(job) && canTakeJob && (
                           <Button
                             type="button"
                             variant="outline"
@@ -1278,6 +1288,21 @@ export default function JobDetailPage() {
                       <span className="font-semibold glass-text">
                         {job.assignedTo.name}
                       </span>
+                    </div>
+                  )}
+                  {job.assignedTo && canClassifyDocAny && !isFormalDocTicketNo(job.ticketNo) && (
+                    <div className="mt-2 flex flex-col gap-2.5 sm:flex-row">
+                      <button
+                        type="button"
+                        tabIndex={0}
+                        data-slot="button"
+                        disabled={classifySubmitting}
+                        onClick={() => void openClassifyDocDialog()}
+                        className="group/button shrink-0 border border-transparent bg-clip-padding whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [a]:hover:bg-primary/80 h-8 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-lg hover:bg-blue-500 focus-visible:ring-blue-500/40 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Stamp width={14} height={14} />
+                        จำแนกเอกสาร
+                      </button>
                     </div>
                   )}
                   {isResolved && (
@@ -1309,18 +1334,6 @@ export default function JobDetailPage() {
                               : "ดาวน์โหลด (เซิร์ฟเวอร์)"}
                           </span>
                         </Button>
-                        {showClassifyDoc ? (
-                          <Button
-                            type="button"
-                            variant="default"
-                            onClick={() => void openClassifyDocDialog()}
-                            disabled={classifySubmitting}
-                            className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-lg hover:bg-blue-500 focus-visible:ring-blue-500/40 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            <Stamp size={14} aria-hidden />
-                            จำแนกเอกสาร
-                          </Button>
-                        ) : null}
                       </div>
                     </div>
                   )}
@@ -1921,8 +1934,8 @@ export default function JobDetailPage() {
         }}
         ticketNo={job?.ticketNo}
         submitting={classifySubmitting}
-        canClassifyContract={canClassifyDocContract}
-        canClassifyOutOfContract={canClassifyDocOutOfContract}
+        canClassifyContract={canClassifyDocContract || canClassifyDoc}
+        canClassifyOutOfContract={canClassifyDocOutOfContract || canClassifyDoc}
         onConfirm={(isOutOfContract) => void handleClassifyDoc(isOutOfContract)}
       />
     </DashboardPageShell>

@@ -10,6 +10,9 @@ import { getConfiguredSentryDsn, getSentryUrl } from "@/lib/sentryEnv";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** GlitchTip ingest timeout — fail fast instead of hanging 30s+ */
+const GLITCHTIP_INGEST_TIMEOUT_MS = 5_000;
+
 /**
  * Same-origin envelope tunnel → GlitchTip
  * เบราว์เซอร์ยิงมาที่นี่ แล้ว Next (ใน LAN) forward ไป ingest
@@ -60,6 +63,7 @@ export async function POST(req: Request): Promise<Response> {
       method: "POST",
       body: new Uint8Array(bodyResult.body),
       headers: { "Content-Type": contentType },
+      signal: AbortSignal.timeout(GLITCHTIP_INGEST_TIMEOUT_MS),
     });
     return new Response(upstream.body, {
       status: upstream.status,

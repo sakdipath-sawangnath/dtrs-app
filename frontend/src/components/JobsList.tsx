@@ -320,7 +320,7 @@ const JOB_SORT_DIR_OPTIONS: GlassSelectOption[] = [
 ];
 
 const AWAITING_SIGNATURE_BADGE_CLS =
-  "h-auto px-2 py-1 text-xs font-semibold shadow-none ring-0 border border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/35 dark:bg-amber-950/30 dark:text-amber-100";
+  "h-auto px-2 py-1 text-xs font-semibold shadow-none ring-0 whitespace-nowrap border border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/35 dark:bg-amber-950/30 dark:text-amber-100";
 
 function AwaitingReporterSignatureBadge() {
   return (
@@ -2168,21 +2168,39 @@ export default function JobsList({
         </div>
       )}
 
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto w-full">
         {/*
-          table-fixed + คอลัมน์กว้างคงที่หลายช่องบน /dashboard/all จะบีบคอลัมน์ที่ไม่มี width
-          (โดยเฉพาะรายละเอียดปัญหา) จน header ทับสถานะ — ใช้ min-w ให้เลื่อนแนวนอนแทนการบีบ
+          table-fixed + colgroup กำหนดความกว้างทุกคอลัมน์ชัดเจน เพื่อป้องกันคอลัมน์ยุบหรือซ้อนทับกัน
+          พร้อม min-w ป้องกันการบีบตารางบนจอเล็ก และ scroll แนวนอนอย่างราบรื่น
         */}
         <table
           className={cn(
             "w-full text-left border-collapse table-fixed text-slate-900 dark:text-slate-100",
-            enableAllBreakdownFilters ? "min-w-[1480px]" : "min-w-[1100px]",
+            enableAllBreakdownFilters ? "min-w-[1850px]" : "min-w-[1450px]",
           )}
         >
+          <colgroup>
+            {enableBulkAssign && <col className="w-11" style={{ width: 44 }} />}
+            <col className="w-40" style={{ width: 160 }} />
+            <col className="w-24" style={{ width: 96 }} />
+            <col className="w-48" style={{ width: 192 }} />
+            <col className="w-52" style={{ width: 208 }} />
+            {enableAllBreakdownFilters && (
+              <>
+                <col className="w-36" style={{ width: 144 }} />
+                <col className="w-36" style={{ width: 144 }} />
+                <col className="w-28" style={{ width: 112 }} />
+              </>
+            )}
+            <col className="w-56" style={{ width: 224 }} />
+            <col className="w-48" style={{ width: 192 }} />
+            {showAssignedToColumn && <col className="w-44" style={{ width: 176 }} />}
+            <col className="w-40" style={{ width: 160 }} />
+          </colgroup>
           <thead>
             <tr className="text-xs font-semibold uppercase tracking-wide sticky top-0 z-10 bg-white/95 dark:bg-[var(--glass-header-bg)] backdrop-blur-sm text-slate-600 dark:text-slate-400">
               {enableBulkAssign && (
-                <th className="px-2 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] w-10">
+                <th className="px-2 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] w-11">
                   {pageAssignableIds.length > 0 ? (
                     <input
                       type="checkbox"
@@ -2194,10 +2212,18 @@ export default function JobsList({
                   ) : null}
                 </th>
               )}
-              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-24">เลขที่</th>
-              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-24">วันที่</th>
-              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-44">ผู้แจ้ง</th>
-              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-48">สถานที่</th>
+              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-40">
+                เลขที่
+              </th>
+              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-24">
+                วันที่
+              </th>
+              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-48">
+                ผู้แจ้ง
+              </th>
+              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-52">
+                สถานที่
+              </th>
               {enableAllBreakdownFilters && (
                 <>
                   <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-36">
@@ -2211,16 +2237,14 @@ export default function JobsList({
                   </th>
                 </>
               )}
-              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-40 overflow-hidden text-ellipsis">
+              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-56">
                 รายละเอียดปัญหา
               </th>
-              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-56">
+              <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-48">
                 สถานะ
               </th>
               {showAssignedToColumn && (
-                <th
-                  className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-40"
-                >
+                <th className="px-2.5 py-2.5 border-b border-slate-200 dark:border-[var(--glass-card-border)] whitespace-nowrap w-44">
                   ผู้รับผิดชอบ
                 </th>
               )}
@@ -2285,13 +2309,15 @@ export default function JobsList({
                       ) : null}
                     </td>
                   )}
-                  <td className="px-2.5 py-2.5 font-mono text-sm font-medium text-slate-900 dark:text-slate-100">
-                    {job.ticketNo?.trim() ? job.ticketNo : "—"}
+                  <td className="px-2.5 py-2.5 font-mono text-sm font-medium whitespace-nowrap text-slate-900 dark:text-slate-100 max-w-0">
+                    <div className="truncate" title={job.ticketNo?.trim() || undefined}>
+                      {job.ticketNo?.trim() ? job.ticketNo : "—"}
+                    </div>
                   </td>
                   <td className="px-2.5 py-2.5 text-sm whitespace-nowrap text-slate-600 dark:text-slate-400">
                     {dateStr ? format(new Date(dateStr), "dd/MM/yy", { locale: th }) : "–"}
                   </td>
-                  <td className="px-2.5 py-2.5 text-sm text-slate-900 dark:text-slate-100">
+                  <td className="px-2.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 max-w-0">
                     <div className="flex items-start gap-2 min-w-0">
                       <PersonAvatar
                         imageUrl={job.reporter?.image}
@@ -2303,19 +2329,29 @@ export default function JobsList({
                         nameLabel={job.reporterName ?? undefined}
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="font-semibold truncate max-w-[140px] text-slate-900 dark:text-slate-100" title={job.reporterName ?? undefined}>
+                        <div
+                          className="font-semibold truncate text-slate-900 dark:text-slate-100"
+                          title={job.reporterName ?? undefined}
+                        >
                           {job.reporterName ?? "–"}
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[140px]" title={job.reporterPhone ?? undefined}>
+                        <div
+                          className="text-xs text-slate-500 dark:text-slate-400 truncate"
+                          title={job.reporterPhone ?? undefined}
+                        >
                           {job.reporterPhone ?? ""}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-2.5 py-2.5 truncate text-sm text-slate-700 dark:text-slate-300" title={location || undefined}>{location || "–"}</td>
+                  <td className="px-2.5 py-2.5 max-w-0 text-sm text-slate-700 dark:text-slate-300">
+                    <div className="truncate" title={location || undefined}>
+                      {location || "–"}
+                    </div>
+                  </td>
                   {enableAllBreakdownFilters && (
                     <>
-                      <td className="px-2.5 py-2.5">
+                      <td className="px-2.5 py-2.5 max-w-0">
                         <Badge
                           variant="outline"
                           className={cn(
@@ -2326,7 +2362,7 @@ export default function JobsList({
                           {envLabel}
                         </Badge>
                       </td>
-                      <td className="px-2.5 py-2.5">
+                      <td className="px-2.5 py-2.5 max-w-0">
                         <Badge
                           variant="outline"
                           className={cn(
@@ -2349,10 +2385,12 @@ export default function JobsList({
                       </td>
                     </>
                   )}
-                  <td className="px-2.5 py-2.5 max-w-0 truncate text-sm text-slate-800 dark:text-slate-200">
+                  <td className="px-2.5 py-2.5 max-w-0 text-sm text-slate-800 dark:text-slate-200">
                     {desc.clipped && desc.full ? (
                       <TextHoverTooltip text={desc.full}>
-                        <span className="truncate block">{desc.short}</span>
+                        <span className="truncate block" title={desc.full}>
+                          {desc.short}
+                        </span>
                       </TextHoverTooltip>
                     ) : (
                       <span className="truncate block" title={desc.full || undefined}>
@@ -2365,7 +2403,7 @@ export default function JobsList({
                       <Badge
                         variant="outline"
                         className={cn(
-                          "h-auto px-2 py-1 text-xs font-semibold shadow-none ring-0",
+                          "h-auto px-2 py-1 text-xs font-semibold shadow-none ring-0 whitespace-nowrap",
                           cfg.badgeCls,
                         )}
                       >
@@ -2375,7 +2413,7 @@ export default function JobsList({
                         <Badge
                           variant="outline"
                           className={cn(
-                            "h-auto px-2 py-0.5 text-[11px] font-semibold shadow-none ring-0",
+                            "h-auto px-2 py-0.5 text-[11px] font-semibold shadow-none ring-0 whitespace-nowrap",
                             job.isOutOfContract === true
                               ? "bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/25"
                               : "bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/25",
@@ -2390,7 +2428,7 @@ export default function JobsList({
                     </div>
                   </td>
                   {showAssignedToColumn && (
-                    <td className="px-2.5 py-2.5 text-sm text-slate-900 dark:text-slate-100">
+                    <td className="px-2.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 max-w-0">
                       <div className="flex items-center gap-2 min-w-0">
                         <PersonAvatar
                           imageUrl={job.assignedTo?.image}
@@ -2401,13 +2439,16 @@ export default function JobsList({
                           }
                           nameLabel={job.assignedTo?.name}
                         />
-                        <span className="truncate font-medium text-slate-900 dark:text-slate-100" title={job.assignedTo?.name ?? undefined}>
+                        <span
+                          className="truncate font-medium text-slate-900 dark:text-slate-100"
+                          title={job.assignedTo?.name ?? undefined}
+                        >
                           {job.assignedTo?.name ?? "–"}
                         </span>
                       </div>
                     </td>
                   )}
-                  <td className="px-2.5 py-2.5 text-right">
+                  <td className="px-2.5 py-2.5 text-right whitespace-nowrap">
                     <div className="flex flex-nowrap items-center justify-end gap-0.5">
                       <ActionIconButton
                         label="ดูรายละเอียด"

@@ -3,7 +3,9 @@ import {
   bangkokYearMonth,
   formatDocRunning,
   formatDocTicketNo,
+  formatRequestTicketNo,
   isFormalDocTicketNo,
+  isRequestTicketNo,
 } from './doc-ticket-no';
 
 describe('doc-ticket-no (Meeting Phase C)', () => {
@@ -78,6 +80,7 @@ describe('doc-ticket-no (Meeting Phase C)', () => {
       expect(isFormalDocTicketNo('12345678')).toBe(false);
       expect(isFormalDocTicketNo('')).toBe(false);
       expect(isFormalDocTicketNo(null)).toBe(false);
+      expect(isFormalDocTicketNo('RQ-CM-20260001')).toBe(false);
     });
 
     it('accepts running Doc No formats (incl. legacy CM-SHF-2002-)', () => {
@@ -85,6 +88,51 @@ describe('doc-ticket-no (Meeting Phase C)', () => {
       expect(isFormalDocTicketNo('CM-SHF-2002-0001')).toBe(true);
       expect(isFormalDocTicketNo('CM-SHF-2026-10000')).toBe(true);
       expect(isFormalDocTicketNo('2026080001')).toBe(true);
+    });
+  });
+
+  describe('formatRequestTicketNo', () => {
+    it('formats RQ-CM-YYYYXXXX with 4-digit padding', () => {
+      expect(formatRequestTicketNo({ year: '2026', running: 1 })).toBe(
+        'RQ-CM-20260001',
+      );
+      expect(formatRequestTicketNo({ year: '2026', running: 42 })).toBe(
+        'RQ-CM-20260042',
+      );
+      expect(formatRequestTicketNo({ year: '2026', running: 9999 })).toBe(
+        'RQ-CM-20269999',
+      );
+    });
+
+    it('grows past 4 digits for large running numbers', () => {
+      expect(formatRequestTicketNo({ year: '2026', running: 10000 })).toBe(
+        'RQ-CM-202610000',
+      );
+    });
+
+    it('rejects invalid year or running', () => {
+      expect(() => formatRequestTicketNo({ year: '26', running: 1 })).toThrow(
+        RangeError,
+      );
+      expect(() => formatRequestTicketNo({ year: '2026', running: 0 })).toThrow(
+        RangeError,
+      );
+    });
+  });
+
+  describe('isRequestTicketNo', () => {
+    it('identifies RQ-CM-YYYYXXXX format', () => {
+      expect(isRequestTicketNo('RQ-CM-20260001')).toBe(true);
+      expect(isRequestTicketNo('RQ-CM-20269999')).toBe(true);
+      expect(isRequestTicketNo('RQ-CM-202610000')).toBe(true);
+    });
+
+    it('rejects formal doc numbers, hex, and invalid values', () => {
+      expect(isRequestTicketNo('CM-SHF-2026-0001')).toBe(false);
+      expect(isRequestTicketNo('2026080001')).toBe(false);
+      expect(isRequestTicketNo('9530f95f')).toBe(false);
+      expect(isRequestTicketNo('')).toBe(false);
+      expect(isRequestTicketNo(null)).toBe(false);
     });
   });
 });

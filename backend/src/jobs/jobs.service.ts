@@ -6,6 +6,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -13,7 +14,6 @@ import {
   maskPhoneForPublic,
   maskTextForPublic,
 } from '../common/utils/mask-public-text';
-import { randomBytes } from 'crypto';
 import { JobStatus, Prisma } from '@prisma/client';
 import { SitesService } from '../sites/sites.service';
 import { UsersService } from '../users/users.service';
@@ -24,12 +24,13 @@ import {
   bangkokYearMonth as formatBangkokYearMonth,
   bangkokYear as formatBangkokYear,
   formatDocTicketNo,
+  formatRequestTicketNo,
   isFormalDocTicketNo,
 } from './doc-ticket-no';
 import axios from 'axios';
 
 @Injectable()
-export class JobsService {
+export class JobsService implements OnModuleInit {
   private readonly logger = new Logger(JobsService.name);
 
   constructor(
@@ -40,6 +41,10 @@ export class JobsService {
     private jobEmailNotifications: JobEmailNotificationService,
     private rolesService: RolesService,
   ) {}
+
+  async onModuleInit() {
+    await this.backfillLegacyHexTicketNumbers();
+  }
 
   /** ปรับ URL รูปผู้ใช้ (avatar) ให้เบราว์เซอร์เข้าถึง MinIO ภายนอกได้ */
   private mapUserImage<T extends { image?: string | null } | null | undefined>(
@@ -140,9 +145,8 @@ export class JobsService {
       (createData as any).isOutOfContract = rawOut === 'true' || rawOut === '1';
     }
 
-    // ticketNo = hex 8 ตัวตอนสร้าง — Running Doc No ออกตอนจำแนกเอกสารหลัง RESOLVED
+    // ticketNo = RQ-CM-YYYYXXXX ตอนสร้าง — Running Doc No ออกตอนจำแนกเอกสารหลัง RESOLVED
     delete (createData as { ticketNo?: unknown }).ticketNo;
-    createData.ticketNo = randomBytes(4).toString('hex');
     if (!createData.reportDate) {
       createData.reportDate = new Date();
     }
@@ -157,8 +161,19 @@ export class JobsService {
       }
     }
 
-    const created = await this.prisma.job.create({
-      data: createData,
+    const reportDate =
+      createData.reportDate instanceof Date
+        ? createData.reportDate
+        : new Date(String(createData.reportDate));
+
+    const created = await this.runInTransaction(async (tx) => {
+      const ticketNo = await this.allocateRequestTicketNo(tx, reportDate);
+      return tx.job.create({
+        data: {
+          ...createData,
+          ticketNo,
+        },
+      });
     });
     void this.jobEmailNotifications.notifyReported(created.id);
     return created;
@@ -1229,7 +1244,7 @@ export class JobsService {
   }
 
   /**
-   * จำแนกเอกสารหลังปิดงาน: แทนที่ hex ด้วย Running Doc No (ครั้งเดียว)
+   * จำแนกเอกสาร: แทนที่ ticketNo เริ่มต้นด้วย Running Doc No (ครั้งเดียว)
    */
   async classifyDoc(id: number, isOutOfContract: boolean, actorUserId: number) {
     await this.assertUserCanClassifyDocKind(actorUserId, isOutOfContract);
@@ -1240,10 +1255,8 @@ export class JobsService {
         select: { id: true, status: true, ticketNo: true },
       });
       if (!job) throw new NotFoundException(`ไม่พบ Job id=${id}`);
-      if (job.status !== JobStatus.RESOLVED) {
-        throw new BadRequestException(
-          'จำแนกเอกสารได้เฉพาะงานสถานะเสร็จสิ้น (RESOLVED)',
-        );
+      if (job.status === JobStatus.CANCELLED) {
+        throw new BadRequestException('ไม่สามารถจำแนกเอกสารงานที่ถูกยกเลิกได้');
       }
       if (isFormalDocTicketNo(job.ticketNo)) {
         throw new ConflictException('งานนี้จำแนกเอกสารแล้ว');
@@ -1300,13 +1313,188 @@ export class JobsService {
   }
 
   /** YYYY ตาม Asia/Bangkok */
-  private bangkokYear(): string {
-    return formatBangkokYear();
+  private bangkokYear(now: Date = new Date()): string {
+    return formatBangkokYear(now);
   }
 
   /** YYYYMM ตาม Asia/Bangkok */
-  private bangkokYearMonth(): string {
-    return formatBangkokYearMonth();
+  private bangkokYearMonth(now: Date = new Date()): string {
+    return formatBangkokYearMonth(now);
+  }
+
+  private async runInTransaction<T>(
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    if (typeof this.prisma.$transaction === 'function') {
+      const res = await this.prisma.$transaction(fn);
+      if (res !== undefined) return res;
+    }
+    return fn(this.prisma as unknown as Prisma.TransactionClient);
+  }
+
+  /** ออกเลขที่ใบแจ้งซ่อมเริ่มต้น RQ-CM-YYYYXXXX พร้อม retry เมื่อชนเลขที่มีอยู่แล้ว */
+  private async allocateRequestTicketNo(
+    tx: Prisma.TransactionClient | PrismaService,
+    date: Date = new Date(),
+    maxAttempts = 5,
+  ): Promise<string> {
+    const year = this.bangkokYear(date);
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        return await this.nextRequestTicketNo(tx, year);
+      } catch (err) {
+        lastErr = err;
+        if (
+          !(err instanceof ConflictException) ||
+          attempt === maxAttempts - 1
+        ) {
+          throw err;
+        }
+      }
+    }
+    throw lastErr;
+  }
+
+  /**
+   * ออกเลขที่ใบแจ้งซ่อมเริ่มต้น (Reference No.) ใน transaction:
+   * รูปแบบ RQ-CM-YYYYXXXX (RQ-CM = fixed prefix, YYYY = ปี 4 หลัก Asia/Bangkok, XXXX = running 4 หลัก)
+   * แถว DocSequence ล็อกด้วย SELECT … FOR UPDATE
+   */
+  private async nextRequestTicketNo(
+    tx: Prisma.TransactionClient | PrismaService,
+    year: string,
+  ): Promise<string> {
+    const kind = 'RQ_CM';
+    const period = year;
+
+    let next = 1;
+
+    if (typeof (tx as any).$executeRaw === 'function') {
+      await (tx as any).$executeRaw`
+        INSERT INTO \`DocSequence\` (\`kind\`, \`period\`, \`lastValue\`, \`updatedAt\`)
+        VALUES (${kind}, ${period}, 0, NOW(3))
+        ON DUPLICATE KEY UPDATE \`id\` = \`id\`
+      `;
+
+      const locked = await (tx as any).$queryRaw<
+        Array<{ lastValue: number | bigint }>
+      >`
+        SELECT \`lastValue\` FROM \`DocSequence\`
+        WHERE \`kind\` = ${kind} AND \`period\` = ${period}
+        FOR UPDATE
+      `;
+      let current = Number(locked[0]?.lastValue ?? 0);
+      if (current === 0 && typeof (tx as any).job?.findFirst === 'function') {
+        const existing = await (tx as any).job.findFirst({
+          where: { ticketNo: { startsWith: `RQ-CM-${year}` } },
+          orderBy: { ticketNo: 'desc' },
+          select: { ticketNo: true },
+        });
+        if (existing?.ticketNo) {
+          const numPart = existing.ticketNo.slice(`RQ-CM-${year}`.length);
+          const parsed = parseInt(numPart, 10);
+          if (!isNaN(parsed) && parsed > current) {
+            current = parsed;
+          }
+        }
+      }
+      next = current + 1;
+
+      await (tx as any).$executeRaw`
+        UPDATE \`DocSequence\`
+        SET \`lastValue\` = ${next}, \`updatedAt\` = NOW(3)
+        WHERE \`kind\` = ${kind} AND \`period\` = ${period}
+      `;
+    } else if (typeof (tx as any).job?.findFirst === 'function') {
+      const existing = await (tx as any).job.findFirst({
+        where: { ticketNo: { startsWith: `RQ-CM-${year}` } },
+        orderBy: { ticketNo: 'desc' },
+        select: { ticketNo: true },
+      });
+      if (existing?.ticketNo) {
+        const numPart = existing.ticketNo.slice(`RQ-CM-${year}`.length);
+        const parsed = parseInt(numPart, 10);
+        if (!isNaN(parsed) && parsed >= 1) {
+          next = parsed + 1;
+        }
+      }
+    }
+
+    const ticketNo = formatRequestTicketNo({ year, running: next });
+
+    if (typeof (tx as any).job?.findUnique === 'function') {
+      const clash = await (tx as any).job.findUnique({
+        where: { ticketNo },
+        select: { id: true },
+      });
+      if (clash) {
+        throw new ConflictException(
+          `เลขที่ใบแจ้งซ่อมซ้ำ (${ticketNo}) — ลองใหม่อีกครั้ง`,
+        );
+      }
+    }
+    return ticketNo;
+  }
+
+  /**
+   * ตรวจสอบและแปลงเลขที่ใบแจ้งซ่อมแบบ hex 8 ตัวเดิม (เช่น 9530f95f)
+   * ให้เป็นรูปแบบทางการ RQ-CM-YYYYXXXX เรียงตามวันที่แจ้ง/สร้าง
+   */
+  async backfillLegacyHexTicketNumbers(): Promise<number> {
+    try {
+      if (!this.prisma.job || typeof this.prisma.job.findMany !== 'function') {
+        return 0;
+      }
+      const candidates = await this.prisma.job.findMany({
+        where: {
+          ticketNo: {
+            not: null,
+          },
+        },
+        select: {
+          id: true,
+          ticketNo: true,
+          reportDate: true,
+          createdAt: true,
+        },
+        orderBy: [{ reportDate: 'asc' }, { id: 'asc' }],
+      });
+
+      const hexJobs = candidates.filter(
+        (j) => j.ticketNo && /^[0-9a-f]{8}$/i.test(j.ticketNo.trim()),
+      );
+
+      if (hexJobs.length === 0) {
+        return 0;
+      }
+
+      this.logger.log(
+        `Found ${hexJobs.length} legacy hex ticket(s) to backfill to RQ-CM-YYYYXXXX`,
+      );
+
+      let count = 0;
+      for (const job of hexJobs) {
+        const date = job.reportDate || job.createdAt || new Date();
+        await this.runInTransaction(async (tx) => {
+          const newTicketNo = await this.allocateRequestTicketNo(tx, date);
+          await tx.job.update({
+            where: { id: job.id },
+            data: { ticketNo: newTicketNo },
+          });
+          this.logger.log(
+            `Migrated Job #${job.id}: ${job.ticketNo} -> ${newTicketNo}`,
+          );
+        });
+        count++;
+      }
+      return count;
+    } catch (err) {
+      this.logger.warn(
+        `backfillLegacyHexTicketNumbers skipped: ${(err as Error)?.message}`,
+      );
+      return 0;
+    }
   }
 
   /** ออกเลข Doc No พร้อม retry เมื่อชนเลขที่มีอยู่แล้ว */

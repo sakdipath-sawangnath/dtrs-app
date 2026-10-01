@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  BadGatewayException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
 import * as Minio from 'minio';
 import * as crypto from 'crypto';
 
@@ -12,6 +17,10 @@ export type MinioObjectInfo = {
 @Injectable()
 export class MinioService implements OnModuleInit {
   private minioClient: Minio.Client;
+  private fallbackClient: Minio.Client | null = null;
+  private readonly primaryEndpoint: string;
+  private readonly fallbackEndpoint: string | null = null;
+  private readonly timeoutMs: number;
   private readonly bucketName =
     process.env.MINIO_BUCKET_NAME || 'cctv-report-images';
   private readonly logger = new Logger(MinioService.name);
@@ -24,13 +33,148 @@ export class MinioService implements OnModuleInit {
     (process.env.MINIO_ENSURE_PUBLIC_READ_POLICY ?? 'false') === 'true';
 
   constructor() {
+    const primaryHost = process.env.MINIO_ENDPOINT || 'localhost';
+    const primaryPort = parseInt(process.env.MINIO_PORT || '9000', 10);
+    const primaryUseSSL = process.env.MINIO_USE_SSL === 'true';
+    const accessKey = process.env.MINIO_ACCESS_KEY || '';
+    const secretKey = process.env.MINIO_SECRET_KEY || '';
+
+    this.primaryEndpoint = `${primaryUseSSL ? 'https' : 'http'}://${primaryHost}:${primaryPort}`;
+    this.timeoutMs = parseInt(process.env.MINIO_TIMEOUT_MS || '5000', 10);
+
     this.minioClient = new Minio.Client({
-      endPoint: process.env.MINIO_ENDPOINT || 'localhost',
-      port: parseInt(process.env.MINIO_PORT || '9000'),
-      useSSL: process.env.MINIO_USE_SSL === 'true',
-      accessKey: process.env.MINIO_ACCESS_KEY || '',
-      secretKey: process.env.MINIO_SECRET_KEY || '',
+      endPoint: primaryHost,
+      port: primaryPort,
+      useSSL: primaryUseSSL,
+      accessKey,
+      secretKey,
     });
+
+    // Fallback MinIO client (e.g. public URL when internal LAN IP is unreachable, or vice versa)
+    const fallbackHost = process.env.MINIO_FALLBACK_ENDPOINT?.trim();
+    if (fallbackHost) {
+      const fallbackPort = parseInt(
+        process.env.MINIO_FALLBACK_PORT || '443',
+        10,
+      );
+      const fallbackUseSSL = process.env.MINIO_FALLBACK_USE_SSL !== 'false';
+      this.fallbackEndpoint = `${fallbackUseSSL ? 'https' : 'http'}://${fallbackHost}:${fallbackPort}`;
+      this.fallbackClient = new Minio.Client({
+        endPoint: fallbackHost,
+        port: fallbackPort,
+        useSSL: fallbackUseSSL,
+        accessKey,
+        secretKey,
+      });
+      this.logger.log(
+        `MinIO configured with explicit fallback: ${this.fallbackEndpoint}`,
+      );
+    } else {
+      const publicUrl = process.env.MINIO_PUBLIC_URL?.trim();
+      if (publicUrl) {
+        try {
+          const parsed = new URL(publicUrl);
+          if (parsed.hostname && parsed.hostname !== primaryHost) {
+            const fallbackPort = parsed.port
+              ? parseInt(parsed.port, 10)
+              : parsed.protocol === 'https:'
+                ? 443
+                : 80;
+            const fallbackUseSSL = parsed.protocol === 'https:';
+            this.fallbackEndpoint = `${parsed.protocol}//${parsed.hostname}:${fallbackPort}`;
+            this.fallbackClient = new Minio.Client({
+              endPoint: parsed.hostname,
+              port: fallbackPort,
+              useSSL: fallbackUseSSL,
+              accessKey,
+              secretKey,
+            });
+            this.logger.log(
+              `MinIO auto-discovered fallback from MINIO_PUBLIC_URL: ${this.fallbackEndpoint}`,
+            );
+          }
+        } catch {
+          // ignore invalid public url
+        }
+      }
+    }
+  }
+
+  private withTimeout<T>(
+    promise: Promise<T>,
+    timeoutMs: number,
+    timeoutMessage: string,
+  ): Promise<T> {
+    let timer: NodeJS.Timeout;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        const err = new Error(timeoutMessage);
+        (err as any).code = 'ETIMEDOUT';
+        reject(err);
+      }, timeoutMs);
+    });
+    return Promise.race([promise, timeoutPromise]).finally(() => {
+      clearTimeout(timer);
+    });
+  }
+
+  private isNetworkOrTimeoutError(err: any): boolean {
+    if (!err) return false;
+    const code = err.code || err.cause?.code;
+    const msg = String(err.message || '').toLowerCase();
+    return (
+      code === 'ETIMEDOUT' ||
+      code === 'ECONNREFUSED' ||
+      code === 'EHOSTUNREACH' ||
+      code === 'ENETUNREACH' ||
+      code === 'ENOTFOUND' ||
+      code === 'ECONNRESET' ||
+      msg.includes('etimedout') ||
+      msg.includes('timed out') ||
+      msg.includes('econnrefused') ||
+      msg.includes('network')
+    );
+  }
+
+  private async executeWithFallback<T>(
+    actionName: string,
+    operation: (client: Minio.Client) => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await this.withTimeout(
+        operation(this.minioClient),
+        this.timeoutMs,
+        `MinIO ${actionName} timed out on primary (${this.primaryEndpoint})`,
+      );
+    } catch (primaryErr: any) {
+      if (this.fallbackClient && this.isNetworkOrTimeoutError(primaryErr)) {
+        this.logger.warn(
+          `MinIO ${actionName} failed on primary (${this.primaryEndpoint}): ${primaryErr?.message || primaryErr}. Retrying with fallback (${this.fallbackEndpoint})...`,
+        );
+        try {
+          return await this.withTimeout(
+            operation(this.fallbackClient),
+            this.timeoutMs,
+            `MinIO ${actionName} timed out on fallback (${this.fallbackEndpoint})`,
+          );
+        } catch (fallbackErr: any) {
+          this.logger.error(
+            `MinIO ${actionName} failed on fallback (${this.fallbackEndpoint}): ${fallbackErr?.message || fallbackErr}`,
+          );
+          throw this.toStorageException(fallbackErr, actionName);
+        }
+      }
+      throw this.toStorageException(primaryErr, actionName);
+    }
+  }
+
+  private toStorageException(err: any, actionName: string): Error {
+    if (this.isNetworkOrTimeoutError(err)) {
+      return new BadGatewayException(
+        `ระบบจัดเก็บไฟล์รูปภาพ (MinIO) ไม่สามารถเชื่อมต่อได้ในขณะนี้ (${actionName})`,
+      );
+    }
+    return err instanceof Error ? err : new Error(String(err));
   }
 
   async onModuleInit() {
@@ -42,12 +186,13 @@ export class MinioService implements OnModuleInit {
     }
 
     try {
-      const endpoint = `${process.env.MINIO_ENDPOINT || 'localhost'}:${process.env.MINIO_PORT || '9000'}`;
       this.logger.log(
-        `MinIO startup check: endpoint=${endpoint}, bucket=${this.bucketName}`,
+        `MinIO startup check: primary=${this.primaryEndpoint}, fallback=${this.fallbackEndpoint ?? 'none'}, bucket=${this.bucketName}`,
       );
 
-      const exists = await this.minioClient.bucketExists(this.bucketName);
+      const exists = await this.executeWithFallback('bucketExists', (client) =>
+        client.bucketExists(this.bucketName),
+      );
       if (!exists) {
         if (!this.autoCreateBucketEnabled) {
           this.logger.warn(
@@ -56,7 +201,9 @@ export class MinioService implements OnModuleInit {
           return;
         }
 
-        await this.minioClient.makeBucket(this.bucketName, 'us-east-1');
+        await this.executeWithFallback('makeBucket', (client) =>
+          client.makeBucket(this.bucketName, 'us-east-1'),
+        );
         this.logger.log(`Bucket ${this.bucketName} created successfully.`);
       }
 
@@ -75,9 +222,8 @@ export class MinioService implements OnModuleInit {
         };
 
         try {
-          await this.minioClient.setBucketPolicy(
-            this.bucketName,
-            JSON.stringify(policy),
+          await this.executeWithFallback('setBucketPolicy', (client) =>
+            client.setBucketPolicy(this.bucketName, JSON.stringify(policy)),
           );
           this.logger.log(
             `Bucket ${this.bucketName} policy set to public read (ensured on startup).`,
@@ -231,31 +377,30 @@ export class MinioService implements OnModuleInit {
     buffer: Buffer;
     contentType: string;
   }> {
-    const stat = await this.minioClient.statObject(this.bucketName, objectName);
-    if (stat.size > MinioService.maxJobImageBytes) {
-      throw new Error(
-        `object too large: ${stat.size} bytes (max ${MinioService.maxJobImageBytes})`,
-      );
-    }
-    const stream = await this.minioClient.getObject(
-      this.bucketName,
-      objectName,
-    );
-    const chunks: Buffer[] = [];
-    for await (const chunk of stream as AsyncIterable<
-      Buffer | Uint8Array | string
-    >) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-    const buffer = Buffer.concat(chunks);
-    const meta = stat.metaData ?? {};
-    const rawCt =
-      (meta['content-type'] as string | undefined) ||
-      (meta['Content-Type'] as string | undefined) ||
-      'application/octet-stream';
-    const contentType =
-      rawCt.split(';')[0]?.trim() || 'application/octet-stream';
-    return { buffer, contentType };
+    return this.executeWithFallback('getBucketObjectBuffer', async (client) => {
+      const stat = await client.statObject(this.bucketName, objectName);
+      if (stat.size > MinioService.maxJobImageBytes) {
+        throw new Error(
+          `object too large: ${stat.size} bytes (max ${MinioService.maxJobImageBytes})`,
+        );
+      }
+      const stream = await client.getObject(this.bucketName, objectName);
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream as AsyncIterable<
+        Buffer | Uint8Array | string
+      >) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      const buffer = Buffer.concat(chunks);
+      const meta = stat.metaData ?? {};
+      const rawCt =
+        (meta['content-type'] as string | undefined) ||
+        (meta['Content-Type'] as string | undefined) ||
+        'application/octet-stream';
+      const contentType =
+        rawCt.split(';')[0]?.trim() || 'application/octet-stream';
+      return { buffer, contentType };
+    });
   }
 
   private async putObjectAndGetUrl(
@@ -266,12 +411,14 @@ export class MinioService implements OnModuleInit {
       'Content-Type': file.mimetype,
     };
 
-    await this.minioClient.putObject(
-      this.bucketName,
-      objectName,
-      file.buffer,
-      file.buffer.length,
-      metaData,
+    await this.executeWithFallback('putObject', (client) =>
+      client.putObject(
+        this.bucketName,
+        objectName,
+        file.buffer,
+        file.buffer.length,
+        metaData,
+      ),
     );
 
     const base = this.getPublicBaseUrl();
@@ -361,6 +508,8 @@ export class MinioService implements OnModuleInit {
   async removeObjectByKey(objectKey: string): Promise<void> {
     const key = objectKey.trim();
     if (!key) return;
-    await this.minioClient.removeObject(this.bucketName, key);
+    await this.executeWithFallback('removeObject', (client) =>
+      client.removeObject(this.bucketName, key),
+    );
   }
 }

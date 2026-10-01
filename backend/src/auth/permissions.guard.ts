@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../prisma/prisma.service';
-import { PERMISSIONS_KEY } from './permissions.decorator';
+import { PERMISSIONS_KEY, PERMISSIONS_ANY_KEY } from './permissions.decorator';
 import { RBAC_ROLE_PERMISSION_CODES } from '../roles/roles.service';
 
 // Guard ตรวจสอบ Permission.code จากตาราง rolePermission/permission
@@ -24,8 +24,12 @@ export class PermissionsGuard implements CanActivate {
       PERMISSIONS_KEY,
       [context.getHandler(), context.getClass()],
     );
+    const requiredAny = this.reflector.getAllAndOverride<string[]>(
+      PERMISSIONS_ANY_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
-    if (!required?.length) return true;
+    if (!required?.length && !requiredAny?.length) return true;
 
     const req = context.switchToHttp().getRequest();
     const user = req.user as { id?: number; role?: string };
@@ -50,10 +54,22 @@ export class PermissionsGuard implements CanActivate {
       permissionCodes = RBAC_ROLE_PERMISSION_CODES[enumRole] ?? [];
     }
 
-    // ต้องมีครบทุก permission ที่ประกาศ
-    const missing = required.filter((code) => !permissionCodes.includes(code));
-    if (missing.length > 0) {
-      throw new ForbiddenException('ไม่มีสิทธิ์ดำเนินการ');
+    // ต้องมีครบทุก permission ที่ประกาศใน @Permissions(...)
+    if (required?.length) {
+      const missing = required.filter(
+        (code) => !permissionCodes.includes(code),
+      );
+      if (missing.length > 0) {
+        throw new ForbiddenException('ไม่มีสิทธิ์ดำเนินการ');
+      }
+    }
+
+    // ต้องมีอย่างน้อย 1 permission ที่ประกาศใน @PermissionsAny(...)
+    if (requiredAny?.length) {
+      const hasAny = requiredAny.some((code) => permissionCodes.includes(code));
+      if (!hasAny) {
+        throw new ForbiddenException('ไม่มีสิทธิ์ดำเนินการ');
+      }
     }
 
     return true;

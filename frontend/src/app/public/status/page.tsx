@@ -659,7 +659,7 @@ function StatusPageInner() {
                   <Input
                     type="text"
                     className={cn(inputClass, "has-leading-icon min-h-11 h-auto")}
-                    placeholder="กรอกเลขที่ใบแจ้งซ่อม"
+                    placeholder="กรอกเลขที่ใบแจ้งซ่อม เช่น RQ-CM-20260001"
                     aria-label="เลขที่ใบแจ้งซ่อม"
                     value={ticketNo}
                     onChange={(e) => setTicketNo(e.target.value)}

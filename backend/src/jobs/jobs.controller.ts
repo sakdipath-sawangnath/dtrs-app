@@ -27,7 +27,7 @@ import { MinioService } from '../minio/minio.service';
 import { EventsGateway } from '../events/events.gateway';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
-import { Permissions } from '../auth/permissions.decorator';
+import { Permissions, PermissionsAny } from '../auth/permissions.decorator';
 import { RolesService } from '../roles/roles.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import {
@@ -541,9 +541,13 @@ export class JobsController {
     return updated;
   }
 
-  /** จำแนกเอกสารหลังปิดงาน — ออก Running Doc No ครั้งเดียว */
+  /** จำแนกเอกสาร — ออก Running Doc No ครั้งเดียว (สิทธิ์ job.classifyDoc หรือ job.classifyDoc.contract หรือ job.classifyDoc.outOfContract) */
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('job.classifyDoc')
+  @PermissionsAny(
+    'job.classifyDoc',
+    'job.classifyDoc.contract',
+    'job.classifyDoc.outOfContract',
+  )
   @Patch(':id/classify-doc')
   async classifyDoc(
     @Req() req: ReqUser,

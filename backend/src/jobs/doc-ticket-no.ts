@@ -11,6 +11,34 @@ export function formatDocRunning(n: number): string {
   return String(Math.trunc(n)).padStart(4, '0');
 }
 
+export const REQUEST_TICKET_PREFIX = 'RQ-CM-';
+export const REQUEST_TICKET_RE = /^RQ-CM-\d{4}\d{4,}$/;
+
+/**
+ * รูปแบบเลขที่ใบแจ้งซ่อมเริ่มต้น (Reference No.): RQ-CM-YYYYXXXX
+ * - RQ-CM = fixed prefix
+ * - YYYY = 4-digit year (Asia/Bangkok)
+ * - XXXX = 4-digit sequential running number
+ */
+export function formatRequestTicketNo(params: {
+  year: string;
+  running: number;
+}): string {
+  const year = (params.year ?? '').trim();
+  if (!/^\d{4}$/.test(year)) {
+    throw new RangeError('year ต้องเป็น YYYY 4 หลัก');
+  }
+  const running = formatDocRunning(params.running);
+  return `${REQUEST_TICKET_PREFIX}${year}${running}`;
+}
+
+export function isRequestTicketNo(
+  ticketNo: string | null | undefined,
+): boolean {
+  const s = (ticketNo ?? '').trim();
+  return REQUEST_TICKET_RE.test(s);
+}
+
 /**
  * ในสัญญา: CM-SHF-YYYY-XXXX (YYYY = Asia/Bangkok ณ วันจำแนก; running ไม่รีเซ็ต)
  * นอกสัญญา: YYYYMM + running

@@ -112,11 +112,11 @@ export default function SiteHeader({ right, subtitle }: SiteHeaderProps) {
               <ManagedImage
                 src="/logo/NBTC.png"
                 alt="DOPA"
-                width={28}
-                height={28}
+                width={960}
+                height={1265}
                 sizes={MANAGED_IMAGE_SIZES.avatarXs}
                 className="shrink-0"
-                style={{ objectFit: "contain" }}
+                style={{ width: 28, height: "auto", objectFit: "contain" }}
               />
             </div>
             <div className="leading-tight min-w-0 hidden sm:block">

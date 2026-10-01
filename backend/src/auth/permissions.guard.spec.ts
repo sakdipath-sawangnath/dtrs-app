@@ -106,4 +106,36 @@ describe('PermissionsGuard (users CRUD / custom roles)', () => {
     expect(prisma.rolePermission.findMany).not.toHaveBeenCalled();
     expect(RBAC_ROLE_PERMISSION_CODES.ADMIN).toContain('menu.users');
   });
+
+  it('allows when user has at least one of permissions_any', async () => {
+    reflector.getAllAndOverride.mockImplementation((key: string) =>
+      key === 'permissions_any'
+        ? ['job.classifyDoc.contract', 'job.classifyDoc.outOfContract']
+        : undefined,
+    );
+    prisma.user.findUnique.mockResolvedValue({ roleId: 12, role: 'STAFF_1' });
+    prisma.rolePermission.findMany.mockResolvedValue([
+      { permission: { code: 'job.classifyDoc.contract' } },
+    ]);
+
+    await expect(
+      guard.canActivate(ctx({ id: 5, role: 'STAFF_1' })),
+    ).resolves.toBe(true);
+  });
+
+  it('forbids when user lacks all permissions_any', async () => {
+    reflector.getAllAndOverride.mockImplementation((key: string) =>
+      key === 'permissions_any'
+        ? ['job.classifyDoc.contract', 'job.classifyDoc.outOfContract']
+        : undefined,
+    );
+    prisma.user.findUnique.mockResolvedValue({ roleId: 12, role: 'STAFF_1' });
+    prisma.rolePermission.findMany.mockResolvedValue([
+      { permission: { code: 'menu.dashboard' } },
+    ]);
+
+    await expect(
+      guard.canActivate(ctx({ id: 5, role: 'STAFF_1' })),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
 });

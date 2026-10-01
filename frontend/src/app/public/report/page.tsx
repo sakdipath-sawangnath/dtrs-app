@@ -35,7 +35,9 @@ import {
 } from "@/lib/jobImageUpload";
 import {
   formatJobImageUploadError,
+  isNetworkOrConnectionError,
   runMultipartUploadWithProxyFallback,
+  STORAGE_CONNECTION_ERROR_MESSAGE,
 } from "@/lib/jobImageProxyFallback";
 
 type ReporterPayload = {
@@ -61,30 +63,38 @@ function clampReportDescription(value: string): string {
 
 /** ดึงข้อความจาก Nest + axios (รองรับ error.message / error.error.message / details) */
 function extractApiErrorMessage(err: unknown): string {
-  const res = (err as { response?: { data?: unknown } })?.response?.data;
-  if (!res || typeof res !== 'object') return '';
-  const d = res as Record<string, unknown>;
-  if (typeof d.message === 'string') return d.message;
-  if (Array.isArray(d.message)) return d.message.join(', ');
-  const inner = d.error;
-  if (inner && typeof inner === 'object') {
-    const e = inner as Record<string, unknown>;
-    if (typeof e.message === 'string') return e.message;
-    const details = e.details;
-    if (Array.isArray(details)) {
-      return details
-        .map((item: unknown) => {
-          if (typeof item === 'string') return item;
-          if (item && typeof item === 'object' && 'message' in item) {
-            const o = item as { field?: string; message?: string };
-            return [o.field, o.message].filter(Boolean).join(': ');
-          }
-          return String(item);
-        })
-        .join('; ');
-    }
+  if (isNetworkOrConnectionError(err)) {
+    return STORAGE_CONNECTION_ERROR_MESSAGE;
   }
-  return '';
+  const res = (err as { response?: { data?: unknown } })?.response?.data;
+  let raw = '';
+  if (res && typeof res === 'object') {
+    const d = res as Record<string, unknown>;
+    if (typeof d.message === 'string') raw = d.message;
+    else if (Array.isArray(d.message)) raw = d.message.join(', ');
+    else if (d.error && typeof d.error === 'object') {
+      const e = d.error as Record<string, unknown>;
+      if (typeof e.message === 'string') raw = e.message;
+      else if (Array.isArray(e.details)) {
+        raw = e.details
+          .map((item: unknown) => {
+            if (typeof item === 'string') return item;
+            if (item && typeof item === 'object' && 'message' in item) {
+              const o = item as { field?: string; message?: string };
+              return [o.field, o.message].filter(Boolean).join(': ');
+            }
+            return String(item);
+          })
+          .join('; ');
+      }
+    }
+  } else if (err instanceof Error && err.message) {
+    raw = err.message;
+  }
+  if (raw && isNetworkOrConnectionError(raw)) {
+    return STORAGE_CONNECTION_ERROR_MESSAGE;
+  }
+  return raw;
 }
 
 function ReportPageContent() {

@@ -50,7 +50,8 @@ describe("getSentryTracesSampleRate", () => {
     try {
       delete process.env.NEXT_PUBLIC_APP_ENV;
       delete process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE;
-      process.env.NODE_ENV = "production";
+      (process.env as Record<string, string | undefined>).NODE_ENV =
+        "production";
       assert.equal(getSentryTracesSampleRate(), 0);
     } finally {
       if (prevApp === undefined) {
@@ -63,7 +64,7 @@ describe("getSentryTracesSampleRate", () => {
       } else {
         process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE = prevRate;
       }
-      process.env.NODE_ENV = prevNode;
+      (process.env as Record<string, string | undefined>).NODE_ENV = prevNode;
     }
   });
 });

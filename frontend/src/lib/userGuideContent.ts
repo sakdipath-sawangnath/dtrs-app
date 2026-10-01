@@ -253,7 +253,7 @@ export const USER_GUIDE_WORKFLOW_STEPS: UserGuideWorkflowStep[] = [
     title: "จำแนกเอกสาร (หลังปิด)",
     status: "RESOLVED",
     description:
-      "งาน RESOLVED ที่ยังเป็น ticketNo hex — ใช้ job.classifyDoc + ลูก contract/outOfContract เพื่อออก Doc No ทางการ",
+      "งาน RESOLVED ที่ยังเป็น ticketNo เริ่มต้น (RQ-CM-YYYYXXXX) — ใช้ job.classifyDoc + ลูก contract/outOfContract เพื่อออก Doc No ทางการ",
     permissions: ["job.classifyDoc", "job.classifyDoc.contract", "job.classifyDoc.outOfContract"],
     routes: ["/dashboard/all", "/dashboard/jobs/:id"],
   },

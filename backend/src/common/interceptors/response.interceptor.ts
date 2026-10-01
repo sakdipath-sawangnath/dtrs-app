@@ -21,9 +21,10 @@ export interface ApiResponse<T> {
 }
 
 @Injectable()
-export class ResponseInterceptor<T>
-  implements NestInterceptor<T, ApiResponse<T> | StreamableFile>
-{
+export class ResponseInterceptor<T> implements NestInterceptor<
+  T,
+  ApiResponse<T> | StreamableFile
+> {
   intercept(
     context: ExecutionContext,
     next: CallHandler,

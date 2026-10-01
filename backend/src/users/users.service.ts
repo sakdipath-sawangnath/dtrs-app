@@ -343,14 +343,20 @@ export class UsersService {
         data: updateData,
       });
       if (params.avatarFile) {
-        const url = await this.minioService.uploadUserAvatar(
-          existing.id,
-          params.avatarFile,
-        );
-        await this.prisma.user.update({
-          where: { id: existing.id },
-          data: { image: url },
-        });
+        try {
+          const url = await this.minioService.uploadUserAvatar(
+            existing.id,
+            params.avatarFile,
+          );
+          await this.prisma.user.update({
+            where: { id: existing.id },
+            data: { image: url },
+          });
+        } catch (err: any) {
+          this.logger.warn(
+            `Failed to upload reporter avatar for user ${existing.id}: ${err?.message || err}`,
+          );
+        }
       }
       return existing.id;
     }
@@ -395,14 +401,20 @@ export class UsersService {
       select: { id: true },
     });
     if (params.avatarFile) {
-      const url = await this.minioService.uploadUserAvatar(
-        created.id,
-        params.avatarFile,
-      );
-      await this.prisma.user.update({
-        where: { id: created.id },
-        data: { image: url },
-      });
+      try {
+        const url = await this.minioService.uploadUserAvatar(
+          created.id,
+          params.avatarFile,
+        );
+        await this.prisma.user.update({
+          where: { id: created.id },
+          data: { image: url },
+        });
+      } catch (err: any) {
+        this.logger.warn(
+          `Failed to upload reporter avatar for new user ${created.id}: ${err?.message || err}`,
+        );
+      }
     }
     return created.id;
   }

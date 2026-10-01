@@ -15,7 +15,10 @@ import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
 import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
 import { PermissionsGuard } from '../src/auth/permissions.guard';
-import { PERMISSIONS_KEY } from '../src/auth/permissions.decorator';
+import {
+  PERMISSIONS_KEY,
+  PERMISSIONS_ANY_KEY,
+} from '../src/auth/permissions.decorator';
 import { EventsGateway } from '../src/events/events.gateway';
 import { MinioService } from '../src/minio/minio.service';
 import { RolesService } from '../src/roles/roles.service';
@@ -31,11 +34,13 @@ import {
   bangkokYear,
   bangkokYearMonth,
   isFormalDocTicketNo,
+  isRequestTicketNo,
 } from '../src/jobs/doc-ticket-no';
 
 const ADMIN_ID = 7;
 const STAFF_ID = 9;
-const HEX_TICKET = 'a1b2c3d4';
+const INITIAL_TICKET = 'RQ-CM-20260001';
+const HEX_TICKET = INITIAL_TICKET;
 
 class FakeJwtAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
@@ -63,15 +68,30 @@ class FakePermissionsGuard implements CanActivate {
       PERMISSIONS_KEY,
       context.getHandler(),
     ) as string[] | undefined;
-    if (!required?.length) return true;
+    const requiredAny = Reflect.getMetadata(
+      PERMISSIONS_ANY_KEY,
+      context.getHandler(),
+    ) as string[] | undefined;
+    if (!required?.length && !requiredAny?.length) return true;
 
     const req = context.switchToHttp().getRequest();
     const role = String(req.user?.role ?? '').toUpperCase();
     const codes =
       role === 'ADMIN' || role === 'SUPERVISOR'
-        ? ['job.classifyDoc', 'job.updateStatus']
+        ? [
+            'job.classifyDoc',
+            'job.classifyDoc.contract',
+            'job.classifyDoc.outOfContract',
+            'job.updateStatus',
+          ]
         : [];
-    if (required.some((code) => !codes.includes(code))) {
+    if (required?.length && required.some((code) => !codes.includes(code))) {
+      throw new ForbiddenException('ไม่มีสิทธิ์ดำเนินการ');
+    }
+    if (
+      requiredAny?.length &&
+      !requiredAny.some((code) => codes.includes(code))
+    ) {
       throw new ForbiddenException('ไม่มีสิทธิ์ดำเนินการ');
     }
     return true;
@@ -129,7 +149,7 @@ describe('Jobs Doc No / classify-doc (e2e HTTP)', () => {
         .mockImplementation(async (id: number, isOutOfContract: boolean) => {
           if (id === 11) {
             throw new BadRequestException(
-              'จำแนกเอกสารได้เฉพาะงานสถานะเสร็จสิ้น (RESOLVED)',
+              'ไม่สามารถจำแนกเอกสารงานที่ถูกยกเลิกได้',
             );
           }
           if (id === 12) {
@@ -200,18 +220,18 @@ describe('Jobs Doc No / classify-doc (e2e HTTP)', () => {
     jest.clearAllMocks();
   });
 
-  it('POST /api/public/jobs creates with hex ticketNo (not Running Doc No)', async () => {
+  it('POST /api/public/jobs creates with RQ-CM ticketNo (not Running Doc No)', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/public/jobs')
       .send(publicReportBody)
       .expect(201);
 
     expect(jobsService.createFromPublicReport).toHaveBeenCalled();
-    expect(res.body.data.ticketNo).toBe(HEX_TICKET);
+    expect(res.body.data.ticketNo).toBe(INITIAL_TICKET);
     expect(isFormalDocTicketNo(res.body.data.ticketNo)).toBe(false);
   });
 
-  it('PATCH /api/jobs/:id/assign keeps hex ticketNo (does not generate Doc No)', async () => {
+  it('PATCH /api/jobs/:id/assign keeps RQ-CM ticketNo (does not generate Doc No)', async () => {
     const res = await request(app.getHttpServer())
       .patch('/api/jobs/101/assign')
       .set('Authorization', 'Bearer admin')
@@ -219,11 +239,11 @@ describe('Jobs Doc No / classify-doc (e2e HTTP)', () => {
       .expect(200);
 
     expect(jobsService.assignStaff).toHaveBeenCalledWith(101, 3, ADMIN_ID);
-    expect(res.body.data.ticketNo).toBe(HEX_TICKET);
+    expect(res.body.data.ticketNo).toBe(INITIAL_TICKET);
     expect(isFormalDocTicketNo(res.body.data.ticketNo)).toBe(false);
   });
 
-  it('PATCH /api/jobs/:id/out-of-contract keeps hex ticketNo', async () => {
+  it('PATCH /api/jobs/:id/out-of-contract keeps RQ-CM ticketNo', async () => {
     const res = await request(app.getHttpServer())
       .patch('/api/jobs/101/out-of-contract')
       .set('Authorization', 'Bearer admin')
@@ -263,7 +283,7 @@ describe('Jobs Doc No / classify-doc (e2e HTTP)', () => {
     expect(isFormalDocTicketNo(res.body.data.ticketNo)).toBe(true);
   });
 
-  it('classify-doc on non-RESOLVED → 400', async () => {
+  it('classify-doc on CANCELLED → 400', async () => {
     const res = await request(app.getHttpServer())
       .patch('/api/jobs/11/classify-doc')
       .set('Authorization', 'Bearer admin')
@@ -271,7 +291,7 @@ describe('Jobs Doc No / classify-doc (e2e HTTP)', () => {
       .expect(400);
 
     expect(res.body.success).toBe(false);
-    expect(String(res.body.error.message)).toMatch(/RESOLVED|เสร็จสิ้น/);
+    expect(String(res.body.error.message)).toMatch(/ยกเลิก/);
   });
 
   it('classify-doc when already classified → 409', async () => {
@@ -487,7 +507,7 @@ describe('JobsService Doc No (create / assign / classify)', () => {
     );
   });
 
-  it('create() assigns hex 8-char ticketNo and ignores client ticketNo', async () => {
+  it('create() assigns RQ-CM-YYYYXXXX ticketNo and ignores client ticketNo', async () => {
     const created = await service.create({
       description: 'รายละเอียดปัญหาอย่างน้อยสิบตัวอักษร',
       reporterName: 'ผู้แจ้ง',
@@ -497,9 +517,46 @@ describe('JobsService Doc No (create / assign / classify)', () => {
 
     expect(prisma.job.create).toHaveBeenCalled();
     const saved = prisma.job.create.mock.calls[0][0].data;
-    expect(saved.ticketNo).toMatch(/^[0-9a-f]{8}$/);
+    expect(saved.ticketNo).toMatch(/^RQ-CM-\d{4}\d{4,}$/);
+    expect(isRequestTicketNo(saved.ticketNo)).toBe(true);
     expect(saved.ticketNo).not.toBe('CM-SHF-2002-9999');
     expect(isFormalDocTicketNo(created.ticketNo)).toBe(false);
+  });
+
+  it('create() generates sequential RQ-CM-YYYYXXXX numbers', async () => {
+    let mockLastValue = 0;
+    const tx = {
+      $executeRaw: jest.fn().mockImplementation(async () => 1),
+      $queryRaw: jest
+        .fn()
+        .mockImplementation(async () => [{ lastValue: mockLastValue }]),
+      job: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockImplementation(async ({ data }) => {
+          mockLastValue++;
+          return { id: mockLastValue, status: 'PENDING', ...data };
+        }),
+      },
+    };
+    prisma.$transaction.mockImplementation(
+      async (fn: (t: typeof tx) => unknown) => fn(tx),
+    );
+
+    const j1 = await service.create({
+      description: 'ปัญหาข้อที่หนึ่งของระบบ',
+      reporterName: 'ผู้แจ้ง 1',
+      reporterPhone: '0812345678',
+    } as never);
+
+    const j2 = await service.create({
+      description: 'ปัญหาข้อที่สองของระบบ',
+      reporterName: 'ผู้แจ้ง 2',
+      reporterPhone: '0812345678',
+    } as never);
+
+    expect(j1.ticketNo).toMatch(/^RQ-CM-\d{4}0001$/);
+    expect(j2.ticketNo).toMatch(/^RQ-CM-\d{4}0002$/);
   });
 
   it('assignStaff() does not write ticketNo', async () => {
@@ -637,12 +694,15 @@ describe('JobsService Doc No (create / assign / classify)', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('classifyDoc() rejects non-RESOLVED', async () => {
+  it('classifyDoc() rejects when CANCELLED', async () => {
+    rolesService.getPermissionsForUser.mockResolvedValue([
+      'job.classifyDoc.contract',
+    ]);
     const tx = {
       job: {
         findUnique: jest.fn().mockResolvedValue({
           id: 10,
-          status: 'PENDING',
+          status: 'CANCELLED',
           ticketNo: HEX_TICKET,
         }),
         update: jest.fn(),

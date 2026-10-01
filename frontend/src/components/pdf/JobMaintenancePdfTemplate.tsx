@@ -255,7 +255,7 @@ function SignatureBlock({
           gap: 4,
         }}
       >
-        <span style={{ flexShrink: 0 }}>ชื่อ (</span>
+        <span style={{ flexShrink: 0 }}>   (</span>
         <span
           style={{
             flex: 1,
@@ -372,7 +372,10 @@ export function JobMaintenancePdfTemplate({
             <tbody>
               <tr>
                 <FieldCell label="เลขที่ใบแจ้งซ่อม" value={job.ticketNo || "–"} />
-                <FieldCell label="วันที่แจ้งซ่อม" value={fmtDate(reportDt)} />
+                <FieldCell
+                  label="วันที่ได้รับแจ้งซ่อม"
+                  value={fmtDate(reportDt)}
+                />
               </tr>
               <tr>
                 <FieldCell label="ชื่อสถานี" value={job.location || "–"} />
@@ -465,7 +468,7 @@ export function JobMaintenancePdfTemplate({
                 <SignatureBlock
                   signatureSrc={prefetchedImages?.reporterSignature}
                   printedName={job.reporterName}
-                  caption="ผู้แจ้งเหตุขัดข้อง"
+                  caption="ผู้แจ้งเหตุขัดข้อง / ผู้ใช้งาน"
                 />
               </tr>
             </tbody>

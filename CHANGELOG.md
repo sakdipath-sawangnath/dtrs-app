@@ -47,21 +47,33 @@ npm install
 
 ## [Unreleased]
 
+---
+
+## [0.7.6] - 2026-10-01
+
 ### Added
 
+- ปุ่ม「จำแนกเอกสาร」ในการ์ดสถานะปัจจุบัน (`/dashboard/jobs/[id]`): แสดงปุ่มใน flex container ด้านล่างข้อความเตือนรอผู้รับผิดชอบตั้งแต่สถานะ PENDING เป็นต้นไป ควบคุมด้วยสิทธิ์ `job.classifyDoc`, `job.classifyDoc.contract`, `job.classifyDoc.outOfContract` พร้อมซ่อนปุ่มเมื่อจำแนกแล้ว และปลดล็อก Backend ให้จำแนกเอกสารได้ตั้งแต่สถานะ PENDING / IN_PROGRESS / RESOLVED
 - Sidebar เดสกท็อปย่อ–ขยายได้ (icon-rail) ใน `DashboardLayoutShell` — จำสถานะใน `localStorage` (`dtrs-sidebar-collapsed`); มือถือคง drawer เดิม
 
 ### Fixed
 
+- GlitchTip ingest tunnel (`/monitoring`): กำหนด fetch timeout 5 วินาที (`AbortSignal.timeout(5_000)`) ป้องกันค้างและคืน 502 ช้า (10–27 วินาที) เมื่อเครือข่ายมี latency สูง
+- User avatar proxy (`/user-images/:id`): กำหนด fetch timeout 8 วินาที (`AbortSignal.timeout(8_000)`) ป้องกันค้างและคืน 502 ช้า (28–40 วินาที) เมื่อ backend ยังไม่พร้อม
+- Header (`SiteHeader`): แก้ aspect-ratio โลโก้ กสทช. (`NBTC.png`) จาก 28x28 เป็นขนาดจริง 960x1265 พร้อม `objectFit: "contain"` ป้องกันภาพผิดสัดส่วนและ Next.js console warning
 - Frontend `next build`: บังคับ `NODE_ENV=production` ในสคริปต์ build และเลิกแนะนำตั้ง `NODE_ENV=development` ใน `.env` — กันพังตอน prerender `/404` (`Html` / `_document`)
 - `/public/report` + `/public/status`: ไอคอนนำหน้าในช่องเบอร์/เลขที่ใบไม่ทับ placeholder และมองเห็นใน light mode — `.form-input-glass.has-leading-icon` + `z-10` บนไอคอน (พื้น input ทึบบัง SVG ที่อยู่ใต้)
+- `JobsList` (ทุกแท็บสถานะ): แก้ปัญหาคอลัมน์ซ้อนทับกันจาก `table-fixed` บนจอแคบ — เพิ่ม `<colgroup>` กำหนดความกว้างทุกคอลัมน์ชัดเจน, เพิ่ม `min-w` (1450px / 1850px) ให้ตารางเลื่อนแนวนอนผ่าน container `overflow-x-auto`, และใส่ `max-w-0` + `truncate` + `title` tooltip ป้องกันข้อความยาวดันเซลล์ข้างเคียง
+- ระบบแจ้งซ่อมและอัปโหลดรูปภาพ (`/public/jobs` & MinIO): แก้ปัญหา connection timeout (`connect ETIMEDOUT 192.168.0.71:9000`) และ 500 error เมื่อแจ้งซ่อมพร้อมแนบรูปภาพ — เพิ่ม fallback client ไปยัง endpoint สำรองอัตโนมัติ, กำหนด timeout 5 วินาที (`MINIO_TIMEOUT_MS`), แยก try/catch สำหรับรูปภาพไม่ให้ล้มเลิกการสร้าง Job ที่บันทึกสำเร็จแล้ว, และแปลง raw socket/network error บน frontend ให้เป็นข้อความแจ้งเตือนภาษาไทยที่เข้าใจง่าย
 
 ### Changed
 
+- รายงานพิมพ์/PDF (`JobMaintenancePdfTemplate`): ปรับ label「วันที่แจ้งซ่อม」เป็น「วันที่ได้รับแจ้งซ่อม」และปรับ caption ใต้บล็อคลายเซ็นผู้แจ้งจาก「ผู้แจ้งเหตุขัดข้อง」เป็น「ผู้แจ้งเหตุขัดข้อง / ผู้ใช้งาน」
+
+- เลขที่ใบแจ้งซ่อมเริ่มต้น (Reference No.): เปลี่ยนจากรหัส hex 8 ตัวสุ่ม เป็นรูปแบบทางการเรียงลำดับ `RQ-CM-YYYYXXXX` (เช่น `RQ-CM-20260001`) โดยนับลำดับรายปีผ่าน `DocSequence` แบบ atomic transaction พร้อม fallback และปรับตารางแสดงผลแดชบอร์ดให้รองรับ
 - รายงานพิมพ์/PDF: ปรับหัวข้อฟิลด์ (เหตุขัดข้อง, วิธีการแก้ไขและผลทดสอบ, วันที่ดำเนินการแล้วเสร็จ, สถานะการแก้ไข), ลบเวลาแจ้งซ่อม/เวลาที่แก้ไข, บล็อคลายเซ็นแสดงชื่อใต้ลายเซ็น, และวาง label ยาวแบบ stack; ค่าเริ่มต้น「สถานะการแก้ไข」เป็น「ใช้งานได้ปกติ」เมื่อไม่มี `systemStatus`
 - `/public/report`: เปลี่ยน label/hint/placeholder จาก「อาการที่พบ」เป็น「เหตุขัดข้อง」
 - `/public/status`: เปลี่ยน label รายละเอียดผู้ซ่อมจาก「วิธีการแก้ไข」เป็น「วิธีการแก้ไขและผลทดสอบ」
-- `JobsList` (`/dashboard/all`): แก้คอลัมน์「รายละเอียดปัญหา」/「สถานะ」ทับกันจาก `table-fixed` — กำหนดความกว้างชัด + min-width ให้เลื่อนแนวนอน
 
 ---
 
