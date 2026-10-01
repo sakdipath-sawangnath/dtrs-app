@@ -1,9 +1,43 @@
 import path from "path";
+import os from "node:os";
 import { withSentryConfig } from "@sentry/nextjs/config";
+
+/**
+ * รวบรวม IP/hostname สำหรับ dev server เพื่อแก้ Next.js warning:
+ * "Cross-origin request detected from ... to /_next/* resource.
+ * In a future major version of Next.js, explicitly configure allowedDevOrigins in next.config"
+ */
+function getAllowedDevOrigins() {
+  const origins = new Set(["localhost", "127.0.0.1"]);
+  try {
+    const interfaces = os.networkInterfaces();
+    for (const list of Object.values(interfaces)) {
+      if (!list) continue;
+      for (const net of list) {
+        if (net.family === "IPv4" && !net.internal) {
+          origins.add(net.address);
+        }
+      }
+    }
+  } catch {
+    // fallback gracefully
+  }
+
+  const envOrigins = process.env.ALLOWED_DEV_ORIGINS;
+  if (envOrigins) {
+    for (const origin of envOrigins.split(",")) {
+      const trimmed = origin.trim();
+      if (trimmed) origins.add(trimmed);
+    }
+  }
+
+  return Array.from(origins);
+}
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  allowedDevOrigins: getAllowedDevOrigins(),
   turbopack: {
     // ใช้โฟลเดอร์ frontend เป็น root (เมื่อรันจาก frontend/) เพื่อไม่ให้สับสนกับ package-lock.json ที่ root โปรเจกต์
     root: path.resolve(process.cwd()),

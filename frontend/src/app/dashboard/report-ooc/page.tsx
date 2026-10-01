@@ -13,27 +13,20 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: 'แจ้งงานนอกสัญญา',
+  title: 'แจ้งงานนอกสัญญา — ระบบจัดการงาน',
   robots: {
     index: false,
     follow: false,
   },
 };
 
-export default async function ReportOocPage() {
+export default async function DashboardReportOocPage() {
   const session = await getServerSession(authOptions);
 
-  // 1. ผู้ใช้ไม่ได้ยืนยันตัวตน (Unauthenticated) -> redirect ไปหน้าล็อกอินพร้อม returnTo
   if (!session || !session.user) {
-    logSecurityAudit({
-      event: 'UNAUTHENTICATED_ACCESS_ATTEMPT',
-      path: '/public/report-ooc',
-      reason: 'Unauthenticated user attempted to access OOC report page',
-    });
-    redirect('/login?returnTo=' + encodeURIComponent('/public/report-ooc'));
+    redirect('/login?returnTo=' + encodeURIComponent('/dashboard/report-ooc'));
   }
 
-  // 2. ดึง permissions ที่แท้จริงจาก Server
   const token = (session as { accessToken?: string })?.accessToken;
   const permissions = await fetchServerPermissions(token);
 
@@ -45,15 +38,13 @@ export default async function ReportOocPage() {
     permissions,
   };
 
-  // 3. ยืนยันตัวตนแล้วแต่ไม่มีสิทธิ์ตาม Authorization Matrix -> ส่งคืน 404 Not Found (ไม่ใช่ 403)
-  // เพื่อปกปิดความมีอยู่ของทรัพยากรและฟังก์ชันงานนอกสัญญา
   if (!can(sessionUser, PERMISSIONS.OOC_VIEW)) {
     logSecurityAudit({
       event: 'UNAUTHORIZED_ACCESS_ATTEMPT',
       userId: sessionUser.id,
       role: sessionUser.role,
-      path: '/public/report-ooc',
-      reason: 'User lacks OOC_VIEW permission (404 Not Found returned)',
+      path: '/dashboard/report-ooc',
+      reason: 'User lacks OOC_VIEW permission',
     });
     notFound();
   }
