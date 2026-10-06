@@ -46,11 +46,13 @@ describe('PublicJobsController & OOC Access Security', () => {
 
   describe('getStatusPublic', () => {
     it('returns 404 NotFoundException when ticket is out-of-contract or not found', async () => {
-      (jobsService.findByTicketNoForStatus as jest.Mock).mockResolvedValue(null);
-
-      await expect(controller.getStatusPublic('RQ-OOC-20260001')).rejects.toThrow(
-        NotFoundException,
+      (jobsService.findByTicketNoForStatus as jest.Mock).mockResolvedValue(
+        null,
       );
+
+      await expect(
+        controller.getStatusPublic('RQ-OOC-20260001'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('returns masked job detail for valid in-contract job', async () => {
@@ -59,7 +61,9 @@ describe('PublicJobsController & OOC Access Security', () => {
         ticketNo: 'RQ-CM-20260001',
         detailLevel: 'masked',
       };
-      (jobsService.findByTicketNoForStatus as jest.Mock).mockResolvedValue(mockJob);
+      (jobsService.findByTicketNoForStatus as jest.Mock).mockResolvedValue(
+        mockJob,
+      );
 
       const result = await controller.getStatusPublic('RQ-CM-20260001');
       expect(result).toEqual(mockJob);
@@ -122,7 +126,9 @@ describe('PublicJobsController & OOC Access Security', () => {
       ]);
 
       const mockCreated = { id: 101, requestTicketNo: 'RQ-OOC-20260001' };
-      (jobsService.createFromPublicReport as jest.Mock).mockResolvedValue(mockCreated);
+      (jobsService.createFromPublicReport as jest.Mock).mockResolvedValue(
+        mockCreated,
+      );
 
       const dto = {
         isOutOfContract: true,

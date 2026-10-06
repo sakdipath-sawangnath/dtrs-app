@@ -102,14 +102,19 @@ export function formatDocTicketNo(params: {
   const running = formatDocRunning(params.running);
   if (params.isOutOfContract) {
     if (params.periodYear) {
-      return formatOocDocTicketNo({ year: params.periodYear, running: params.running });
+      return formatOocDocTicketNo({
+        year: params.periodYear,
+        running: params.running,
+      });
     }
     const period = (params.periodYm ?? '').trim();
     if (/^\d{4}$/.test(period)) {
       return formatOocDocTicketNo({ year: period, running: params.running });
     }
     if (!/^\d{6}$/.test(period)) {
-      throw new RangeError('periodYm ต้องเป็น YYYYMM 6 หลัก หรือ periodYear 4 หลัก');
+      throw new RangeError(
+        'periodYm ต้องเป็น YYYYMM 6 หลัก หรือ periodYear 4 หลัก',
+      );
     }
     return `${period}${running}`;
   }

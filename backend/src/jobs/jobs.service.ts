@@ -405,10 +405,7 @@ export class JobsService implements OnModuleInit {
     if (includeSensitive) {
       const job = await this.prisma.job.findFirst({
         where: {
-          OR: [
-            { requestTicketNo: trimmed },
-            { ticketNo: trimmed },
-          ],
+          OR: [{ requestTicketNo: trimmed }, { ticketNo: trimmed }],
         },
         select: {
           id: true,
@@ -443,10 +440,7 @@ export class JobsService implements OnModuleInit {
 
     const job = await this.prisma.job.findFirst({
       where: {
-        OR: [
-          { requestTicketNo: trimmed },
-          { ticketNo: trimmed },
-        ],
+        OR: [{ requestTicketNo: trimmed }, { ticketNo: trimmed }],
         NOT: { isOutOfContract: true },
       },
       select: {
@@ -1296,7 +1290,12 @@ export class JobsService implements OnModuleInit {
     return this.prisma.$transaction(async (tx) => {
       const job = await tx.job.findUnique({
         where: { id },
-        select: { id: true, status: true, ticketNo: true, requestTicketNo: true },
+        select: {
+          id: true,
+          status: true,
+          ticketNo: true,
+          requestTicketNo: true,
+        },
       });
       if (!job) throw new NotFoundException(`ไม่พบ Job id=${id}`);
       if (job.status === JobStatus.CANCELLED) {
@@ -1482,10 +1481,7 @@ export class JobsService implements OnModuleInit {
     if (typeof (tx as any).job?.findFirst === 'function') {
       const clash = await (tx as any).job.findFirst({
         where: {
-          OR: [
-            { requestTicketNo: ticketNo },
-            { ticketNo },
-          ],
+          OR: [{ requestTicketNo: ticketNo }, { ticketNo }],
         },
         select: { id: true },
       });
@@ -1604,10 +1600,7 @@ export class JobsService implements OnModuleInit {
     if (typeof (tx as any).job?.findFirst === 'function') {
       const clash = await (tx as any).job.findFirst({
         where: {
-          OR: [
-            { requestTicketNo: ticketNo },
-            { ticketNo },
-          ],
+          OR: [{ requestTicketNo: ticketNo }, { ticketNo }],
         },
         select: { id: true },
       });
@@ -1745,10 +1738,7 @@ export class JobsService implements OnModuleInit {
 
     const clash = await tx.job.findFirst({
       where: {
-        OR: [
-          { ticketNo },
-          { requestTicketNo: ticketNo },
-        ],
+        OR: [{ ticketNo }, { requestTicketNo: ticketNo }],
       },
       select: { id: true },
     });

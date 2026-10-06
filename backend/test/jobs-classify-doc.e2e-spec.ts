@@ -32,7 +32,6 @@ import { SitesService } from '../src/sites/sites.service';
 import { UsersService } from '../src/users/users.service';
 import {
   bangkokYear,
-  bangkokYearMonth,
   isFormalDocTicketNo,
   isRequestTicketNo,
 } from '../src/jobs/doc-ticket-no';
@@ -620,7 +619,12 @@ describe('JobsService Doc No (create / assign / classify)', () => {
       job: {
         findUnique: jest.fn().mockImplementation(async ({ where }) => {
           if (where.id === 10) {
-            return { id: 10, status: 'RESOLVED', ticketNo: null, requestTicketNo: HEX_TICKET };
+            return {
+              id: 10,
+              status: 'RESOLVED',
+              ticketNo: null,
+              requestTicketNo: HEX_TICKET,
+            };
           }
           if (where.ticketNo) return null;
           return null;
@@ -651,7 +655,12 @@ describe('JobsService Doc No (create / assign / classify)', () => {
       job: {
         findUnique: jest.fn().mockImplementation(async ({ where }) => {
           if (where.id === 10) {
-            return { id: 10, status: 'RESOLVED', ticketNo: null, requestTicketNo: HEX_TICKET };
+            return {
+              id: 10,
+              status: 'RESOLVED',
+              ticketNo: null,
+              requestTicketNo: HEX_TICKET,
+            };
           }
           if (where.ticketNo) return null;
           return null;
