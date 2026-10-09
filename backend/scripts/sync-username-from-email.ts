@@ -21,7 +21,9 @@ async function main() {
   for (const u of users) {
     const email = u.email?.trim();
     if (!email) {
-      console.log(`  [ข้าม] id=${u.id} name=${u.name ?? '-'} ไม่มี email (username=${u.username})`);
+      console.log(
+        `  [ข้าม] id=${u.id} name=${u.name ?? '-'} ไม่มี email (username=${u.username})`,
+      );
       skipped++;
       continue;
     }
@@ -34,10 +36,15 @@ async function main() {
         where: { id: u.id },
         data: { username: email },
       });
-      console.log(`  [อัปเดต] id=${u.id} username: "${u.username}" → "${email}"`);
+      console.log(
+        `  [อัปเดต] id=${u.id} username: "${u.username}" → "${email}"`,
+      );
       updated++;
     } catch (e) {
-      console.error(`  [ผิดพลาด] id=${u.id} ไม่สามารถตั้ง username="${email}" ได้ (อาจซ้ำ):`, e);
+      console.error(
+        `  [ผิดพลาด] id=${u.id} ไม่สามารถตั้ง username="${email}" ได้ (อาจซ้ำ):`,
+        e,
+      );
     }
   }
 

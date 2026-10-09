@@ -1,19 +1,32 @@
-/* eslint-disable no-console */
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 async function main() {
-  console.log('Effective env DATABASE_URL=', process.env.DATABASE_URL ? 'SET' : 'EMPTY');
+  console.log(
+    'Effective env DATABASE_URL=',
+    process.env.DATABASE_URL ? 'SET' : 'EMPTY',
+  );
   if (process.env.DATABASE_URL) console.log(process.env.DATABASE_URL);
-  console.log('Effective env MINIO_ENDPOINT=', process.env.MINIO_ENDPOINT ?? '(undefined)');
+  console.log(
+    'Effective env MINIO_ENDPOINT=',
+    process.env.MINIO_ENDPOINT ?? '(undefined)',
+  );
   const app = await NestFactory.createApplicationContext(AppModule, {
     logger: ['log', 'error', 'warn'],
   });
   const prisma = app.get(PrismaService);
 
   const users = await prisma.user.findMany({
-    select: { id: true, email: true, username: true, phone: true, role: true, image: true, name: true },
+    select: {
+      id: true,
+      email: true,
+      username: true,
+      phone: true,
+      role: true,
+      image: true,
+      name: true,
+    },
     take: 50,
     orderBy: { id: 'asc' },
   });
@@ -38,4 +51,3 @@ main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
-

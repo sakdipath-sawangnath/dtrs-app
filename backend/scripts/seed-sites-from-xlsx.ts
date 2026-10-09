@@ -15,10 +15,7 @@
 
 import * as path from 'path';
 import { PrismaClient } from '@prisma/client';
-import {
-  loadWorkbookXlsx,
-  worksheetToRecords,
-} from './excel-sheet';
+import { loadWorkbookXlsx, worksheetToRecords } from './excel-sheet';
 
 const cliArgs = new Set(process.argv.slice(2));
 const prisma = new PrismaClient();
@@ -71,7 +68,9 @@ function parseRows(records: Record<string, unknown>[]): SiteRow[] {
 
     if (!province || !district || !agency || !station) continue;
 
-    const key = [province, district, subdistrict ?? '', agency, station].join('\0');
+    const key = [province, district, subdistrict ?? '', agency, station].join(
+      '\0',
+    );
     if (seen.has(key)) continue;
     seen.add(key);
 
@@ -122,7 +121,9 @@ async function main() {
 
   if (CLEAR) {
     const deleted = await prisma.site.deleteMany({});
-    console.log(`[seed-sites-xlsx] ลบ Site เก่า ${deleted.count} แถว (CLEAR_SITES_BEFORE_IMPORT=1)`);
+    console.log(
+      `[seed-sites-xlsx] ลบ Site เก่า ${deleted.count} แถว (CLEAR_SITES_BEFORE_IMPORT=1)`,
+    );
   }
 
   let created = 0;

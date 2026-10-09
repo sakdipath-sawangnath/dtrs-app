@@ -7,6 +7,7 @@ import {
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
+import { App } from 'supertest/types';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
 import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
@@ -17,6 +18,22 @@ import { JobsPdfService } from '../src/jobs/jobs-pdf.service';
 import { JobsService } from '../src/jobs/jobs.service';
 import { MinioService } from '../src/minio/minio.service';
 import { RolesService } from '../src/roles/roles.service';
+
+interface ApiEnvelope<T = unknown> {
+  data?: T;
+  error?: { message?: string };
+}
+
+interface JobItem {
+  id?: number;
+  ticketNo?: string;
+  status?: string;
+  fixEnvironment?: string;
+  brokenPart?: string;
+  cause?: string;
+  fixMethod?: string;
+  fixImages?: string[];
+}
 
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -37,7 +54,9 @@ const awaitingSignatureJob = {
 
 class AllowAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
-    const req = context.switchToHttp().getRequest();
+    const req = context.switchToHttp().getRequest<{
+      user?: { id: number; role: string };
+    }>();
     req.user = { id: 7, role: 'STAFF' };
     return true;
   }
@@ -66,10 +85,15 @@ describe('PATCH /api/jobs/:id/fix and /close (e2e)', () => {
   const eventsGateway = {
     notifyJobUpdate: jest.fn(),
   };
+  const rolesService = {
+    getPermissionsForUser: jest
+      .fn()
+      .mockResolvedValue(['job.viewContractTabs']),
+  };
 
   async function createApp(opts: {
     authenticated: boolean;
-  }): Promise<INestApplication> {
+  }): Promise<INestApplication<App>> {
     const moduleFixture = await Test.createTestingModule({
       controllers: [JobsController],
       providers: [
@@ -77,7 +101,7 @@ describe('PATCH /api/jobs/:id/fix and /close (e2e)', () => {
         { provide: JobsPdfService, useValue: {} },
         { provide: MinioService, useValue: minioService },
         { provide: EventsGateway, useValue: eventsGateway },
-        { provide: RolesService, useValue: {} },
+        { provide: RolesService, useValue: rolesService },
         { provide: APP_FILTER, useClass: AllExceptionsFilter },
         {
           provide: APP_GUARD,
@@ -91,7 +115,7 @@ describe('PATCH /api/jobs/:id/fix and /close (e2e)', () => {
       .useValue({ canActivate: () => true })
       .compile();
 
-    const app = moduleFixture.createNestApplication();
+    const app = moduleFixture.createNestApplication<INestApplication<App>>();
     app.setGlobalPrefix('api');
     app.useGlobalInterceptors(new ResponseInterceptor());
     await app.init();
@@ -111,8 +135,8 @@ describe('PATCH /api/jobs/:id/fix and /close (e2e)', () => {
     });
     jobsService.findAll.mockResolvedValue([awaitingSignatureJob]);
     minioService.uploadJobImage.mockImplementation(
-      async (jobId: number, kind: string, index: number) =>
-        `http://minio.test/jobs/${jobId}/${kind}/${index}.jpg`,
+      (jobId: number, kind: string, index: number) =>
+        Promise.resolve(`http://minio.test/jobs/${jobId}/${kind}/${index}.jpg`),
     );
     minioService.uploadJobReporterSignature.mockResolvedValue(
       'http://minio.test/jobs/42/signature.png',
@@ -158,7 +182,8 @@ describe('PATCH /api/jobs/:id/fix and /close (e2e)', () => {
       expect(jobsService.assertUserCanFix).toHaveBeenCalledWith(42, 7);
       expect(jobsService.saveFixInfo).toHaveBeenCalled();
       expect(jobsService.closeJob).not.toHaveBeenCalled();
-      expect(res.body?.data?.status).toBe('IN_PROGRESS');
+      const body = res.body as ApiEnvelope<{ status?: string }>;
+      expect(body?.data?.status).toBe('IN_PROGRESS');
     } finally {
       await app.close();
     }
@@ -171,13 +196,14 @@ describe('PATCH /api/jobs/:id/fix and /close (e2e)', () => {
         .get('/api/jobs/list')
         .expect(200);
 
-      const job = res.body?.data?.[0];
-      expect(job.status).toBe('IN_PROGRESS');
-      expect(job.fixEnvironment).toBe('INDOOR');
-      expect(job.brokenPart).toBe('Hardware');
-      expect(job.cause).toBe('สายหลุด');
-      expect(job.fixMethod).toBe('ต่อสายใหม่');
-      expect(job.fixImages).toHaveLength(2);
+      const body = res.body as ApiEnvelope<JobItem[]>;
+      const job = body?.data?.[0];
+      expect(job?.status).toBe('IN_PROGRESS');
+      expect(job?.fixEnvironment).toBe('INDOOR');
+      expect(job?.brokenPart).toBe('Hardware');
+      expect(job?.cause).toBe('สายหลุด');
+      expect(job?.fixMethod).toBe('ต่อสายใหม่');
+      expect(job?.fixImages).toHaveLength(2);
     } finally {
       await app.close();
     }
@@ -199,7 +225,8 @@ describe('PATCH /api/jobs/:id/fix and /close (e2e)', () => {
 
       expect(jobsService.closeJob).not.toHaveBeenCalled();
       expect(minioService.uploadJobReporterSignature).not.toHaveBeenCalled();
-      expect(String(res.body?.error?.message ?? '')).toMatch(/สาเหตุ/);
+      const body = res.body as ApiEnvelope;
+      expect(String(body?.error?.message ?? '')).toMatch(/สาเหตุ/);
     } finally {
       await app.close();
     }
@@ -213,7 +240,8 @@ describe('PATCH /api/jobs/:id/fix and /close (e2e)', () => {
         .expect(400);
 
       expect(jobsService.closeJob).not.toHaveBeenCalled();
-      expect(String(res.body?.error?.message ?? '')).toMatch(/ลายเซ็นผู้แจ้ง/);
+      const body = res.body as ApiEnvelope;
+      expect(String(body?.error?.message ?? '')).toMatch(/ลายเซ็นผู้แจ้ง/);
     } finally {
       await app.close();
     }
@@ -238,7 +266,8 @@ describe('PATCH /api/jobs/:id/fix and /close (e2e)', () => {
         7,
         expect.any(String),
       );
-      expect(res.body?.data?.status).toBe('RESOLVED');
+      const body = res.body as ApiEnvelope<{ status?: string }>;
+      expect(body?.data?.status).toBe('RESOLVED');
     } finally {
       await app.close();
     }

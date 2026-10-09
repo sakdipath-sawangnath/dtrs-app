@@ -20,7 +20,9 @@ const ADMIN_EMAIL_USERNAME = ADMIN_EMAIL;
 const ADMIN_EMAIL_NAME = 'ผู้ดูแลระบบ (Forth)';
 
 async function main() {
-  const existing = await prisma.user.findUnique({ where: { username: ADMIN_USERNAME } });
+  const existing = await prisma.user.findUnique({
+    where: { username: ADMIN_USERNAME },
+  });
   if (!existing) {
     const hashed = await bcrypt.hash(ADMIN_PASSWORD, 10);
     await prisma.user.create({
@@ -40,7 +42,9 @@ async function main() {
   }
 
   // Seed admin เพิ่มเติมด้วย email
-  const existingEmailAdmin = await prisma.user.findUnique({ where: { username: ADMIN_EMAIL_USERNAME } });
+  const existingEmailAdmin = await prisma.user.findUnique({
+    where: { username: ADMIN_EMAIL_USERNAME },
+  });
   if (existingEmailAdmin) {
     console.log('✓ มี user admin (email/admin@forth.co.th) อยู่แล้ว');
     return;

@@ -11,10 +11,7 @@ import * as dotenv from 'dotenv';
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 import { PrismaClient } from '@prisma/client';
-import {
-  bangkokYear,
-  formatRequestTicketNo,
-} from '../src/jobs/doc-ticket-no';
+import { bangkokYear, formatRequestTicketNo } from '../src/jobs/doc-ticket-no';
 
 const prisma = new PrismaClient();
 
@@ -41,13 +38,17 @@ async function main() {
   );
 
   if (hexJobs.length === 0) {
-    console.log('✅ ไม่พบใบแจ้งซ่อมที่ต้อง migrate (ทั้งหมดอยู่ในรูปแบบใหม่แล้ว)');
+    console.log(
+      '✅ ไม่พบใบแจ้งซ่อมที่ต้อง migrate (ทั้งหมดอยู่ในรูปแบบใหม่แล้ว)',
+    );
     return;
   }
 
   console.log(`พบ ${hexJobs.length} รายการที่ต้อง migrate:`);
   for (const j of hexJobs) {
-    console.log(`  - Job #${j.id}: ticketNo="${j.ticketNo}" (วันที่: ${j.reportDate?.toISOString()})`);
+    console.log(
+      `  - Job #${j.id}: ticketNo="${j.ticketNo}" (วันที่: ${j.reportDate?.toISOString()})`,
+    );
   }
 
   // กลุ่มตามปี Asia/Bangkok
@@ -61,7 +62,9 @@ async function main() {
   }
 
   for (const [year, jobs] of byYear.entries()) {
-    console.log(`\nกำลังประมวลผลสำหรับปี ${year} (จำนวน ${jobs.length} รายการ)...`);
+    console.log(
+      `\nกำลังประมวลผลสำหรับปี ${year} (จำนวน ${jobs.length} รายการ)...`,
+    );
     const kind = 'RQ_CM';
     const period = year;
 
@@ -131,7 +134,9 @@ async function main() {
       },
     });
 
-    console.log(`✅ อัปเดต DocSequence (${kind}, ${period}) = ${currentRunning} สำเร็จ`);
+    console.log(
+      `✅ อัปเดต DocSequence (${kind}, ${period}) = ${currentRunning} สำเร็จ`,
+    );
   }
 
   console.log('\n🎉 Migrate ทั้งหมดเรียบร้อยแล้ว!');

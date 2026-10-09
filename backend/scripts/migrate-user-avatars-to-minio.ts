@@ -28,7 +28,10 @@ const DRY_RUN = process.env.DRY_RUN !== 'false';
 
 // โฟลเดอร์เก็บไฟล์เดิมจาก AppSheet
 // ตัวอย่าง: d:\cctv-app.forth-co-th\CCTVMaintenance-641488446\ผู้แก้ไข_Images\...
-const APPSHEET_ROOT = path.resolve(__dirname, '../../CCTVMaintenance-641488446');
+const APPSHEET_ROOT = path.resolve(
+  __dirname,
+  '../../CCTVMaintenance-641488446',
+);
 
 // ตั้งค่าจาก .env ให้เหมือน MinioService
 const MINIO_BUCKET_NAME = process.env.MINIO_BUCKET_NAME || 'cctv-app';
@@ -54,7 +57,8 @@ function createMinioClient() {
 
 function getPublicBaseUrl(): string {
   const publicBase =
-    process.env.MINIO_PUBLIC_URL && process.env.MINIO_PUBLIC_URL.trim().length > 0
+    process.env.MINIO_PUBLIC_URL &&
+    process.env.MINIO_PUBLIC_URL.trim().length > 0
       ? process.env.MINIO_PUBLIC_URL.replace(/\/+$/, '')
       : undefined;
 
@@ -94,13 +98,17 @@ async function migrate() {
 
   if (!fs.existsSync(APPSHEET_ROOT)) {
     console.warn('⚠️  ไม่พบโฟลเดอร์ APPSHEET_ROOT:', APPSHEET_ROOT);
-    console.warn('    โปรดคัดลอกโฟลเดอร์/ไฟล์จาก CCTVMaintenance (AppSheet) มาไว้ที่นี่ก่อน');
+    console.warn(
+      '    โปรดคัดลอกโฟลเดอร์/ไฟล์จาก CCTVMaintenance (AppSheet) มาไว้ที่นี่ก่อน',
+    );
   }
 
   const minioClient = createMinioClient();
 
   if (!DRY_RUN) {
-    const exists = await minioClient.bucketExists(MINIO_BUCKET_NAME).catch(() => false);
+    const exists = await minioClient
+      .bucketExists(MINIO_BUCKET_NAME)
+      .catch(() => false);
     if (!exists) {
       console.log(`🪣 สร้าง bucket ใหม่: ${MINIO_BUCKET_NAME}`);
       await minioClient.makeBucket(MINIO_BUCKET_NAME, 'us-east-1');
@@ -182,7 +190,10 @@ async function migrate() {
 
   console.log('\n📊 สรุปผลการประมวลผล:');
   console.log('   จำนวนผู้ใช้ที่ migrate avatar แล้ว         :', migrated);
-  console.log('   จำนวนผู้ใช้ที่ image เป็น URL อยู่แล้ว     :', skippedAlreadyUrl);
+  console.log(
+    '   จำนวนผู้ใช้ที่ image เป็น URL อยู่แล้ว     :',
+    skippedAlreadyUrl,
+  );
   console.log('   จำนวนไฟล์ที่หาไม่เจอ (missing files)       :', missingFiles);
   console.log('   DRY_RUN                                      :', DRY_RUN);
 }
@@ -201,4 +212,3 @@ migrate()
     await prisma.$disconnect();
     process.exit(1);
   });
-
