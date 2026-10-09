@@ -17,7 +17,6 @@
  *   $env:DRY_RUN="false"; npx ts-node -r tsconfig-paths/register ./scripts/migrate-all-job-images-to-minio.ts
  */
 
-/* eslint-disable no-console */
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -28,11 +27,16 @@ import * as path from 'path';
 const DRY_RUN = (process.env.DRY_RUN ?? 'true') !== 'false';
 const LIMIT = process.env.LIMIT ? Number(process.env.LIMIT) : undefined;
 
-const APPSHEET_ROOT = path.resolve(__dirname, '..', '..', 'CCTVMaintenance-641488446');
+const APPSHEET_ROOT = path.resolve(
+  __dirname,
+  '..',
+  '..',
+  'CCTVMaintenance-641488446',
+);
 
 function toStringArray(v: unknown): string[] {
   if (!v) return [];
-  if (Array.isArray(v)) return v.filter((x) => typeof x === 'string') as string[];
+  if (Array.isArray(v)) return v.filter((x) => typeof x === 'string');
   return [];
 }
 
@@ -45,7 +49,10 @@ function guessMimeTypeFromExt(ext: string): string {
   return 'image/jpeg';
 }
 
-async function buildBasenameIndex(rootDir: string, targets: Set<string>): Promise<Map<string, string>> {
+async function buildBasenameIndex(
+  rootDir: string,
+  targets: Set<string>,
+): Promise<Map<string, string>> {
   const index = new Map<string, string>();
   const stack: string[] = [rootDir];
 
@@ -101,10 +108,18 @@ async function main() {
       images: toStringArray(j.images),
       fixImages: toStringArray(j.fixImages),
     }))
-    .filter((j) => j.images.some((s) => !isUrl(s)) || j.fixImages.some((s) => !isUrl(s)));
+    .filter(
+      (j) =>
+        j.images.some((s) => !isUrl(s)) || j.fixImages.some((s) => !isUrl(s)),
+    );
 
-  const selectedJobs = typeof LIMIT === 'number' && Number.isFinite(LIMIT) ? legacyJobs.slice(0, LIMIT) : legacyJobs;
-  console.log(`jobs total=${jobs.length}, legacyJobs=${legacyJobs.length}, selected=${selectedJobs.length}`);
+  const selectedJobs =
+    typeof LIMIT === 'number' && Number.isFinite(LIMIT)
+      ? legacyJobs.slice(0, LIMIT)
+      : legacyJobs;
+  console.log(
+    `jobs total=${jobs.length}, legacyJobs=${legacyJobs.length}, selected=${selectedJobs.length}`,
+  );
 
   // เก็บ basenames ที่ต้องหาไฟล์
   const targets = new Set<string>();
@@ -144,7 +159,9 @@ async function main() {
         const basename = path.basename(src);
         const abs = basenameIndex.get(basename);
         if (!abs) {
-          console.warn(`[SKIP] missing file for kind=${kind} basename=${basename}`);
+          console.warn(
+            `[SKIP] missing file for kind=${kind} basename=${basename}`,
+          );
           continue;
         }
 
@@ -198,10 +215,14 @@ async function main() {
       },
     });
     migratedJobs++;
-    console.log(`Updated job ${jobId}: images=${images.length}, fixImages=${fixImages.length}`);
+    console.log(
+      `Updated job ${jobId}: images=${images.length}, fixImages=${fixImages.length}`,
+    );
   }
 
-  console.log(`\nDone. migratedJobs=${migratedJobs}, skippedJobs=${skippedJobs}`);
+  console.log(
+    `\nDone. migratedJobs=${migratedJobs}, skippedJobs=${skippedJobs}`,
+  );
   await app.close();
 }
 
@@ -209,4 +230,3 @@ main().catch(async (err) => {
   console.error(err);
   process.exit(1);
 });
-

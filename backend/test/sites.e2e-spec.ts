@@ -5,6 +5,18 @@ import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
 
+interface SiteItem {
+  province?: string;
+  district?: string;
+  agency?: string;
+  station?: string;
+}
+
+interface ApiResponse<T> {
+  success?: boolean;
+  data?: T;
+}
+
 describe('Sites API (e2e)', () => {
   let app: INestApplication<App>;
 
@@ -28,14 +40,15 @@ describe('Sites API (e2e)', () => {
       .get('/api/sites')
       .expect(200);
 
-    const payload = res.body?.data ?? res.body;
+    const body = res.body as ApiResponse<SiteItem[]> | SiteItem[];
+    const payload = Array.isArray(body) ? body : (body.data ?? []);
     expect(Array.isArray(payload)).toBe(true);
 
     if (payload.length === 0) {
       return;
     }
 
-    const first = payload[0] as Record<string, unknown>;
+    const first = payload[0];
     expect(first).toHaveProperty('province');
     expect(first).toHaveProperty('district');
     expect(first).toHaveProperty('agency');
@@ -51,7 +64,8 @@ describe('Sites API (e2e)', () => {
       .get('/api/sites/options/provinces')
       .expect(200);
 
-    const payload = res.body?.data ?? res.body;
+    const body = res.body as ApiResponse<string[]> | string[];
+    const payload = Array.isArray(body) ? body : (body.data ?? []);
     expect(Array.isArray(payload)).toBe(true);
     if (payload.length === 0) return;
     expect(typeof payload[0]).toBe('string');

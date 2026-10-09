@@ -43,9 +43,13 @@ async function main() {
   const endTodayBkk = getEndOfTodayBangkok();
   const { gte, lt } = bangkokYearUtcBounds(auditYear);
 
-  console.log('--- audit-job-report-future-in-year (อ่านอย่างเดียว / dry-run) ---');
+  console.log(
+    '--- audit-job-report-future-in-year (อ่านอย่างเดียว / dry-run) ---',
+  );
   console.log(`AUDIT_YEAR (ปฏิทิน Bangkok): ${auditYear}`);
-  console.log(`สิ้นวันนี้ Bangkok (เทียบกับ reportDate): ${endTodayBkk.toISOString()}  ≈  ${formatBangkokDisplay(endTodayBkk)}`);
+  console.log(
+    `สิ้นวันนี้ Bangkok (เทียบกับ reportDate): ${endTodayBkk.toISOString()}  ≈  ${formatBangkokDisplay(endTodayBkk)}`,
+  );
   console.log('');
 
   const candidates = await prisma.job.findMany({
@@ -70,8 +74,12 @@ async function main() {
     (j) => j.reportDate && j.reportDate.getTime() > endTodayBkk.getTime(),
   );
 
-  console.log(`รวม Job ที่มี reportDate ในช่วง UTC รอบปี ${auditYear} (Bangkok): ${inYear.length} แถว`);
-  console.log(`เคส "แจ้งล่วงหน้า" (reportDate > สิ้นวันนี้ Bangkok): ${invalid.length} แถว`);
+  console.log(
+    `รวม Job ที่มี reportDate ในช่วง UTC รอบปี ${auditYear} (Bangkok): ${inYear.length} แถว`,
+  );
+  console.log(
+    `เคส "แจ้งล่วงหน้า" (reportDate > สิ้นวันนี้ Bangkok): ${invalid.length} แถว`,
+  );
   console.log('');
 
   if (invalid.length === 0) {

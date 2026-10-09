@@ -6,6 +6,7 @@ import {
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
+import { App } from 'supertest/types';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
 import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
@@ -17,12 +18,19 @@ import { JobsService } from '../src/jobs/jobs.service';
 import { MinioService } from '../src/minio/minio.service';
 import { RolesService } from '../src/roles/roles.service';
 
+interface ApiEnvelope<T = unknown> {
+  data?: T;
+  error?: { message?: string };
+}
+
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
 const GIF = Buffer.from('GIF89a', 'ascii');
 
 class AllowAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
-    const req = context.switchToHttp().getRequest();
+    const req = context.switchToHttp().getRequest<{
+      user?: { id: number; role: string };
+    }>();
     req.user = { id: 7, role: 'STAFF' };
     return true;
   }
@@ -49,7 +57,7 @@ describe('PATCH /api/jobs/:id/issue-images (e2e)', () => {
 
   async function createApp(opts: {
     authenticated: boolean;
-  }): Promise<INestApplication> {
+  }): Promise<INestApplication<App>> {
     const moduleFixture = await Test.createTestingModule({
       controllers: [JobsController],
       providers: [
@@ -71,7 +79,7 @@ describe('PATCH /api/jobs/:id/issue-images (e2e)', () => {
       .useValue({ canActivate: () => true })
       .compile();
 
-    const app = moduleFixture.createNestApplication();
+    const app = moduleFixture.createNestApplication<INestApplication<App>>();
     app.setGlobalPrefix('api');
     app.useGlobalInterceptors(new ResponseInterceptor());
     await app.init();
@@ -125,7 +133,8 @@ describe('PATCH /api/jobs/:id/issue-images (e2e)', () => {
       );
       expect(minioService.uploadJobImage).toHaveBeenCalled();
       expect(jobsService.setIssueImages).toHaveBeenCalled();
-      expect(res.body?.data?.id).toBe(9);
+      const body = res.body as ApiEnvelope<{ id?: number }>;
+      expect(body?.data?.id).toBe(9);
     } finally {
       await app.close();
     }
@@ -138,7 +147,8 @@ describe('PATCH /api/jobs/:id/issue-images (e2e)', () => {
         .patch('/api/jobs/9/issue-images')
         .attach('images', GIF, { filename: 'a.gif', contentType: 'image/gif' })
         .expect(400);
-      expect(String(res.body?.error?.message ?? '')).toMatch(
+      const body = res.body as ApiEnvelope;
+      expect(String(body?.error?.message ?? '')).toMatch(
         /JPG, PNG, WebP หรือ HEIC/,
       );
     } finally {
@@ -161,7 +171,8 @@ describe('PATCH /api/jobs/:id/issue-images (e2e)', () => {
           contentType: 'image/jpeg',
         })
         .expect(400);
-      expect(String(res.body?.error?.message ?? '')).toMatch(/สูงสุด 3 รูป/);
+      const body = res.body as ApiEnvelope;
+      expect(String(body?.error?.message ?? '')).toMatch(/สูงสุด 3 รูป/);
     } finally {
       await app.close();
     }

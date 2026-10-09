@@ -109,25 +109,37 @@ async function createManyBatched<T extends object>(
     const result = await createBatch(batch);
     created += result.count;
     if ((i / BATCH) % 5 === 0 || i + BATCH >= rows.length) {
-      console.log(`  … ${label}: ${Math.min(i + BATCH, rows.length)}/${rows.length}`);
+      console.log(
+        `  … ${label}: ${Math.min(i + BATCH, rows.length)}/${rows.length}`,
+      );
     }
   }
   return created;
 }
 
 async function main() {
-  console.log(DRY_RUN ? '=== DRY RUN (ไม่เขียน DB) ===' : '=== นำเข้า Locations master ===');
+  console.log(
+    DRY_RUN
+      ? '=== DRY RUN (ไม่เขียน DB) ==='
+      : '=== นำเข้า Locations master ===',
+  );
 
   const provinces = parseProvinces();
   const districts = parseDistricts();
   const subdistricts = parseSubdistricts();
 
-  console.log(`Parse: จังหวัด ${provinces.length}, อำเภอ ${districts.length}, ตำบล ${subdistricts.length}`);
+  console.log(
+    `Parse: จังหวัด ${provinces.length}, อำเภอ ${districts.length}, ตำบล ${subdistricts.length}`,
+  );
 
   const provinceCodes = new Set(provinces.map((p) => p.code));
   const districtCodes = new Set(districts.map((d) => d.code));
-  const orphanDistricts = districts.filter((d) => !provinceCodes.has(d.provinceCode));
-  const orphanSubs = subdistricts.filter((s) => !districtCodes.has(s.districtCode));
+  const orphanDistricts = districts.filter(
+    (d) => !provinceCodes.has(d.provinceCode),
+  );
+  const orphanSubs = subdistricts.filter(
+    (s) => !districtCodes.has(s.districtCode),
+  );
   if (orphanDistricts.length) {
     console.warn(`⚠️  อำเภอที่ไม่มีจังหวัด: ${orphanDistricts.length}`);
   }
@@ -136,9 +148,27 @@ async function main() {
   }
 
   if (DRY_RUN) {
-    console.log('ตัวอย่างจังหวัด:', provinces.slice(0, 3).map((p) => p.name).join(', '));
-    console.log('ตัวอย่างอำเภอ:', districts.slice(0, 3).map((d) => d.name).join(', '));
-    console.log('ตัวอย่างตำบล:', subdistricts.slice(0, 3).map((s) => s.name).join(', '));
+    console.log(
+      'ตัวอย่างจังหวัด:',
+      provinces
+        .slice(0, 3)
+        .map((p) => p.name)
+        .join(', '),
+    );
+    console.log(
+      'ตัวอย่างอำเภอ:',
+      districts
+        .slice(0, 3)
+        .map((d) => d.name)
+        .join(', '),
+    );
+    console.log(
+      'ตัวอย่างตำบล:',
+      subdistricts
+        .slice(0, 3)
+        .map((s) => s.name)
+        .join(', '),
+    );
     return;
   }
 
@@ -149,7 +179,9 @@ async function main() {
   );
   console.log(`✓ Province สร้างใหม่ ${provinceCreated} (ข้ามชื่อซ้ำได้)`);
 
-  const provinceRows = await prisma.province.findMany({ select: { id: true, name: true } });
+  const provinceRows = await prisma.province.findMany({
+    select: { id: true, name: true },
+  });
   const provinceIdByName = new Map(provinceRows.map((p) => [p.name, p.id]));
   const provinceIdByCode = new Map<string, number>();
   for (const p of provinces) {
@@ -206,7 +238,9 @@ async function main() {
     prisma.district.count(),
     prisma.subdistrict.count(),
   ]);
-  console.log(`สรุปใน DB: Province=${pCount}, District=${dCount}, Subdistrict=${sCount}`);
+  console.log(
+    `สรุปใน DB: Province=${pCount}, District=${dCount}, Subdistrict=${sCount}`,
+  );
 }
 
 main()

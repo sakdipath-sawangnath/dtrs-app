@@ -2,12 +2,19 @@ import { INestApplication } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
+import { App } from 'supertest/types';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
 import { EventsGateway } from '../src/events/events.gateway';
 import { JobsService } from '../src/jobs/jobs.service';
 import { PublicJobsController } from '../src/jobs/public-jobs.controller';
 import { MinioService } from '../src/minio/minio.service';
+
+interface ApiResponseBody {
+  data?: { ticketNo?: string };
+  error?: { message?: string };
+  message?: string;
+}
 
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
 const GIF = Buffer.from('GIF89a', 'ascii');
@@ -24,7 +31,7 @@ const VALID_FIELDS = {
 };
 
 describe('POST /api/public/jobs upload (e2e)', () => {
-  let app: INestApplication;
+  let app: INestApplication<App>;
   const jobsService = {
     createFromPublicReport: jest.fn(),
     updateImages: jest.fn(),
@@ -63,13 +70,11 @@ describe('POST /api/public/jobs upload (e2e)', () => {
       id: 42,
       ticketNo: 'deadbeef',
     });
-    jobsService.updateImages.mockImplementation(
-      async (_id: number, urls: string[]) => ({
-        id: 42,
-        ticketNo: 'deadbeef',
-        images: urls,
-      }),
-    );
+    jobsService.updateImages.mockResolvedValue({
+      id: 42,
+      ticketNo: 'deadbeef',
+      images: ['http://minio.test/jobs/42/issue/1.jpg'],
+    });
     minioService.uploadJobImage.mockResolvedValue(
       'http://minio.test/jobs/42/issue/1.jpg',
     );
@@ -97,7 +102,8 @@ describe('POST /api/public/jobs upload (e2e)', () => {
     expect(jobsService.updateImages).toHaveBeenCalledWith(42, [
       'http://minio.test/jobs/42/issue/1.jpg',
     ]);
-    expect(res.body?.data?.ticketNo).toBe('deadbeef');
+    const body = res.body as ApiResponseBody;
+    expect(body?.data?.ticketNo).toBe('deadbeef');
   });
 
   it('rejects GIF with Thai type error (400)', async () => {
@@ -108,7 +114,8 @@ describe('POST /api/public/jobs upload (e2e)', () => {
       .expect(400);
 
     expect(minioService.uploadJobImage).not.toHaveBeenCalled();
-    expect(String(res.body?.error?.message ?? res.body?.message)).toMatch(
+    const body = res.body as ApiResponseBody;
+    expect(String(body?.error?.message ?? body?.message)).toMatch(
       /JPG, PNG, WebP หรือ HEIC/,
     );
   });
@@ -127,7 +134,8 @@ describe('POST /api/public/jobs upload (e2e)', () => {
       })
       .expect(400);
 
-    expect(String(res.body?.error?.message ?? '')).toMatch(/5MB/);
+    const body = res.body as ApiResponseBody;
+    expect(String(body?.error?.message ?? '')).toMatch(/5MB/);
   });
 
   it('rejects more than 3 issue images (400)', async () => {
@@ -141,6 +149,7 @@ describe('POST /api/public/jobs upload (e2e)', () => {
       });
     }
     const res = await req.expect(400);
-    expect(String(res.body?.error?.message ?? '')).toMatch(/3 รูป/);
+    const body = res.body as ApiResponseBody;
+    expect(String(body?.error?.message ?? '')).toMatch(/3 รูป/);
   });
 });

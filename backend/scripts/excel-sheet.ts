@@ -11,7 +11,10 @@ function stringifyHeader(v: unknown): string {
     'richText' in v &&
     Array.isArray((v as CellRichTextValue).richText)
   ) {
-    return (v as CellRichTextValue).richText.map((r) => r.text).join('').trim();
+    return (v as CellRichTextValue).richText
+      .map((r) => r.text)
+      .join('')
+      .trim();
   }
   return String(v).trim();
 }
@@ -31,15 +34,17 @@ function plainCellValue(cell: ExcelJS.Cell): unknown {
     if ('result' in v && (v as CellFormulaValue).result !== undefined) {
       return (v as CellFormulaValue).result;
     }
-    if ('richText' in v && Array.isArray((v as CellRichTextValue).richText)) {
-      return (v as CellRichTextValue).richText.map((r) => r.text).join('');
+    if ('richText' in v && Array.isArray(v.richText)) {
+      return v.richText.map((r) => r.text).join('');
     }
   }
   return v;
 }
 
 /** พฤติกรรมใกล้เคียง xlsx.utils.sheet_to_json (แถวแรก = หัวคอลัมน์) */
-export function worksheetToRecords(ws: ExcelJS.Worksheet | undefined): Record<string, unknown>[] {
+export function worksheetToRecords(
+  ws: ExcelJS.Worksheet | undefined,
+): Record<string, unknown>[] {
   if (!ws || ws.rowCount < 2) return [];
   const headerRow = ws.getRow(1);
   const colCount = Math.max(headerRow.cellCount, 1);
@@ -66,7 +71,9 @@ export function worksheetToRecords(ws: ExcelJS.Worksheet | undefined): Record<st
   return rows;
 }
 
-export async function loadWorkbookXlsx(path: string): Promise<ExcelJS.Workbook> {
+export async function loadWorkbookXlsx(
+  path: string,
+): Promise<ExcelJS.Workbook> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile(path);
   return wb;

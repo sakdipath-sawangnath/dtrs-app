@@ -24,7 +24,10 @@ const DRY_RUN = process.env.DRY_RUN !== 'false';
 
 // โฟลเดอร์เก็บไฟล์เดิมจาก AppSheet (ให้วางไฟล์/โฟลเดอร์จาก CCTVMaintenance จริงไว้ที่นี่)
 // ตัวอย่าง: d:\cctv-app.forth-co-th\CCTVMaintenance-641488446\ระบบแจ้งซ่อม_Images\...
-const APPSHEET_ROOT = path.resolve(__dirname, '../../CCTVMaintenance-641488446');
+const APPSHEET_ROOT = path.resolve(
+  __dirname,
+  '../../CCTVMaintenance-641488446',
+);
 
 // ตั้งค่าจาก .env / default ให้เหมือน MinioService
 const MINIO_BUCKET_NAME = process.env.MINIO_BUCKET_NAME || 'cctv-report-images';
@@ -77,14 +80,18 @@ async function migrate() {
 
   if (!fs.existsSync(APPSHEET_ROOT)) {
     console.warn('⚠️  ไม่พบโฟลเดอร์ APPSHEET_ROOT:', APPSHEET_ROOT);
-    console.warn('    โปรดคัดลอกโฟลเดอร์/ไฟล์จาก CCTVMaintenance (AppSheet) มาไว้ที่นี่ก่อน');
+    console.warn(
+      '    โปรดคัดลอกโฟลเดอร์/ไฟล์จาก CCTVMaintenance (AppSheet) มาไว้ที่นี่ก่อน',
+    );
   }
 
   const minioClient = createMinioClient();
 
   if (!DRY_RUN) {
     // ตรวจว่ามี bucket แล้วหรือไม่
-    const exists = await minioClient.bucketExists(MINIO_BUCKET_NAME).catch(() => false);
+    const exists = await minioClient
+      .bucketExists(MINIO_BUCKET_NAME)
+      .catch(() => false);
     if (!exists) {
       console.log(`🪣 สร้าง bucket ใหม่: ${MINIO_BUCKET_NAME}`);
       await minioClient.makeBucket(MINIO_BUCKET_NAME, 'us-east-1');
@@ -98,7 +105,7 @@ async function migrate() {
     where: {
       OR: [
         { images: { not: { equals: null } } },
-        { fixImages: { not: { equals: null } } }
+        { fixImages: { not: { equals: null } } },
       ],
     },
     select: {
@@ -116,8 +123,12 @@ async function migrate() {
   let missingFiles = 0;
 
   for (const job of jobs) {
-    const issuePaths: string[] = Array.isArray(job.images) ? (job.images as any) : [];
-    const fixPaths: string[] = Array.isArray(job.fixImages) ? (job.fixImages as any) : [];
+    const issuePaths: string[] = Array.isArray(job.images)
+      ? (job.images as any)
+      : [];
+    const fixPaths: string[] = Array.isArray(job.fixImages)
+      ? (job.fixImages as any)
+      : [];
 
     if (!issuePaths.length && !fixPaths.length) continue;
 
@@ -204,9 +215,18 @@ async function migrate() {
   }
 
   console.log('\n📊 สรุปผลการประมวลผล (เฉพาะ jobs ที่มี images/fixImages):');
-  console.log('   รูปข้อขัดข้อง (issue images) ที่พบทั้งหมด    :', totalIssueImages);
-  console.log('   รูปการแก้ไข (fix images) ที่พบทั้งหมด        :', totalFixImages);
-  console.log('   จำนวนไฟล์ที่หาไม่เจอ (missing files)         :', missingFiles);
+  console.log(
+    '   รูปข้อขัดข้อง (issue images) ที่พบทั้งหมด    :',
+    totalIssueImages,
+  );
+  console.log(
+    '   รูปการแก้ไข (fix images) ที่พบทั้งหมด        :',
+    totalFixImages,
+  );
+  console.log(
+    '   จำนวนไฟล์ที่หาไม่เจอ (missing files)         :',
+    missingFiles,
+  );
   console.log('   DRY_RUN                                      :', DRY_RUN);
 }
 
@@ -224,4 +244,3 @@ migrate()
     await prisma.$disconnect();
     process.exit(1);
   });
-

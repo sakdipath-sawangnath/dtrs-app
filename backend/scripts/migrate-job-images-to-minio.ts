@@ -10,7 +10,6 @@
  *   npx ts-node -r tsconfig-paths/register ./scripts/migrate-job-images-to-minio.ts
  */
 
-/* eslint-disable no-console */
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -22,15 +21,23 @@ const JOB_ID = process.env.JOB_ID ? Number(process.env.JOB_ID) : NaN;
 const DRY_RUN = (process.env.DRY_RUN ?? 'true') !== 'false';
 
 // โฟลเดอร์เก็บไฟล์เดิมจาก AppSheet / ระบบ legacy
-const APPSHEET_ROOT = path.resolve(__dirname, '..', '..', 'CCTVMaintenance-641488446');
+const APPSHEET_ROOT = path.resolve(
+  __dirname,
+  '..',
+  '..',
+  'CCTVMaintenance-641488446',
+);
 
 function toStringArray(v: unknown): string[] {
   if (!v) return [];
-  if (Array.isArray(v)) return v.filter((x) => typeof x === 'string') as string[];
+  if (Array.isArray(v)) return v.filter((x) => typeof x === 'string');
   return [];
 }
 
-async function findFileByBasename(rootDir: string, basename: string): Promise<string | null> {
+async function findFileByBasename(
+  rootDir: string,
+  basename: string,
+): Promise<string | null> {
   // เดินหาแบบ BFS/DFS เพื่อ early-stop เมื่อเจอไฟล์ที่ชื่อซ้ำกัน
   const stack: string[] = [rootDir];
   while (stack.length > 0) {
@@ -100,7 +107,9 @@ async function main() {
       const basename = path.basename(src);
       const abs = await findFileByBasename(APPSHEET_ROOT, basename);
       if (!abs) {
-        console.warn(`[SKIP] (${kind}) not found file basename="${basename}" from "${src}"`);
+        console.warn(
+          `[SKIP] (${kind}) not found file basename="${basename}" from "${src}"`,
+        );
         continue;
       }
 
@@ -145,7 +154,9 @@ async function main() {
         fixImages: migratedFixImages as any,
       },
     });
-    console.log(`Updated Job ${JOB_ID}: images=${migratedImages.length}, fixImages=${migratedFixImages.length}`);
+    console.log(
+      `Updated Job ${JOB_ID}: images=${migratedImages.length}, fixImages=${migratedFixImages.length}`,
+    );
   } else {
     console.log(`DRY_RUN=true: not updating DB`);
   }
@@ -157,4 +168,3 @@ main().catch(async (err) => {
   console.error(err);
   process.exit(1);
 });
-

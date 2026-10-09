@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -100,11 +99,13 @@ async function main() {
       continue;
     }
 
-            // CSV เก็บ path แบบ relative ไปยังโฟลเดอร์ใน CCTVMaintenance
-            const absImagePath = path.join(appsheetRoot, row.imagePath!);
+    // CSV เก็บ path แบบ relative ไปยังโฟลเดอร์ใน CCTVMaintenance
+    const absImagePath = path.join(appsheetRoot, row.imagePath!);
     if (!fs.existsSync(absImagePath)) {
       skipped++;
-      console.warn(`[SKIP] image file not found: ${absImagePath} (user id=${user.id})`);
+      console.warn(
+        `[SKIP] image file not found: ${absImagePath} (user id=${user.id})`,
+      );
       continue;
     }
 
@@ -133,7 +134,10 @@ async function main() {
       console.log(`[OK] user id=${user.id} -> ${url}`);
     } catch (e: any) {
       skipped++;
-      console.error(`[ERROR] upload avatar for user id=${user.id}`, e?.message ?? String(e));
+      console.error(
+        `[ERROR] upload avatar for user id=${user.id}`,
+        e?.message ?? String(e),
+      );
     }
   }
 
@@ -145,4 +149,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-

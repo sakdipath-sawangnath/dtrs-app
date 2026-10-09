@@ -30,7 +30,10 @@ export function bangkokCalendarYear(d: Date): number {
 }
 
 /** ช่วง [gte, lt) UTC ที่ครอบปีปฏิทิน Bangkok = calendarYear เต็มปี */
-export function bangkokYearUtcBounds(calendarYear: number): { gte: Date; lt: Date } {
+export function bangkokYearUtcBounds(calendarYear: number): {
+  gte: Date;
+  lt: Date;
+} {
   const gte = new Date(`${calendarYear - 1}-12-31T17:00:00.000Z`);
   const lt = new Date(`${calendarYear}-12-31T17:00:00.000Z`);
   return { gte, lt };
